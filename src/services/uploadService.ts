@@ -123,7 +123,9 @@ async function putToR2(
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      const task = ReactNativeBlobUtil.fetch(
+      // timeout large (10 min) — un gros fichier sur réseau lent ne doit pas
+      // être coupé par le timeout par défaut (~60 s).
+      const task = ReactNativeBlobUtil.config({ timeout: 600_000 }).fetch(
         'PUT',
         uploadUrl,
         { 'Content-Type': contentType },
@@ -241,14 +243,21 @@ export async function deleteUploadedImage(_publicId: string): Promise<void> {
 
 // ── Vidéo ─────────────────────────────────────────────────────────────────────
 
+// Phase de l'upload — passée en 2e argument optionnel de onProgress pour que
+// l'UI affiche un libellé exact ("Envoi…" vs "Traitement…") au lieu d'une barre
+// qui semble finir puis reprendre.
+export type UploadPhase = 'compressing' | 'uploading' | 'processing';
+
 export async function uploadVideoFromUri(
   uri: string,
   folder: VideoFolder = 'reels',
   fileName?: string,
   mimeType?: string,
-  onProgress?: (pct: number) => void,
+  onProgress?: (pct: number, phase?: UploadPhase) => void,
 ): Promise<UploadedVideo> {
-  const compressed = await compressVideo(uri, { onProgress });
+  const compressed = await compressVideo(uri, {
+    onProgress: (p) => onProgress?.(p, p < 90 ? 'compressing' : 'uploading'),
+  });
 
   const contentType = mimeType ?? 'video/mp4';
   const filename    = fileName ?? `video_${Date.now()}.mp4`;
@@ -262,35 +271,70 @@ export async function uploadVideoFromUri(
   if (['reels', 'stories', 'messages', 'events', 'concerts', 'content', 'posts'].includes(folder)) {
     let jobId: string | undefined;
     let data: any = {};
+    const filePath = compressed.uri.startsWith('file://') ? compressed.uri.slice(7) : compressed.uri;
+
     try {
-      // 1) presigned URL
-      const presign = await getPresignedUrl(folder, filename, contentType);
-      const r2Key = presign.key ?? presign.public_url.split(`${folder}/`).slice(1).join(`${folder}/`);
+      // ── Tentative 1 : upload DIRECT client → R2 (rapide) ──────────────────
+      let directOk = false;
+      try {
+        const presign = await getPresignedUrl(folder, filename, contentType);
+        const r2Key = presign.key ?? presign.public_url.split(`${folder}/`).slice(1).join(`${folder}/`);
 
-      // 2) PUT direct vers R2 avec progression réelle (upload = 10→70 %)
-      await putToR2(presign.upload_url, compressed.uri, contentType, (pct) => {
-        onProgress?.(10 + Math.round(pct * 0.6));
-      });
-      onProgress?.(70);
+        await putToR2(presign.upload_url, compressed.uri, contentType, (pct) => {
+          onProgress?.(10 + Math.round(pct * 0.6), 'uploading');
+        });
+        onProgress?.(70, 'processing');
 
-      // 3) demander la génération HLS au backend (léger, réponse immédiate)
-      const procRes = await ReactNativeBlobUtil.fetch(
-        'POST',
-        `${API_BASE_URL}/api/v1/upload/video/process`,
-        {
-          Accept:         'application/json',
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        JSON.stringify({ key: presign.key ?? r2Key, folder }),
-      );
-      if (procRes.respInfo.status >= 300) {
-        let detail = `Process error ${procRes.respInfo.status}`;
-        try { detail = (procRes.json() as any)?.detail ?? detail; } catch {}
-        throw new Error(detail);
+        const procRes = await ReactNativeBlobUtil.config({ timeout: 30_000 }).fetch(
+          'POST',
+          `${API_BASE_URL}/api/v1/upload/video/process`,
+          {
+            Accept:         'application/json',
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          JSON.stringify({ key: presign.key ?? r2Key, folder }),
+        );
+        if (procRes.respInfo.status === 404) {
+          // Backend pas encore déployé avec /video/process → fallback multipart.
+          throw new Error('__process_endpoint_missing__');
+        }
+        if (procRes.respInfo.status >= 300) {
+          let detail = `Process error ${procRes.respInfo.status}`;
+          try { detail = (procRes.json() as any)?.detail ?? detail; } catch {}
+          throw new Error(detail);
+        }
+        data = procRes.json() as any;
+        jobId = data.job_id;
+        directOk = true;
+      } catch (directErr: any) {
+        if (directErr?.message !== '__process_endpoint_missing__') {
+          console.warn('[upload] direct R2 échoué, fallback multipart:', directErr?.message ?? directErr);
+        }
       }
-      data = procRes.json() as any;
-      jobId = data.job_id;
+
+      // ── Tentative 2 (fallback) : ancien upload multipart via le backend ───
+      if (!directOk) {
+        onProgress?.(15, 'uploading');
+        const res = await ReactNativeBlobUtil.config({ timeout: 600_000 }).fetch(
+          'POST',
+          `${API_BASE_URL}/api/v1/upload/video?folder=${folder}`,
+          {
+            Accept:         'application/json',
+            'Content-Type': 'multipart/form-data',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          [{ name: 'file', filename, type: contentType, data: ReactNativeBlobUtil.wrap(filePath) as any }],
+        );
+        if (res.respInfo.status >= 300) {
+          let detail = `Upload error ${res.respInfo.status}`;
+          try { detail = (res.json() as any)?.detail ?? detail; } catch {}
+          throw new Error(detail);
+        }
+        onProgress?.(70, 'processing');
+        data = res.json() as any;
+        jobId = data.job_id;
+      }
     } finally {
       if (compressed.isTempFile) {
         await cleanupTempVideos([compressed.uri]).catch(() => {});
@@ -310,7 +354,7 @@ export async function uploadVideoFromUri(
         const wait = elapsed < 20_000 ? 1_500 : elapsed < 60_000 ? 3_000 : 5_000;
         await new Promise<void>(r => setTimeout(() => r(), wait));
         elapsed += wait;
-        onProgress?.(Math.min(95, 70 + Math.round((elapsed / MAX_TOTAL_MS) * 25)));
+        onProgress?.(Math.min(95, 70 + Math.round((elapsed / MAX_TOTAL_MS) * 25)), 'processing');
         try {
           const statusRes = await apiClient.get<any>(
             `/api/v1/upload/video/status/${jobId}`,
@@ -383,7 +427,7 @@ export async function uploadVideoFromUri(
   const [{ public_url }, thumbnailPublicUrl] = await Promise.all([
     (async () => {
       const p = await getPresignedUrl(folder, filename, contentType);
-      await putToR2(p.upload_url, compressed.uri, contentType, (pct) => onProgress?.(10 + Math.round(pct * 0.8)));
+      await putToR2(p.upload_url, compressed.uri, contentType, (pct) => onProgress?.(10 + Math.round(pct * 0.8), 'uploading'));
       return p;
     })(),
     (async (): Promise<string | undefined> => {

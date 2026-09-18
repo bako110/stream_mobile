@@ -38,6 +38,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     catch { return true; }
   });
 
+  const currentUserRef = useRef(currentUser);
+  currentUserRef.current = currentUser;
+
   const refreshUser = useCallback(async (): Promise<User | null> => {
     try {
       invalidateUserCache();
@@ -47,9 +50,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return me;
     } catch {
       // Offline — garder le user déjà en state, ne pas retourner null
-      return currentUser;
+      return currentUserRef.current;
     }
-  }, [currentUser]);
+  }, []);
 
   useEffect(() => {
     authService.getMe().then(me => {

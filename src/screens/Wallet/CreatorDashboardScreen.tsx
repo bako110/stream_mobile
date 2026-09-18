@@ -31,6 +31,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { toastService } from '../../services';
+import { showWithdrawUnavailable } from '../../utils/withdrawAlert';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface CreatorProfile {
@@ -385,7 +386,7 @@ const CreatorDashboardScreen: React.FC = () => {
             </Text>
           </View>
           <TouchableOpacity
-            onPress={() => navigation.navigate('Withdraw')}
+            onPress={showWithdrawUnavailable}
             disabled={(stats?.available_balance ?? 0) < 500}
             activeOpacity={0.85}
           >

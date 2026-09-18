@@ -1,12 +1,13 @@
 import React, { useState, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Platform,
+  StyleSheet, Platform, StatusBar,
 } from 'react-native';
 import Animated, {
   useSharedValue, useAnimatedStyle, withTiming, interpolate,
 } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { BackButton } from '../../components/common';
 
@@ -235,15 +236,21 @@ const AccordionItem: React.FC<{
 export const CGUScreen: React.FC<Props> = ({ onBack }) => {
   const { theme } = useTheme();
   const { colors } = theme;
+  const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
 
   const sectionRefs = useRef<Record<string, number>>({});
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle={theme.isDark ? 'light-content' : 'dark-content'}
+      />
 
       {/* Header */}
-      <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+      <View style={[s.header, { paddingTop: insets.top + (Platform.OS === 'android' ? 8 : 6), backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
         <BackButton onPress={onBack} />
         <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Conditions d'utilisation</Text>
         <View style={{ width: 40 }} />
@@ -327,7 +334,6 @@ const s = StyleSheet.create({
   header:   {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingBottom: 14,
-    paddingTop: Platform.OS === 'android' ? 48 : 56,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerTitle:  { fontSize: 17, fontWeight: '800', flex: 1, textAlign: 'center' },

@@ -27,7 +27,6 @@ import { showConfirm } from '../../services/confirmService';
 import { CommentsBottomSheet } from './CommentsBottomSheet';
 import { RichText } from './RichText';
 import { ShareBottomSheet } from './ShareBottomSheet';
-import { InlineVideoPlayer } from './InlineVideoPlayer';
 import { ReportModal } from './ReportModal';
 import { LikersBottomSheet } from './LikersBottomSheet';
 import { FriendsWhoLiked } from './FriendsWhoLiked';
@@ -48,6 +47,18 @@ const fmtN = (n: number): string => {
   return String(n);
 };
 const GRID_H = Math.round(CARD_INNER_W * 0.72);
+
+// Hauteur réelle occupée par la grille d'images, SELON LE NOMBRE d'images —
+// chaque cas (1/2/3/4+) a son propre ratio dans ImageGrid ci-dessous. Le
+// wrapper qui clippe le média (pc.mediaClip) doit utiliser CETTE fonction,
+// jamais une constante fixe (GRID_H) : sinon, pour 1 ou 2 images — dont le
+// ratio réel est plus bas que GRID_H — un bandeau noir de fond (mediaClip)
+// apparaissait sous la grille, qui elle s'arrêtait plus haut.
+function gridHeightFor(n: number): number {
+  if (n <= 1) return Math.round(CARD_INNER_W * 0.78);
+  if (n === 2) return Math.round(((CARD_INNER_W - GAP) / 2) * 1.1);
+  return GRID_H; // 3 et 4+ partagent déjà le même ratio
+}
 
 // ── ImgTile ───────────────────────────────────────────────────────────────────
 const ImgTile: React.FC<{
@@ -88,7 +99,7 @@ const ImageGrid: React.FC<{ urls: string[]; onPressImage: (i: number) => void }>
   if (n === 0) return null;
 
   if (n === 1) {
-    const h = Math.round(CARD_INNER_W * 0.78);
+    const h = gridHeightFor(1);
     return (
       <ImgTile uri={urls[0]} style={{ width: CARD_INNER_W, height: h }}
         radius={{ tl: RADIUS, tr: RADIUS, bl: RADIUS, br: RADIUS }}
@@ -96,8 +107,7 @@ const ImageGrid: React.FC<{ urls: string[]; onPressImage: (i: number) => void }>
     );
   }
   if (n === 2) {
-    const W = (CARD_INNER_W - GAP) / 2;
-    const H = Math.round(W * 1.1);
+    const H = gridHeightFor(2);
     return (
       <View style={{ flexDirection: 'row', height: H, gap: GAP }}>
         <ImgTile uri={urls[0]} style={{ flex: 1, height: H }} radius={{ tl: RADIUS, bl: RADIUS }} onPress={() => onPressImage(0)} />
@@ -163,33 +173,96 @@ function timeAgo(iso: string): string {
 }
 
 // ── VideoFsModal ──────────────────────────────────────────────────────────────
+// Overlay plein écran : la vidéo n'est chargée/montée qu'à l'ouverture (visible),
+// jamais dans la carte du feed. À la fin de la lecture (onEnd), on referme tout
+// seul et on revient au feed — pas besoin que l'utilisateur ferme manuellement.
+// Barre d'actions (like/commenter/partager/enregistrer) en bas, par-dessus la
+// vidéo — mêmes handlers/état que PostCard, pas de logique dupliquée : les
+// bottom sheets (commentaires, partage) restent montées par PostCardInner.
 const VideoFsModal: React.FC<{
   visible: boolean; uri: string; thumbnailUri?: string | null;
   onClose: () => void; onViewPost: () => void;
-}> = ({ visible, uri, onClose, onViewPost }) => {
+  liked: boolean; likeCount: number; onLike: () => void; heartStyle: any;
+  commentsDisabled: boolean; commentCount: number; onComment: () => void;
+  shareCount: number; onShare: () => void;
+  saved: boolean; onSave: () => void;
+}> = ({
+  visible, uri, onClose, onViewPost,
+  liked, likeCount, onLike, heartStyle,
+  commentsDisabled, commentCount, onComment,
+  shareCount, onShare,
+  saved, onSave,
+}) => {
   const [nav, setNav] = useState(false);
   const player = useVideoPlayer({ uri }, p => { p.loop = false; p.muted = false; });
+
+  const close = useCallback(() => {
+    try { player.pause(); player.release(); } catch {}
+    onClose();
+  }, [player, onClose]);
+
   React.useEffect(() => {
     if (visible) { setNav(false); player.play(); } else { player.pause(); }
   }, [visible]);
+
+  React.useEffect(() => {
+    if (!visible) return;
+    let sub: { remove: () => void } | undefined;
+    try { sub = player.addEventListener('onEnd', () => close()); } catch {}
+    return () => { try { sub?.remove(); } catch {} };
+  }, [visible, player, close]);
+
+  if (!visible) return null;
+
   return (
     <Modal visible={visible} transparent={false} animationType="fade" statusBarTranslucent
-      onRequestClose={() => { try { player.pause(); player.release(); } catch {} onClose(); }}>
+      onRequestClose={close}>
       <View style={{ flex: 1, backgroundColor: '#000' }}>
         <StatusBar hidden />
-        <View style={{ flex: 1, justifyContent: 'center' }}>
-          <VideoView player={player} style={{ width: '100%', aspectRatio: 16 / 9 }} resizeMode="contain" controls />
+        <View style={{ flex: 1 }}>
+          <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="contain" controls />
         </View>
-        <TouchableOpacity style={pc.vfClose}
-          onPress={() => { try { player.pause(); player.release(); } catch {} onClose(); }}>
+        <TouchableOpacity style={pc.vfClose} onPress={close}>
           <Icon name="x" size={20} color="#fff" />
         </TouchableOpacity>
-        <TouchableOpacity style={pc.vfDetails} onPress={() => { setNav(true); try { player.pause(); player.release(); } catch {} onClose(); onViewPost(); }} disabled={nav}>
+        <TouchableOpacity style={pc.vfDetails} onPress={() => { setNav(true); close(); onViewPost(); }} disabled={nav}>
           {nav ? <ActivityIndicator size="small" color="#fff" /> : (
             <><Icon name="arrow-right" size={14} color="#fff" />
               <Text style={pc.vfDetailsTxt}>Voir les détails</Text></>
           )}
         </TouchableOpacity>
+
+        {/* ── Barre d'actions — même set que PostCard, superposée en bas ──── */}
+        <View style={pc.vfActionBar}>
+          <TouchableOpacity style={pc.vfActionBtn} onPress={onLike} activeOpacity={0.7}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+            <Animated.View style={heartStyle}>
+              <MCIcon name={liked ? 'heart' : 'heart-outline'} size={FeedActionIcon.size}
+                color={liked ? '#EF4444' : '#fff'} />
+            </Animated.View>
+            {likeCount > 0 && <Text style={pc.vfActionCount}>{fmtN(likeCount)}</Text>}
+          </TouchableOpacity>
+
+          {!commentsDisabled && (
+            <TouchableOpacity style={pc.vfActionBtn} onPress={onComment} activeOpacity={0.7}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+              <MCIcon name="comment-outline" size={FeedActionIcon.size} color="#fff" />
+              {commentCount > 0 && <Text style={pc.vfActionCount}>{fmtN(commentCount)}</Text>}
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity style={pc.vfActionBtn} onPress={onShare} activeOpacity={0.7}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+            <MCIcon name="share-outline" size={FeedActionIcon.size} color="#fff" />
+            {shareCount > 0 && <Text style={pc.vfActionCount}>{fmtN(shareCount)}</Text>}
+          </TouchableOpacity>
+
+          <TouchableOpacity style={pc.vfActionBtn} onPress={onSave} activeOpacity={0.7}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+            <MCIcon name={saved ? 'bookmark' : 'bookmark-outline'} size={FeedActionIcon.size}
+              color={saved ? '#fff' : '#fff'} />
+          </TouchableOpacity>
+        </View>
       </View>
     </Modal>
   );
@@ -306,17 +379,27 @@ const PostCardInner: React.FC<PostCardProps> = ({
     }
   }, [saved, post]);
 
+  const isVideoPost = !!(post.hls_url ?? post.video_url) && images.length === 0;
   const hasMedia = images.length > 0 || !!(post.hls_url ?? post.video_url);
+
+  // Le serveur a-t-il stocké les vraies dimensions de la vidéo ?
+  const hasServerVideoDims =
+    !!(post.video_width && post.video_height && post.video_width > 0 && post.video_height > 0);
 
   // Calcul du ratio depuis les dimensions stockees, clamp portrait/paysage — plancher
   // 3/4 (au lieu de 4/5) pour des hero plus hauts/impactants sur les images portrait.
   const videoAspectRatio = (() => {
-    if (post.video_width && post.video_height && post.video_width > 0 && post.video_height > 0) {
-      const raw = post.video_width / post.video_height;
+    if (hasServerVideoDims) {
+      const raw = post.video_width! / post.video_height!;
       return Math.min(Math.max(raw, 3 / 4), 16 / 9);
     }
-    // Pas de dimensions stockées (image sans métadonnées) — 4/5 par défaut,
-    // plus haut/impactant que 16/9 pour un rendu feed plus dense et professionnel.
+    // Pas de dimensions stockées. Pour une VIDÉO sans métadonnées (upload direct
+    // mobile fréquent), on prend 16/9 : un cadre vidéo standard, jamais un ratio
+    // image portrait (4/5) qui écraserait/rognerait une vidéo paysage — c'était
+    // la cause du « on ne voit pas tout, l'espace est trop petit ». InlineVideo
+    // Player corrigera cette estimation à la volée via onLoad.
+    if (isVideoPost) return 16 / 9;
+    // Image sans métadonnées — 4/5 par défaut, plus dense qu'un 16/9.
     return 4 / 5;
   })();
   const HERO_H = Math.round(CARD_INNER_W / videoAspectRatio);
@@ -419,20 +502,26 @@ const PostCardInner: React.FC<PostCardProps> = ({
       {hasMedia && (
         <View style={pc.mediaWrap}>
           {(post.hls_url ?? post.video_url) && images.length === 0 ? (
-            <View style={[pc.mediaClip, { height: HERO_H }]}>
-              <InlineVideoPlayer
-                uri={(post.hls_url ?? post.video_url)!}
-                thumbnailUri={post.thumbnail_url}
-                aspectRatio={videoAspectRatio}
-                borderRadius={RADIUS}
-                muted
-                autoPlay={false}
-                isActive={false}
-              />
-            </View>
+            // Aucune vidéo n'est chargée/montée ici — juste la miniature statique.
+            // La vidéo n'est chargée qu'au clic, dans l'overlay plein écran
+            // (VideoFsModal) ; à la fin de la lecture, l'overlay se referme seul.
+            <TouchableOpacity activeOpacity={0.92} onPress={() => setVideoFs(true)}>
+              <View style={[pc.mediaClip, { height: HERO_H }]}>
+                {post.thumbnail_url ? (
+                  <CachedImage uri={post.thumbnail_url} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                ) : (
+                  <LinearGradient colors={['#1a1a2e', '#252540']} style={StyleSheet.absoluteFill} />
+                )}
+                <View style={pc.videoPlayOverlay}>
+                  <View style={pc.videoPlayCircle}>
+                    <Icon name="play" size={30} color="#fff" style={{ marginLeft: 3 }} />
+                  </View>
+                </View>
+              </View>
+            </TouchableOpacity>
           ) : (
             <TouchableOpacity onPress={onPress} activeOpacity={0.95}>
-              <View style={[pc.mediaClip, { height: images.length === 1 ? HERO_H : GRID_H }]}>
+              <View style={[pc.mediaClip, { height: images.length === 1 ? HERO_H : gridHeightFor(images.length) }]}>
                 {images.length === 1 ? (
                   <CachedImage uri={images[0]} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                 ) : (
@@ -654,7 +743,11 @@ const PostCardInner: React.FC<PostCardProps> = ({
       )}
       {(post.hls_url ?? post.video_url) && videoFs && (
         <VideoFsModal visible={videoFs} uri={(post.hls_url ?? post.video_url)!} thumbnailUri={post.thumbnail_url}
-          onClose={() => setVideoFs(false)} onViewPost={onPress} />
+          onClose={() => setVideoFs(false)} onViewPost={onPress}
+          liked={liked} likeCount={likeCount} onLike={handleLike} heartStyle={heartStyle}
+          commentsDisabled={commentsDisabledSt} commentCount={commentCount} onComment={() => setCommentsOpen(true)}
+          shareCount={shareCount} onShare={() => setShareOpen(true)}
+          saved={saved} onSave={handleSave} />
       )}
 
 
@@ -723,6 +816,8 @@ const pc = StyleSheet.create({
   // Media — encadré dans la carte, coins arrondis propres
   mediaWrap:    { paddingHorizontal: PAD, paddingBottom: 10 },
   mediaClip:    { borderRadius: RADIUS, overflow: 'hidden', backgroundColor: '#0d0d1a' },
+  videoPlayOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.28)' },
+  videoPlayCircle:  { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
   // Compteurs
   countsRow:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: PAD, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth },
   countsGrow:       { flex: 1, minWidth: 0 },
@@ -754,6 +849,9 @@ const pc = StyleSheet.create({
   editBtn:      { flex: 1, padding: 14, borderRadius: 12, alignItems: 'center' },
   // Video modal
   vfClose:      { position: 'absolute', top: 48, right: 16, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
-  vfDetails:    { position: 'absolute', bottom: 40, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 20, paddingVertical: 11, borderRadius: 30 },
+  vfDetails:    { position: 'absolute', bottom: 108, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 20, paddingVertical: 11, borderRadius: 30 },
   vfDetailsTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  vfActionBar:  { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingBottom: 28, paddingTop: 14, backgroundColor: 'rgba(0,0,0,0.35)' },
+  vfActionBtn:  { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, height: 44 },
+  vfActionCount:{ color: '#fff', fontSize: 11, fontWeight: '600' },
 });

@@ -11,6 +11,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
+import { useWalletPinGate } from '../../hooks/useWalletPinGate';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { toastService, showConfirm } from '../../services';
 
@@ -31,6 +32,7 @@ interface Props {
 
 export const LiveGiftBar: React.FC<Props> = ({ liveId, receiverId, onGiftSent }) => {
   const nav = useNavigation<Nav>();
+  const { runWithPin, pinModal } = useWalletPinGate();
   const [gifts,   setGifts]   = useState<GiftType[]>([]);
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -61,19 +63,22 @@ export const LiveGiftBar: React.FC<Props> = ({ liveId, receiverId, onGiftSent })
     }
     setSendingId(gift.id);
     try {
-      await apiClient.post(Endpoints.wallet.sendGift, {
+      await runWithPin(extra => apiClient.post(Endpoints.wallet.sendGift, {
         gift_type_id: gift.id,
         receiver_id:  receiverId,
         live_id:      liveId,
-      });
+        ...extra,
+      }));
       setBalance(b => b - gift.gogold_cost);
       onGiftSent(gift.emoji);
     } catch (e: any) {
-      toastService.error('Erreur', e?.response?.data?.detail ?? 'Impossible d\'envoyer le cadeau');
+      if (e?.message !== 'pin_cancelled') {
+        toastService.error('Erreur', e?.message ?? e?.response?.data?.detail ?? 'Impossible d\'envoyer le cadeau');
+      }
     } finally {
       setSendingId(null);
     }
-  }, [sendingId, balance, receiverId, liveId, onGiftSent, nav]);
+  }, [sendingId, balance, receiverId, liveId, onGiftSent, nav, runWithPin]);
 
   if (loading) {
     return (
@@ -83,9 +88,10 @@ export const LiveGiftBar: React.FC<Props> = ({ liveId, receiverId, onGiftSent })
     );
   }
 
-  if (gifts.length === 0) return null;
+  if (gifts.length === 0) return pinModal;
 
   return (
+    <>
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
@@ -111,6 +117,8 @@ export const LiveGiftBar: React.FC<Props> = ({ liveId, receiverId, onGiftSent })
         );
       })}
     </ScrollView>
+    {pinModal}
+    </>
   );
 };
 

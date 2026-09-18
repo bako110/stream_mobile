@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
-  StyleSheet, ActivityIndicator, Platform,
+  StyleSheet, ActivityIndicator, Platform, StatusBar,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { BackButton } from '../../components/common';
 import { AvatarWithBadge } from '../../components/common/AvatarWithBadge';
@@ -29,6 +30,7 @@ export const StoryViewersScreen: React.FC = () => {
 
   const { theme } = useTheme();
   const { colors } = theme;
+  const insets = useSafeAreaInsets();
 
   const [viewers, setViewers] = useState<StoryViewerUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,8 +44,13 @@ export const StoryViewersScreen: React.FC = () => {
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle={theme.isDark ? 'light-content' : 'dark-content'}
+      />
       {/* Header */}
-      <View style={[s.header, { borderBottomColor: colors.divider, backgroundColor: colors.background }]}>
+      <View style={[s.header, { paddingTop: insets.top + (Platform.OS === 'android' ? 8 : 6), borderBottomColor: colors.divider, backgroundColor: colors.background }]}>
         <BackButton onPress={() => nav.goBack()} />
         <View style={s.headerCenter}>
           <Icon name="eye" size={18} color={colors.primary} />
@@ -106,7 +113,6 @@ const s = StyleSheet.create({
   root: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'android' ? 48 : 56,
     paddingBottom: 14, paddingHorizontal: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },

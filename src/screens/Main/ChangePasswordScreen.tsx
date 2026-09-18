@@ -2,10 +2,11 @@ import React, { useState, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ActivityIndicator,
-  KeyboardAvoidingView, Platform, Animated,
+  KeyboardAvoidingView, Platform, Animated, StatusBar,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { authService } from '../../services/authService';
 import { toastService } from '../../services';
@@ -16,6 +17,7 @@ interface Props { navigation: any; }
 export const ChangePasswordScreen: React.FC<Props> = ({ navigation }) => {
   const { theme } = useTheme();
   const { colors } = theme;
+  const insets = useSafeAreaInsets();
 
   // Étape 1 : vérification mot de passe actuel
   // Étape 2 : saisie nouveau mot de passe
@@ -76,8 +78,13 @@ export const ChangePasswordScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle={theme.isDark ? 'light-content' : 'dark-content'}
+      />
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+      <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === 'android' ? 8 : 6), backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
         <BackButton onPress={() => {
           if (step === 2) { setStep(1); } else { navigation.goBack(); }
         }} />
@@ -268,7 +275,7 @@ const styles = StyleSheet.create({
   root:   { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'android' ? 48 : 56, paddingBottom: 14,
+    paddingBottom: 14,
     paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth,
   },
   title:   { fontSize: 17, fontWeight: '800' },

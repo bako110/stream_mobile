@@ -254,8 +254,8 @@ export function createWsEventHandler(callbacks: WsEventCallbacks) {
         break;
 
       default:
-        // Tous les autres types (message, call_offer, etc.) sont gérés
-        // directement dans WebSocketContext — on ne les touche pas ici.
+        // Tous les autres types (message, etc.) sont gérés directement
+        // dans WebSocketContext — on ne les touche pas ici.
         break;
     }
   };

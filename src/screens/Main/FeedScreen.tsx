@@ -34,6 +34,7 @@ import { storage } from '../../utils/storage';
 import { showConfirm } from '../../services';
 import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet, FriendsWhoLiked, CachedImage, LiveThumbnailBackground, PriceWithLocal, GofolyxLoader, PeopleSuggestions } from '../../components/common';
 import { cacheImage } from '../../services/imageCacheService';
+import { AdvertiserRow, AdCTA, AdFullscreenPlayer, adIsVideo, type AdData } from '../../components/ads';
 import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
 import { ShareBottomSheet } from '../../components/common/ShareBottomSheet';
 import type { UserPublic } from '../../types/user';
@@ -59,7 +60,7 @@ import type { Post } from '../../types/post';
 import type { AppColors } from '../../theme/colors';
 import { SectionHeader } from '../../components/common/SectionHeader';
 import { FeedCarousel, FeedCardLayout, FeedRadius, FeedActionIcon, getFeedCardStyle } from '../../theme/feed';
-import { feedStyles as s, fS } from '../../styles/FeedScreen.styles';
+import { feedStyles as s } from '../../styles/FeedScreen.styles';
 import { FILTERS, FILTER_VIDEO_OPACITY, FILTER_VIDEO_OPACITY2 } from '../Create/ReelEditorScreen';
 import type { FilterKey } from '../Create/ReelEditorScreen';
 
@@ -109,266 +110,141 @@ const badgeS = StyleSheet.create({
 });
 
 
-// ── AdCard — publicité native dans le feed ────────────────────────────────────
+// ── AdCard — publicité native dans le feed (direction éditoriale) ─────────────
+// Type AdData, hooks et sous-composants viennent de src/components/ads/.
+// `settled` = la carte est immobile à l'écran depuis ≥ ~450 ms → le CTA passe
+// de « lien texte » à « bouton discret » avec une accroche unique.
 
-interface AdData {
-  id: string;
-  title: string;
-  description?: string;
-  cta_text?: string;
-  cta_url?: string;
-  creative_url?: string;
-  thumbnail_url?: string;
-  format: string;
-}
+const AdCard: React.FC<{
+  ad: AdData;
+  colors: AppColors;
+  settled?: boolean;
+  searchOverlay?: boolean;   // rendu dans l'overlay recherche : CTA = lien texte, entrée FadeInDown
+  onImpression: (id: string) => void;
+  onPress: (id: string, url: string) => void;
+  onOpenFullscreen: (ad: AdData) => void;
+}> = React.memo(({ ad, colors, settled = false, searchOverlay = false, onImpression, onPress, onOpenFullscreen }) => {
+  const firedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (ad?.id && firedRef.current !== ad.id) {
+      firedRef.current = ad.id;
+      onImpression(ad.id);
+    }
+  }, [ad?.id, onImpression]);
 
-const AdVideoCreative: React.FC<{ uri: string; thumbnailUri?: string; isVisible: boolean }> = ({ uri, thumbnailUri, isVisible }) => {
+  const creativeUri = ad.creative_url || ad.thumbnail_url;
+  const isVideo = adIsVideo(ad);
+  const [imgFailed, setImgFailed] = useState(false);
+  const hasCreative = !!creativeUri && !(imgFailed && !isVideo);
+
+  const handleCardPress = () => {
+    if (isVideo) { onOpenFullscreen(ad); return; }
+    if (ad.cta_url) onPress(ad.id, ad.cta_url);
+  };
+  const handleCta = () => {
+    if (isVideo) { onOpenFullscreen(ad); return; }
+    onPress(ad.id, ad.cta_url ?? '');
+  };
+
+  // Carte douce SANS ombre (direction éditoriale : la pub se fond). La pub arrive
+  // déjà résolue depuis le backend (voir InjectionPlanner.maybe_inject_ads côté
+  // serveur) — plus de placeholder à hauteur estimée qui change de taille au
+  // chargement, donc plus besoin de minHeight réservée ici.
+  const cardStyle = {
+    ...getFeedCardStyle(colors),
+    shadowOpacity: 0,
+    elevation: 0,
+  };
+  // Dans l'overlay recherche : entrée FadeInDown + fond sombre (cohérent avec l'overlay).
+  const Wrapper: any = searchOverlay ? Animated.View : React.Fragment;
+  const wrapperProps = searchOverlay ? { entering: FadeInDown.duration(220) } : {};
+  const mediaAlwaysOn = searchOverlay || settled;
+
+  return (
+    <Wrapper {...wrapperProps}>
+    <GHTouchableOpacity style={cardStyle} activeOpacity={0.94} onPress={handleCardPress}>
+      <AdvertiserRow ad={ad} variant="light" />
+
+      {(ad.title || ad.description) ? (
+        <View style={adSt.copy}>
+          {ad.title ? <Text style={[adSt.hl, { color: colors.textPrimary }]} numberOfLines={2}>{ad.title}</Text> : null}
+          {ad.description ? <Text style={[adSt.sub, { color: colors.textSecondary }]} numberOfLines={3}>{ad.description}</Text> : null}
+        </View>
+      ) : null}
+
+      <View style={adSt.mediaWrap}>
+        {hasCreative ? (
+          isVideo ? (
+            <View style={adSt.mediaClip}>
+              <FeedAdVideo uri={creativeUri!} thumbnailUri={ad.thumbnail_url} isVisible={mediaAlwaysOn} />
+            </View>
+          ) : (
+            <CachedImage uri={creativeUri!} style={[adSt.image, adSt.mediaClip]} resizeMode="cover" onError={() => setImgFailed(true)} />
+          )
+        ) : (
+          <View style={[adSt.imagePlaceholder, adSt.mediaClip, { backgroundColor: colors.primary + '12' }]}>
+            <Icon name="image" size={30} color={colors.primary + '55'} />
+          </View>
+        )}
+      </View>
+
+      {ad.cta_url ? (
+        <AdCTA
+          ad={ad}
+          context={searchOverlay ? 'search-overlay' : 'feed'}
+          activated={searchOverlay ? true : settled}
+          onPress={handleCta}
+        />
+      ) : null}
+    </GHTouchableOpacity>
+    </Wrapper>
+  );
+});
+
+// Créatif vidéo du feed — ne charge le flux qu'une fois la carte réellement
+// visible/immobile (settled). Bouton mute superposé.
+const FeedAdVideo: React.FC<{ uri: string; thumbnailUri?: string; isVisible: boolean }> = ({ uri, thumbnailUri, isVisible }) => {
   const [muted, setMuted] = useState(true);
   const everVisibleRef = useRef(false);
   if (isVisible) everVisibleRef.current = true;
 
-  // Ne charge le flux vidéo qu'une fois la pub devenue visible au moins une fois —
-  // évite de streamer une vidéo qui n'a jamais été vue.
   const videoSource = useMemo(
     () => (everVisibleRef.current ? { uri } : 'about:blank'),
     [uri, everVisibleRef.current],
   );
+  const player = useVideoPlayer(videoSource, p => { p.loop = true; p.muted = true; });
 
-  const player = useVideoPlayer(videoSource, p => {
-    p.loop = true;
-    p.muted = true;
-  });
-
-  // Joue/pause selon la visibilité réelle à l'écran — coupe le stream hors champ
   useEffect(() => {
     if (isVisible) player.play();
     else player.pause();
   }, [isVisible, player]);
 
   const toggleMute = useCallback(() => {
-    setMuted(m => {
-      player.muted = !m;
-      return !m;
-    });
+    setMuted(m => { player.muted = !m; return !m; });
   }, [player]);
 
   if (!everVisibleRef.current) {
-    // Avant la première apparition à l'écran : thumbnail statique seulement
-    return thumbnailUri ? (
-      <CachedImage uri={thumbnailUri} style={adSt.image} resizeMode="cover" />
-    ) : null;
+    return thumbnailUri ? <CachedImage uri={thumbnailUri} style={adSt.image} resizeMode="cover" /> : null;
   }
-
   return (
     <View style={{ position: 'relative' }}>
-      <VideoView
-        player={player}
-        style={adSt.image}
-        resizeMode="cover"
-        controls={false}
-      />
-      <TouchableOpacity
-        onPress={toggleMute}
-        style={adSt.muteBtn}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      >
+      <VideoView player={player} style={adSt.image} resizeMode="cover" controls={false} />
+      <TouchableOpacity onPress={toggleMute} style={adSt.muteBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
         <Icon name={muted ? 'volume-x' : 'volume-2'} size={14} color="#fff" />
       </TouchableOpacity>
     </View>
   );
 };
 
-const AdCard: React.FC<{ ad: AdData; colors: AppColors; isVisible: boolean; onImpression: (id: string) => void; onPress: (id: string, url: string) => void; onOpenFullscreen: (ad: AdData) => void }> = React.memo(
-  ({ ad, colors, isVisible, onImpression, onPress, onOpenFullscreen }) => {
-    const firedRef = useRef<string | null>(null);
-    useEffect(() => {
-      if (ad?.id && firedRef.current !== ad.id) {
-        firedRef.current = ad.id;
-        onImpression(ad.id);
-      }
-    }, [ad?.id, onImpression]);
-
-    const creativeUri = ad.creative_url || ad.thumbnail_url;
-    const isVideo = !!(creativeUri && (creativeUri.includes('.m3u8') || creativeUri.includes('.mp4')));
-    // Domaine lisible de l'annonceur — sert de "nom" en en-tête (façon Facebook :
-    // l'URL de destination identifie l'annonceur quand aucun nom n'est fourni).
-    const adDomain = (() => {
-      if (!ad.cta_url) return '';
-      try { return new URL(ad.cta_url).hostname.replace(/^www\./, ''); }
-      catch { return ad.cta_url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]; }
-    })();
-    // CachedImage ne montre rien de visible en cas d'échec de chargement (URL cassée,
-    // réseau...) — sans ce state, une pub dont l'image échoue apparaît comme une carte
-    // sans visuel, indiscernable d'une pub qui n'en a simplement pas.
-    const [imgFailed, setImgFailed] = useState(false);
-    const hasCreative = !!creativeUri && !(imgFailed && !isVideo);
-
-    // Une pub vidéo s'ouvre d'abord en plein écran avec son (comme un reel) —
-    // le CTA reste accessible depuis cet écran, jamais ouvert automatiquement
-    // au premier tap. Une pub image garde le comportement direct (CTA immédiat).
-    const handleCardPress = () => {
-      if (isVideo) { onOpenFullscreen(ad); return; }
-      if (ad.cta_url) onPress(ad.id, ad.cta_url);
-    };
-
-    // Toute la carte est cliquable (pas seulement le petit bouton CTA) — via
-    // TouchableOpacity de react-native-gesture-handler plutôt que celui de
-    // react-native core : dans une ScrollView/FlatList profondément imbriquée
-    // sous GestureHandlerRootView (App.tsx), le TouchableOpacity RN core entre
-    // en compétition avec le responder de gesture-handler et son tap peut être
-    // perdu — c'était la cause du clic mort sur les pubs de l'overlay recherche.
-    return (
-      <GHTouchableOpacity
-        style={getFeedCardStyle(colors)}
-        activeOpacity={0.92}
-        onPress={handleCardPress}
-      >
-
-        {/* ── En-tête : logo + nom annonceur + pastille "Sponsorisé" ── */}
-        <View style={adSt.header}>
-          <View style={[adSt.logoWrap, { backgroundColor: colors.primary + '18' }]}>
-            <Icon name="briefcase" size={15} color={colors.primary} />
-          </View>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={[adSt.advertiserName, { color: colors.textPrimary }]} numberOfLines={1}>
-              {adDomain || ad.title}
-            </Text>
-            <View style={adSt.sponsoredRow}>
-              <View style={[adSt.sponsoredTag, { backgroundColor: colors.textTertiary + '1A' }]}>
-                <Text style={[adSt.sponsoredTagText, { color: colors.textTertiary }]}>Sponsorisé</Text>
-              </View>
-              <Icon name="globe" size={10} color={colors.textTertiary} />
-            </View>
-          </View>
-        </View>
-
-        {/* ── Accroche + description (texte du post sponsorisé) ── */}
-        {(ad.title || ad.description) ? (
-          <View style={adSt.copy}>
-            {ad.title ? (
-              <Text style={[adSt.copyTitle, { color: colors.textPrimary }]} numberOfLines={2}>{ad.title}</Text>
-            ) : null}
-            {ad.description ? (
-              <Text style={[adSt.copyDesc, { color: colors.textSecondary }]} numberOfLines={3}>{ad.description}</Text>
-            ) : null}
-          </View>
-        ) : null}
-
-        {/* ── Créatif : vidéo ou image — encadré, coins arrondis ── */}
-        <View style={adSt.mediaWrap}>
-          {hasCreative ? (
-            isVideo ? (
-              <View style={adSt.mediaClip}>
-                <AdVideoCreative uri={creativeUri!} thumbnailUri={ad.thumbnail_url} isVisible={isVisible} />
-              </View>
-            ) : (
-              <CachedImage uri={creativeUri!} style={[adSt.image, adSt.mediaClip]} resizeMode="cover" onError={() => setImgFailed(true)} />
-            )
-          ) : (
-            <View style={[adSt.imagePlaceholder, adSt.mediaClip, { backgroundColor: colors.primary + '14' }]}>
-              <Icon name="image" size={32} color={colors.primary + '60'} />
-            </View>
-          )}
-        </View>
-
-        {/* ── Barre CTA — bandeau plein sous le créatif, façon Facebook :
-            domaine à gauche, bouton d'action à droite. "En savoir plus"
-            n'apparaît qu'UNE fois (sur le bouton). ──────────────────────── */}
-        {ad.cta_url ? (
-          <View style={[adSt.ctaBar, { backgroundColor: colors.backgroundSecondary, borderTopColor: colors.divider }]}>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[adSt.ctaDomain, { color: colors.textTertiary }]} numberOfLines={1}>
-                {adDomain.toUpperCase()}
-              </Text>
-              <Text style={[adSt.ctaSub, { color: colors.textSecondary }]} numberOfLines={1}>
-                Annonce · en savoir plus
-              </Text>
-            </View>
-            <View style={[adSt.ctaBtn, { backgroundColor: colors.primary }]}>
-              <Text style={adSt.ctaBtnText}>{ad.cta_text || 'En savoir plus'}</Text>
-              <Icon name="arrow-right" size={13} color="#fff" />
-            </View>
-          </View>
-        ) : null}
-
-      </GHTouchableOpacity>
-    );
-  },
-);
-
-// ── AdFullscreenPlayer — pub vidéo ouverte en plein écran avec son (via Modal),
-// équivalent du AdSlide de ReelsScreen mais pour ce fichier (AdData local, sans
-// advertiser_id). Fermeture par le bouton X, jamais d'ouverture auto du CTA. ──
-
-const AdFullscreenPlayer: React.FC<{ ad: AdData; onClose: () => void }> = ({ ad, onClose }) => {
-  const insets = useSafeAreaInsets();
-  const creativeUri = ad.creative_url || ad.thumbnail_url!;
-  const player = useVideoPlayer({ uri: creativeUri }, p => { p.loop = true; p.muted = false; p.volume = 1; });
-  useEffect(() => { try { player.play(); } catch {} }, [player]);
-
-  const rawCta = (ad.cta_url ?? '').trim();
-  const handleCta = () => { if (rawCta) Linking.openURL(rawCta).catch(() => {}); };
-
-  return (
-    <View style={{ flex: 1, backgroundColor: '#000' }}>
-      <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="contain" controls={false} />
-
-      <TouchableOpacity
-        style={{ position: 'absolute', top: insets.top + 10, left: 14, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' }}
-        onPress={onClose}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      >
-        <Icon name="x" size={22} color="#fff" />
-      </TouchableOpacity>
-
-      <View style={{ position: 'absolute', bottom: Math.max(insets.bottom, 16) + 10, left: 16, right: 16, gap: 8 }}>
-        <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 }} numberOfLines={1}>
-          {ad.title}
-        </Text>
-        {ad.description ? (
-          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13, lineHeight: 18 }} numberOfLines={3}>{ad.description}</Text>
-        ) : null}
-        {rawCta ? (
-          <TouchableOpacity activeOpacity={0.88} onPress={handleCta} style={{ marginTop: 4 }}>
-            <LinearGradient colors={['#7B3FF2', '#C044E8', '#E0389A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={{ borderRadius: 14, paddingVertical: 13, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7 }}>
-              <Icon name="globe" size={15} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 14.5, fontWeight: '800' }}>{ad.cta_text || 'En savoir plus'}</Text>
-              <Icon name="arrow-right" size={16} color="#fff" />
-            </LinearGradient>
-          </TouchableOpacity>
-        ) : null}
-      </View>
-    </View>
-  );
-};
-
 const adSt = StyleSheet.create({
-  // La carte vient de getFeedCardStyle(colors) — ici seulement le contenu.
-  header:         { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: FeedCardLayout.padH, paddingTop: FeedCardLayout.padH, paddingBottom: 8 },
-  logoWrap:       { width: 38, height: 38, borderRadius: FeedRadius.media, alignItems: 'center', justifyContent: 'center' },
-  advertiserName: { fontSize: 13.5, fontWeight: '700', letterSpacing: -0.1, lineHeight: 17 },
-  sponsoredRow:   { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 },
-  sponsoredTag:   { paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 },
-  sponsoredTagText:{ fontSize: 9.5, fontWeight: '700', letterSpacing: 0.3 },
-
-  // Accroche + description (le "texte" du post sponsorisé)
-  copy:           { paddingHorizontal: FeedCardLayout.padH, paddingBottom: 10, gap: 3 },
-  copyTitle:      { fontSize: 14.5, fontWeight: '700', lineHeight: 20 },
-  copyDesc:       { fontSize: 13.5, lineHeight: 19 },
-
-  mediaWrap:      { paddingHorizontal: FeedCardLayout.padH, paddingBottom: 0 },
-  mediaClip:      { borderRadius: FeedRadius.media, overflow: 'hidden' },
-  image:          { width: '100%', aspectRatio: 1.91 },   // ratio pub standard, ne s'écrase plus
-  muteBtn:        { position: 'absolute', bottom: 10, right: 10, width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
-  imagePlaceholder:{ width: '100%', aspectRatio: 1.91, alignItems: 'center', justifyContent: 'center' },
-
-  // Bandeau CTA plein sous le créatif (façon Facebook)
-  ctaBar:         { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 10, paddingHorizontal: FeedCardLayout.padH, paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth },
-  ctaDomain:      { fontSize: 10, fontWeight: '700', letterSpacing: 0.4 },
-  ctaSub:         { fontSize: 12, fontWeight: '500', marginTop: 1 },
-  ctaBtn:         { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 9, borderRadius: FeedRadius.chip, flexShrink: 0 },
-  ctaBtnText:     { fontSize: 13, fontWeight: '800', color: '#fff' },
+  copy:            { paddingHorizontal: FeedCardLayout.padH, paddingTop: 10, paddingBottom: 12 },
+  hl:              { fontSize: 15, fontWeight: '700', lineHeight: 21, letterSpacing: -0.2 },
+  sub:             { fontSize: 13, lineHeight: 19, marginTop: 5 },
+  mediaWrap:       { paddingHorizontal: FeedCardLayout.padH, paddingBottom: 0 },
+  mediaClip:       { borderRadius: FeedRadius.media, overflow: 'hidden' },
+  image:           { width: '100%', aspectRatio: 1.6 },
+  imagePlaceholder:{ width: '100%', aspectRatio: 1.6, alignItems: 'center', justifyContent: 'center' },
+  muteBtn:         { position: 'absolute', bottom: 10, right: 10, width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
 });
 
 // ── LiveConcertCard — mémoïsé : re-rend uniquement si ses props changent ──────
@@ -606,104 +482,14 @@ const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
   );
 });
 
-// ── Badges isolés — ne re-rendent que le FeedScreen quand les unread changent ─
-
-const FeedHeaderBadges: React.FC<{
-  onMessages: () => void;
-  onNotifs: () => void;
-  onMenu: () => void;
-  onFavorites: () => void;
-  onLive: () => void;
-  onFriends: () => void;
-  friendsActive: boolean;
-  colors: AppColors;
-}> = React.memo(({ onMessages, onNotifs, onFavorites, onLive, onFriends, friendsActive, colors }) => {
-  const { unreadMessages, unreadActivity, unreadNotifications } = useWs();
-  const totalNotifs = unreadNotifications + unreadActivity;
-  // Zoom d'accessibilité système (taille de texte agrandie dans les réglages du
-  // téléphone) — fontScale se met à jour en direct via useWindowDimensions, pas
-  // besoin de relancer l'app. Au-delà d'un certain agrandissement, 5 libellés sur
-  // une seule rangée de largeur fixe se chevauchent/débordent : on masque le texte
-  // et ne garde que les icônes, mieux centrées, plutôt que casser la mise en page.
-  const { fontScale } = useWindowDimensions();
-  const showLabels = fontScale < 1.15;
-  // Séparateur thème-aware : rgba(255,255,255,…) était invisible en clair (fond
-  // blanc) et visible en sombre — incohérent. colors.divider marche dans les deux.
-  const sep = <View style={{ width: StyleSheet.hairlineWidth, height: 24, backgroundColor: colors.divider }} />;
-  const iconWrapStyle = showLabels ? undefined : { paddingVertical: 4 };
-  return (
-    <View style={{ paddingBottom: 6, marginHorizontal: -16 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'stretch', borderRadius: 12, overflow: 'hidden' }}>
-        {/* Mes amis / Général — c'est un FILTRE du fil, pas une navigation. Rendu
-            comme une pastille pleine quand actif (fond primary léger + bordure)
-            pour qu'il ne se confonde pas avec les icônes de navigation à droite.
-            Icône ET libellé changent selon l'état. */}
-        <TouchableOpacity
-          style={[
-            fS.actionIcon,
-            { flex: 1, marginVertical: 4, marginLeft: 4, borderRadius: 10, borderWidth: 1 },
-            iconWrapStyle,
-            friendsActive
-              ? { backgroundColor: colors.primary + '18', borderColor: colors.primary + '40' }
-              : { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider },
-          ]}
-          onPress={onFriends}
-          activeOpacity={0.8}
-        >
-          <MCIcon name={friendsActive ? 'account-group' : 'account-heart-outline'} size={20} color={friendsActive ? colors.primary : colors.textPrimary} />
-          {showLabels && (
-            <Text style={{ fontSize: 10.5, color: friendsActive ? colors.primary : colors.textSecondary, marginTop: 2, fontWeight: friendsActive ? '700' : '600' }}>
-              {friendsActive ? 'Général' : 'Mes amis'}
-            </Text>
-          )}
-        </TouchableOpacity>
-        {sep}
-        {/* Messages & Appels */}
-        <TouchableOpacity style={[fS.actionIcon, { flex: 1 }, iconWrapStyle]} onPress={onMessages} activeOpacity={0.8}>
-          <View style={{ position: 'relative' }}>
-            <MCIcon name="forum" size={19} color={colors.textPrimary} />
-            {unreadMessages > 0 && (
-              <View style={[badgeS.badge, { borderColor: colors.backgroundSecondary }]}>
-                <Text style={badgeS.badgeText}>{unreadMessages > 99 ? '99+' : unreadMessages}</Text>
-              </View>
-            )}
-          </View>
-          {showLabels && <Text style={{ fontSize: 10.5, color: colors.textSecondary, marginTop: 2, fontWeight: '500' }}>Messages</Text>}
-        </TouchableOpacity>
-        {sep}
-        {/* Notifications */}
-        <TouchableOpacity style={[fS.actionIcon, { flex: 1 }, iconWrapStyle]} onPress={onNotifs} activeOpacity={0.8}>
-          <View style={{ position: 'relative' }}>
-            <Icon name="bell" size={19} color={colors.textPrimary} />
-            {totalNotifs > 0 && (
-              <View style={[badgeS.badge, { borderColor: colors.backgroundSecondary, backgroundColor: colors.primary }]}>
-                <Text style={badgeS.badgeText}>{totalNotifs > 99 ? '99+' : totalNotifs}</Text>
-              </View>
-            )}
-          </View>
-          {showLabels && <Text style={{ fontSize: 10.5, color: colors.textSecondary, marginTop: 2, fontWeight: '500' }}>Notifications</Text>}
-        </TouchableOpacity>
-        {sep}
-        {/* Enregistrés */}
-        <TouchableOpacity style={[fS.actionIcon, { flex: 1 }, iconWrapStyle]} onPress={onFavorites} activeOpacity={0.8}>
-          <MCIcon name="bookmark-outline" size={20} color={colors.textPrimary} />
-          {showLabels && <Text style={{ fontSize: 10.5, color: colors.textSecondary, marginTop: 2, fontWeight: '500' }}>Enregistrés</Text>}
-        </TouchableOpacity>
-        {sep}
-        {/* En direct */}
-        <TouchableOpacity style={[fS.actionIcon, { flex: 1 }, iconWrapStyle]} onPress={onLive} activeOpacity={0.8}>
-          <View style={{ position: 'relative' }}>
-            <MCIcon name="video-outline" size={21} color={colors.liveTag} />
-            <View style={{ position: 'absolute', top: -2, right: -4, width: 7, height: 7, borderRadius: 4, backgroundColor: colors.liveTag, borderWidth: 1.5, borderColor: colors.surface }} />
-          </View>
-          {showLabels && <Text style={{ fontSize: 10.5, color: colors.liveTag, marginTop: 2, fontWeight: '600' }}>En direct</Text>}
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-});
-
 // ── Encart : suggestions de communautés ─────────────────────────────────────────
+// Même gabarit de carte que PeopleSuggestions (cover + avatar chevauchant +
+// nom + bouton) — cohérence visuelle entre tous les encarts de suggestion du
+// feed, et beaucoup plus de présence que l'ancienne simple liste 44px.
+const COMM_CARD_W    = Math.round(Dimensions.get('window').width * 0.45);
+const COMM_COVER_H   = Math.round(COMM_CARD_W * 0.5);
+const COMM_AVATAR_SZ = Math.round(COMM_CARD_W * 0.4);
+
 const CommunitiesInlineCard: React.FC<{
   communities: CommunityData[];
   colors: AppColors;
@@ -726,46 +512,88 @@ const CommunitiesInlineCard: React.FC<{
         seeAllLabel="Explorer"
         onSeeAll={() => nav.navigate('Communities' as any)}
       />
-      <View style={{ paddingHorizontal: 8, paddingBottom: 8 }}>
-        {communities.map(c => (
-          <View key={c.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 6, paddingVertical: 8 }}>
-            {c.avatar_url
-              ? <CachedImage uri={c.avatar_url} style={{ width: 44, height: 44, borderRadius: 12 }} />
-              : <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ color: '#fff', fontWeight: '800', fontSize: 16 }}>{c.name?.[0]?.toUpperCase()}</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 4, paddingBottom: 12, gap: 10 }}>
+        {communities.map(c => {
+          const isJoined = joined.has(c.id);
+          const initial  = c.name?.[0]?.toUpperCase() ?? '?';
+          return (
+            <View key={c.id} style={{ width: COMM_CARD_W, borderRadius: FeedRadius.media, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.divider, backgroundColor: colors.surface, overflow: 'hidden' }}>
+              {/* Cover — bannière si dispo, sinon dégradé de marque */}
+              <TouchableOpacity activeOpacity={0.9} onPress={() => nav.navigate('CommunityChat', { communityId: c.id, communityName: c.name })}>
+                {c.banner_url ? (
+                  <CachedImage uri={c.banner_url} style={{ width: '100%', height: COMM_COVER_H }} resizeMode="cover" />
+                ) : (
+                  <LinearGradient
+                    colors={[colors.gradientStart ?? colors.primary, colors.gradientEnd ?? colors.primary]}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={{ width: '100%', height: COMM_COVER_H }}
+                  />
+                )}
+              </TouchableOpacity>
+
+              {/* Avatar chevauchant, centré */}
+              <View style={{ alignSelf: 'center', marginTop: -(COMM_AVATAR_SZ / 2) }}>
+                <View style={{
+                  width: COMM_AVATAR_SZ + 4, height: COMM_AVATAR_SZ + 4, borderRadius: (COMM_AVATAR_SZ + 4) / 2,
+                  borderWidth: 3, borderColor: colors.surface, overflow: 'hidden', backgroundColor: colors.primary,
+                  alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {c.avatar_url
+                    ? <CachedImage uri={c.avatar_url} style={{ width: '100%', height: '100%' }} />
+                    : <Text style={{ color: '#fff', fontWeight: '800', fontSize: COMM_AVATAR_SZ * 0.4 }}>{initial}</Text>
+                  }
                 </View>
-            }
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>{c.name}</Text>
-              <Text style={{ fontSize: 10.5, color: colors.textTertiary }}>{(c.members_count ?? 0).toLocaleString()} membres</Text>
+              </View>
+
+              {/* Infos */}
+              <View style={{ alignItems: 'center', paddingHorizontal: 12, paddingBottom: 14, paddingTop: 8, gap: 4 }}>
+                <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' }}>
+                  {c.name}
+                </Text>
+                <Text style={{ fontSize: 11, color: colors.textTertiary }}>
+                  {(c.members_count ?? 0).toLocaleString()} membres
+                </Text>
+
+                <TouchableOpacity
+                  disabled={isJoined}
+                  onPress={() => join(c.id)}
+                  style={{
+                    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    marginTop: 8, borderRadius: 8, paddingVertical: 10, width: '100%',
+                    backgroundColor: isJoined ? 'transparent' : colors.primary,
+                    borderWidth: isJoined ? 1.5 : 0, borderColor: colors.border,
+                  }}>
+                  <Icon name={isJoined ? 'check' : 'plus'} size={14} color={isJoined ? colors.textSecondary : '#fff'} />
+                  <Text style={{ fontSize: 13.5, fontWeight: '700', color: isJoined ? colors.textSecondary : '#fff' }}>
+                    {isJoined ? 'Membre ✓' : 'Rejoindre'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
-            <TouchableOpacity
-              disabled={joined.has(c.id)}
-              onPress={() => join(c.id)}
-              style={{
-                paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999,
-                backgroundColor: joined.has(c.id) ? colors.divider : 'transparent',
-                borderWidth: joined.has(c.id) ? 0 : 1.3, borderColor: colors.primary,
-                flexDirection: 'row', alignItems: 'center', gap: 4,
-              }}>
-              {joined.has(c.id) && <Icon name="check" size={10} color={colors.textTertiary} />}
-              <Text style={{ fontSize: 11, fontWeight: '700', color: joined.has(c.id) ? colors.textTertiary : colors.primary }}>
-                {joined.has(c.id) ? 'Membre' : 'Rejoindre'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        ))}
-      </View>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 };
 
 // ── Encart : rangée de reels ───────────────────────────────────────────────────
+// Carte grande, style Facebook "Reels pour vous" : 60% de la largeur d'écran
+// SUR TÉLÉPHONE — bien plus de présence qu'une simple vignette. Sur tablette
+// (largeur qui explose), 60% donnerait des cartes démesurées : on plafonne à
+// une largeur "confortable" de contenu vertical (280px, ~1.7 reel visible
+// même sur grand écran) au lieu de laisser le pourcentage grimper sans limite.
+// useWindowDimensions() (pas Dimensions.get figé) pour réagir aux rotations/
+// changements de fenêtre (split-screen, pliable).
+const REEL_ROW_MAX_W = 280;
+
 const ReelRowInlineCard: React.FC<{
   reels: any[];
   colors: AppColors;
   nav: any;
 }> = ({ reels, colors, nav }) => {
+  const { width: winW } = useWindowDimensions();
+  const cardW = Math.min(Math.round(winW * 0.60), REEL_ROW_MAX_W);
   return (
     <View style={[getFeedCardStyle(colors), { paddingTop: 12 }]}>
       <SectionHeader
@@ -774,29 +602,49 @@ const ReelRowInlineCard: React.FC<{
         icon="film"
         onSeeAll={() => nav.navigate('Tabs', { screen: 'Reels' } as any)}
       />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 4, paddingBottom: 12, gap: 8 }}>
-        {reels.map(r => (
-          <TouchableOpacity
-            key={r.id}
-            onPress={() => (nav as any).navigate('Tabs', { screen: 'Reels', params: { initialReelId: r.id, initialReel: r } })}
-            style={{ width: 104, aspectRatio: 9 / 16, borderRadius: FeedRadius.media, overflow: 'hidden', backgroundColor: '#000' }}>
-            {r.thumbnail_url
-              ? <CachedImage uri={r.thumbnail_url} style={{ width: '100%', height: '100%' }} />
-              : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon name="film" size={20} color="rgba(255,255,255,0.3)" />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 4, paddingBottom: 12, gap: 10 }}>
+        {reels.map(r => {
+          const authorName = r.author?.display_name ?? r.author?.username ?? null;
+          return (
+            <TouchableOpacity
+              key={r.id}
+              activeOpacity={0.9}
+              onPress={() => (nav as any).navigate('Tabs', { screen: 'Reels', params: { initialReelId: r.id, initialReel: r } })}
+              style={{ width: cardW, aspectRatio: 9 / 16, borderRadius: FeedRadius.media, overflow: 'hidden', backgroundColor: '#000' }}>
+              {r.thumbnail_url
+                ? <CachedImage uri={r.thumbnail_url} style={{ width: '100%', height: '100%' }} />
+                : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon name="film" size={30} color="rgba(255,255,255,0.3)" />
+                  </View>
+              }
+              {/* Icône lecture centrée — affirme que c'est un contenu vidéo */}
+              <View style={{ position: 'absolute', top: '42%', left: '42%' }}>
+                <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="play" size={15} color="#fff" style={{ marginLeft: 2 }} />
                 </View>
-            }
-            <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 36, backgroundColor: 'rgba(0,0,0,0.0)' }} />
-            {(r.view_count ?? 0) > 0 && (
-              <View style={{ position: 'absolute', left: 6, bottom: 6, flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                <Icon name="play" size={8} color="#fff" />
-                <Text style={{ fontSize: 9.5, fontWeight: '700', color: '#fff' }}>
-                  {(r.view_count ?? 0) >= 1000 ? `${((r.view_count ?? 0) / 1000).toFixed(1)}k` : r.view_count}
-                </Text>
               </View>
-            )}
-          </TouchableOpacity>
-        ))}
+              {/* Overlay bas dégradé — auteur + vues, lisibilité garantie */}
+              <LinearGradient
+                colors={['transparent', 'rgba(0,0,0,0.75)']}
+                style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '38%', justifyContent: 'flex-end', padding: 10, gap: 3 }}
+              >
+                {authorName ? (
+                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#fff' }} numberOfLines={1}>
+                    {authorName}
+                  </Text>
+                ) : null}
+                {(r.view_count ?? 0) > 0 && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Icon name="eye" size={11} color="rgba(255,255,255,0.85)" />
+                    <Text style={{ fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.85)' }}>
+                      {(r.view_count ?? 0) >= 1000 ? `${((r.view_count ?? 0) / 1000).toFixed(1)}k` : r.view_count}
+                    </Text>
+                  </View>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
     </View>
   );
@@ -814,32 +662,15 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   const { colors } = theme;
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
-  const { addListener, removeListener, lastLiveStarted, lastLiveEnded, lastLiveViewersUpdated, lastPresenceUpdate } = useWs();
+  const { addListener, removeListener, lastLiveStarted, lastLiveEnded, lastLiveViewersUpdated, lastPresenceUpdate, unreadMessages, unreadActivity, unreadNotifications } = useWs();
+  const headerNotifCount = unreadNotifications + unreadActivity;
   const { currentUser } = useUser();
   // false — ne demande pas la permission localisation des l'arrivee sur le feed,
   // uniquement la section secondaire "Pres de toi" en beneficie ici.
   const userLocation = useUserLocation(false);
-  // Zoom d'accessibilité système — réduit le logo "Gofolyx" centré au-delà d'un
-  // certain agrandissement, sinon il chevauche le nom d'utilisateur (gauche) et
-  // les boutons de recherche (droite) qui grandissent aussi.
-  const { fontScale: headerFontScale } = useWindowDimensions();
-  const logoFontSize = headerFontScale >= 1.15 ? 26 / Math.min(headerFontScale, 1.6) : 26;
-
   const [filter,      setFilter]      = useState<FeedFilter>('all');
   const [items,       setItems]       = useState<FeedItem[]>([]);
   const [loading,     setLoading]     = useState(true);
-  // Plusieurs campagnes peuvent être injectées dans le même feed (une par emplacement
-  // publicitaire) — map id → data, alimentée au fur et à mesure des tirages successifs.
-  const [adsById,     setAdsById]     = useState<Record<string, AdData>>({});
-  const seenAdIdsRef  = useRef<string[]>([]); // exclude_ids envoyés au backend, dans l'ordre
-  // File d'attente sérialisant tous les appels à assignAdsToSlots (load('all') et
-  // loadMoreFeed peuvent tous deux en déclencher un, potentiellement en même temps si un
-  // refresh silencieux chevauche le prefetch anticipé) — évite que deux tirages concurrents
-  // lisent/écrivent seenAdIdsRef de façon incohérente.
-  const adAssignQueueRef = useRef<Promise<void>>(Promise.resolve());
-  // slotId (__ad__slot_N) → id de la campagne tirée pour cet emplacement précis
-  const [adSlotMap,   setAdSlotMap]   = useState<Record<string, string>>({});
-  const adInsertedRef = useRef<Set<string>>(new Set()); // évite double-injection
   const [refreshing,  setRefreshing]  = useState(false);
   const lastLoadedAtRef = useRef<number>(0);
   // ── Scroll infini ────────────────────────────────────────────────────────
@@ -856,6 +687,12 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   const [liveConcerts,    setLiveConcerts]    = useState<Concert[]>([]);
   const [spontLives,      setSpontLives]      = useState<LiveStream[]>([]);
   const [nearbyEvents,    setNearbyEvents]    = useState<Event[]>([]);
+  // Miroirs synchrones — lus par applySpontLivesUpdate quand on n'est pas au
+  // sommet (le state peut être en retard d'un tick sur ce qu'on veut accumuler).
+  const spontLivesRef   = useRef<LiveStream[]>([]);
+  const liveConcertsRef = useRef<Concert[]>([]);
+  useEffect(() => { spontLivesRef.current = spontLives; }, [spontLives]);
+  useEffect(() => { liveConcertsRef.current = liveConcerts; }, [liveConcerts]);
   // Panneau infos primaires — ouvert via le chevron du header, fermé au tap
   // extérieur. Restait ouvert indéfiniment si on quittait l'écran (changement
   // d'onglet, navigation vers un écran empilé) sans re-taper explicitement à
@@ -917,6 +754,17 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     minimumViewTime: 200,              // évite les faux positifs au scroll rapide
   }).current;
   const [adVisible, setAdVisible] = useState(false);
+  // « settled » — un slot pub visible depuis ≥ SETTLE_MS sans que la liste ne
+  // bouge → le CTA de la carte passe de « lien texte » à « bouton discret » avec
+  // son accroche unique (direction éditoriale). Set des slotId déjà settled +
+  // timers en cours, gérés dans onFeedViewableChanged / handleFeedScroll.
+  const SETTLE_MS = 450;
+  const [settledAdSlots, setSettledAdSlots] = useState<Set<string>>(new Set());
+  const settleTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const clearSettleTimers = useCallback(() => {
+    Object.values(settleTimersRef.current).forEach(clearTimeout);
+    settleTimersRef.current = {};
+  }, []);
   // Ref stable vers loadMoreFeed — onFeedViewableChanged est figé au montage (useRef().current,
   // imposé par onViewableItemsChanged qui n'accepte pas de callback changeant de référence),
   // donc on ne peut pas appeler loadMoreFeed directement dedans (sa référence change à chaque
@@ -999,8 +847,35 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   // scroll rapide + chargement réseau simultané ne doit jamais figer le JS thread.
   const AVG_ITEM_HEIGHT = 420; // estimation grossière, mélange posts/reels/pubs/suggestions
   const lastScrollPrefetchIndexRef = useRef(-1);
+  // Vrai tant que la liste est proche du haut. Sert à figer le ListHeader
+  // (carrousels "En direct" / "Dans ton quartier") quand on est scrollé plus bas :
+  // un changement de hauteur du header alors qu'on lit plus bas dans le feed
+  // repousse tout le contenu et donne l'impression que "le scroll revient en
+  // arrière tout seul" au retour de focus (les events WS lives / la géoloc
+  // rechargent et redimensionnent le header). Seuil = stories + titre de la
+  // section "En direct" (~260px) : dès que le carrousel commence à sortir par le
+  // haut, on gèle le header. La resync se fait dès qu'on repasse sous ce seuil.
+  const AT_TOP_THRESHOLD = 260;
+  const feedAtTopRef = useRef(true);
+  const [feedAtTop, setFeedAtTop] = useState(true);
+  // Dernier instantané "En direct" reçu pendant qu'on lisait plus bas — appliqué
+  // en différé quand on remonte au sommet (voir l'effect de resync du header).
+  const pendingLiveHeaderRef = useRef<{ liveConcerts: Concert[]; spontLives: LiveStream[] } | null>(null);
+  // Offset de scroll à restaurer juste après un refresh silencieux de focus
+  // (filet de sécurité ultime si malgré tout une hauteur au-dessus a bougé).
+  const focusRestoreOffsetRef = useRef<number | null>(null);
+  const lastScrollYRef = useRef(0);
+  // Vrai tant que le doigt de l'utilisateur tient la liste (entre begin/end drag)
+  // ou que la liste décélère après un fling — la restauration d'offset s'abstient.
+  const userDraggingRef = useRef(false);
   const handleFeedScroll = (e: any) => {
     const offsetY = e.nativeEvent?.contentOffset?.y ?? 0;
+    lastScrollYRef.current = offsetY;
+    const atTop = offsetY < AT_TOP_THRESHOLD;
+    if (atTop !== feedAtTopRef.current) {
+      feedAtTopRef.current = atTop;
+      setFeedAtTop(atTop);
+    }
     const approxIndex = Math.floor(offsetY / AVG_ITEM_HEIGHT);
     if (approxIndex > lastScrollPrefetchIndexRef.current) {
       lastScrollPrefetchIndexRef.current = approxIndex;
@@ -1013,6 +888,31 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
 
     // Pub vidéo : ne joue que quand réellement visible à l'écran (coupe le stream sinon)
     setAdVisible(viewableItems.some(v => v.item?.kind === 'ad'));
+
+    // « settled » : un slot pub visible → on arme un timer ; s'il tient SETTLE_MS
+    // sans que le slot ne quitte la zone visible (viewability se re-déclenche au
+    // scroll), on marque le slot settled. Slots sortis de vue → timer annulé.
+    const visibleAdSlots = new Set<string>(
+      viewableItems.filter(v => v.item?.kind === 'ad').map(v => v.item.id as string),
+    );
+    for (const slotId of Object.keys(settleTimersRef.current)) {
+      if (!visibleAdSlots.has(slotId)) {
+        clearTimeout(settleTimersRef.current[slotId]);
+        delete settleTimersRef.current[slotId];
+      }
+    }
+    visibleAdSlots.forEach(slotId => {
+      if (settleTimersRef.current[slotId]) return;
+      settleTimersRef.current[slotId] = setTimeout(() => {
+        delete settleTimersRef.current[slotId];
+        setSettledAdSlots(prev => {
+          if (prev.has(slotId)) return prev;
+          const next = new Set(prev);
+          next.add(slotId);
+          return next;
+        });
+      }, SETTLE_MS);
+    });
 
     // Prefetch anticipé : dès que l'item le plus bas visible est à moins de N items de la
     // fin du contenu déjà chargé, on lance loadMoreFeed en arrière-plan — l'utilisateur ne
@@ -1252,44 +1152,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   // ── Chargement de la pub feed — une campagne par emplacement, jamais deux fois la
   // même dans le même feed (exclude_ids envoyé au backend à chaque tirage). Retourne
   // l'id de la pub obtenue (ou null si aucune campagne disponible/restante).
-  const fetchNextAd = useCallback(async (): Promise<string | null> => {
-    try {
-      // Dédupliqué avant envoi : load('all') et loadMoreFeed peuvent toutes deux appeler
-      // assignAdsToSlots sur ce même seenAdIdsRef partagé (ex: refresh silencieux qui se
-      // chevauche avec le prefetch anticipé) — sans garde explicite entre les deux, deux
-      // appels concurrents peuvent pousser le même id ou lire un historique pas encore à
-      // jour, produisant un exclude_ids avec des doublons observés côté logs serveur.
-      const exclude = Array.from(new Set(seenAdIdsRef.current)).join(',');
-      const url = `/api/v1/ads/feed/next?placement=feed${exclude ? `&exclude_ids=${exclude}` : ''}`;
-      const res = await apiClient.get<AdData | null>(url);
-      if (!res.data) return null;
-      if (!seenAdIdsRef.current.includes(res.data.id)) {
-        seenAdIdsRef.current.push(res.data.id);
-      }
-      setAdsById(prev => ({ ...prev, [res.data!.id]: res.data! }));
-      return res.data.id;
-    } catch {
-      return null;
-    }
-  }, []);
-
-  // Attribue une campagne distincte à chaque emplacement pub du feed — séquentiel pour
-  // que chaque tirage voie bien l'exclusion mise à jour par les précédents (pas de doublon).
-  // Chaînée sur adAssignQueueRef pour sérialiser aussi les appels concurrents entre eux
-  // (load('all') vs loadMoreFeed) — un seul tirage de pub à la fois dans toute la session.
-  const assignAdsToSlots = useCallback((slotIds: string[]): Promise<void> => {
-    const run = async () => {
-      for (const slotId of slotIds) {
-        const adId = await fetchNextAd();
-        if (!adId) break; // plus aucune campagne disponible — les slots restants resteront vides
-        setAdSlotMap(prev => ({ ...prev, [slotId]: adId }));
-      }
-    };
-    const next = adAssignQueueRef.current.then(run, run);
-    adAssignQueueRef.current = next;
-    return next;
-  }, [fetchNextAd]);
-
   // ── Suivi (follow) state ──────────────────────────────────────────────────
   const [followingSet, setFollowingSet] = useState<Set<string>>(new Set());
 
@@ -1323,10 +1185,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     }
   }, [followingSet, currentUser]);
 
-  // Espacement d'injection de la pub, gérée côté client.
-  const AD_EVERY       = 8;
-  const adSlotIdxRef  = useRef(0); // continue la numérotation des slots pub entre pages
-
   // Garde synchrone : tant que load('all') (page 1 / rechargement complet) n'a pas
   // fini d'écrire son résultat dans items, loadMoreFeed ne doit jamais démarrer —
   // sinon la page 2 pourrait se charger avant que la page 1 ne soit stabilisée à
@@ -1358,26 +1216,36 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         if (!silent) {
           feedPageRef.current = 1;
           setHasMoreFeed(true);
-          adSlotIdxRef.current = 0;
-          seenAdIdsRef.current = [];
           feedHasMoreRef.current = true;
         }
-        // /search/feed renvoie events/concerts/posts triés par score. Le mobile
-        // mappe kind -> FeedItem et injecte la pub à part.
+        // /search/feed renvoie events/concerts/posts/pub déjà positionnée et résolue
+        // par le backend (voir InjectionPlanner.maybe_inject_ads côté serveur — la
+        // pub arrive comme un item complet, plus de slot différé côté client).
         const [feedResult, liveConcerts, spontLivesResult] = await Promise.all([
           searchService.getFeed(1, FEED_PAGE_SIZE, false, forceRefresh).catch(() => ({ items: [] })),
           concertService.getLive().catch(() => [] as Concert[]),
           liveService.getLives().catch(() => [] as LiveStream[]),
         ]);
         feedHasMoreRef.current = (feedResult.items ?? []).length >= FEED_PAGE_SIZE;
-        setLiveConcerts(Array.isArray(liveConcerts) ? liveConcerts : []);
-        setSpontLives(Array.isArray(spontLivesResult) ? spontLivesResult : []);
+        // Header "En direct" : ne le laisser changer de hauteur (donc pousser tout
+        // le feed) QUE si l'utilisateur est au sommet, ou lors d'un vrai
+        // rechargement (pull-to-refresh / changement de filtre / 1er montage).
+        // Un refresh silencieux au retour de focus alors qu'on lit plus bas ne
+        // doit jamais bouger le carrousel — sinon "l'écran glisse tout seul".
+        if (!silent || feedAtTopRef.current) {
+          setLiveConcerts(Array.isArray(liveConcerts) ? liveConcerts : []);
+          setSpontLives(Array.isArray(spontLivesResult) ? spontLivesResult : []);
+        } else {
+          pendingLiveHeaderRef.current = {
+            liveConcerts: Array.isArray(liveConcerts) ? liveConcerts : [],
+            spontLives: Array.isArray(spontLivesResult) ? spontLivesResult : [],
+          };
+        }
 
         const feedRaw: any[] = feedResult.items ?? [];
         const seen = new Set<string>();
         const result: FeedItem[] = [];
         let nonSpecialCount = 0;
-        const adSlotIds: string[] = [];
         for (const d of feedRaw) {
           if (!d || !d.id) continue;
           if (d.kind === 'event' || d.kind === 'concert' || d.kind === 'post') {
@@ -1386,12 +1254,10 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
             seen.add(key);
             result.push({ kind: d.kind, id: d.id, data: d });
             nonSpecialCount += 1;
-            if (nonSpecialCount > 0 && nonSpecialCount % AD_EVERY === 0) {
-              const slotId = `__ad__slot_${adSlotIdxRef.current}`;
-              adSlotIdxRef.current += 1;
-              adSlotIds.push(slotId);
-              result.push({ kind: 'ad', id: slotId, data: null });
-            }
+          } else if (d.kind === 'ad') {
+            // Pub déjà résolue par le backend — item complet (créatif inclus),
+            // jamais de placeholder à remplir après coup.
+            result.push({ kind: 'ad', id: d.id, data: d });
           } else if (d.kind === 'reel_row') {
             result.push({ kind: 'reel_row', id: d.id, data: d.reels ?? [] });
           } else if (d.kind === 'suggestions') {
@@ -1409,19 +1275,27 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         seenItemIdsRef.current = new Set(filtered.map(i => `${i.kind}-${i.id}`));
         nonReelCountRef.current = nonSpecialCount;
 
-        // En mode silent : ne remplacer les items que si le contenu a réellement changé
-        // Evite le re-render + reset de scroll au retour sur l'écran
+        // En mode silent : ne remplacer les items QUE si le contenu a réellement
+        // changé. Comparer uniquement les `id` ne suffit pas : les rangées
+        // reel_row / suggestions / communities gardent leur id mais leur `data`
+        // (nb de reels, liste de suggestions…) change à chaque refetch — la carte
+        // se re-render alors avec une hauteur différente et pousse tout ce qui est
+        // en dessous. On compare donc une signature du contenu (id + longueur/ids
+        // du data pour les rangées, updated_at pour posts/events) ; si identique,
+        // on garde `prev` À L'IDENTIQUE (même référence → zéro re-render de cellule).
         if (silent) {
-          setItems(prev => {
-            const prevIds = prev.map(i => i.id).join(',');
-            const nextIds = filtered.map(i => i.id).join(',');
-            return prevIds === nextIds ? prev : filtered;
-          });
+          const sig = (arr: FeedItem[]) => arr.map(i => {
+            if (i.kind === 'reel_row' || i.kind === 'suggestions' || i.kind === 'communities') {
+              const d = (i.data ?? []) as any[];
+              return `${i.kind}:${i.id}:${d.map(x => x?.id ?? '').join('|')}`;
+            }
+            const u = (i.data as any)?.updated_at ?? (i.data as any)?.created_at ?? '';
+            return `${i.kind}:${i.id}:${u}`;
+          }).join(',');
+          setItems(prev => (sig(prev) === sig(filtered) ? prev : filtered));
         } else {
           setItems(filtered);
         }
-        // Tire une campagne distincte pour chaque nouvel emplacement pub de cette page
-        if (adSlotIds.length > 0) assignAdsToSlots(adSlotIds);
       } else if (f === 'following') {
         // "Mes amis" — posts + events/concerts + reels des comptes suivis UNIQUEMENT
         // (exclusion stricte côté backend via following_only, pas juste un boost de
@@ -1474,7 +1348,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
       setLoading(false);
       setRefreshing(false);
     }
-  }, [assignAdsToSlots]);
+  }, []);
 
   // Recharge quand le filtre change
   // setLoading(true) uniquement si aucun item visible — évite le flash skeleton
@@ -1543,7 +1417,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
 
         const appended: FeedItem[] = [];
         let freshNonSpecialCount = 0;
-        const adSlotIds: string[] = [];
         for (const d of feedRawItems) {
           if (!d || !d.id) continue;
           if (d.kind === 'event' || d.kind === 'concert' || d.kind === 'post') {
@@ -1552,12 +1425,9 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
             seenItemIdsRef.current.add(key);
             appended.push({ kind: d.kind, id: d.id, data: d });
             freshNonSpecialCount += 1;
-            if (freshNonSpecialCount > 0 && freshNonSpecialCount % AD_EVERY === 0) {
-              const slotId = `__ad__slot_${adSlotIdxRef.current}`;
-              adSlotIdxRef.current += 1;
-              adSlotIds.push(slotId);
-              appended.push({ kind: 'ad', id: slotId, data: null });
-            }
+          } else if (d.kind === 'ad') {
+            // Pub déjà résolue par le backend — item complet, jamais de slot différé.
+            appended.push({ kind: 'ad', id: d.id, data: d });
           } else if (d.kind === 'reel_row') {
             appended.push({ kind: 'reel_row', id: d.id, data: d.reels ?? [] });
           } else if (d.kind === 'suggestions') {
@@ -1578,7 +1448,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         }
         nonReelCountRef.current += freshNonSpecialCount;
         setItems(prev => [...prev, ...appended]);
-        if (adSlotIds.length > 0) assignAdsToSlots(adSlotIds);
         break;
       }
     } catch (err) {
@@ -1587,7 +1456,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
       loadingMoreRef.current = false;
       setLoadingMoreFeed(false);
     }
-  }, [filter, hasMoreFeed, assignAdsToSlots]);
+  }, [filter, hasMoreFeed]);
   useEffect(() => { loadMoreFeedRef.current = loadMoreFeed; }, [loadMoreFeed]);
 
   // Près de toi — chargé dès que la position est disponible
@@ -1613,29 +1482,46 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     } catch { /* silencieux */ }
   }, []);
 
+  // Applique une transformation au carrousel "En direct" — MAIS seulement si on
+  // est au sommet. Scrollé plus bas, on l'accumule dans pendingLiveHeaderRef :
+  // l'effect de resync l'appliquera quand on remontera. Sans ça, un événement WS
+  // (live qui démarre/s'arrête, viewers) redimensionne le header sous les yeux de
+  // l'utilisateur qui lit un post 10 écrans plus bas → "ça glisse tout seul".
+  const applySpontLivesUpdate = useCallback((fn: (prev: LiveStream[]) => LiveStream[]) => {
+    if (feedAtTopRef.current) {
+      setSpontLives(fn);
+      return;
+    }
+    const base = pendingLiveHeaderRef.current?.spontLives ?? spontLivesRef.current;
+    pendingLiveHeaderRef.current = {
+      liveConcerts: pendingLiveHeaderRef.current?.liveConcerts ?? liveConcertsRef.current,
+      spontLives: fn(base),
+    };
+  }, []);
+
   // WS : nouveau live spontané démarré → refetch pour respecter is_private + follow
   useEffect(() => {
     if (!lastLiveStarted) return;
     liveService.getLives()
-      .then(lives => { setSpontLives(Array.isArray(lives) ? lives : []); })
+      .then(lives => { applySpontLivesUpdate(() => (Array.isArray(lives) ? lives : [])); })
       .catch(() => {});
-  }, [lastLiveStarted]);
+  }, [lastLiveStarted, applySpontLivesUpdate]);
 
   // WS : live spontané terminé
   useEffect(() => {
     if (!lastLiveEnded) return;
-    setSpontLives(prev => prev.filter(l => l.id !== lastLiveEnded));
-  }, [lastLiveEnded]);
+    applySpontLivesUpdate(prev => prev.filter(l => l.id !== lastLiveEnded));
+  }, [lastLiveEnded, applySpontLivesUpdate]);
 
   // WS : viewers mis à jour
   useEffect(() => {
     if (!lastLiveViewersUpdated) return;
-    setSpontLives(prev => prev.map(l =>
+    applySpontLivesUpdate(prev => prev.map(l =>
       l.id === lastLiveViewersUpdated.live_id
         ? { ...l, current_viewers: lastLiveViewersUpdated.current_viewers }
         : l
     ));
-  }, [lastLiveViewersUpdated]);
+  }, [lastLiveViewersUpdated, applySpontLivesUpdate]);
 
   // WS : mise à jour is_online en temps réel sur les cartes du feed
   useEffect(() => {
@@ -1690,6 +1576,11 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     // seulement relire un résultat encore en cache côté backend (TTL 5 min).
     const age = Date.now() - lastLoadedAtRef.current;
     if (age > 60_000) {
+      // Filet de sécurité : si l'utilisateur avait scrollé, on mémorise sa
+      // position AVANT le refresh. Un effect post-`items` la restaure (sans
+      // animation) si malgré les gardes une hauteur au-dessus a bougé — la page
+      // ne "glisse" plus jamais au retour, même dans un cas limite non prévu.
+      focusRestoreOffsetRef.current = lastScrollYRef.current > 4 ? lastScrollYRef.current : null;
       load(filter, true, true);
     }
     return () => {
@@ -1703,8 +1594,25 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
       setSearchFilter('all');
       searchBarWidth.value = 0;
       searchBarOpacity.value = 0;
+      clearSettleTimers();
     };
   }, [filter]));
+
+  // Filet de sécurité anti-"la page glisse au retour" : après un refresh
+  // silencieux de focus, si on avait mémorisé un offset et que la liste s'est
+  // re-rendue, on repositionne le scroll là où il était — MAIS jamais si
+  // l'utilisateur a la main sur l'écran (userDraggingRef) : on ne lui vole pas
+  // son geste. Ne s'exécute qu'une fois par retour (la ref est consommée).
+  useEffect(() => {
+    const target = focusRestoreOffsetRef.current;
+    if (target == null) return;
+    focusRestoreOffsetRef.current = null;
+    const id = requestAnimationFrame(() => {
+      if (userDraggingRef.current) return;
+      try { feedListRef.current?.scrollToOffset({ offset: target, animated: false }); } catch {}
+    });
+    return () => cancelAnimationFrame(id);
+  }, [items]);
 
   // ── Posts ──────────────────────────────────────────────────────────────────
 
@@ -1766,8 +1674,28 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   const onNavMyStories   = useCallback(() => nav.navigate('MyStories'), [nav]);
   const onNavChat        = useCallback((partnerId: string, partnerName: string, avatarUrl?: string) =>
     nav.navigate('Chat', { partnerId, partnerName, avatarUrl }), [nav]);
-  const onNavCall        = useCallback((partnerId: string, partnerName: string, callType: 'voice' | 'video', avatarUrl?: string) =>
-    nav.navigate('Call', { partnerId, partnerName, partnerAvatar: avatarUrl, callType, isIncoming: false }), [nav]);
+
+  // Données du ListHeader "gelées" tant qu'on n'est pas en haut du feed : on ne
+  // laisse le header changer de hauteur que quand l'utilisateur est proche du
+  // sommet (donc regarde le header). Scrollé plus bas, on garde le dernier
+  // instantané — le contenu sous le header ne bouge plus tout seul quand un live
+  // WS démarre/s'arrête ou que la géoloc arrive. La resync se fait dès qu'on
+  // remonte (feedAtTop repasse à true).
+  const [frozenHeaderData, setFrozenHeaderData] = useState({ liveConcerts, spontLives, nearbyEvents });
+  useEffect(() => {
+    if (!feedAtTop) return;
+    // On est (re)monté au sommet : appliquer d'abord l'instantané "En direct"
+    // mis en attente par un refresh silencieux, puis resynchroniser le header.
+    if (pendingLiveHeaderRef.current) {
+      const p = pendingLiveHeaderRef.current;
+      pendingLiveHeaderRef.current = null;
+      setLiveConcerts(p.liveConcerts);
+      setSpontLives(p.spontLives);
+      setFrozenHeaderData({ liveConcerts: p.liveConcerts, spontLives: p.spontLives, nearbyEvents });
+      return;
+    }
+    setFrozenHeaderData({ liveConcerts, spontLives, nearbyEvents });
+  }, [feedAtTop, liveConcerts, spontLives, nearbyEvents]);
 
   const feedListHeader = useMemo(() => (
     <>
@@ -1777,12 +1705,11 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         colors={colors}
         onNavigateToMyStories={onNavMyStories}
         onNavigateToChat={onNavChat}
-        onNavigateToCall={onNavCall}
       />
       <FeedListHeader
-        liveConcerts={liveConcerts}
-        spontLives={spontLives}
-        nearbyEvents={nearbyEvents}
+        liveConcerts={frozenHeaderData.liveConcerts}
+        spontLives={frozenHeaderData.spontLives}
+        nearbyEvents={frozenHeaderData.nearbyEvents}
         colors={colors}
         isDark={theme.isDark}
         currentUserId={currentUser?.id}
@@ -1797,9 +1724,9 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         onNavEvent={onNavEvent}
       />
     </>
-  ), [liveConcerts, spontLives, nearbyEvents, colors, theme.isDark,
+  ), [frozenHeaderData, colors, theme.isDark,
       currentUser, currentUser?.id, filter,
-      onNavMyStories, onNavChat, onNavCall,
+      onNavMyStories, onNavChat,
       onNavLiveList, onNavSpontList, onNavNearby, onNavLiveStream, onNavLiveViewer,
       onNavSpontStream, onNavSpontViewer, onNavEvent]);
 
@@ -1825,16 +1752,16 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   const renderItem = useCallback(({ item }: { item: FeedItem }) => {
     if (!item) return null;
     if (item.kind === 'ad') {
-      // item.id est le slotId (__ad__slot_N) — résolu vers la campagne qui lui a été
-      // attribuée par assignAdsToSlots. Reste null tant que le tirage n'a pas répondu.
-      const adId = adSlotMap[item.id];
-      const ad = adId ? adsById[adId] : null;
+      // La pub arrive déjà résolue depuis le backend (item.data = AdData complet,
+      // voir InjectionPlanner.maybe_inject_ads côté serveur) — jamais de slot vide
+      // à remplir après coup, donc jamais de redimensionnement au scroll.
+      const ad = item.data as AdData | null;
       if (!ad) return null;
       return (
         <AdCard
           ad={ad}
           colors={colors}
-          isVisible={adVisible}
+          settled={settledAdSlots.has(item.id)}
           onImpression={handleAdImpression}
           onPress={handleAdPress}
           onOpenFullscreen={setFullscreenAd}
@@ -1908,7 +1835,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         onHide={() => setItems(prev => prev.filter(i => !(i.kind === item.kind && i.id === item.id)))}
       />
     );
-  }, [colors, currentUser?.id, followingSet, handleToggleFollow, handlePostDeleted, openComments, nav, load, filter]);
+  }, [colors, currentUser?.id, followingSet, handleToggleFollow, handlePostDeleted, openComments, nav, load, filter, settledAdSlots, handleAdImpression, handleAdPress]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -1926,20 +1853,23 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <View style={[s.header, { backgroundColor: colors.surface, paddingTop: insets.top + (Platform.OS === 'android' ? 8 : 6) }]}>
         <View style={s.headerRow}>
-          {/* Gauche : avatar + nom tronqué — masqué si recherche ouverte */}
+          {/* Gauche : avatar + pastille "en ligne" — masqué si recherche ouverte */}
           {!searchOpen && (
             !currentUser ? (
-              <View style={[s.headerLeft, { pointerEvents: 'none' }]}>
-                <SkeletonBox width={34} height={34} borderRadius={17} />
-                <SkeletonBox width={60} height={12} borderRadius={6} />
+              <View style={{ pointerEvents: 'none' }}>
+                <SkeletonBox width={36} height={36} borderRadius={18} />
               </View>
             ) : (
-              <View style={s.headerLeft}>
-                <TouchableOpacity
-                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 }}
-                  activeOpacity={0.7}
-                  onPress={() => currentUser.id && (nav as any).navigate('UserProfile', { userId: currentUser.id })}
-                >
+              <TouchableOpacity
+                style={{ flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 3 }}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
+                onPress={() => {
+                  if (!showProfilePanel) setAccounts(accountsService.listAccounts());
+                  setShowProfilePanel(v => !v);
+                }}
+              >
+                <View>
                   {currentUser.avatar_url ? (
                     <CachedImage uri={currentUser.avatar_url} style={s.avatar} />
                   ) : (
@@ -1947,25 +1877,23 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                       <Text style={[s.avatarText, { color: colors.primary }]}>{initials}</Text>
                     </View>
                   )}
-                  {displayName ? (
-                    <Text style={{ fontSize: 13, fontWeight: '700', letterSpacing: -0.1, color: colors.textPrimary, flexShrink: 1 }} numberOfLines={1} ellipsizeMode="tail">
-                      {displayName.split(' ')[0]}
-                    </Text>
-                  ) : null}
-                </TouchableOpacity>
-                {displayName ? (
-                  <TouchableOpacity
-                    onPress={() => {
-                      if (!showProfilePanel) setAccounts(accountsService.listAccounts());
-                      setShowProfilePanel(v => !v);
-                    }}
-                    hitSlop={{ top: 10, bottom: 10, left: 6, right: 10 }}
-                    style={{ paddingLeft: 2 }}
-                  >
-                    <Icon name={showProfilePanel ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textPrimary} />
-                  </TouchableOpacity>
-                ) : null}
-              </View>
+                  {/* Pastille présence — verte "en ligne" (l'utilisateur courant
+                      l'est par définition quand il consulte son feed). */}
+                  <View style={{
+                    position: 'absolute', right: -1, bottom: -1,
+                    width: 11, height: 11, borderRadius: 6,
+                    backgroundColor: '#22C55E',
+                    borderWidth: 2, borderColor: colors.surface,
+                  }} />
+                </View>
+                {/* Chevron — indique que l'avatar est cliquable (ouvre le panneau
+                    profil / multi-comptes). */}
+                <Icon
+                  name={showProfilePanel ? 'chevron-up' : 'chevron-down'}
+                  size={14}
+                  color={colors.textSecondary}
+                />
+              </TouchableOpacity>
             )
           )}
 
@@ -2077,13 +2005,25 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
             </>
           )}
 
-          {/* Centre : Gofolyx — même style que "Reels" dans ReelsScreen */}
+          {/* Centre : barre de recherche permanente (remplace le logo). Au tap,
+              ouvre l'overlay de recherche plein écran existant. */}
           {!searchOpen && (
-            <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center' }}>
-              <Text style={{ fontSize: logoFontSize, fontWeight: '900', letterSpacing: 0.2, color: colors.textPrimary }} numberOfLines={1}>
-                <Text style={{ color: colors.primary }}>G</Text>oFoly<Text style={{ color: colors.primary }}>X</Text>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={openSearch}
+              style={{
+                flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
+                height: 38, borderRadius: 20, paddingHorizontal: 14,
+                marginHorizontal: 8,
+                backgroundColor: colors.backgroundSecondary,
+                borderWidth: 1, borderColor: colors.divider,
+              }}
+            >
+              <Icon name="search" size={16} color={colors.textTertiary} />
+              <Text style={{ flex: 1, fontSize: 13.5, color: colors.textTertiary }} numberOfLines={1}>
+                Rechercher une publication, un ami…
               </Text>
-            </View>
+            </TouchableOpacity>
           )}
 
           {/* Barre de recherche animée — apparaît quand searchOpen */}
@@ -2120,41 +2060,124 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
             </Animated.View>
           )}
 
-          {/* Droite : search + menu — icônes nues, sans cercle ni bordure */}
+          {/* Droite : quand la recherche est ouverte → juste la croix pour fermer.
+              Sinon → notifications (cloche + badge) · messages (bulle + badge) ·
+              menu (grille "apps", ouvre Explorer — plus qualitatif que le
+              hamburger plat). Icônes nues, mêmes tailles que le reste de l'app. */}
           <View style={s.headerRight}>
-            <TouchableOpacity
-              style={[s.iconBtn, searchOpen && { backgroundColor: colors.primary + '18' }]}
-              onPress={searchOpen ? closeSearch : openSearch}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Icon name={searchOpen ? 'x' : 'search'} size={22} color={searchOpen ? colors.primary : colors.textPrimary} />
-            </TouchableOpacity>
-            {!searchOpen && (
+            {searchOpen ? (
               <TouchableOpacity
-                style={s.iconBtn}
-                onPress={openMenu}
+                style={[s.iconBtn, { backgroundColor: colors.primary + '18' }]}
+                onPress={closeSearch}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Icon name="menu" size={22} color={colors.textPrimary} />
+                <Icon name="x" size={22} color={colors.primary} />
               </TouchableOpacity>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={s.iconBtn}
+                  onPress={goToNotifs}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <View style={{ position: 'relative' }}>
+                    <Icon name="bell" size={22} color={colors.textPrimary} />
+                    {headerNotifCount > 0 && (
+                      <View style={[badgeS.badge, { borderColor: colors.surface, backgroundColor: colors.primary }]}>
+                        <Text style={badgeS.badgeText}>{headerNotifCount > 99 ? '99+' : headerNotifCount}</Text>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={s.iconBtn}
+                  onPress={goToMessages}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <View style={{ position: 'relative' }}>
+                    <Icon name="message-circle" size={22} color={colors.textPrimary} />
+                    {unreadMessages > 0 && (
+                      <View style={[badgeS.badge, { borderColor: colors.surface }]}>
+                        <Text style={badgeS.badgeText}>{unreadMessages > 99 ? '99+' : unreadMessages}</Text>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={s.iconBtn}
+                  onPress={openMenu}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <MCIcon name="view-grid-outline" size={22} color={colors.textPrimary} />
+                </TouchableOpacity>
+              </>
             )}
           </View>
         </View>
 
 
-        {/* ── Actions ────────────────────────────────────────────────────── */}
+        {/* ── Onglets (pills) : Mes amis (filtre du fil) · Favoris · Direct ─── */}
         {!searchOpen && (
-          <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider, marginTop: 8, paddingTop: 10, paddingBottom: 8 }}>
-            <FeedHeaderBadges
-              onMessages={goToMessages}
-              onNotifs={goToNotifs}
-              onMenu={openMenu}
-              onFavorites={() => nav.navigate('Favorites')}
-              onLive={() => nav.navigate('GoLive')}
-              onFriends={handleToggleFriends}
-              friendsActive={filter === 'following'}
-              colors={colors}
-            />
+          <View style={s.headerPills}>
+            {/* Mes amis — bascule le filtre du fil (Général ↔ Suivis). Pas de
+                chevron : c'est un filtre, pas une navigation. */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={handleToggleFriends}
+              style={[
+                s.headerPill,
+                { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider },
+                filter === 'following' && { backgroundColor: colors.primary + '18', borderColor: colors.primary + '40' },
+              ]}
+            >
+              <Icon
+                name="users"
+                size={16}
+                color={filter === 'following' ? colors.primary : colors.textSecondary}
+              />
+              <Text style={[
+                s.headerPillText,
+                { color: filter === 'following' ? colors.primary : colors.textSecondary,
+                  fontWeight: filter === 'following' ? '700' : '600' },
+              ]}>
+                {filter === 'following' ? 'Général' : 'Mes amis'}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Favoris — navigable : icône + libellé à gauche, chevron à droite */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => nav.navigate('Favorites')}
+              style={[s.headerPillNav, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
+            >
+              <View style={s.headerPillNavInner}>
+                <Icon name="heart" size={16} color={colors.textSecondary} />
+                <Text style={[s.headerPillText, { color: colors.textSecondary }]}>Favoris</Text>
+              </View>
+              <Icon name="chevron-right" size={15} color={colors.textTertiary} />
+            </TouchableOpacity>
+
+            {/* Direct — même fonction que l'ancien bouton "En direct" : ouvre
+                l'écran de diffusion en direct (GoLive). Seul le design change. */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => nav.navigate('GoLive')}
+              style={[s.headerPillNav, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
+            >
+              <View style={s.headerPillNavInner}>
+                <View style={{ position: 'relative' }}>
+                  <Icon name="send" size={16} color={colors.textSecondary} />
+                  <View style={{
+                    position: 'absolute', top: -2, right: -4,
+                    width: 7, height: 7, borderRadius: 4,
+                    backgroundColor: colors.liveTag,
+                    borderWidth: 1.5, borderColor: colors.backgroundSecondary,
+                  }} />
+                </View>
+                <Text style={[s.headerPillText, { color: colors.textSecondary }]}>Direct</Text>
+              </View>
+              <Icon name="chevron-right" size={15} color={colors.textTertiary} />
+            </TouchableOpacity>
           </View>
         )}
 
@@ -2252,7 +2275,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                     <AdCard
                       ad={searchAd}
                       colors={colors}
-                      isVisible={searchOpen}
+                      searchOverlay
                       onImpression={handleAdImpression}
                       onPress={handleAdPress}
                       onOpenFullscreen={setFullscreenAd}
@@ -2450,7 +2473,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                     <AdCard
                       ad={searchAd}
                       colors={colors}
-                      isVisible={searchOpen}
+                      searchOverlay
                       onImpression={handleAdImpression}
                       onPress={handleAdPress}
                       onOpenFullscreen={setFullscreenAd}
@@ -2587,7 +2610,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                       <AdCard
                         ad={searchAd}
                         colors={colors}
-                        isVisible={searchOpen}
+                        searchOverlay
                         onImpression={handleAdImpression}
                         onPress={handleAdPress}
                         onOpenFullscreen={setFullscreenAd}
@@ -2713,7 +2736,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           ref={feedListRef}
           data={items}
           keyExtractor={item => `${item.kind}-${item.id}`}
-          extraData={adSlotMap}
+          extraData={settledAdSlots}
           style={{ backgroundColor: colors.background }}
           contentContainerStyle={s.scroll}
           showsVerticalScrollIndicator={false}
@@ -2721,7 +2744,21 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           onViewableItemsChanged={onFeedViewableChanged}
           viewabilityConfig={feedViewabilityConfig}
           onScroll={handleFeedScroll}
+          onScrollBeginDrag={() => { userDraggingRef.current = true; }}
+          onScrollEndDrag={() => { userDraggingRef.current = false; }}
+          onMomentumScrollBegin={() => { userDraggingRef.current = true; }}
+          onMomentumScrollEnd={() => { userDraggingRef.current = false; }}
           scrollEventThrottle={100}
+          // NB : pas de maintainVisibleContentPosition ici. Testé, mais contre-
+          // productif sur CE feed : les cartes ont des hauteurs très variables et
+          // non déterministes (posts 0..N images, ExpandableText, rangées reels,
+          // carrousels, pubs qui se redimensionnent au chargement) et il n'y a pas
+          // de getItemLayout — RN ré-estime les hauteurs en permanence au scroll,
+          // et maintainVisibleContentPosition "compense" chaque correction d'estimation
+          // par un ajustement d'offset => saccades + retours en arrière au scroll.
+          // La stabilité au retour de focus est traitée à la source : header de liste
+          // à hauteur figée (voir FeedListHeader) + refresh silencieux qui ne
+          // remplace jamais `items` s'il est déjà scrollé (voir load(), branche silent).
           onEndReached={handleEndReached}
           onEndReachedThreshold={0.3}
           updateCellsBatchingPeriod={50}
@@ -3452,13 +3489,15 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
 
       {/* ── Media — encadré dans la carte, coins arrondis (radius média = 12) ─ */}
       <View style={fc.mediaWrap}>
-        <View style={[fc.mediaClip, { height: BANNER_H }]}>
+        <View style={[fc.mediaClip, videoUrl ? null : { height: BANNER_H }]}>
           {videoUrl ? (
             <InlineVideoPlayer
               uri={videoUrl}
               thumbnailUri={thumbUrl}
               aspectRatio={FC_INNER_W / BANNER_H}
               borderRadius={FeedRadius.media}
+              fixedHeight={BANNER_H}
+              resizeMode="cover"
               muted
               autoPlay={false}
               isActive={false}

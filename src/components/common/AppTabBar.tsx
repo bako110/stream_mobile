@@ -9,7 +9,6 @@ import Icon from 'react-native-vector-icons/Feather';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import { useWs } from '../../context/WebSocketContext';
 import { TAB_BAR_HEIGHT } from '../../styles';
 import { popToTabRoot } from '../../navigation/stackHygiene';
 
@@ -20,10 +19,10 @@ interface TabConfig {
 }
 
 const TABS: TabConfig[] = [
-  { name: 'Home',        icon: 'home',        label: 'Accueil'     },
-  { name: 'Communities', icon: 'users',        label: 'Communautés' },
-  { name: 'Reels',       icon: 'play-circle', label: 'Reels'       },
-  { name: 'Profile',     icon: 'user',        label: 'Profil'      },
+  { name: 'Home',        icon: 'home',        label: 'Accueil'    },
+  { name: 'Communities', icon: 'compass',     label: 'Découvrir'  },
+  { name: 'Reels',       icon: 'play-circle', label: 'Reels'      },
+  { name: 'Profile',     icon: 'user',        label: 'Profil'     },
 ];
 
 const CREATE_OPTIONS = [
@@ -37,7 +36,6 @@ export const AppTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, nav
   const { theme } = useTheme();
   const { colors } = theme;
   const insets = useSafeAreaInsets();
-  const { missedCallCount } = useWs();
   const [createOpen, setCreateOpen] = useState(false);
   // Zoom d'accessibilité système — au-delà d'un certain agrandissement, les 4
   // libellés + le bouton Créer central n'ont plus la place de tenir sur la
@@ -85,7 +83,6 @@ export const AppTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, nav
         {TABS.map((tab, index) => {
           const route     = state.routes.find(r => r.name === tab.name);
           const isFocused = !!route && state.routes[state.index]?.name === tab.name;
-          const badge     = tab.name === 'Profile' ? missedCallCount : 0;
 
           return (
             <React.Fragment key={tab.name}>
@@ -96,7 +93,6 @@ export const AppTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, nav
                 navigation={navigation}
                 activeColor={colors.primary}
                 inactiveColor={colors.textTertiary}
-                badge={badge}
                 showLabel={showLabels}
               />
               {/* Bouton Créer — entre Communautés (index 1) et Reels (index 2) */}
@@ -165,14 +161,14 @@ const CreateTabButton: React.FC<CreateTabButtonProps> = memo(({ open, onToggle, 
       <TouchableOpacity
         onPress={onToggle}
         style={styles.createBtnTouchable}
-        activeOpacity={0.75}
+        activeOpacity={0.85}
       >
         <View style={[
           styles.createBtn,
-          { backgroundColor: colors.background, borderColor: open ? colors.textPrimary : colors.divider },
+          { backgroundColor: colors.primary, borderColor: colors.surface },
         ]}>
           <Animated.View style={iconRotateStyle}>
-            <Icon name="plus" size={20} color={colors.textPrimary} />
+            <Icon name="plus" size={24} color="#fff" />
           </Animated.View>
         </View>
       </TouchableOpacity>
@@ -309,25 +305,25 @@ const styles = StyleSheet.create({
   createWrap: {
     alignItems:     'center',
     justifyContent: 'center',
-    width:          56,
+    width:          64,
   },
   createBtnTouchable: {
     alignItems:     'center',
     justifyContent: 'center',
-    marginTop:      -16, // dépasse légèrement au-dessus de la barre, sans FAB flottant décalé
+    marginTop:      -22, // le cercle bleu dépasse d'environ sa moitié au-dessus de la barre
   },
   createBtn: {
-    width:          46,
-    height:         46,
-    borderRadius:   23,
-    borderWidth:    1.5,
+    width:          52,
+    height:         52,
+    borderRadius:   26,
+    borderWidth:    3,      // liseré de la couleur de la barre → détache le cercle du fond
     alignItems:     'center',
     justifyContent: 'center',
     shadowColor:    '#000',
-    shadowOpacity:  0.12,
-    shadowRadius:   6,
-    shadowOffset:   { width: 0, height: 2 },
-    elevation:      3,
+    shadowOpacity:  0.18,
+    shadowRadius:   8,
+    shadowOffset:   { width: 0, height: 3 },
+    elevation:      6,
   },
   createMenu: {
     position:     'absolute',

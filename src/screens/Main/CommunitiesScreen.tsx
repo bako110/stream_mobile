@@ -7,7 +7,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { BackButton, CategorySelector, CONTENT_CATEGORIES } from '../../components/common';
+import { CategorySelector, CONTENT_CATEGORIES } from '../../components/common';
 import { CommunityCard } from '../../components/communities/CommunityCard';
 import { CommunityGridCard } from '../../components/communities/CommunityGridCard';
 import { CommunitySkeletonCard } from '../../components/communities/CommunitySkeleton';
@@ -370,21 +370,29 @@ export const CommunitiesScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={S.categoriesScroll} contentContainerStyle={S.categoriesRow}>
-        {CONTENT_CATEGORIES.filter(c => c.value !== 'autre').map(cat => (
-          <TouchableOpacity
-            key={cat.value}
-            onPress={() => handleCategoryPress(cat.value)}
-            activeOpacity={0.8}
-            style={S.categoryItem}
-          >
-            <View style={[S.categoryIconWrap, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
-              <Text style={S.categoryEmoji}>{cat.emoji}</Text>
-            </View>
-            <Text style={[S.categoryLabel, { color: colors.textSecondary }]} numberOfLines={1}>
-              {cat.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {CONTENT_CATEGORIES.filter(c => c.value !== 'autre').map(cat => {
+          // Vraie icône vectorielle (Feather/MaterialCommunityIcons), jamais
+          // d'emoji système — cohérent avec le reste du design de l'app.
+          const iconInfo = TEMPLATE_ICONS[cat.value] ?? { lib: 'feather' as const, name: 'grid' };
+          return (
+            <TouchableOpacity
+              key={cat.value}
+              onPress={() => handleCategoryPress(cat.value)}
+              activeOpacity={0.8}
+              style={S.categoryItem}
+            >
+              <View style={[S.categoryIconWrap, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
+                {iconInfo.lib === 'mc'
+                  ? <MCIcon name={iconInfo.name} size={20} color={colors.primary} />
+                  : <Icon name={iconInfo.name} size={18} color={colors.primary} />
+                }
+              </View>
+              <Text style={[S.categoryLabel, { color: colors.textSecondary }]} numberOfLines={1}>
+                {cat.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
     </View>
   );
@@ -942,33 +950,59 @@ export const CommunitiesScreen: React.FC = () => {
   // ── Rendu principal ──────────────────────────────────────────────────────────
   return (
     <View style={[S.root, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
+      {/* Toujours light-content : la bannière dégradée est immersive (le fond
+          sous la status bar est coloré, pas colors.surface), quel que soit
+          le thème clair/sombre. */}
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* ── Header ── */}
-      <View style={[S.header, {
-        backgroundColor: colors.surface,
-        paddingTop: insets.top + 10,
-        borderBottomColor: colors.divider,
-      }]}>
-        {/* Titre + sous-titre + bouton créer */}
-        <View style={S.headerRow}>
-          <BackButton onPress={() => nav.goBack()} />
-          <View style={{ flex: 1 }}>
-            <Text style={[S.headerTitle, { color: colors.textPrimary }]}>Communautés</Text>
-            <Text style={[S.headerSubtitle, { color: colors.textTertiary }]}>
-              Connecte-toi, partage et grandis ensemble
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => { resetForm(); setCreateOpen(true); }}
-            style={[S.createBtn, { backgroundColor: colors.primary }]}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-          >
-            <Icon name="plus" size={20} color="#fff" />
-          </TouchableOpacity>
-        </View>
+      <View style={[S.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
 
-        {/* Barre de recherche + filtre */}
+        {/* Bannière dégradée immersive — même identité que le reste de l'app
+            (colors.gradientStart → colors.gradientEnd), pas de couleurs en dur. */}
+        <LinearGradient
+          colors={[colors.gradientStart, colors.gradientEnd]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[S.banner, { paddingTop: insets.top + 6 }]}
+        >
+          {/* Seule la flèche retour occupe la barre du haut — le bouton de
+              création n'est PAS un bouton générique isolé à côté d'elle, il
+              fait partie du badge illustré ci-dessous (posé en superposition
+              dessus, comme sur la référence). Évite le "2 boutons ronds
+              identiques côte à côte" qui n'avait aucune hiérarchie claire. */}
+          <View style={S.bannerTopRow}>
+            <TouchableOpacity
+              onPress={() => nav.goBack()}
+              style={S.backBtn}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <Icon name="arrow-left" size={16} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Corps centré (badge groupe → titre → sous-titre), fidèle à la
+              référence — hauteur ramenée à ~50% : badge réduit (30px) et
+              marges resserrées. Le bouton "+" (créer une communauté) est posé
+              en coin du badge, couleur pleine — se distingue clairement de la
+              flèche translucide. */}
+          <View style={S.bannerBody}>
+            <View style={S.bannerIconWrap}>
+              <Icon name="users" size={15} color="#fff" />
+              <TouchableOpacity
+                onPress={() => { resetForm(); setCreateOpen(true); }}
+                style={S.bannerCreateBtn}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <Icon name="plus" size={9} color={colors.gradientStart ?? colors.primary} />
+              </TouchableOpacity>
+            </View>
+            <Text style={S.bannerTitle}>Communautés</Text>
+            <Text style={S.bannerSubtitle}>Connecte-toi, partage et grandis ensemble</Text>
+          </View>
+        </LinearGradient>
+
+        {/* Barre de recherche + filtre — remonte sur la bannière */}
         <View style={[S.searchWrap, {
           backgroundColor: colors.backgroundSecondary,
           borderColor: colors.divider,
@@ -1167,41 +1201,70 @@ const S = StyleSheet.create({
 
   // Header
   header: { borderBottomWidth: StyleSheet.hairlineWidth },
-  headerRow: {
+
+  // Bannière dégradée immersive (remplace l'ancien header plat) — layout
+  // centré (icône → titre → sous-titre) fidèle à la référence. Hauteur
+  // ramenée à ~50% de la version précédente : badge/texte/marges réduits
+  // proportionnellement, sous-titre sur une seule ligne.
+  banner: {
+    paddingHorizontal: 18,
+    paddingBottom: 10,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    overflow: 'hidden',
+  },
+  bannerTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingBottom: 14,
   },
-  headerTitle: { fontSize: 26, fontWeight: '800', letterSpacing: -0.6 },
-  headerSubtitle: { fontSize: 13, fontWeight: '500', marginTop: 2 },
+  bannerBody: { alignItems: 'center', marginTop: 2 },
+  bannerIconWrap: {
+    width: 30, height: 30, borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 4,
+  },
+  // Bouton "+" (créer) posé en coin du badge groupe — couleur pleine blanche,
+  // se distingue nettement de la flèche retour translucide.
+  bannerCreateBtn: {
+    position: 'absolute',
+    right: -4, bottom: -4,
+    width: 15, height: 15, borderRadius: 8,
+    backgroundColor: '#fff',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.4)',
+  },
+  bannerTitle: { fontSize: 15, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
+  bannerSubtitle: {
+    fontSize: 10.5, fontWeight: '500', color: 'rgba(255,255,255,0.85)',
+    marginTop: 1, textAlign: 'center', paddingHorizontal: 24,
+  },
   backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.16)',
   },
-  createBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // Search
+  // Search — chevauche le bas de la bannière (marge négative) comme sur la
+  // référence, avec une ombre pour la détacher visuellement.
   searchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
     marginHorizontal: 16,
+    marginTop: -10,
     marginBottom: 16,
     paddingHorizontal: 14,
     paddingVertical: 11,
     borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
   searchInput: { flex: 1, fontSize: 14, padding: 0 },
   filterBtn: {
@@ -1228,7 +1291,6 @@ const S = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth,
   },
-  categoryEmoji: { fontSize: 22 },
   categoryLabel: { fontSize: 11, fontWeight: '700', textAlign: 'center' },
 
   // Hero banner

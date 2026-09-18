@@ -1,11 +1,7 @@
 /**
- * Global WebSocket context — persistent connection + call history management.
- *
- * Single source of truth for call records:
- *  - call_offer   → creates a pending entry (direction = outgoing or incoming)
- *  - call_answer  → marks entry as answered, records connectedAt timestamp
- *  - call_hangup  → finalises entry (answered / missed / declined) + persists to MMKV
- *  - 30s timeout  → if pending call still not answered → marks as missed
+ * Global WebSocket context — persistent connection + unread counters + realtime
+ * events (follows, gifts, stories, live…). Les appels 1‑à‑1 ont été retirés de
+ * l'app (migrés vers une app dédiée).
  */
 import React, {
   createContext, useContext, useEffect, useRef, useCallback, useState, useMemo,
@@ -19,7 +15,6 @@ import { messageService } from '../services/messageService';
 import { notificationService } from '../services/notificationService';
 import { favoriteService } from '../services/favoriteService';
 import { liveService } from '../services/liveService';
-import { cancelCallNotification } from '../services/fcmService';
 import {
   createWsEventHandler,
   type NewFollowerPayload,
@@ -38,51 +33,6 @@ import {
 export type WsPayload = { [key: string]: any; type: string };
 type WsListener = (payload: WsPayload) => void;
 
-// ── Pending call tracker ──────────────────────────────────────────────────────
-
-interface PendingCall {
-  partnerId:   string;
-  partnerName: string;
-  avatarUrl?:  string;
-  callType:    'voice' | 'video';
-  direction:   'incoming' | 'outgoing';
-  callId:      string | null;
-  startedAt:   string;
-  connectedAt: number | null;   // Date.now() when connected
-  timeoutId:   ReturnType<typeof setTimeout> | null;
-}
-
-// Génère un identifiant unique par appel — permet de distinguer deux appels successifs
-// avec la même personne, pour qu'un call_hangup de l'appel précédent ne puisse jamais
-// être confondu avec un event du nouvel appel (voir filtrage par call_id dans CallScreen).
-export function generateCallId(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
-export interface CallLogEntry {
-  id:          string;
-  partnerId:   string;
-  partnerName: string;
-  avatarUrl?:  string;
-  callType:    'voice' | 'video';
-  direction:   'incoming' | 'outgoing' | 'missed';
-  durationSec: number;
-  startedAt:   string;
-}
-
-export interface IncomingCallPayload {
-  partnerId:     string;
-  partnerName:   string;
-  partnerAvatar: string | null;
-  callType:      'voice' | 'video';
-  offer:         any;
-  callId:        string | null;
-  // Appelant hors abonnements + call_silence_unknown activé (cf. backend,
-  // routers/messages.py handler call_offer) — la sonnerie doit rester
-  // silencieuse, l'appel reste affiché normalement sinon.
-  silent?:       boolean;
-}
-
 interface WebSocketContextValue {
   sendMessage:              (payload: object) => void;
   isConnected:              boolean;
@@ -96,19 +46,6 @@ interface WebSocketContextValue {
   clearUnreadActivity:      () => void;
   clearUnreadNotifications: () => void;
   setActiveChat:            (partnerId: string | null) => void;
-  missedCallCount:          number;
-  clearMissedCalls:         () => void;
-  notifyCallConnected: (partnerId: string) => void;
-  notifyCallEnded:     (partnerId: string) => void;
-  markCallAccepted:    (partnerId: string) => void;
-  markCallEnded:       (partnerId: string) => void;
-  isOutgoingCall:      (partnerId: string) => boolean;
-  getActiveCallId:     (partnerId: string) => string | null;
-  // Buffer: events arrivés avant que CallScreen soit monté
-  drainCallBuffer:     (partnerId: string) => WsPayload[];
-  // Appel entrant en attente de navigation
-  pendingIncomingCall:      IncomingCallPayload | null;
-  clearPendingIncomingCall: () => void;
   // Events temps-réel enrichis
   lastNewFollower:          NewFollowerPayload | null;
   lastGoGoldTransfer:         GoGoldTransferPayload | null;
@@ -138,17 +75,6 @@ const Ctx = createContext<WebSocketContextValue>({
   clearUnreadActivity:      () => {},
   clearUnreadNotifications: () => {},
   setActiveChat:            () => {},
-  missedCallCount:          0,
-  clearMissedCalls:         () => {},
-  notifyCallConnected:      () => {},
-  notifyCallEnded:          () => {},
-  markCallAccepted:         () => {},
-  markCallEnded:            () => {},
-  isOutgoingCall:           () => false,
-  getActiveCallId:          () => null,
-  drainCallBuffer:          () => [],
-  pendingIncomingCall:      null,
-  clearPendingIncomingCall: () => {},
   lastNewFollower:          null,
   lastGoGoldTransfer:         null,
   lastGiftReceived:         null,
@@ -167,7 +93,6 @@ const Ctx = createContext<WebSocketContextValue>({
 const WS_BASE        = API_BASE_URL.replace(/^http/, 'ws');
 const INITIAL_DELAY  = 1_000;
 const PING_INTERVAL  = 25_000;
-const CALL_TIMEOUT   = 30_000;
 
 export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountBlocked?: (reason?: string, contact?: string) => void }> = ({ children, onAccountBlocked }) => {
   const wsRef           = useRef<WebSocket | null>(null);
@@ -181,27 +106,11 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
   // true uniquement après confirmation via getMe() — évite les faux positifs fromSelf
   const myIdConfirmedRef  = useRef<boolean>(false);
   const activeChatRef   = useRef<string | null>(null);
-  const pendingCalls    = useRef<Map<string, PendingCall>>(new Map());
-  // Buffer des events call (ice/answer/hangup) arrivés avant que CallScreen soit monté.
-  // Chaque entrée garde son heure de réception : au drain, on ignore tout ce qui date de
-  // plus de CALL_EVENT_BUFFER_TTL_MS — sans ça, un call_hangup d'un appel déjà terminé
-  // pouvait rester piégé indéfiniment et être rejoué au montage du PROCHAIN appel avec
-  // cette même personne, le terminant instantanément côté appelant à tort.
-  const callEventBuffer = useRef<Map<string, { payload: WsPayload; receivedAt: number }[]>>(new Map());
-  const CALL_EVENT_BUFFER_TTL_MS = 10_000;
-  // IDs des appels déjà acceptés — bloquer les call_offer dupliqués
-  const acceptedCalls   = useRef<Set<string>>(new Set());
-  // IDs destinataires des appels sortants en cours — bloquer l'écho call_offer
-  const outgoingCallIds = useRef<Set<string>>(new Set());
 
   const [isConnected,         setIsConnected]         = useState(false);
   const [unreadMessages,      setUnreadMessages]      = useState(0);
   const [unreadActivity,      setUnreadActivity]      = useState(0);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
-  const [missedCallCount,     setMissedCallCount]     = useState(0);
-  const [pendingIncomingCall, setPendingIncomingCall] = useState<IncomingCallPayload | null>(null);
-
-  const clearPendingIncomingCall = useCallback(() => setPendingIncomingCall(null), []);
 
   // États des événements enrichis
   const [lastNewFollower,       setLastNewFollower]       = useState<NewFollowerPayload | null>(null);
@@ -253,105 +162,6 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
     onNotification:       ()  => { if (isMounted.current) setUnreadNotifications(n => n + 1); },
   }));
 
-  // CallScreen appelle drainCallBuffer au montage pour récupérer les events reçus avant lui.
-  // Les entrées trop anciennes (> TTL) sont ignorées — elles appartiennent à un appel déjà
-  // terminé, pas à celui qu'on vient de monter.
-  const drainCallBuffer = useCallback((partnerId: string): WsPayload[] => {
-    const buf = callEventBuffer.current.get(partnerId) ?? [];
-    callEventBuffer.current.delete(partnerId);
-    const now = Date.now();
-    return buf
-      .filter(entry => now - entry.receivedAt <= CALL_EVENT_BUFFER_TTL_MS)
-      .map(entry => entry.payload);
-  }, []);
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
-
-  const finalisePendingCall = useCallback((
-    partnerId: string,
-    direction: 'incoming' | 'outgoing' | 'missed',
-    _connectedAt: number | null,
-  ) => {
-    const pending = pendingCalls.current.get(partnerId);
-    if (!pending) return;
-    if (pending.timeoutId) clearTimeout(pending.timeoutId);
-    pendingCalls.current.delete(partnerId);
-
-    if (direction === 'missed' && isMounted.current) {
-      setMissedCallCount(c => c + 1);
-    }
-  }, []);
-
-  const registerPendingCall = useCallback((
-    partnerId:   string,
-    partnerName: string,
-    avatarUrl:   string | undefined,
-    callType:    'voice' | 'video',
-    direction:   'incoming' | 'outgoing',
-    callId:      string | null = null,
-  ) => {
-    // Cancel any existing pending entry for this partner (duplicate offer)
-    const existing = pendingCalls.current.get(partnerId);
-    if (existing?.timeoutId) clearTimeout(existing.timeoutId);
-
-    // 30s timeout → missed uniquement pour incoming, outgoing reste outgoing
-    const timeoutId = setTimeout(() => {
-      const p = pendingCalls.current.get(partnerId);
-      const timeoutDir = p?.direction === 'incoming' ? 'missed' : 'outgoing';
-      finalisePendingCall(partnerId, timeoutDir, null);
-    }, CALL_TIMEOUT);
-
-    pendingCalls.current.set(partnerId, {
-      partnerId, partnerName, avatarUrl, callType, direction, callId,
-      startedAt:   new Date().toISOString(),
-      connectedAt: null,
-      timeoutId,
-    });
-  }, [finalisePendingCall]);
-
-  // ── Call ID de l'appel en cours avec ce partenaire — permet à CallScreen de
-  // filtrer les events (hangup/ice/answer) d'un appel précédent déjà terminé ───
-  const getActiveCallId = useCallback((partnerId: string): string | null => {
-    return pendingCalls.current.get(partnerId)?.callId ?? null;
-  }, []);
-
-  // ── Called by CallScreen when WebRTC actually connects ────────────────────
-
-  const notifyCallConnected = useCallback((partnerId: string) => {
-    const pending = pendingCalls.current.get(partnerId);
-    if (!pending) return;
-    // Cancel miss timeout — call is live
-    if (pending.timeoutId) clearTimeout(pending.timeoutId);
-    pendingCalls.current.set(partnerId, { ...pending, connectedAt: Date.now(), timeoutId: null });
-  }, []);
-
-  // ── Called by CallScreen on hangup (from either side) ────────────────────
-
-  const notifyCallEnded = useCallback((partnerId: string) => {
-    const pending = pendingCalls.current.get(partnerId);
-    if (!pending) return;
-    const direction = pending.connectedAt
-      ? pending.direction          // was connected → answered call
-      : pending.direction === 'incoming' ? 'missed' : 'outgoing';
-    finalisePendingCall(partnerId, direction, pending.connectedAt);
-  }, [finalisePendingCall]);
-
-  // ── Called by CallScreen when user accepts — block duplicate call_offer ───
-
-  const markCallAccepted = useCallback((partnerId: string) => {
-    acceptedCalls.current.add(partnerId);
-    cancelCallNotification(partnerId).catch(() => {});
-  }, []);
-
-  const markCallEnded = useCallback((partnerId: string) => {
-    acceptedCalls.current.delete(partnerId);
-    outgoingCallIds.current.delete(partnerId);
-  }, []);
-
-  const isOutgoingCall = useCallback((partnerId: string): boolean => {
-    return outgoingCallIds.current.has(partnerId);
-  }, []);
-
   // ── refreshUnread ─────────────────────────────────────────────────────────
 
   const refreshUnread = useCallback(() => {
@@ -371,11 +181,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
   // ── WebSocket connect ─────────────────────────────────────────────────────
   // Toutes les callbacks appelées depuis onmessage/onclose sont dans des refs
   // pour eviter de recréer connect() a chaque render et de boucler le useEffect.
-  const registerPendingCallRef  = useRef(registerPendingCall);
-  const finalisePendingCallRef  = useRef(finalisePendingCall);
   const refreshUnreadRef        = useRef(refreshUnread);
-  useEffect(() => { registerPendingCallRef.current  = registerPendingCall;  }, [registerPendingCall]);
-  useEffect(() => { finalisePendingCallRef.current  = finalisePendingCall;  }, [finalisePendingCall]);
   useEffect(() => { refreshUnreadRef.current        = refreshUnread;        }, [refreshUnread]);
 
   const connect = useCallback(() => {
@@ -433,79 +239,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
         // planning est géré exclusivement par wsEventHandler (onNotification / onPlanningUpdate)
         // pour éviter les doublons.
 
-        if (payload.type === 'call_offer') {
-          const fromSelf    = (myIdConfirmedRef.current && payload.from === myIdRef.current)
-                           || outgoingCallIds.current.has(payload.from);
-          const alreadyLive = acceptedCalls.current.has(payload.from);
-          if (!fromSelf && !alreadyLive && isMounted.current) {
-            callEventBuffer.current.delete(payload.from);
-            registerPendingCallRef.current(
-              payload.from,
-              payload.from_name ?? 'Inconnu',
-              payload.from_avatar ?? undefined,
-              payload.call_type ?? 'voice',
-              'incoming',
-              payload.call_id ?? null,
-            );
-            // App au premier plan → naviguer directement
-            if (AppState.currentState === 'active' || AppState.currentState === 'inactive') {
-              setPendingIncomingCall({
-                partnerId:     payload.from,
-                partnerName:   payload.from_name ?? 'Inconnu',
-                partnerAvatar: payload.from_avatar ?? null,
-                callType:      payload.call_type ?? 'voice',
-                offer:         payload.sdp ?? null,
-                callId:        payload.call_id ?? null,
-                silent:        payload.silent === true,
-              });
-            }
-            // App en background → FCM + MMKV gèrent le réveil (handleBackgroundFCM)
-          }
-        }
-
-        if (payload.type === 'call_answer' && isMounted.current) {
-          const pending = pendingCalls.current.get(payload.from ?? payload.to);
-          if (pending) {
-            if (pending.timeoutId) clearTimeout(pending.timeoutId);
-            pendingCalls.current.set(pending.partnerId, {
-              ...pending,
-              connectedAt: Date.now(),
-              timeoutId:   null,
-            });
-          }
-        }
-
-        if (payload.type === 'call_hangup' && isMounted.current) {
-          const fromId = payload.from ?? payload.sender_id;
-          if (fromId) cancelCallNotification(fromId).catch(() => {});
-        }
-
-        if (payload.type === 'missed_call' && isMounted.current) {
-          setMissedCallCount(c => c + 1);
-        }
-
-        // Bufferisé avec timestamp — drainCallBuffer() ignore tout ce qui a expiré
-        // (CALL_EVENT_BUFFER_TTL_MS), pour qu'un vieux call_hangup ne survive jamais
-        // assez longtemps pour être rejoué au montage d'un appel ultérieur avec la
-        // même personne (voir commentaire sur callEventBuffer plus haut).
-        if ((payload.type === 'call_ice' || payload.type === 'call_answer' || payload.type === 'call_hangup') && isMounted.current) {
-          const fromId = payload.from ?? payload.sender_id;
-          if (fromId) {
-            const buf = callEventBuffer.current.get(fromId) ?? [];
-            buf.push({ payload, receivedAt: Date.now() });
-            callEventBuffer.current.set(fromId, buf);
-          }
-        }
-
-        if (payload.type === 'call_offer') {
-          const fromSelf = (myIdConfirmedRef.current && payload.from === myIdRef.current)
-                        || outgoingCallIds.current.has(payload.from);
-          if (!fromSelf) {
-            listeners.current.forEach(fn => { try { fn(payload); } catch {} });
-          }
-        } else {
-          listeners.current.forEach(fn => { try { fn(payload); } catch {} });
-        }
+        listeners.current.forEach(fn => { try { fn(payload); } catch {} });
 
         if (isMounted.current) {
           wsEventHandlerRef.current(payload);
@@ -557,27 +291,8 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
           // WS vivant en background — signaler qu'on est de nouveau actif
           wsRef.current.send(JSON.stringify({ type: 'presence_update', is_online: true }));
         }
-        // Appel entrant reçu via FCM pendant qu'on était en background
-        const raw = storage.getItem('pending_incoming_call');
-        if (raw) {
-          storage.removeItem('pending_incoming_call');
-          try {
-            const p = JSON.parse(raw);
-            const age = Date.now() - (p.received_at ?? 0);
-            if (age < 60_000 && p.caller_id && isMounted.current) {
-              setPendingIncomingCall({
-                partnerId:     p.caller_id,
-                partnerName:   p.caller_name ?? 'Inconnu',
-                partnerAvatar: p.caller_avatar || null,
-                callType:      p.call_type ?? 'voice',
-                offer:         p.offer ?? null,
-                callId:        p.call_id ?? null,
-              });
-            }
-          } catch {}
-        }
       } else if (next === 'background') {
-        // WS reste vivant pour les appels — mais signaler qu'on est hors ligne
+        // Signaler qu'on est hors ligne
         if (wsRef.current?.readyState === WebSocket.OPEN) {
           wsRef.current.send(JSON.stringify({ type: 'presence_update', is_online: false }));
         }
@@ -597,35 +312,12 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
   const clearUnreadMessages      = useCallback(() => setUnreadMessages(0), []);
   const clearUnreadActivity      = useCallback(() => setUnreadActivity(0), []);
   const clearUnreadNotifications = useCallback(() => setUnreadNotifications(0), []);
-  const clearMissedCalls         = useCallback(() => setMissedCallCount(0), []);
 
-  const sendMessage = useCallback((payload: object, _retryMs = 0) => {
-    const p = payload as any;
-    const readyState = wsRef.current?.readyState;
-    if (p.type?.startsWith('call_')) {
-      console.log('[WS] sendMessage', p.type, 'readyState=', readyState, 'retry=', _retryMs);
+  const sendMessage = useCallback((payload: object) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify(payload));
     }
-    if (readyState === WebSocket.OPEN) {
-      // Enregistrer AVANT d'envoyer pour bloquer l'écho immédiat du serveur
-      if (p.type === 'call_offer' && isMounted.current) {
-        outgoingCallIds.current.add(p.to);
-        registerPendingCall(
-          p.to,
-          p.to_name ?? p.to,
-          p.to_avatar ?? undefined,
-          p.call_type ?? 'voice',
-          'outgoing',
-          p.call_id ?? null,
-        );
-      }
-      wsRef.current!.send(JSON.stringify(payload));
-      return;
-    }
-    // WS pas encore OPEN — retry jusqu'a 8s pour les messages critiques d'appel
-    if (p.type && ['call_offer', 'call_answer', 'call_ice'].includes(p.type) && _retryMs < 8000) {
-      setTimeout(() => sendMessage(payload, _retryMs + 200), 200);
-    }
-  }, [registerPendingCall]);
+  }, []);
 
   // ── Contexte stable (connexion + actions) — re-render rare ──────────────
   const stableValue = useMemo(() => ({
@@ -635,15 +327,6 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
     removeListener,
     refreshUnread,
     setActiveChat,
-    notifyCallConnected,
-    notifyCallEnded,
-    markCallAccepted,
-    markCallEnded,
-    isOutgoingCall,
-    getActiveCallId,
-    drainCallBuffer,
-    clearPendingIncomingCall,
-    pendingIncomingCall,
     lastNewFollower,
     lastGoGoldTransfer,
     lastGiftReceived,
@@ -660,9 +343,6 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
   }), [
     sendMessage, isConnected, addListener, removeListener,
     refreshUnread, setActiveChat,
-    notifyCallConnected, notifyCallEnded, markCallAccepted, markCallEnded,
-    isOutgoingCall, getActiveCallId, drainCallBuffer,
-    pendingIncomingCall, clearPendingIncomingCall,
     lastNewFollower, lastGoGoldTransfer, lastGiftReceived, lastStoryAdded,
     lastStoryView, lastCommentOnContent, lastReactionOnContent, lastPresenceUpdate,
     lastConcertLive, lastLiveStarted, lastLiveEnded, liveUserIds, lastLiveViewersUpdated,
@@ -673,14 +353,12 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode; onAccountB
     unreadMessages,
     unreadActivity,
     unreadNotifications,
-    missedCallCount,
     clearUnreadMessages,
     clearUnreadActivity,
     clearUnreadNotifications,
-    clearMissedCalls,
   }), [
-    unreadMessages, unreadActivity, unreadNotifications, missedCallCount,
-    clearUnreadMessages, clearUnreadActivity, clearUnreadNotifications, clearMissedCalls,
+    unreadMessages, unreadActivity, unreadNotifications,
+    clearUnreadMessages, clearUnreadActivity, clearUnreadNotifications,
   ]);
 
   // Merge les deux pour l'interface publique (rétrocompatibilité totale)

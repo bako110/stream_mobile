@@ -62,3 +62,5 @@ export { GofolyxLoader } from './FolixLoader';
 export { CachedImage } from './CachedImage';
 export { HeartRain, RecentLikersAvatars, LikeNamesFeed } from './HeartRain';
 export { PriceWithLocal } from './PriceWithLocal';
+export { CodeInput } from './CodeInput';
+export { PinPad } from './PinPad';

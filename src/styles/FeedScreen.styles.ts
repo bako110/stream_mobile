@@ -46,12 +46,51 @@ export const feedStyles = StyleSheet.create({
     position: 'absolute', left: 0, right: 0, alignItems: 'center',
   },
   headerBrand: { fontSize: 22, fontWeight: '900', letterSpacing: 1 },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   // Boutons d'icône nus (pas de fond ni de bordure "bouton sur bouton") — style
   // Instagram/X. La zone de tap reste à 40px, l'icône visuellement légère.
   iconBtn: {
     width: 40, height: 40, borderRadius: 20,
     alignItems: 'center', justifyContent: 'center',
+  },
+
+  // ── Pills sous le header (Mes amis · Favoris · Direct) ────────────────────
+  headerPills: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+    paddingBottom: 10,
+  },
+  headerPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 40,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  // Variante navigable : contenu à gauche, chevron collé à droite (indique un
+  // tap qui ouvre un écran).
+  headerPillNav: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    height: 40,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+  },
+  headerPillNavInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  headerPillText: {
+    fontSize: 12.5,
+    fontWeight: '600',
   },
 
   // ── Filtres ───────────────────────────────────────────────────────────────

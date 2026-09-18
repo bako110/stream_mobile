@@ -42,7 +42,6 @@ export const Endpoints = {
     userReels:      (id: string) => `${V1}/users/${id}/reels`,
     userEvents:     (id: string) => `${V1}/users/${id}/events`,
     userConcerts:   (id: string) => `${V1}/users/${id}/concerts`,
-    callEligibility:(id: string) => `${V1}/users/${id}/call-eligibility`,
     follow:         (id: string) => `${V1}/users/${id}/follow`,
     followers:      (id: string) => `${V1}/users/${id}/followers`,
     following:      (id: string) => `${V1}/users/${id}/following`,
@@ -333,6 +332,8 @@ export const Endpoints = {
     giftTypes:        `${V1}/wallet/gifts`,
     withdraw:         `${V1}/wallet/withdraw`,
     withdrawHistory:  `${V1}/wallet/withdraw/history`,
+    pin:              `${V1}/wallet/pin`,
+    pinChange:        `${V1}/wallet/pin/change`,
     creatorProfile:   `${V1}/wallet/creator/profile`,
     creatorStats:     `${V1}/wallet/creator/stats`,
     creatorReels:     `${V1}/wallet/creator/top-reels`,
@@ -414,14 +415,6 @@ export const Endpoints = {
     save:   `${V1}/favorites`,
     unsave: (targetType: string, targetId: string) => `${V1}/favorites/${targetType}/${targetId}`,
     check:  (targetType: string, targetId: string) => `${V1}/favorites/check/${targetType}/${targetId}`,
-  },
-
-  // ── Appels (historique persistant) ───────────────────────────────────────
-  calls: {
-    log:     `${V1}/calls/log`,
-    history: `${V1}/calls/`,
-    byId:    (id: string) => `${V1}/calls/${id}`,
-    clear:   `${V1}/calls/`,
   },
 
   // ── E2EE — distribution de clés publiques (Signal Protocol) ──────────────
@@ -542,7 +535,9 @@ export const Endpoints = {
     byId:        (id: string) => `${V1}/ads/${id}`,
     update:      (id: string) => `${V1}/ads/${id}`,
     delete:      (id: string) => `${V1}/ads/${id}`,
-    feedNext:    (placement: string) => `${V1}/ads/feed/next?placement=${placement}`,
+    feedNext:    (placement: string, excludeIds?: string[]) =>
+      `${V1}/ads/feed/next?placement=${placement}` +
+      (excludeIds && excludeIds.length ? `&exclude_ids=${encodeURIComponent(excludeIds.join(','))}` : ''),
     impression:  (id: string) => `${V1}/ads/${id}/impression`,
     click:       (id: string) => `${V1}/ads/${id}/click`,
   },

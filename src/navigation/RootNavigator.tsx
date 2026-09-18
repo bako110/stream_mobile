@@ -19,8 +19,7 @@ import { ApiError }         from '../api/client';
 import NetInfo              from '@react-native-community/netinfo';
 import { useTheme }         from '../hooks/useTheme';
 import { decodeId }         from '../utils/slugId';
-import { setupFCM, resumePendingCallAccept } from '../services/fcmService';
-import { callConnectionService } from '../services/callConnectionService';
+import { setupFCM } from '../services/fcmService';
 import { UpdateBanner } from '../components/common/UpdateBanner';
 import { DownloadToast } from '../components/common/DownloadToast';
 import { cleanupImageCache } from '../services/imageCacheService';
@@ -79,40 +78,6 @@ export const RootNavigator: React.FC = () => {
     return () => sub.remove();
   }, []);
 
-  // Actions de l'utilisateur depuis l'écran d'appel natif Android (répondre/refuser),
-  // pris hors de l'app (verrouillé, autre appli) — même logique que les actions Notifee.
-  useEffect(() => {
-    const unsubscribe = callConnectionService.addListener(async (event, callId) => {
-      if (event === 'answer') {
-        const pendingRaw = storage.getItem('pending_incoming_call');
-        let pending: any = null;
-        try { pending = pendingRaw ? JSON.parse(pendingRaw) : null; } catch {}
-        storage.setItem('pending_call_accept', JSON.stringify({
-          caller_id:    callId,
-          caller_name:  pending?.caller_name ?? 'Inconnu',
-          caller_avatar: pending?.caller_avatar ?? '',
-          call_type:    pending?.call_type ?? 'voice',
-          call_id:      pending?.call_id ?? null,
-        }));
-        resumePendingCallAccept();
-      } else if (event === 'reject' || event === 'hangup') {
-        try {
-          const token = storage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-          if (token) {
-            const { API_BASE_URL } = require('../utils/constants');
-            await fetch(`${API_BASE_URL}/api/v1/messages/call/reject`, {
-              method:  'POST',
-              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-              body:    JSON.stringify({ caller_id: callId }),
-            });
-          }
-        } catch {}
-        storage.removeItem('pending_incoming_call');
-      }
-    });
-    return unsubscribe;
-  }, []);
-
   const navigatePendingUrl = () => {
     const url = pendingUrlRef.current;
     if (!url) return;
@@ -151,12 +116,6 @@ export const RootNavigator: React.FC = () => {
 
     const enterMain = () => {
       setAppState('main');
-      // Priorité absolue : reprendre un appel accepté depuis la notification, avant
-      // même setupFCM() (permissions/token/réseau, plus lent et faillible) — sinon
-      // l'accueil s'affiche et navigationRef.navigate('Call', ...) arrive trop tard
-      // ou jamais si une étape de setupFCM échoue en cours de route.
-      setTimeout(() => resumePendingCallAccept(), 50);
-      callConnectionService.setup();
       setTimeout(() => {
         setupFCM().catch((e) => console.warn('[FCM] setupFCM splash error:', e?.message ?? e));
       }, 500);
@@ -207,8 +166,6 @@ export const RootNavigator: React.FC = () => {
       return;
     }
     setAppState('main');
-    setTimeout(() => resumePendingCallAccept(), 50);
-    callConnectionService.setup();
     setTimeout(() => {
       setupFCM().catch((e) => console.warn('[FCM] setupFCM login error:', e?.message ?? e));
     }, 500);

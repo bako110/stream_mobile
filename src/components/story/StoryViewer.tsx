@@ -23,6 +23,15 @@ import { getLocalUri, getLocalUriAsync, cacheInBackground, invalidateCacheEntry 
 import { apiClient } from '../../api/client';
 import { networkService } from '../../services/networkService';
 import { useIsWifi } from '../../hooks/useIsWifi';
+import Reanimated, {
+  useSharedValue as useRSharedValue, useAnimatedStyle as useRAnimatedStyle,
+  withTiming as withRTiming, withDelay as withRDelay, withRepeat as withRRepeat,
+  withSequence as withRSequence, withSpring as withRSpring, Easing as REasing,
+  interpolate as rInterpolate, FadeInUp as RFadeInUp,
+} from 'react-native-reanimated';
+import { Gesture as RGesture, GestureDetector as RGestureDetector, GestureHandlerRootView as RGHRootView } from 'react-native-gesture-handler';
+import { AdvertiserRow as AdAdvertiserRow, adIsVideo as adIsVideoFn, adIsPhone as adIsPhoneFn } from '../ads';
+import { openPhoneMenu as openAdPhoneMenu } from '../../utils/phoneMenu';
 
 const AudioRecorderPlayerModule = require('react-native-audio-recorder-player');
 const AudioRecorderPlayerClass = AudioRecorderPlayerModule.default || AudioRecorderPlayerModule;
@@ -56,7 +65,6 @@ interface Props {
   currentUserId?:     string;
   onClose:            () => void;
   onNavigateToChat?:  (partnerId: string, partnerName: string, avatarUrl?: string) => void;
-  onNavigateToCall?:  (partnerId: string, partnerName: string, callType: 'voice' | 'video', avatarUrl?: string) => void;
 }
 
 // ── Lecteur vidéo story ───────────────────────────────────────────────────────
@@ -145,7 +153,12 @@ const StoryVideoView: React.FC<{ uri: string; paused: boolean; onReady: () => vo
   }, [paused, player]);
 
   useEffect(() => {
-    if (!resolvedUri || resolvedUri === player.src?.uri) return;
+    // player.source (et non .src) porte l'URI courante — voir VideoPlayer de
+    // react-native-video 7. On évite un replaceSourceAsync inutile si l'URI n'a
+    // pas changé (ex: re-render sans changement de resolvedUri).
+    let currentUri: string | undefined;
+    try { currentUri = player.source?.uri; } catch { /* source pas encore prête */ }
+    if (!resolvedUri || resolvedUri === currentUri) return;
     player.replaceSourceAsync({ uri: resolvedUri, bufferConfig: BUFFER_CFG }).catch(() => {});
   }, [resolvedUri]);
 
@@ -282,11 +295,16 @@ const MusicWidget: React.FC<{ audioUrl: string; audioName?: string | null; accen
 
 // ─── StoryAdSlide — pub plein ecran entre groupes de stories ─────────────────
 
-interface AdInfo { id: string; title: string; description?: string; cta_text?: string; cta_url?: string; creative_url?: string; thumbnail_url?: string; }
+interface AdInfo {
+  id: string; title: string; description?: string; cta_text?: string; cta_url?: string;
+  creative_url?: string; thumbnail_url?: string;
+  advertiser_id?: string; advertiser_name?: string; advertiser_logo?: string;
+}
 
-const StoryAdSlide: React.FC<{ ad: AdInfo; onSkip: () => void }> = ({ ad, onSkip }) => {
+const StoryAdSlide: React.FC<{ ad: AdInfo; onSkip: () => void; onClose: () => void }> = ({ ad, onSkip, onClose }) => {
   const { width: W, height: H } = Dimensions.get('window');
-  const isVideo = !!(ad.creative_url && (ad.creative_url.includes('.m3u8') || ad.creative_url.includes('/hls/')));
+  const adInsets = useSafeAreaInsets();
+  const isVideo = adIsVideoFn(ad);
   const adPlayer = useVideoPlayer(
     isVideo && ad.creative_url ? { uri: ad.creative_url } : 'about:blank',
     p => { p.loop = true; p.muted = false; p.volume = 1; },
@@ -297,17 +315,58 @@ const StoryAdSlide: React.FC<{ ad: AdInfo; onSkip: () => void }> = ({ ad, onSkip
     return () => { try { adPlayer.pause(); } catch {} };
   }, [isVideo, adPlayer]);
 
-  // Barre de progression animee (5s)
-  const prog = useRef(new Animated.Value(0)).current;
+  // ── reanimated : progression 5 s, entrée du contenu, rebond de la poignée ──
+  const prog = useRSharedValue(0);
+  const kburns = useRSharedValue(0);
+  const handleY = useRSharedValue(0);
   useEffect(() => {
-    Animated.timing(prog, { toValue: 1, duration: 5000, useNativeDriver: false }).start();
-  }, [prog]);
+    prog.value = withRTiming(1, { duration: 5000, easing: REasing.linear });
+    if (!isVideo && (ad.creative_url || ad.thumbnail_url)) {
+      kburns.value = withRTiming(1, { duration: 5000, easing: REasing.linear });
+    }
+    // 2 rebonds de la poignée swipe-up puis fige
+    handleY.value = withRDelay(400, withRRepeat(
+      withRSequence(
+        withRTiming(-5, { duration: 260, easing: REasing.out(REasing.quad) }),
+        withRSpring(0, { damping: 9, stiffness: 200 }),
+      ), 2, false,
+    ));
+  }, [prog, kburns, handleY, isVideo, ad.creative_url, ad.thumbnail_url]);
 
-  // L'impression est déjà enregistrée dans goNext() au moment d'afficher la pub.
-  // On ne la refait pas ici pour éviter le double comptage.
+  const progStyle = useRAnimatedStyle(() => ({ width: `${prog.value * 100}%` }));
+  const kburnsStyle = useRAnimatedStyle(() => ({ transform: [{ scale: rInterpolate(kburns.value, [0, 1], [1, 1.06]) }] }));
+  const handleStyle = useRAnimatedStyle(() => ({ transform: [{ translateY: handleY.value }] }));
+
+  const rawCta = (ad.cta_url ?? '').trim();
+  const phone = adIsPhoneFn(rawCta);
+  const openCta = () => {
+    apiClient.post(`/api/v1/ads/${ad.id}/click`).catch(() => {});
+    if (!rawCta) { onSkip(); return; }
+    if (phone) { openAdPhoneMenu(rawCta.replace(/^tel:/i, '')); onSkip(); return; }
+    Linking.openURL(rawCta).catch(() => {});
+    onSkip();
+  };
+
+  // Gestes du slide, comme une story normale :
+  //  swipe ↑  → ouvre le CTA
+  //  swipe ↓  → ferme complètement les stories (onClose)
+  //  tap      → passe au groupe suivant (onSkip)
+  const pan = RGesture.Pan()
+    .activeOffsetY([-14, 14])
+    .runOnJS(true)
+    .onEnd(e => {
+      if (e.translationY < -40) openCta();
+      else if (e.translationY > 80) onClose();
+    });
+  const tapNext = RGesture.Tap()
+    .maxDuration(250)
+    .runOnJS(true)
+    .onEnd(() => onSkip());
+  const slideGesture = RGesture.Race(pan, tapNext);
 
   return (
-    <Modal visible transparent animationType="fade" statusBarTranslucent>
+    <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
+      <RGHRootView style={{ flex: 1 }}>
       <View style={{ width: W, height: H, backgroundColor: '#000' }}>
         <StatusBar hidden translucent />
 
@@ -315,72 +374,65 @@ const StoryAdSlide: React.FC<{ ad: AdInfo; onSkip: () => void }> = ({ ad, onSkip
         {isVideo && ad.creative_url ? (
           <VideoView player={adPlayer} style={{ position: 'absolute', width: W, height: H }} resizeMode="cover" controls={false} />
         ) : (ad.creative_url || ad.thumbnail_url) ? (
-          <Image source={{ uri: ad.creative_url || ad.thumbnail_url }} style={{ position: 'absolute', width: W, height: H }} resizeMode="cover" />
+          <Reanimated.Image source={{ uri: ad.creative_url || ad.thumbnail_url }} style={[{ position: 'absolute', width: W, height: H }, kburnsStyle]} resizeMode="cover" />
         ) : (
-          // Pas de creative — fond gradient avec cercles decoratifs
           <LinearGradient colors={['#3B0764', '#7B3FF2', '#E0389A']} locations={[0, 0.5, 1]} style={{ position: 'absolute', width: W, height: H }}>
             <View style={{ position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(255,255,255,0.06)' }} />
             <View style={{ position: 'absolute', bottom: -60, left: -30, width: 250, height: 250, borderRadius: 125, backgroundColor: 'rgba(255,255,255,0.05)' }} />
           </LinearGradient>
         )}
 
-        {/* Gradient bas */}
         <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.88)']}
-          locations={[0.35, 0.65, 1]}
-          style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: H * 0.55 }}
+          colors={['transparent', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.9)']}
+          locations={[0.4, 0.7, 1]}
+          style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: H * 0.52 }}
         />
 
-        {/* Barre progression */}
-        <View style={{ position: 'absolute', top: 44, left: 8, right: 8, height: 2.5, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 2 }}>
-          <Animated.View style={{ height: '100%', backgroundColor: '#fff', borderRadius: 2, width: prog.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }} />
+        {/* Couche gestes PLEIN ÉCRAN, derrière les boutons : tap → suivant,
+            swipe ↑ → CTA. Les TouchableOpacity (X, poignée) sont au-dessus et
+            captent leur tap avant cette couche. */}
+        <RGestureDetector gesture={slideGesture}>
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
+        </RGestureDetector>
+
+        {/* Barre de progression — même style que les stories normales (2px blanche).
+            Décalée sous la status bar (insets.top) pour ne pas passer sous l'encoche. */}
+        <View style={{ position: 'absolute', top: adInsets.top + 8, left: 8, right: 8, flexDirection: 'row' }}>
+          <View style={{ flex: 1, height: 2, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.28)', overflow: 'hidden' }}>
+            <Reanimated.View style={[{ height: '100%', backgroundColor: '#fff', borderRadius: 2 }, progStyle]} />
+          </View>
         </View>
 
-        {/* Label Sponsorisé + bouton fermer */}
-        <View style={{ position: 'absolute', top: 52, left: 16, right: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '600' }}>Sponsorisé</Text>
-            <Icon name="globe" size={10} color="rgba(255,255,255,0.45)" />
-          </View>
-          <TouchableOpacity
-            onPress={onSkip}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            style={{ backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 16, padding: 6 }}
-          >
-            <Icon name="x" size={18} color="#fff" />
+        {/* Sponsorisé + fermer */}
+        <View style={{ position: 'absolute', top: adInsets.top + 20, left: 16, right: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 10, fontWeight: '600', letterSpacing: 1, textTransform: 'uppercase' }}>Sponsorisé</Text>
+          <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} style={{ backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 14, padding: 6 }}>
+            <Icon name="x" size={16} color="#fff" />
           </TouchableOpacity>
         </View>
 
-        {/* Contenu bas */}
-        <View style={{ position: 'absolute', bottom: 72, left: 20, right: 20 }}>
-          {/* Ligne annonceur */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
-              <Icon name="zap" size={16} color="#fff" />
-            </View>
-            <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }} numberOfLines={1}>
-              {ad.title}
-            </Text>
+        {/* Contenu bas — entrée fade-up, une phrase */}
+        <Reanimated.View entering={RFadeInUp.delay(180).duration(300)} style={{ position: 'absolute', bottom: 96, left: 20, right: 20 }}>
+          <View style={{ marginBottom: 10 }}>
+            <AdAdvertiserRow ad={ad as any} variant="dark" />
           </View>
-          {ad.description ? (
-            <Text style={{ color: 'rgba(255,255,255,0.78)', fontSize: 14, lineHeight: 20, marginBottom: 18 }} numberOfLines={2}>{ad.description}</Text>
-          ) : null}
-          {ad.cta_url ? (
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => {
-                apiClient.post(`/api/v1/ads/${ad.id}/click`).catch(() => {});
-                if (ad.cta_url) Linking.openURL(ad.cta_url).catch(() => {});
-                onSkip();
-              }}
-              style={{ alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.15)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 7 }}
-            >
-              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{ad.cta_text || 'En savoir plus'}</Text>
-              <Icon name="chevron-right" size={14} color="#fff" />
-            </TouchableOpacity>
-          ) : null}
-        </View>
+          <Text style={{ color: 'rgba(255,255,255,0.92)', fontSize: 15, fontWeight: '500', lineHeight: 21, letterSpacing: -0.1 }} numberOfLines={2}>
+            {ad.description || ad.title}
+          </Text>
+        </Reanimated.View>
+
+        {/* Poignée swipe-up */}
+        <Reanimated.View style={[{ position: 'absolute', left: 0, right: 0, bottom: 30, alignItems: 'center' }, handleStyle]}>
+          <TouchableOpacity activeOpacity={0.8} onPress={openCta} style={{ alignItems: 'center', gap: 5 }}>
+            <Icon name="chevron-up" size={20} color="rgba(255,255,255,0.85)" />
+            <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700', letterSpacing: 0.3, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 }}>
+              {ad.cta_text || (phone ? 'Contactez-nous' : 'En savoir plus')}
+            </Text>
+            <View style={{ width: 40, height: 3.5, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.45)' }} />
+          </TouchableOpacity>
+        </Reanimated.View>
       </View>
+      </RGHRootView>
     </Modal>
   );
 };
@@ -487,7 +539,7 @@ const StoryOverlaysRenderer: React.FC<{ overlaysJson: string }> = ({ overlaysJso
 
 export const StoryViewer: React.FC<Props> = ({
   groups, initialGroupIndex, initialStoryIndex, currentUserId,
-  onClose, onNavigateToChat, onNavigateToCall,
+  onClose, onNavigateToChat,
 }) => {
   const { addListener, removeListener } = useWs();
   const isWifi = useIsWifi();
@@ -496,7 +548,7 @@ export const StoryViewer: React.FC<Props> = ({
   const [groupIdx,    setGroupIdx]    = useState(initialGroupIndex);
   const [storyIdx,    setStoryIdx]    = useState(initialStoryIndex ?? 0);
   const [paused,      setPaused]      = useState(false);
-  type StoryAdInfo = { id: string; title: string; description?: string; cta_text?: string; cta_url?: string; creative_url?: string; thumbnail_url?: string };
+  type StoryAdInfo = { id: string; title: string; description?: string; cta_text?: string; cta_url?: string; creative_url?: string; thumbnail_url?: string; advertiser_id?: string; advertiser_name?: string; advertiser_logo?: string };
   // Une ad par TRANSITION entre groupes (clé = groupIdx qu'on quitte), pas une ad unique
   // réutilisée à chaque changement de créateur — avant, la même pub apparaissait à
   // chaque transition, quel que soit le nombre de stories vues.
@@ -509,30 +561,41 @@ export const StoryViewer: React.FC<Props> = ({
   const [showStoryAd, setShowStoryAd] = useState(false);
   const storyAdTimerRef               = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nextGroupIdxRef               = useRef<number>(0); // groupe cible apres la pub
+  // Sérialise les tirages — sans ça, les deux appels loadStoryAdForSlot(groupIdx)
+  // et loadStoryAdForSlot(groupIdx + 1) faits l'un après l'autre plus bas partent
+  // en parallèle AVANT que servedStoryAdIdsRef soit mis à jour par la réponse du
+  // premier : les deux requêtes envoient la même exclusion et reçoivent la même
+  // pub gagnante (même raisonnement que ReelsScreen.tsx loadAdForSlot).
+  const storyAdQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const loadStoryAdForSlot = useCallback((slotIdx: number, allowRepeat = false) => {
     if (loadingStoryAdSlotsRef.current.has(slotIdx) || adSlotsRef.current.has(slotIdx)) return;
     loadingStoryAdSlotsRef.current.add(slotIdx);
-    const excludeIds = allowRepeat ? '' : Array.from(servedStoryAdIdsRef.current).slice(-20).join(',');
-    const qs = excludeIds ? `&exclude_ids=${encodeURIComponent(excludeIds)}` : '';
-    apiClient.get<StoryAdInfo | null>(`/api/v1/ads/feed/next?placement=stories${qs}`)
-      .then(r => {
-        loadingStoryAdSlotsRef.current.delete(slotIdx);
-        // Stock de pubs actives épuisé pour cette session — recommence le cycle sans
-        // exclusion plutôt que de ne plus jamais afficher de pub après épuisement
-        // (même raisonnement que ReelsScreen.tsx loadAdForSlot).
-        if (!r?.data?.id) {
-          if (excludeIds) loadStoryAdForSlot(slotIdx, true);
-          return;
-        }
-        servedStoryAdIdsRef.current.add(r.data.id);
-        setAdSlots(prev => {
-          const next = new Map(prev);
-          next.set(slotIdx, r.data as StoryAdInfo);
-          return next;
-        });
-      })
-      .catch(() => { loadingStoryAdSlotsRef.current.delete(slotIdx); });
+
+    const fetchOne = (repeat: boolean): Promise<void> => {
+      const excludeIds = repeat ? '' : Array.from(servedStoryAdIdsRef.current).slice(-20).join(',');
+      const qs = excludeIds ? `&exclude_ids=${encodeURIComponent(excludeIds)}` : '';
+      return apiClient.get<StoryAdInfo | null>(`/api/v1/ads/feed/next?placement=stories${qs}`)
+        .then(r => {
+          // Stock de pubs actives épuisé pour cette session — recommence le cycle sans
+          // exclusion plutôt que de ne plus jamais afficher de pub après épuisement.
+          if (!r?.data?.id) {
+            if (excludeIds) return fetchOne(true);
+            return;
+          }
+          servedStoryAdIdsRef.current.add(r.data.id);
+          setAdSlots(prev => {
+            const next = new Map(prev);
+            next.set(slotIdx, r.data as StoryAdInfo);
+            return next;
+          });
+        })
+        .catch(() => {});
+    };
+
+    storyAdQueueRef.current = storyAdQueueRef.current
+      .then(() => fetchOne(allowRepeat))
+      .finally(() => { loadingStoryAdSlotsRef.current.delete(slotIdx); });
   }, []);
   const [menuOpen,    setMenuOpen]    = useState(false);
   const [editMode,    setEditMode]    = useState(false);
@@ -548,6 +611,11 @@ export const StoryViewer: React.FC<Props> = ({
   const [saved,       setSaved]       = useState(false);
   const [liked,       setLiked]       = useState(false);
   const [likeCount,   setLikeCount]   = useState(0);
+  // `groups` est une prop et `story.liked_by_me` reflète l'état au 1er fetch : si on
+  // like puis revient sur la même story (remount / navigation), l'état repartait à
+  // faux et on pouvait re-liker (toggle serveur → doublon / désync). On garde donc
+  // un override local, source de vérité tant que le viewer est monté.
+  const likeOverridesRef = useRef<Map<string, { liked: boolean; count: number }>>(new Map());
   const [likeToast,   setLikeToast]   = useState<{ name: string; avatar: string | null } | null>(null);
 
   // Réponse story (style WhatsApp)
@@ -634,8 +702,10 @@ export const StoryViewer: React.FC<Props> = ({
   // ── Like state — reset à chaque story ────────────────────────────────────
 
   useEffect(() => {
-    setLiked(story?.liked_by_me ?? false);
-    setLikeCount(story?.like_count ?? 0);
+    if (!story?.id) return;
+    const ov = likeOverridesRef.current.get(story.id);
+    setLiked(ov ? ov.liked : (story.liked_by_me ?? false));
+    setLikeCount(ov ? ov.count : (story.like_count ?? 0));
   }, [story?.id]);
 
   // ── WS : écoute story_liked (propriétaire reçoit la notif) ───────────────
@@ -669,15 +739,28 @@ export const StoryViewer: React.FC<Props> = ({
 
   const handleLikeBtn = useCallback(() => {
     if (!story || isOwn) return;
+    const sid = story.id;
     const newLiked = !liked;
+    const prevCount = likeCount;
     setLiked(newLiked);
     setLikeCount(c => newLiked ? c + 1 : Math.max(0, c - 1));
+    likeOverridesRef.current.set(sid, { liked: newLiked, count: newLiked ? prevCount + 1 : Math.max(0, prevCount - 1) });
     if (newLiked) showHeartAnim();
-    storyService.like(story.id).catch(() => {
-      setLiked(!newLiked);
-      setLikeCount(c => newLiked ? Math.max(0, c - 1) : c + 1);
-    });
-  }, [story, liked, isOwn, showHeartAnim]);
+    storyService.like(sid)
+      .then(res => {
+        // Le backend est un toggle : on aligne l'affichage sur ce qu'il a réellement fait.
+        const serverLiked = res?.action === 'added';
+        const serverCount = res?.like_count ?? (serverLiked ? prevCount + 1 : Math.max(0, prevCount - 1));
+        setLiked(serverLiked);
+        setLikeCount(serverCount);
+        likeOverridesRef.current.set(sid, { liked: serverLiked, count: serverCount });
+      })
+      .catch(() => {
+        setLiked(!newLiked);
+        setLikeCount(prevCount);
+        likeOverridesRef.current.set(sid, { liked: !newLiked, count: prevCount });
+      });
+  }, [story, liked, likeCount, isOwn, showHeartAnim]);
 
   const handleReplyFocus = useCallback(() => {
     setReplyFocused(true);
@@ -799,13 +882,25 @@ export const StoryViewer: React.FC<Props> = ({
     if (now - lastTapRef.current < 300) {
       if (tapTimerRef.current) { clearTimeout(tapTimerRef.current); tapTimerRef.current = null; }
       if (!isOwn && story && !liked) {
+        const sid = story.id;
+        const prevCount = likeCount;
         setLiked(true);
-        setLikeCount(c => c + 1);
+        setLikeCount(prevCount + 1);
+        likeOverridesRef.current.set(sid, { liked: true, count: prevCount + 1 });
         showHeartAnim();
-        storyService.like(story.id).catch(() => {
-          setLiked(false);
-          setLikeCount(c => Math.max(0, c - 1));
-        });
+        storyService.like(sid)
+          .then(res => {
+            const serverLiked = res?.action === 'added';
+            const serverCount = res?.like_count ?? (serverLiked ? prevCount + 1 : prevCount);
+            setLiked(serverLiked);
+            setLikeCount(serverCount);
+            likeOverridesRef.current.set(sid, { liked: serverLiked, count: serverCount });
+          })
+          .catch(() => {
+            setLiked(false);
+            setLikeCount(prevCount);
+            likeOverridesRef.current.set(sid, { liked: false, count: prevCount });
+          });
       }
     } else {
       tapTimerRef.current = setTimeout(() => {
@@ -814,7 +909,7 @@ export const StoryViewer: React.FC<Props> = ({
       }, 280);
     }
     lastTapRef.current = now;
-  }, [story, liked, isOwn, showHeartAnim, goNext]);
+  }, [story, liked, likeCount, isOwn, showHeartAnim, goNext]);
 
   // ── Swipe vertical (fermer) + horizontal (changer de groupe) ─────────────────
 
@@ -955,13 +1050,22 @@ export const StoryViewer: React.FC<Props> = ({
 
   // Slide pub entre groupes — avec lecture video si HLS
   if (showStoryAd && storyAd) {
-    return <StoryAdSlide ad={storyAd} onSkip={() => {
-      if (storyAdTimerRef.current) clearTimeout(storyAdTimerRef.current);
-      setShowStoryAd(false);
-      setPaused(false);
-      setGroupIdx(nextGroupIdxRef.current);
-      setStoryIdx(0);
-    }} />;
+    return <StoryAdSlide
+      ad={storyAd}
+      onSkip={() => {
+        if (storyAdTimerRef.current) clearTimeout(storyAdTimerRef.current);
+        setShowStoryAd(false);
+        setPaused(false);
+        setGroupIdx(nextGroupIdxRef.current);
+        setStoryIdx(0);
+      }}
+      onClose={() => {
+        if (storyAdTimerRef.current) clearTimeout(storyAdTimerRef.current);
+        setShowStoryAd(false);
+        stopAudio();
+        onClose();
+      }}
+    />;
   }
 
   return (
@@ -1375,18 +1479,6 @@ export const StoryViewer: React.FC<Props> = ({
                                 >
                                   <Icon name="message-circle" size={16} color="#fff" />
                                 </TouchableOpacity>
-                                <TouchableOpacity
-                                  style={[s.vActBtn, { backgroundColor: '#25D366' }]}
-                                  onPress={() => { closeViewers(); onNavigateToCall?.(v.id, vName, 'voice', v.avatar_url ?? undefined); }}
-                                >
-                                  <Icon name="phone" size={16} color="#fff" />
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                  style={[s.vActBtn, { backgroundColor: accent }]}
-                                  onPress={() => { closeViewers(); onNavigateToCall?.(v.id, vName, 'video', v.avatar_url ?? undefined); }}
-                                >
-                                  <Icon name="video" size={16} color="#fff" />
-                                </TouchableOpacity>
                               </View>
                             </View>
                           );
@@ -1437,18 +1529,6 @@ export const StoryViewer: React.FC<Props> = ({
                                   onPress={() => { closeViewers(); onNavigateToChat?.(r.sender.id, rName, r.sender?.avatar_url ?? undefined); }}
                                 >
                                   <Icon name="message-circle" size={16} color="#fff" />
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                  style={[s.vActBtn, { backgroundColor: '#25D366' }]}
-                                  onPress={() => { closeViewers(); onNavigateToCall?.(r.sender.id, rName, 'voice', r.sender?.avatar_url ?? undefined); }}
-                                >
-                                  <Icon name="phone" size={16} color="#fff" />
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                  style={[s.vActBtn, { backgroundColor: accent }]}
-                                  onPress={() => { closeViewers(); onNavigateToCall?.(r.sender.id, rName, 'video', r.sender?.avatar_url ?? undefined); }}
-                                >
-                                  <Icon name="video" size={16} color="#fff" />
                                 </TouchableOpacity>
                               </View>
                             </View>

@@ -2,8 +2,16 @@
  * InlineVideoPlayer — lecteur vidéo inline tap-to-play/pause.
  * Utilisé dans PostCard, PostDetailScreen, et partout où une vidéo
  * doit être jouée directement dans le flux sans naviguer vers un écran dédié.
+ *
+ * Cadrage adaptatif : le composant mesure sa propre largeur (onLayout, pas la
+ * largeur d'écran figée) et, dès que la vidéo est chargée (onLoad → width/height
+ * réels), recalcule sa hauteur sur le VRAI ratio de la vidéo — clampé entre
+ * portrait 3/4 et paysage 16/9 pour ne jamais occuper un écran entier ni
+ * devenir une bande trop fine. Avec resizeMode="contain", aucune image n'est
+ * rognée pendant la transition estimation → ratio réel.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import type { LayoutChangeEvent } from 'react-native';
 import {
   View, TouchableOpacity, StyleSheet, Image, Dimensions,
   Modal, StatusBar, BackHandler,
@@ -13,6 +21,15 @@ import Icon from 'react-native-vector-icons/Feather';
 import { getPlaybackPrefs } from '../../hooks/usePlaybackPrefs';
 
 const { width: SCREEN_W } = Dimensions.get('window');
+
+// Bornes de cadrage feed : une vidéo plus portrait que 3/4 est affichée en 3/4
+// (le reste tenu par le contain → fines bandes), une plus paysage que 16/9 en
+// 16/9. Évite les cartes vidéo hautes comme un écran entier ou plates comme un
+// bandeau.
+const MIN_RATIO = 3 / 4;   // portrait le plus haut autorisé
+const MAX_RATIO = 16 / 9;  // paysage le plus large autorisé
+const clampRatio = (r: number) =>
+  Number.isFinite(r) && r > 0 ? Math.min(Math.max(r, MIN_RATIO), MAX_RATIO) : 16 / 9;
 
 interface Props {
   uri:           string;
@@ -24,6 +41,22 @@ interface Props {
   showControls?: boolean;
   isActive?:     boolean;
   onPress?:      () => void;
+  // 'contain' (défaut) = vidéo entière visible, bandes noires si le ratio du
+  // cadre diffère — indispensable quand le ratio réel de la vidéo est inconnu.
+  // 'cover' = remplit le cadre en rognant.
+  resizeMode?:   'contain' | 'cover';
+  // Hauteur imposée par le parent (bannière promo au cadre maîtrisé). Quand
+  // fournie, le cadrage auto (mesure + onLoad) est désactivé — la vidéo occupe
+  // exactement cette hauteur avec le resizeMode demandé.
+  fixedHeight?:  number;
+  // Largeur exacte occupée par le lecteur, connue du parent (ex: CARD_INNER_W de
+  // PostCard). La passer évite le saut de layout « pleine largeur → largeur
+  // réelle » du premier rendu (onLayout arrive une frame trop tard).
+  width?:        number;
+  // true si `aspectRatio` vient de dimensions RÉELLES stockées côté serveur
+  // (post.video_width/height). Dans ce cas on ne « corrige » pas via onLoad —
+  // l'estimation EST la vérité, donc aucune bascule de hauteur à la lecture.
+  ratioIsExact?: boolean;
 }
 
 export const InlineVideoPlayer: React.FC<Props> = ({
@@ -36,6 +69,10 @@ export const InlineVideoPlayer: React.FC<Props> = ({
   showControls  = false,
   isActive,
   onPress,
+  resizeMode    = 'contain',
+  fixedHeight,
+  width: propW,
+  ratioIsExact  = false,
 }) => {
   const { autoplay: userAutoplay } = getPlaybackPrefs();
   const effectiveAutoPlay = autoPlay ?? userAutoplay;
@@ -45,11 +82,51 @@ export const InlineVideoPlayer: React.FC<Props> = ({
   const [isMuted, setIsMuted]       = useState(muted);
   const [fullscreen, setFullscreen] = useState(false);
 
+  // Largeur réelle occupée par le lecteur. Priorité à la valeur fournie par le
+  // parent (pas de saut au 1er rendu) ; sinon mesurée via onLayout ; sinon
+  // largeur d'écran en dernier recours.
+  const [measuredW, setMeasuredW] = useState(propW ?? 0);
+  // Ratio réel de la vidéo une fois chargée. On ne s'en sert QUE si l'estimation
+  // n'était pas déjà exacte (ratioIsExact) — évite une bascule de hauteur en
+  // pleine lecture quand on connaissait déjà les vraies dimensions.
+  const [naturalRatio, setNaturalRatio] = useState<number | null>(null);
+
   const player = useVideoPlayer({ uri }, p => {
     p.loop  = false;
     p.muted = muted;
     if (effectiveAutoPlay) p.play();
   });
+
+  // Dimensions réelles de la vidéo dès qu'elle est décodée (onLoad).
+  useEffect(() => {
+    if (ratioIsExact || fixedHeight != null) return; // estimation déjà fiable
+    let sub: { remove: () => void } | undefined;
+    try {
+      sub = player.addEventListener('onLoad', (d: { width?: number; height?: number }) => {
+        if (d?.width && d?.height && d.width > 0 && d.height > 0) {
+          setNaturalRatio(prev => {
+            const next = d.width! / d.height!;
+            // Ignore un écart minime (< 3%) — pas la peine de re-layouter pour ça.
+            return prev != null && Math.abs(prev - next) / next < 0.03 ? prev : next;
+          });
+        }
+      });
+    } catch { /* API indispo — on garde l'estimation */ }
+    return () => { try { sub?.remove(); } catch {} };
+  }, [player, ratioIsExact, fixedHeight]);
+
+  const onWrapLayout = (e: LayoutChangeEvent) => {
+    if (propW != null) return; // largeur déjà connue, onLayout inutile
+    const w = e.nativeEvent.layout.width;
+    if (w > 0 && Math.abs(w - measuredW) > 1) setMeasuredW(w);
+  };
+
+  // Ratio effectif : le vrai ratio vidéo si on a dû le mesurer, sinon
+  // l'estimation passée en prop, le tout clampé aux bornes feed.
+  const effectiveRatio = useMemo(
+    () => clampRatio(naturalRatio ?? aspectRatio),
+    [naturalRatio, aspectRatio],
+  );
 
   const toggleMute = () => {
     const next = !isMuted;
@@ -84,7 +161,8 @@ export const InlineVideoPlayer: React.FC<Props> = ({
     }
   }, [playing, showControls]);
 
-  const height = Math.round(SCREEN_W / aspectRatio);
+  const baseW = propW ?? (measuredW > 0 ? measuredW : SCREEN_W);
+  const height = fixedHeight ?? Math.round(baseW / effectiveRatio);
 
   // Ferme le fullscreen via le bouton Android back
   useEffect(() => {
@@ -98,9 +176,9 @@ export const InlineVideoPlayer: React.FC<Props> = ({
 
   if (showControls) {
     return (
-      <View style={[styles.wrap, { height, borderRadius, overflow: 'hidden' }]}>
+      <View onLayout={onWrapLayout} style={[styles.wrap, { height, borderRadius, overflow: 'hidden' }]}>
         {!started && thumbnailUri ? (
-          <Image source={{ uri: thumbnailUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          <Image source={{ uri: thumbnailUri }} style={StyleSheet.absoluteFill} resizeMode="contain" />
         ) : null}
 
         <VideoView
@@ -185,14 +263,14 @@ export const InlineVideoPlayer: React.FC<Props> = ({
   }
 
   return (
-    <View style={[styles.wrap, { height, borderRadius, overflow: 'hidden' }]}>
+    <View onLayout={onWrapLayout} style={[styles.wrap, { height, borderRadius, overflow: 'hidden' }]}>
 
       {/* Thumbnail avant le premier play */}
       {!started && thumbnailUri ? (
         <Image
           source={{ uri: thumbnailUri }}
           style={StyleSheet.absoluteFill}
-          resizeMode="cover"
+          resizeMode={resizeMode}
         />
       ) : null}
 
@@ -200,7 +278,7 @@ export const InlineVideoPlayer: React.FC<Props> = ({
       <VideoView
         player={player}
         style={StyleSheet.absoluteFill}
-        resizeMode="cover"
+        resizeMode={resizeMode}
         controls={false}
         surfaceType="texture"
       />

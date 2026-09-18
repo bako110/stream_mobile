@@ -20,19 +20,20 @@ interface Props {
   currentUser: User | null;
   colors: any;
   onNavigateToChat?: (partnerId: string, partnerName: string, avatarUrl?: string) => void;
-  onNavigateToCall?: (partnerId: string, partnerName: string, callType: 'voice' | 'video') => void;
   onNavigateToMyStories?: () => void;
 }
 
 // ── Dimensions ─────────────────────────────────────────────────────────────────
-// Alignées sur les tokens du feed (theme/feed → StoryCard). Cartes un peu plus
-// compactes qu'avant (72×100 au lieu de 76×112) : la barre gagne ~12px de vertical
-// pour un contenu identique.
+// La carte occupe désormais toute la hauteur de la barre (plus d'espace vide
+// au-dessus/dessous) : padding vertical du scroll ramené au minimum, hauteur de
+// carte recalculée en conséquence — largeur inchangée (tokens du feed).
 import { StoryCard as StoryCardToken } from '../../theme/feed';
-const CARD_W  = StoryCardToken.w;      // 72
-const CARD_H  = StoryCardToken.h;      // 100
-const RADIUS  = StoryCardToken.radius; // 12
-const CARD_GAP = StoryCardToken.gap;   // 8
+const CARD_W   = StoryCardToken.w;      // 72
+const RADIUS   = StoryCardToken.radius; // 12
+const CARD_GAP = StoryCardToken.gap;    // 8
+const BAR_V_PAD = 6;    // marge haut/bas minimale de la barre
+const CARD_H = 124;     // hauteur de carte — la barre ne garde qu'une mince
+                        // respiration autour (BAR_V_PAD de chaque côté)
 
 // Même palette que web/MediaPlaceholder — gradient déterministe depuis le nom
 const PALETTES: [string, string, string][] = [
@@ -49,7 +50,7 @@ function paletteBySeed(seed: string): [string, string, string] {
   return PALETTES[h % PALETTES.length];
 }
 
-export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToChat, onNavigateToCall, onNavigateToMyStories }) => {
+export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToChat, onNavigateToMyStories }) => {
   const [groups,      setGroups]      = useState<StoryGroup[]>([]);
   const [viewerOpen,  setViewerOpen]  = useState(false);
   const [viewerGroup, setViewerGroup] = useState(0);
@@ -154,87 +155,100 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
           decelerationRate="fast"
           snapToAlignment="start"
         >
-          {/* ── Ma story (carte style WhatsApp) ── */}
-          <LinearGradient
-            colors={myGroup ? brandGrad : ['transparent', 'transparent']}
-            style={[s.cardBorderWrap, !myGroup && { backgroundColor: colors.border ?? '#ddd' }]}
-          >
-          <TouchableOpacity
-            activeOpacity={0.85}
-            style={s.card}
-            onPress={myGroup
-              ? () => onNavigateToMyStories ? onNavigateToMyStories() : openViewer(0)
-              : () => setCreatorOpen(true)
-            }
-          >
-            {/* Fond : thumbnail si story existante, sinon couleur secondaire */}
-            {myThumb ? (
-              <CachedImage uri={myThumb} style={[s.cardBg, { width: CARD_W, height: CARD_H }]} resizeMode="cover" />
-            ) : myBg ? (
-              <View style={[s.cardBg, { backgroundColor: myBg }]} />
-            ) : (
-              <View style={[s.cardBg, { backgroundColor: colors.backgroundSecondary ?? '#f0f0f0' }]} />
-            )}
+          {/* ── Ma story ── */}
+          {myGroup ? (
+            // A déjà une story : carte "photo de fond" classique, comme les autres.
+            <LinearGradient colors={brandGrad} style={s.cardBorderWrap}>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={s.card}
+                onPress={() => onNavigateToMyStories ? onNavigateToMyStories() : openViewer(0)}
+              >
+                {myThumb ? (
+                  <CachedImage uri={myThumb} style={[s.cardBg, { width: CARD_W, height: CARD_H }]} resizeMode="cover" />
+                ) : myBg ? (
+                  <View style={[s.cardBg, { backgroundColor: myBg }]} />
+                ) : (
+                  <View style={[s.cardBg, { backgroundColor: colors.backgroundSecondary ?? '#f0f0f0' }]} />
+                )}
 
-            {/* Overlay sombre en bas */}
-            <LinearGradient
-              colors={['transparent', 'rgba(0,0,0,0.55)']}
-              style={s.cardOverlay}
-            />
+                <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={s.cardOverlay} />
 
-            {/* Upload spinner */}
-            {isUploading && (
-              <ActivityIndicator
-                size="small"
-                color="#fff"
-                style={{ position: 'absolute', top: 8, right: 8 }}
-              />
-            )}
+                {isUploading && (
+                  <ActivityIndicator size="small" color="#fff" style={{ position: 'absolute', top: 8, right: 8 }} />
+                )}
 
-            {/* Avatar du user en haut à gauche — ring gradient si story, simple sinon */}
-            <View style={s.cardAvatarWrap}>
-              {myGroup && !isUploading ? (
-                <LinearGradient colors={brandGrad} style={s.cardAvatarRing}>
-                  <View style={s.cardAvatarInner}>
-                    {currentUser?.avatar_url
-                      ? <CachedImage uri={currentUser.avatar_url} style={s.cardAvatar} />
-                      : <View style={[s.cardAvatarFallback, { backgroundColor: colors.primary ?? '#7B3FF2' }]}>
-                          <Text style={s.cardAvatarInitial}>{initials}</Text>
-                        </View>
-                    }
-                  </View>
-                </LinearGradient>
-              ) : (
-                // Pas de story → avatar simple sans ring
-                <View style={s.cardAvatarInner}>
-                  {currentUser?.avatar_url
-                    ? <CachedImage uri={currentUser.avatar_url} style={s.cardAvatar} />
-                    : <View style={[s.cardAvatarFallback, { backgroundColor: colors.backgroundSecondary ?? '#e0e0e0' }]}>
-                        <Text style={[s.cardAvatarInitial, { color: colors.primary ?? '#7B3FF2' }]}>{initials}</Text>
+                <View style={s.cardAvatarWrap}>
+                  {!isUploading ? (
+                    <LinearGradient colors={brandGrad} style={s.cardAvatarRing}>
+                      <View style={s.cardAvatarInner}>
+                        {currentUser?.avatar_url
+                          ? <CachedImage uri={currentUser.avatar_url} style={s.cardAvatar} />
+                          : <View style={[s.cardAvatarFallback, { backgroundColor: colors.primary ?? '#7B3FF2' }]}>
+                              <Text style={s.cardAvatarInitial}>{initials}</Text>
+                            </View>
+                        }
                       </View>
-                  }
+                    </LinearGradient>
+                  ) : (
+                    <View style={s.cardAvatarInner}>
+                      {currentUser?.avatar_url
+                        ? <CachedImage uri={currentUser.avatar_url} style={s.cardAvatar} />
+                        : <View style={[s.cardAvatarFallback, { backgroundColor: colors.backgroundSecondary ?? '#e0e0e0' }]}>
+                            <Text style={[s.cardAvatarInitial, { color: colors.primary ?? '#7B3FF2' }]}>{initials}</Text>
+                          </View>
+                      }
+                    </View>
+                  )}
                 </View>
-              )}
+
+                <TouchableOpacity
+                  style={[s.addBtn, { backgroundColor: colors.primary ?? '#7B3FF2', borderColor: colors.background ?? '#fff' }]}
+                  onPress={() => setCreatorOpen(true)}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                >
+                  <Icon name="plus" size={11} color="#fff" />
+                </TouchableOpacity>
+
+                <Text style={s.cardLabelAbs} numberOfLines={1}>Ma story</Text>
+                {myGroup.stories.length > 1 && (
+                  <Text style={s.cardCount}>{myGroup.stories.length} stories</Text>
+                )}
+              </TouchableOpacity>
+            </LinearGradient>
+          ) : (
+            // Pas encore de story : carte "Ajouter" — fond dégradé uni (pas de
+            // photo plaquée arbitrairement), avatar centré avec + superposé,
+            // grande initiale, comme la référence.
+            <View style={[s.cardBorderWrap, { padding: 0 }]}>
+              <TouchableOpacity activeOpacity={0.85} style={s.card} onPress={() => setCreatorOpen(true)}>
+                <LinearGradient colors={brandGrad} style={s.cardBg} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
+
+                <View style={s.addCardBody}>
+                  <View style={s.addCardAvatarWrap}>
+                    <View style={s.addCardAvatarInner}>
+                      {currentUser?.avatar_url
+                        ? <CachedImage uri={currentUser.avatar_url} style={s.cardAvatar} />
+                        : <View style={[s.cardAvatarFallback, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
+                            <Text style={s.cardAvatarInitial}>{initials}</Text>
+                          </View>
+                      }
+                    </View>
+                    <TouchableOpacity
+                      style={[s.addBtnOnAvatar, { backgroundColor: colors.primary ?? '#7B3FF2', borderColor: colors.gradientEnd ?? '#E0389A' }]}
+                      onPress={() => setCreatorOpen(true)}
+                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                    >
+                      <Icon name="plus" size={11} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={s.addCardInitial} numberOfLines={1}>{initials}</Text>
+                </View>
+
+                <Text style={s.cardLabelAbs} numberOfLines={1}>Ajouter</Text>
+              </TouchableOpacity>
             </View>
-
-            {/* Bouton + */}
-            <TouchableOpacity
-              style={[s.addBtn, { backgroundColor: colors.primary ?? '#7B3FF2', borderColor: colors.background ?? '#fff' }]}
-              onPress={() => setCreatorOpen(true)}
-              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-            >
-              <Icon name="plus" size={11} color="#fff" />
-            </TouchableOpacity>
-
-            {/* Label bas */}
-            <Text style={s.cardLabelAbs} numberOfLines={1}>
-              {myGroup ? 'Ma story' : 'Ajouter'}
-            </Text>
-            {myGroup && myGroup.stories.length > 1 && (
-              <Text style={s.cardCount}>{myGroup.stories.length} stories</Text>
-            )}
-          </TouchableOpacity>
-          </LinearGradient>
+          )}
 
           {/* ── Stories des autres ── */}
           {otherGroups.map((group, i) => {
@@ -365,9 +379,7 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
           initialGroupIndex={viewerGroup}
           currentUserId={currentUser?.id}
           onClose={() => { setViewerOpen(false); load(false); }}
-          onNavigateToChat={onNavigateToChat}
-          onNavigateToCall={onNavigateToCall}
-        />
+          onNavigateToChat={onNavigateToChat}        />
       )}
 
       <StoryCreator
@@ -382,11 +394,11 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
 const s = StyleSheet.create({
   container: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    height: CARD_H + 4 + 20,
+    height: CARD_H + 4 + BAR_V_PAD * 2,
   },
   scroll: {
     paddingHorizontal: 12,
-    paddingVertical:   10,
+    paddingVertical:   BAR_V_PAD,
     gap:               CARD_GAP,
     alignItems:        'flex-start',
   },
@@ -477,6 +489,31 @@ const s = StyleSheet.create({
     alignItems:    'center',
     justifyContent:'center',
     borderWidth:   2,
+  },
+
+  // ── Carte "Ajouter" (pas encore de story) — fond dégradé uni ────────────────
+  addCardBody: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  addCardAvatarWrap: { position: 'relative' },
+  addCardAvatarInner: {
+    width: 34, height: 34, borderRadius: 17,
+    overflow: 'hidden',
+    borderWidth: 2, borderColor: 'rgba(255,255,255,0.55)',
+  },
+  addBtnOnAvatar: {
+    position: 'absolute', bottom: -3, right: -3,
+    width: 16, height: 16, borderRadius: 8,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2,
+  },
+  addCardInitial: {
+    fontSize: 30,
+    fontWeight: '800',
+    color: 'rgba(255,255,255,0.85)',
   },
 
   // ── Caption story texte (centré dans la carte) ───────────────────────────────

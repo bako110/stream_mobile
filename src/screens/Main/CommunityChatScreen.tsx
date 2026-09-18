@@ -2071,11 +2071,12 @@ export const CommunityChatScreen: React.FC = () => {
                     <Text style={[S.uploadBarText, { color: job.status === 'error' ? '#ff3b30' : job.status === 'done' ? '#34c759' : colors.primary }]}>
                       {job.status === 'done'          ? 'Vidéo envoyée !'
                        : job.status === 'error'       ? (job.error ?? "Échec de l'envoi")
-                       : job.status === 'compressing' ? `Compression… ${job.progress}%`
+                       : job.status === 'compressing' ? `Préparation… ${job.progress}%`
+                       : job.status === 'processing'  ? 'Traitement…'
                        : `Envoi… ${job.progress}%`}
                     </Text>
                   </View>
-                  {job.status !== 'done' && job.status !== 'error' && (
+                  {job.status !== 'done' && job.status !== 'error' && job.status !== 'processing' && (
                     <Text style={[S.uploadBarPct, { color: colors.primary }]}>{job.progress}%</Text>
                   )}
                 </View>

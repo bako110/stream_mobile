@@ -1,6 +1,6 @@
 ﻿/**
  * ChatScreen — fenêtre de conversation entre deux utilisateurs
- * Supporte : texte, vocal, image, vidéo, fichiers, appels
+ * Supporte : texte, vocal, image, vidéo, fichiers
  */
 import React, {
   useState, useCallback, useEffect, useRef, useMemo,
@@ -25,7 +25,6 @@ import { useTheme } from '../../hooks/useTheme';
 import { Spacing } from '../../theme';
 import { messageService } from '../../services/messageService';
 import { authService } from '../../services/authService';
-import { userService } from '../../services/userService';
 import { uploadAudioFile, uploadMessageImage, uploadFileFromUri } from '../../services/uploadService';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
 import { useBackgroundUpload } from '../../hooks/useBackgroundUpload';
@@ -173,21 +172,6 @@ export const ChatScreen: React.FC = () => {
   const [partnerOnline,   setPartnerOnline]   = useState(initialIsOnline ?? false);
   const [partnerLastSeen, setPartnerLastSeen] = useState<string | null>(initialLastSeen ?? null);
 
-  // Éligibilité d'appel — masque le bouton Appeler plutôt que de laisser
-  // l'utilisateur cliquer pour rien (le rejet réel, côté serveur, reste
-  // en place comme filet de sécurité si le réglage change entre-temps).
-  // true tant que non chargé : évite de faire disparaître le bouton
-  // brièvement au premier rendu pour l'immense majorité des cas où l'appel
-  // est autorisé.
-  const [callEligible, setCallEligible] = useState(true);
-  useEffect(() => {
-    if (!partnerId) return;
-    let cancelled = false;
-    userService.getCallEligibility(partnerId)
-      .then(r => { if (!cancelled) setCallEligible(r.can_call); })
-      .catch(() => { /* silencieux — le bouton reste visible, le serveur reste le vrai filet de sécurité */ });
-    return () => { cancelled = true; };
-  }, [partnerId]);
   const [isBlocked,       setIsBlocked]       = useState(false);
   const [requestStatus,   setRequestStatus]   = useState<ConversationRequestStatus>('none');
   const [requestActionLoading, setRequestActionLoading] = useState(false);
@@ -809,16 +793,6 @@ export const ChatScreen: React.FC = () => {
     }
   };
 
-  // ── Call handlers ─────────────────────────────────────────────────────────
-  const startCall = (callType: 'voice' | 'video') => {
-    nav.navigate('Call', {
-      partnerId,
-      partnerName,
-      partnerAvatar: partnerAvatarUrl,
-      callType,
-      isIncoming: false,
-    });
-  };
 
   const isMine = (msg: Message) => myId && msg.sender_id === myId;
 
@@ -1435,16 +1409,6 @@ export const ChatScreen: React.FC = () => {
         >
           <Icon name={showSearch ? 'x' : 'search'} size={19} color={colors.textPrimary} />
         </TouchableOpacity>
-        {callEligible && (
-          <>
-            <TouchableOpacity style={styles.callBtn} onPress={() => startCall('voice')}>
-              <Icon name="phone" size={20} color={colors.textPrimary} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.callBtn} onPress={() => startCall('video')}>
-              <Icon name="video" size={20} color={colors.textPrimary} />
-            </TouchableOpacity>
-          </>
-        )}
         <TouchableOpacity
           style={styles.moreBtn}
           onPress={() => nav.navigate('ConversationDetails', {
@@ -1508,7 +1472,8 @@ export const ChatScreen: React.FC = () => {
               <Text style={[styles.uploadBarText, { color: job.status === 'error' ? '#ff3b30' : job.status === 'done' ? '#34c759' : colors.primary }]}>
                 {job.status === 'done'       ? 'Vidéo envoyée !'
                  : job.status === 'error'    ? (job.error ?? 'Échec de l\'envoi')
-                 : job.status === 'compressing' ? `Compression… ${job.progress}%`
+                 : job.status === 'compressing' ? `Préparation… ${job.progress}%`
+                 : job.status === 'processing' ? 'Traitement…'
                  : `Envoi… ${job.progress}%`}
               </Text>
             </View>

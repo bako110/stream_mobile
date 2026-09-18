@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, Image, StyleSheet,
-  ActivityIndicator, TextInput, Modal, RefreshControl,
+  ActivityIndicator, TextInput, Modal, RefreshControl, StatusBar, Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
@@ -177,8 +177,13 @@ export const AdminVerificationScreen: React.FC = () => {
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle={theme.isDark ? 'light-content' : 'dark-content'}
+      />
       {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + 8, backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+      <View style={[s.header, { paddingTop: insets.top + (Platform.OS === 'android' ? 8 : 6), backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
         <BackButton onPress={() => nav.goBack()} />
         <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Vérification des communautés</Text>
         <View style={{ width: 40 }} />

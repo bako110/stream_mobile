@@ -23,26 +23,15 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- Contacts -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
-    <!-- Appels WebRTC -->
+    <!-- Routage audio (partagé : live streaming + lecture vidéo) -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <!-- Notifications (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- Full-screen intent pour appels entrants (écran verrouillé) -->
-    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
     <!-- Upload de publications en arriere-plan (survit a l'app fermee) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <!-- Ecran d'appel natif (ConnectionService self-managed, comme WhatsApp) -->
-    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
-    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
-    <!-- Exemption optimisation batterie — evite que certains fabricants (Xiaomi/MIUI,
-         Huawei, Samsung) tuent l'app avant qu'un appel entrant ne puisse la reveiller -->
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <queries>
         <package android:name="com.facebook.katana" />
@@ -100,17 +89,6 @@
             <data android:scheme="https" android:host="gofolyx.com" />
         </intent-filter>
       </activity>
-
-      <!-- Ecran d'appel natif — ConnectionService self-managed -->
-      <service
-          android:name=".callconnection.CallConnectionService"
-          android:permission="android.permission.BIND_TELECOM_CONNECTION_SERVICE"
-          android:foregroundServiceType="phoneCall"
-          android:exported="true">
-        <intent-filter>
-            <action android:name="android.telecom.ConnectionService" />
-        </intent-filter>
-      </service>
 
       <!-- Override du foreground service de Notifee : sa lib le declare en
            "shortService" (plafonne a ~3 min sur Android 14+). On le repasse en

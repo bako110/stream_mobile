@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Dimensions, ScrollView,
+  ActivityIndicator, ScrollView, useWindowDimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
@@ -16,11 +16,17 @@ import { AvatarWithBadge } from './AvatarWithBadge';
 import type { UserPublic } from '../../types';
 import { FeedCardLayout, FeedRadius } from '../../theme/feed';
 
-const { width: SW } = Dimensions.get('window');
-// Carte large et visible — environ 45% de l'écran
-const CARD_W    = SW * 0.45;
-const COVER_H   = CARD_W * 0.5;
-const AVATAR_SZ = CARD_W * 0.4;
+// Carte large et visible — 40% de la largeur d'écran SUR TÉLÉPHONE. Sur
+// tablette, 40% de la largeur exploserait la carte : plafonné à une largeur
+// "confortable" (240px) au lieu de suivre le pourcentage sans limite.
+// useWindowDimensions() (réactif : rotation, split-screen, pliable) au lieu
+// de Dimensions.get('window') figé une seule fois au chargement du module.
+const CARD_MAX_W = 240;
+function useCardSizes() {
+  const { width: winW } = useWindowDimensions();
+  const cardW = Math.min(Math.round(winW * 0.40), CARD_MAX_W);
+  return { cardW, coverH: Math.round(cardW * 0.5), avatarSz: Math.round(cardW * 0.4) };
+}
 
 interface Props {
   users:       UserPublic[];
@@ -49,6 +55,7 @@ export const PeopleSuggestions: React.FC<Props> = ({ users, loading, onUserPress
   const nav = useNavigation<any>();
   const [itemState, setItemState] = useState<ItemState>({});
   const [joiningLiveId, setJoiningLiveId] = useState<string | null>(null);
+  const { cardW: CARD_W, coverH: COVER_H, avatarSz: AVATAR_SZ } = useCardSizes();
 
   const joinUserLive = useCallback(async (userId: string) => {
     if (joiningLiveId) return;
@@ -118,12 +125,15 @@ export const PeopleSuggestions: React.FC<Props> = ({ users, loading, onUserPress
       >
         {loading
           ? skeletons.map(i => (
-              <View key={i} style={[st.card, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+              <View key={i} style={[st.card, { width: CARD_W, backgroundColor: colors.surface, borderColor: colors.divider }]}>
                 {/* Cover skeleton */}
-                <View style={[st.cover, { backgroundColor: colors.surfaceElevated }]} />
+                <View style={[st.cover, { height: COVER_H, backgroundColor: colors.surfaceElevated }]} />
                 {/* Avatar skeleton */}
-                <View style={[st.avatarWrap, { borderColor: colors.background, backgroundColor: colors.surfaceElevated, marginTop: -(AVATAR_SZ / 2) }]} />
-                <View style={st.cardBody}>
+                <View style={[st.avatarWrap, {
+                  width: AVATAR_SZ + 4, height: AVATAR_SZ + 4, borderRadius: (AVATAR_SZ + 4) / 2,
+                  borderColor: colors.background, backgroundColor: colors.surfaceElevated, marginTop: -(AVATAR_SZ / 2),
+                }]} />
+                <View style={[st.cardBody, { paddingTop: AVATAR_SZ / 2 + 8 }]}>
                   <View style={{ height: 13, width: '65%', borderRadius: 6, backgroundColor: colors.surfaceElevated, marginTop: AVATAR_SZ / 2 + 10 }} />
                   <View style={{ height: 10, width: '45%', borderRadius: 5, backgroundColor: colors.surfaceElevated, marginTop: 7 }} />
                   <View style={[st.btnSkeleton, { backgroundColor: colors.surfaceElevated }]} />
@@ -143,7 +153,7 @@ export const PeopleSuggestions: React.FC<Props> = ({ users, loading, onUserPress
                 : (state === 'followed' || (item as any).is_following === true);
 
               return (
-                <View key={item.id} style={[st.card, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+                <View key={item.id} style={[st.card, { width: CARD_W, backgroundColor: colors.surface, borderColor: colors.divider }]}>
 
                   {/* Bouton X */}
                   <TouchableOpacity
@@ -159,7 +169,7 @@ export const PeopleSuggestions: React.FC<Props> = ({ users, loading, onUserPress
                     <LinearGradient
                       colors={[colors.primary + 'DD', colors.primary + '44']}
                       start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                      style={st.cover}
+                      style={[st.cover, { height: COVER_H }]}
                     />
                   </TouchableOpacity>
 
@@ -191,7 +201,7 @@ export const PeopleSuggestions: React.FC<Props> = ({ users, loading, onUserPress
                   </View>
 
                   {/* Infos */}
-                  <View style={st.cardBody}>
+                  <View style={[st.cardBody, { paddingTop: AVATAR_SZ / 2 + 8 }]}>
                     <TouchableOpacity onPress={() => onUserPress(item.id)} activeOpacity={0.8} style={{ alignItems: 'center', width: '100%' }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
                         <Text style={[st.name, { color: colors.textPrimary }]} numberOfLines={1}>{name}</Text>
@@ -274,13 +284,16 @@ const st = StyleSheet.create({
   seeAll:     { fontSize: 13, fontWeight: '700' },
   list:       { paddingHorizontal: FeedCardLayout.padH, gap: 10, paddingBottom: 4 },
 
-  card:       { width: CARD_W, borderRadius: FeedRadius.media, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
-  cover:      { width: '100%', height: COVER_H },
+  // width/height dépendants de la taille d'écran (CARD_W/COVER_H/AVATAR_SZ) ne
+  // sont PAS ici — ils viennent de useCardSizes() et sont appliqués en inline
+  // à chaque site d'usage (voir card/cover/avatarWrap/cardBody ci-dessous).
+  card:       { borderRadius: FeedRadius.media, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  cover:      { width: '100%' },
   closeBtn:   { position: 'absolute', top: 8, right: 8, zIndex: 10, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
 
-  avatarWrap: { width: AVATAR_SZ + 4, height: AVATAR_SZ + 4, borderRadius: (AVATAR_SZ + 4) / 2, borderWidth: 3, overflow: 'visible', alignSelf: 'center' },
+  avatarWrap: { borderWidth: 3, overflow: 'visible', alignSelf: 'center' },
 
-  cardBody:   { alignItems: 'center', paddingHorizontal: 12, paddingBottom: 14, paddingTop: AVATAR_SZ / 2 + 8, gap: 4 },
+  cardBody:   { alignItems: 'center', paddingHorizontal: 12, paddingBottom: 14, gap: 4 },
   name:       { fontSize: 14, fontWeight: '700', textAlign: 'center' },
   handle:     { fontSize: 11, textAlign: 'center' },
   signalPill: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 5, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8 },

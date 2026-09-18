@@ -31,7 +31,6 @@ interface Props {
   // active (fusionnées avec les abonnements ci-dessous, dédupliquées).
   conversations?: Array<{ partner_id: string; partner?: { id?: string; username?: string; full_name?: string; avatar_url?: string | null } }>;
   onNavigateToChat?: (partnerId: string, partnerName: string, avatarUrl?: string) => void;
-  onNavigateToCall?: (partnerId: string, partnerName: string, callType: 'voice' | 'video') => void;
   onNavigateToMyStories?: () => void;
 }
 
@@ -48,7 +47,7 @@ interface FriendOnly {
 const AVATAR_SIZE = 56;
 const RING_SIZE   = AVATAR_SIZE + 6;
 
-export const ConversationStoryBar: React.FC<Props> = ({ currentUser, colors, conversations, onNavigateToChat, onNavigateToCall, onNavigateToMyStories }) => {
+export const ConversationStoryBar: React.FC<Props> = ({ currentUser, colors, conversations, onNavigateToChat, onNavigateToMyStories }) => {
   const [groups,      setGroups]      = useState<StoryGroup[]>([]);
   const [friendsOnly, setFriendsOnly] = useState<FriendOnly[]>([]);
   const [viewerOpen,  setViewerOpen]  = useState(false);
@@ -304,7 +303,6 @@ export const ConversationStoryBar: React.FC<Props> = ({ currentUser, colors, con
           currentUserId={currentUser?.id}
           onClose={() => { setViewerOpen(false); load(false); }}
           onNavigateToChat={onNavigateToChat}
-          onNavigateToCall={onNavigateToCall}
         />
       )}
 

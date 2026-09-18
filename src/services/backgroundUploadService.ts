@@ -17,9 +17,10 @@ import type { VideoFolder, UploadFolder } from './uploadService';
 export type UploadJobType = 'reel' | 'post' | 'event' | 'concert' | 'message';
 
 export type UploadJobStatus =
-  | 'queued'
-  | 'compressing'
-  | 'uploading'
+  | 'queued'        // en file d'attente
+  | 'compressing'   // compression locale du fichier
+  | 'uploading'     // envoi du fichier (réseau)
+  | 'processing'    // fichier reçu — le serveur prépare la vidéo (HLS, miniature)
   | 'done'
   | 'error';
 
@@ -374,8 +375,14 @@ class BackgroundUploadService {
         opts.folder,
         undefined,
         undefined,
-        (pct) => {
-          const status: UploadJobStatus = pct < 85 ? 'compressing' : 'uploading';
+        (pct, phase) => {
+          // La phase vient directement d'uploadVideoFromUri ; fallback sur le %
+          // si absente (chemins qui n'appellent pas encore avec phase).
+          const status: UploadJobStatus =
+            phase === 'processing' ? 'processing'
+            : phase === 'uploading' ? 'uploading'
+            : phase === 'compressing' ? 'compressing'
+            : pct < 60 ? 'compressing' : pct < 75 ? 'uploading' : 'processing';
           const p = Math.min(99, Math.round(pct * 0.9));
           this.update(id, { status, progress: p });
           _foreground.progress(p, opts.label);
@@ -400,6 +407,11 @@ class BackgroundUploadService {
       });
     } catch (err: any) {
       const message = err?.message ?? 'Erreur inconnue';
+      console.error('[backgroundUpload] _runVideo FAILED —', {
+        label: opts.label, folder: opts.folder,
+        message, status: err?.status, name: err?.name,
+        raw: JSON.stringify(err ?? {}).slice(0, 500),
+      });
       this.update(id, { status: 'error', error: message });
       opts.onError?.(err instanceof Error ? err : new Error(message));
       await this._notifyError(opts.label);

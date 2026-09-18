@@ -105,11 +105,6 @@ export const userService = {
     await apiClient.put(Endpoints.users.updateLocation, { latitude, longitude });
   },
 
-  async getCallEligibility(userId: string): Promise<{ can_call: boolean; silent: boolean }> {
-    const res = await apiClient.get<{ can_call: boolean; silent: boolean }>(Endpoints.users.callEligibility(userId));
-    return res.data;
-  },
-
   async getPrivacy(): Promise<PrivacySettings> {
     const res = await apiClient.get<PrivacySettings>(Endpoints.users.privacy);
     return res.data;
@@ -133,8 +128,6 @@ export const userService = {
   },
 };
 
-export type CallPrivacy = 'everyone' | 'followers' | 'none';
-
 export interface PrivacySettings {
   privacy_profile_public:  boolean;
   privacy_show_activity:   boolean;
@@ -146,7 +139,4 @@ export interface PrivacySettings {
   privacy_allow_comments:  boolean;
   privacy_read_receipts:   boolean;
   privacy_show_typing:     boolean;
-  call_privacy:            CallPrivacy;
-  call_e2e_encryption:     boolean;
-  call_silence_unknown:    boolean;
 }

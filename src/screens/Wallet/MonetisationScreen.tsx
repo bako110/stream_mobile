@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api';
 import { Endpoints } from '../../api/endpoints';
+import { showWithdrawUnavailable } from '../../utils/withdrawAlert';
 
 type MonetStatus = 'none' | 'pending' | 'approved' | 'rejected';
 
@@ -27,7 +28,7 @@ const SECTIONS: { title: string; accent: string; rows: RowItem[] }[] = [
     rows: [
       { icon: 'trending-up',  color: '#8B5CF6', label: 'Statistiques',       sub: 'Vues, audience, évolution par contenu', screen: 'CreatorAnalytics' },
       { icon: 'dollar-sign',  color: '#22C55E', label: 'Revenus détaillés',  sub: 'Historique, par mois, par reel',       screen: 'RevenueDetail' },
-      { icon: 'credit-card',  color: '#10B981', label: 'Retirer mes gains',   sub: 'Virement bancaire ou Mobile Money',    screen: 'Withdraw' },
+      { icon: 'credit-card',  color: '#10B981', label: 'Retirer mes gains',   sub: 'Bientôt sur l\'app — via gofolyx.com', screen: 'Withdraw' },
     ],
   },
   {
@@ -143,7 +144,7 @@ export function MonetisationScreen() {
                     styles.row,
                     i < sec.rows.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
                   ]}
-                  onPress={() => nav.navigate(row.screen)}
+                  onPress={() => (row.screen === 'Withdraw' ? showWithdrawUnavailable() : nav.navigate(row.screen))}
                   activeOpacity={0.7}
                 >
                   <View style={[styles.iconWrap, { backgroundColor: row.color + '22' }]}>

@@ -5,9 +5,7 @@ import { toastService } from '../services/toastService';
 import { createBottomTabNavigator }   from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useNavigation, useNavigationState, CommonActions } from '@react-navigation/native';
-import { navigate as navRefNavigate } from './navigationRef';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useWs } from '../context/WebSocketContext';
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 import { FeedScreen as HomeScreen } from '../screens/Main/FeedScreen';
@@ -20,8 +18,6 @@ import { ProfileScreen }            from '../screens/Main/ProfileScreen';
 import { PlanningScreen }           from '../screens/Main/PlanningScreen';
 import { AppTabBar, NotificationToast } from '../components/common';
 import { UploadProgressBanner } from '../components/common/UploadProgressBanner';
-import { ActiveCallBar }        from '../components/call/ActiveCallBar';
-import { ActiveCallProvider }   from '../context/ActiveCallContext';
 import { ActiveVoiceBar }       from '../components/call/ActiveVoiceBar';
 import { ActiveVoiceProvider }  from '../context/ActiveVoiceContext';
 import { BattleInviteModal }    from '../components/battle/BattleInviteModal';
@@ -43,14 +39,11 @@ import { ChangePasswordScreen }  from '../screens/Main/ChangePasswordScreen';
 import { PrivacyScreen }         from '../screens/Main/PrivacyScreen';
 import { ChatScreen }            from '../screens/Main/ChatScreen';
 import { NewConversationScreen } from '../screens/Main/NewConversationScreen';
-import { NewCallScreen }         from '../screens/Main/NewCallScreen';
-import { CallHistoryScreen }     from '../screens/Main/CallHistoryScreen';
 import { ConversationDetailsScreen } from '../screens/Main/ConversationDetailsScreen';
 import { FollowingScreen }       from '../screens/Main/FollowingScreen';
 import { CommunitiesScreen }     from '../screens/Main/CommunitiesScreen';
 import { CommunitiesDiscoverScreen } from '../screens/Main/CommunitiesDiscoverScreen';
 import { CommunityChatScreen }   from '../screens/Main/CommunityChatScreen';
-import { CallScreen }            from '../screens/Main/CallScreen';
 import { EventsScreen }          from '../screens/Main/EventsScreen';
 import { NearbyEventsScreen }    from '../screens/Main/NearbyEventsScreen';
 import { ConcertsScreen }        from '../screens/Main/ConcertsScreen';
@@ -116,8 +109,8 @@ import { RevenueContentListScreen } from '../screens/Wallet/RevenueContentListSc
 import { RevenueTransactionsScreen } from '../screens/Wallet/RevenueTransactionsScreen';
 import { ContentAnalyticsDetailScreen } from '../screens/Wallet/ContentAnalyticsDetailScreen';
 import { ContentAnalyticsListScreen } from '../screens/Wallet/ContentAnalyticsListScreen';
-import WithdrawScreen              from '../screens/Wallet/WithdrawScreen';
 import TransferScreen              from '../screens/Wallet/TransferScreen';
+import { WalletPinScreen }         from '../screens/Wallet/WalletPinScreen';
 import BoostScreen                 from '../screens/Wallet/BoostScreen';
 import { ReferralScreen }          from '../screens/Wallet/ReferralScreen';
 import SubscriptionPlansScreen     from '../screens/Wallet/SubscriptionPlansScreen';
@@ -134,7 +127,6 @@ import { SettingsAbonnementScreen }    from '../screens/Settings/SettingsAbonnem
 import { SettingsApparenceScreen }     from '../screens/Settings/SettingsApparenceScreen';
 import { SettingsNotificationsScreen } from '../screens/Settings/SettingsNotificationsScreen';
 import { SettingsMessagesPrivacyScreen } from '../screens/Settings/SettingsMessagesPrivacyScreen';
-import { SettingsCallsPrivacyScreen } from '../screens/Settings/SettingsCallsPrivacyScreen';
 import { SettingsLectureScreen }       from '../screens/Settings/SettingsLectureScreen';
 import { SettingsDeviseScreen }        from '../screens/Settings/SettingsDeviseScreen';
 import { SettingsCompteScreen }        from '../screens/Settings/SettingsCompteScreen';
@@ -196,10 +188,7 @@ export type MainStackParamList = {
   ChangePassword:  undefined;
   Privacy:         undefined;
   Chat:            { partnerId: string; partnerName: string; avatarUrl?: string; isOnline?: boolean; lastSeen?: string | null };
-  Call:            { partnerId: string; partnerName: string; partnerAvatar?: string | null; callType: 'voice' | 'video'; isIncoming: boolean; offer?: any };
   NewConversation: undefined;
-  NewCall:         undefined;
-  CallHistory:         undefined;
   ConversationDetails: { partnerId: string; partnerName: string; avatarUrl?: string; isOnline?: boolean; lastSeen?: string | null; isVerified?: boolean };
   Following:       { userId?: string; tab?: 'followers' | 'following' } | undefined;
   CommunityChat:           { communityId: string; communityName: string };
@@ -260,8 +249,8 @@ export type MainStackParamList = {
   RevenueContentList:  { period?: 'all' | 'month' | 'year' } | undefined;
   RevenueTransactions: undefined;
   Monetisation:     undefined;
-  Withdraw:        undefined;
   Transfer:        { recipientId?: string; recipientName?: string; recipientAvatar?: string } | undefined;
+  WalletPin:       undefined;
   Boost:                    undefined;
   Referral:                 undefined;
   SubscriptionPlans:        undefined;
@@ -278,7 +267,6 @@ export type MainStackParamList = {
   SettingsApparence:         undefined;
   SettingsNotifications:     undefined;
   SettingsMessagesPrivacy:   undefined;
-  SettingsCallsPrivacy:      undefined;
   SettingsLecture:           undefined;
   SettingsDevise:            undefined;
   SettingsCompte:            undefined;
@@ -435,30 +423,6 @@ const ExitHandler: React.FC = () => {
   return null;
 };
 
-// ── IncomingCallHandler — écoute pendingIncomingCall et navigue dans le bon contexte ─
-
-const IncomingCallHandler: React.FC = () => {
-  const { pendingIncomingCall, clearPendingIncomingCall } = useWs();
-
-  useEffect(() => {
-    if (!pendingIncomingCall) return;
-    clearPendingIncomingCall();
-    console.log('[NAV] navigating to Call from IncomingCallHandler', pendingIncomingCall.partnerId);
-    navRefNavigate('Call', {
-      partnerId:     pendingIncomingCall.partnerId,
-      partnerName:   pendingIncomingCall.partnerName,
-      partnerAvatar: pendingIncomingCall.partnerAvatar,
-      callType:      pendingIncomingCall.callType,
-      isIncoming:    true,
-      offer:         pendingIncomingCall.offer,
-      callId:        pendingIncomingCall.callId,
-      silent:        pendingIncomingCall.silent,
-    });
-  }, [pendingIncomingCall, clearPendingIncomingCall]);
-
-  return null;
-};
-
 // ── MainNavigator ─────────────────────────────────────────────────────────────
 
 export const MainNavigator: React.FC<{
@@ -484,7 +448,6 @@ const SettingsWrapper = useCallback(
   }, []);
 
   return (
-    <ActiveCallProvider>
     <ActiveVoiceProvider>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Tabs"           children={() => <><ExitHandler /><Tabs onLogout={onLogout} onSwitchAccount={onSwitchAccount} /></>} />
@@ -518,10 +481,7 @@ const SettingsWrapper = useCallback(
         <Stack.Screen name="ChangePassword" component={ChangePasswordScreen}  options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Privacy"        component={PrivacyScreen}         options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Chat"           component={ChatScreen}            options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="Call"           component={CallScreen}            options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="NewConversation" component={NewConversationScreen} options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
-        <Stack.Screen name="NewCall"        component={NewCallScreen}         options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
-        <Stack.Screen name="CallHistory"         component={CallHistoryScreen}         options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="ConversationDetails" component={ConversationDetailsScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="CommunityChat"  component={CommunityChatScreen}   options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Following"      component={FollowingScreen}       options={{ animation: 'slide_from_right' }} />
@@ -579,8 +539,8 @@ const SettingsWrapper = useCallback(
         <Stack.Screen name="RevenueContentList"  component={RevenueContentListScreen}  options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="RevenueTransactions" component={RevenueTransactionsScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Monetisation"    component={MonetisationScreen}     options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="Withdraw"       component={WithdrawScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Transfer"       component={TransferScreen}        options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="WalletPin"      component={WalletPinScreen}       options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Boost"             component={BoostScreen}             options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Referral"          component={ReferralScreen}          options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="SubscriptionPlans"   component={SubscriptionPlansScreen}   options={{ animation: 'slide_from_right' }} />
@@ -610,7 +570,6 @@ const SettingsWrapper = useCallback(
         <Stack.Screen name="SettingsApparence"     component={SettingsApparenceScreen}     options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="SettingsNotifications" component={SettingsNotificationsScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="SettingsMessagesPrivacy" component={SettingsMessagesPrivacyScreen} options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="SettingsCallsPrivacy" component={SettingsCallsPrivacyScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="SettingsLecture"       component={SettingsLectureScreen}       options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="SettingsDevise"        component={SettingsDeviseScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="SettingsCompte" options={{ animation: 'slide_from_right' }}>
@@ -657,11 +616,8 @@ const SettingsWrapper = useCallback(
       </Stack.Navigator>
       <UploadProgressBanner />
       <NotificationToast />
-      <ActiveCallBar />
       <ActiveVoiceBar />
-      <IncomingCallHandler />
       <BattleInviteModal />
     </ActiveVoiceProvider>
-    </ActiveCallProvider>
   );
 };

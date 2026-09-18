@@ -1,0 +1,129 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "SF Pro Text", -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; background: #0A0A11; color: #fff; -webkit-font-smoothing: antialiased; }
+    a { color: #C9B3FF; } a:hover { color: #fff; }
+    .wrap { width: 390px; padding: 22px 0 44px; }
+    .kicker { font-size: 10.5px; font-weight: 800; letter-spacing: 1.4px; color: #6A6884; text-transform: uppercase; padding: 0 16px; margin: 0 0 4px; }
+    .lede { font-size: 12.5px; color: #9997B2; padding: 0 16px; margin: 0 0 18px; line-height: 1.55; }
+    .state { font-size: 10px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; color: #B79BFF; padding: 0 16px; margin: 22px 0 8px; display: flex; align-items: center; gap: 6px; }
+    .state::before { content: ""; width: 14px; height: 1.5px; background: #B79BFF; }
+    .grp { padding: 0 16px; margin-bottom: 8px; }
+    .tl { margin: 12px 16px 0; padding: 12px 14px; background: #12121C; border: 1px solid #23233A; border-radius: 12px; }
+    .tl h4 { margin: 0 0 8px; font-size: 10px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: #6A6884; }
+    .tl .row { display: flex; gap: 10px; font-size: 11px; color: #9997B2; padding: 3px 0; line-height: 1.55; }
+    .tl .row b { color: #E7E5F5; font-weight: 650; }
+    .tl code { font-family: ui-monospace, Menlo, monospace; font-size: 10px; background: rgba(183,155,255,0.12); color: #C9B3FF; padding: 1px 4px; border-radius: 4px; }
+    .tl .t { font-family: ui-monospace, Menlo, monospace; font-size: 10px; color: #B79BFF; flex-shrink: 0; width: 64px; font-weight: 600; }
+
+    /* 1 · Feed search overlay — editorial card on dark */
+    .oc { background: #10101A; border: 1px solid #23233A; border-radius: 16px; overflow: hidden; }
+    .oc-h { display: flex; align-items: center; gap: 10px; padding: 13px 13px 0; }
+    .oc-lg { width: 28px; height: 28px; border-radius: 7px; background: #221E33; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; letter-spacing: -0.3px; }
+    .oc-nm { font-size: 12.5px; font-weight: 650; color: #F0EFF8; }
+    .oc-mt { font-size: 10px; font-weight: 500; color: #77758F; margin-top: 1px; letter-spacing: 0.2px; }
+    .oc-cp { padding: 9px 13px 12px; font-size: 13.5px; line-height: 19px; color: #C7C5E0; letter-spacing: -0.1px; }
+    .oc-md { margin: 0 13px 12px; border-radius: 10px; aspect-ratio: 1.6; background: linear-gradient(135deg,#241C38,#3A1E33); }
+    .oc-c { display: flex; align-items: center; margin: 0 13px 13px; padding-top: 11px; border-top: 1px solid #23233A; gap: 6px; }
+    .oc-c .lk { font-size: 12.5px; font-weight: 650; color: #C9B3FF; }
+    .oc-c .dm { margin-left: auto; font-size: 9.5px; font-weight: 600; letter-spacing: 0.5px; color: #77758F; text-transform: uppercase; }
+
+    /* 2 · Reels search grid */
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+    .cell { position: relative; border-radius: 12px; overflow: hidden; aspect-ratio: 4/5; background: #151515; }
+    .th { position: absolute; inset: 0; }
+    .cell.reel .th { background: linear-gradient(160deg,#2A1B3D,#39202F); }
+    .g { position: absolute; left: 0; right: 0; bottom: 0; height: 72%; background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.35) 45%, rgba(0,0,0,0.92)); }
+    .cell.reel .i { position: absolute; left: 8px; right: 8px; bottom: 8px; }
+    .cell.reel .i .n { font-size: 11px; font-weight: 650; color: #fff; }
+    .cell.reel .i .c { font-size: 9.5px; color: rgba(255,255,255,0.5); margin-top: 2px; }
+    .play { position: absolute; top: 8px; right: 8px; width: 19px; height: 19px; border-radius: 10px; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; }
+
+    /* AD cell — editorial: no coloured badge, a thin top marker + word */
+    .cell.ad { border: 1px solid rgba(123,63,242,0.28); }
+    .cell.ad .th { background: linear-gradient(160deg,#211533,#39202F); }
+    .cell.ad::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, #7B3FF2, #E0389A); z-index: 2; }
+    .cell.ad .mk { position: absolute; top: 9px; left: 9px; font-size: 9px; font-weight: 700; letter-spacing: 1px; color: rgba(255,255,255,0.72); text-transform: uppercase; }
+    .cell.ad .i { position: absolute; left: 9px; right: 9px; bottom: 9px; }
+    .cell.ad .i .n { font-size: 12px; font-weight: 700; color: #fff; letter-spacing: -0.1px; }
+    .cell.ad .i .c { font-size: 10px; color: rgba(255,255,255,0.6); margin-top: 3px; line-height: 13px; }
+    .cell.ad .i .cta { display: inline-flex; align-items: center; gap: 4px; margin-top: 7px; font-size: 10px; font-weight: 700; color: #fff; }
+    svg { display: block; }
+  </style>
+</helmet>
+
+<div class="wrap">
+
+  <p class="kicker">Recherche · 2 contextes</p>
+  <p class="lede">Même logique éditoriale : la pub s'aligne sur ce qui l'entoure, le repère est <b>minimal</b> (un filet, un mot). Entrées <b>staggerées</b> comme les cellules autour.</p>
+
+  <p class="state">1 · Overlay recherche du Feed</p>
+  <div class="grp">
+    <div class="oc">
+      <div class="oc-h">
+        <div class="oc-lg">RV</div>
+        <div><div class="oc-nm">Rove</div><div class="oc-mt">Sponsorisé · rove.co</div></div>
+      </div>
+      <p class="oc-cp">Le sac cabine qui tient debout tout seul. Garanti à vie.</p>
+      <div class="oc-md"></div>
+      <div class="oc-c">
+        <span class="lk">Découvrir Rove</span>
+        <span class="dm">rove.co</span>
+      </div>
+    </div>
+  </div>
+  <p class="tl" style="background:none;border:none;padding:8px 2px 0;margin:0 16px;">
+    <span style="font-size:11px;color:#9997B2;line-height:1.55;">Entrée : <code style="font-family:ui-monospace,Menlo,monospace;font-size:10px;background:rgba(183,155,255,0.12);color:#C9B3FF;padding:1px 4px;border-radius:4px;">FadeInDown.duration(220)</code>. Header = logo + nom réels, <b style="color:#E7E5F5">CTA lien texte</b> (pas de bouton dans l'overlay). Une seule pub, en tête des résultats « Tout ».</span>
+  </p>
+
+  <p class="state">2 · Grille recherche des Reels</p>
+  <div class="grp">
+    <div class="grid">
+      <div class="cell reel">
+        <div class="th"></div><div class="g"></div>
+        <div class="play"><svg width="8" height="8" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg></div>
+        <div class="i"><div class="n">@maya.k</div><div class="c">make-up 2 min</div></div>
+      </div>
+      <div class="cell ad">
+        <div class="th"></div><div class="g"></div>
+        <span class="mk">Annonce</span>
+        <div class="i">
+          <div class="n">Kite Cycles</div>
+          <div class="c">Vélo électrique pliable, 60 km.</div>
+          <span class="cta">En savoir plus
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </span>
+        </div>
+      </div>
+      <div class="cell reel">
+        <div class="th"></div><div class="g"></div>
+        <div class="play"><svg width="8" height="8" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg></div>
+        <div class="i"><div class="n">@leo</div><div class="c">recette 30 s</div></div>
+      </div>
+      <div class="cell reel">
+        <div class="th"></div><div class="g"></div>
+        <div class="play"><svg width="8" height="8" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg></div>
+        <div class="i"><div class="n">@nadia</div><div class="c">danse</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tl">
+    <h4>Grille Reels — repère & animation</h4>
+    <div class="row"><span class="t">repère</span><span>plus de pastille rose pleine. <b>Filet gradient 2 px</b> en haut de cellule + le mot <code>Annonce</code> en capitales fines. Bordure <code>primary</code> à ~28 %.</span></div>
+    <div class="row"><span class="t">entrée</span><span><code>FadeIn.delay($index * 45).duration(200)</code> — la cellule pub suit le même stagger que les cellules reel (aujourd'hui : aucune anim).</span></div>
+    <div class="row"><span class="t">tap</span><span>image → ouvre <code>cta_url</code> ; vidéo → plein écran <code>AdSlide</code>. <code>/ads/:id/click</code> dans les deux cas.</span></div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

@@ -158,8 +158,6 @@ export const NotificationToast: React.FC = () => {
         });
         return;
       }
-
-      // call_offer et call_hangup gérés par Notifee full-screen uniquement
     };
 
     addListener(onWsEvent);

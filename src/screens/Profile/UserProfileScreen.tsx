@@ -9,8 +9,9 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
-  StyleSheet, ActivityIndicator, FlatList,
+  StyleSheet, ActivityIndicator, FlatList, StatusBar,
   InteractionManager, useWindowDimensions,
+  type NativeSyntheticEvent, type NativeScrollEvent,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -55,8 +56,13 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
   const FRIEND_CARD_W = (W - FRIEND_H_PAD * 2 - FRIEND_GAP * 2) / 3;
   const FRIEND_COVER  = FRIEND_CARD_W * 0.5;
   const FRIEND_AVT    = FRIEND_CARD_W * 0.44;
-  const pubGridCardW  = (W - 24 - 8) / 2;
-  const reelCardW     = (W - 24 - 10) / 3;
+  // Nombre de colonnes adaptatif : 2/3 sur téléphone, davantage sur tablette /
+  // pliable ouvert — sinon les vignettes deviennent démesurées et la grille
+  // paraît "mal disposée" sur les grands écrans.
+  const PUB_COLS  = Math.max(2, Math.min(4, Math.floor((W - 24) / 200)));
+  const REEL_COLS = Math.max(3, Math.min(6, Math.floor((W - 24) / 130)));
+  const pubGridCardW  = (W - 24 - 8 * (PUB_COLS - 1)) / PUB_COLS;
+  const reelCardW     = (W - 24 - 5 * (REEL_COLS - 1)) / REEL_COLS;
   const { userId } = route.params;
   const { currentUser } = useUser();
   const { lastPresenceUpdate, liveUserIds } = useWs();
@@ -96,6 +102,14 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
       setJoiningLive(false);
     }
   }, [joiningLive, userId, navigation]);
+
+  // Cale de status bar : visible seulement une fois la bannière dépassée.
+  const [scrolledPastBanner, setScrolledPastBanner] = useState(false);
+  const onProfileScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    // 180 = hauteur bannière (styles.bannerWrap) ; on bascule ~une ligne avant.
+    const past = e.nativeEvent.contentOffset.y > 180 - insets.top - 8;
+    setScrolledPastBanner(prev => (prev === past ? prev : past));
+  }, [insets.top]);
 
   // Content tabs
   const [activeTab, setActiveTab] = useState<ContentTab>('publications');
@@ -287,9 +301,18 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
     finally { setListLoadingMore(false); }
   };
 
+  const bar = (
+    <StatusBar
+      translucent
+      backgroundColor="transparent"
+      barStyle={theme.isDark ? 'light-content' : 'dark-content'}
+    />
+  );
+
   if (loading) {
     return (
       <View style={[styles.loadingRoot, { backgroundColor: colors.background }]}>
+        {bar}
         <SkeletonUserProfile />
       </View>
     );
@@ -298,6 +321,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
   if (!profile) {
     return (
       <View style={[styles.loadingRoot, { backgroundColor: colors.background }]}>
+        {bar}
         <Icon name="user-x" size={48} color={colors.textTertiary} />
         <Text style={{ color: colors.textSecondary, marginTop: 12 }}>Profil introuvable</Text>
       </View>
@@ -321,7 +345,13 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+      {bar}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 100 }}
+        onScroll={onProfileScroll}
+        scrollEventThrottle={16}
+      >
         {/* ── Banner ──────────────────────────────────────────────────── */}
         <View style={styles.bannerWrap}>
           <TouchableOpacity
@@ -980,6 +1010,20 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
         ) : null}
       </ScrollView>
 
+      {/* Cale de status bar — masquée en haut de page (bannière immersive), elle
+          apparaît dès qu'on a défilé au-delà de la bannière : la grille ne
+          "passe" alors plus sous l'heure/la batterie sur les écrans à encoche
+          haute, et les icônes système restent lisibles. */}
+      {scrolledPastBanner && (
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute', top: 0, left: 0, right: 0,
+            height: insets.top,
+            backgroundColor: colors.background,
+          }}
+        />
+      )}
 
       {/* ── Followers/Following list modal ─────────────────────────── */}
       {showList && (

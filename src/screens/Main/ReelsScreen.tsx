@@ -10,7 +10,8 @@ import {
 } from 'react-native';
 import Animated, {
   useSharedValue, useAnimatedStyle,
-  withSequence, withTiming, withSpring, withRepeat,
+  withSequence, withTiming, withSpring, withRepeat, withDelay,
+  Easing, interpolate, FadeIn,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector, TouchableOpacity as GHTouchableOpacity } from 'react-native-gesture-handler';
 import LinearGradient from 'react-native-linear-gradient';
@@ -35,6 +36,7 @@ import {
   CommentsBottomSheet, VerifiedBadge, ReportModal, GofolyxLoader, ShareBottomSheet, FriendsWhoLiked,
   HeartRain, LikeNamesFeed, AvatarWithBadge,
 } from '../../components/common';
+import { AdvertiserRow, AdCTA, adIsVideo, adIsPhone } from '../../components/ads';
 import { GiftPickerModal } from '../../components/wallet/GiftPickerModal';
 import type { Reel, ReactionType } from '../../types';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -51,8 +53,27 @@ type Nav = NativeStackNavigationProp<MainStackParamList>;
 const REEL_LIKE  = '#E0389A'; // rose — cœur "aimé", HeartRain, badges d'amis
 const REEL_MUSIC = '#7B3FF2'; // violet — bandeau musique, bouton + sur avatar
 
+// Surface "verre" unique pour TOUS les éléments d'overlay posés sur la vidéo
+// (boutons d'action, bandes info, cercle play/pause…). Avant, 5 opacités de noir
+// différentes (0.45 / 0.5 / 0.55) et 3 opacités de bordure cohabitaient pour des
+// éléments de même niveau — incohérent à l'œil. Une seule valeur partout.
+const OVERLAY_SURFACE = 'rgba(0,0,0,0.5)';
+const OVERLAY_BORDER  = 'rgba(255,255,255,0.18)';
+
 // Échelle de border-radius pour les zones NON-vidéo (grilles, sheets, menus).
 const RR = { chip: 8, media: 12, card: 16, pill: 999 } as const;
+
+// Tailles overlay dérivées du facteur d'échelle responsive (voir `ui` dans
+// ReelsScreen). Passé en prop à VideoSlide / AdSlide.
+type ReelUI = {
+  scale: number;
+  actionCircle: number; actionIcon: number; actionIconMC: number; actionLabel: number;
+  railGap: number; muteBtn: number; muteIcon: number;
+  headerTitle: number; headerIcon: number;
+  playPause: number; playPauseIcon: number;
+  musicDisc: number; reelInfoRight: number;
+  authorName: number; caption: number; commentBar: number;
+};
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -87,6 +108,12 @@ const USER_REELS_PAGE_LIMIT = 20;
 // SEARCH_AD_INTERVAL cartes (placement="search" côté backend, distinct de "reels").
 const SEARCH_AD_INTERVAL = 6;
 const SEARCH_PAGE_LIMIT = 20;
+// Durée minimale passée en arrière-plan avant qu'un retour sur l'écran Reels
+// déclenche un vrai reset (nouveau pool, page=1) plutôt qu'un simple
+// ré-ancrage sur le contenu déjà en mémoire. 3 min choisi pour ignorer les
+// aller-retours courts (verrouillage écran, notification) tout en couvrant
+// le cas réel signalé : app mise en arrière-plan puis reprise plus tard.
+const BACKGROUND_STALE_MS = 3 * 60_000;
 
 export const ReelsScreen: React.FC = () => {
   useKeepAwake();
@@ -101,6 +128,41 @@ export const ReelsScreen: React.FC = () => {
   const SCREEN_H = screenDims.height;
   const insets   = useSafeAreaInsets();
   const HEADER_H = insets.top + 54;
+
+  // ── Échelle responsive de l'UI overlay ──────────────────────────────────────
+  // Toutes les tailles de la surface overlay (colonne d'actions, header, bandes)
+  // dérivent d'UN facteur, au lieu d'être figées en px — sinon les icônes
+  // paraissent minuscules sur grand écran (iPad, ou Android téléphone en paysage,
+  // tous deux non verrouillés en portrait). Base = iPhone 14 (390×844). On prend
+  // le MIN des deux ratios pour ne pas gonfler l'UI en paysage (hauteur réduite),
+  // et on borne [1, 1.35] : jamais plus petit que la baseline téléphone déjà
+  // calibrée, jamais surdimensionné sur tablette.
+  const uiScale = useMemo(() => {
+    const raw = Math.min(SCREEN_W / 390, SCREEN_H / 844);
+    return Math.max(1, Math.min(raw, 1.35));
+  }, [SCREEN_W, SCREEN_H]);
+  const ui = useMemo(() => {
+    const r = (n: number) => Math.round(n * uiScale);
+    return {
+      scale:          uiScale,
+      actionCircle:   r(44),
+      actionIcon:     r(22),
+      actionIconMC:   r(24),
+      actionLabel:    r(11),
+      railGap:        r(14),
+      muteBtn:        r(34),
+      muteIcon:       r(16),
+      headerTitle:    r(22),
+      headerIcon:     r(20),
+      playPause:      r(64),
+      playPauseIcon:  r(36),
+      musicDisc:      r(40),
+      reelInfoRight:  r(84),   // dégagement de la colonne d'actions
+      authorName:     r(13),
+      caption:        r(12),
+      commentBar:     r(12),
+    };
+  }, [uiScale]);
   const { theme, isDark } = useTheme();
   const { colors }        = theme;
   const nav    = useNavigation<Nav>();
@@ -127,6 +189,12 @@ export const ReelsScreen: React.FC = () => {
   // immédiat en préchargement silencieux). Empêche deux players de sonner en même temps.
   const audioOwnerRef     = useRef<string | null>(null);
   const mountedRef        = useRef(true);
+  // Horodatage du passage en arrière-plan (null tant que l'app est active) —
+  // permet de distinguer un simple aller-retour rapide (verrouillage écran,
+  // notification) d'un vrai retour après un moment en arrière-plan, sans quoi
+  // le composant restant monté (React Navigation ne le démonte pas), l'écran
+  // ne rafraîchissait jamais son contenu au-delà du tout premier focus.
+  const backgroundedAtRef = useRef<number | null>(null);
   const searchTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchReqRef      = useRef('');
   const searchInputRef    = useRef<TextInput>(null);
@@ -168,35 +236,50 @@ export const ReelsScreen: React.FC = () => {
   const reelAdRef = useRef(false);
   reelAdRef.current = adSlots.size > 0;
 
+  // File d'attente — sérialise les chargements de slots pub. Sans ça, plusieurs
+  // slots demandés dans le même passage (voir useEffect[reels.length] plus bas)
+  // partaient en parallèle AVANT que servedAdIdsRef soit mis à jour par la réponse
+  // du premier : chaque requête envoyait donc la même exclusion (souvent vide), et
+  // le backend — qui trie par cpm_eur.desc() — renvoyait la même pub gagnante à
+  // tous les slots. En chaînant les appels, chaque requête part avec la liste
+  // d'exclusion à jour de tout ce qui a déjà été servi.
+  const adQueueRef = useRef<Promise<void>>(Promise.resolve());
+
   const loadAdForSlot = useCallback((slotIdx: number, allowRepeat = false) => {
     if (loadingAdSlotsRef.current.has(slotIdx) || adSlotsRef.current.has(slotIdx)) return;
     loadingAdSlotsRef.current.add(slotIdx);
-    // Bornage défensif — au-delà d'une vingtaine d'ads distinctes déjà servies dans la
-    // même session, on recommence à autoriser les répétitions plutôt que d'envoyer une
-    // liste d'exclusion qui grossirait indéfiniment sur un scroll très long.
-    const recentExcluded = allowRepeat ? [] : Array.from(servedAdIdsRef.current).slice(-20);
-    const excludeIds = recentExcluded.join(',');
-    const qs = excludeIds ? `&exclude_ids=${encodeURIComponent(excludeIds)}` : '';
-    apiClient.get<AdData0 | null>(`/api/v1/ads/feed/next?placement=reels${qs}`)
-      .then(r => {
-        loadingAdSlotsRef.current.delete(slotIdx);
-        if (!mountedRef.current) return;
-        // Aucune campagne restante hors exclusion (stock de pubs actives épuisé pour
-        // cette session) — plutôt que de laisser le slot vide en permanence, on
-        // recommence le cycle sans exclusion : mieux vaut revoir une pub déjà vue
-        // que ne plus jamais afficher aucune publicité après quelques scrolls.
-        if (!r.data) {
-          if (excludeIds) loadAdForSlot(slotIdx, true);
-          return;
-        }
-        servedAdIdsRef.current.add(r.data.id);
-        setAdSlots(prev => {
-          const next = new Map(prev);
-          next.set(slotIdx, r.data as AdData0);
-          return next;
-        });
-      })
-      .catch(() => { loadingAdSlotsRef.current.delete(slotIdx); });
+
+    const fetchOne = (repeat: boolean): Promise<void> => {
+      // Bornage défensif — au-delà d'une vingtaine d'ads distinctes déjà servies dans la
+      // même session, on recommence à autoriser les répétitions plutôt que d'envoyer une
+      // liste d'exclusion qui grossirait indéfiniment sur un scroll très long.
+      const recentExcluded = repeat ? [] : Array.from(servedAdIdsRef.current).slice(-20);
+      const excludeIds = recentExcluded.join(',');
+      const qs = excludeIds ? `&exclude_ids=${encodeURIComponent(excludeIds)}` : '';
+      return apiClient.get<AdData0 | null>(`/api/v1/ads/feed/next?placement=reels${qs}`)
+        .then(r => {
+          if (!mountedRef.current) return;
+          // Aucune campagne restante hors exclusion (stock de pubs actives épuisé pour
+          // cette session) — plutôt que de laisser le slot vide en permanence, on
+          // recommence le cycle sans exclusion : mieux vaut revoir une pub déjà vue
+          // que ne plus jamais afficher aucune publicité après quelques scrolls.
+          if (!r.data) {
+            if (excludeIds) return fetchOne(true);
+            return;
+          }
+          servedAdIdsRef.current.add(r.data.id);
+          setAdSlots(prev => {
+            const next = new Map(prev);
+            next.set(slotIdx, r.data as AdData0);
+            return next;
+          });
+        })
+        .catch(() => {});
+    };
+
+    adQueueRef.current = adQueueRef.current
+      .then(() => fetchOne(allowRepeat))
+      .finally(() => { loadingAdSlotsRef.current.delete(slotIdx); });
   }, []);
   const [menuReel,      setMenuReel]      = useState<Reel | null>(null);
   const [editReel,      setEditReel]      = useState<Reel | null>(null);
@@ -243,29 +326,40 @@ export const ReelsScreen: React.FC = () => {
   searchAdSlotsRef.current = searchAdSlots;
   const loadingSearchAdSlotsRef = useRef<Set<number>>(new Set());
   const servedSearchAdIdsRef = useRef<Set<string>>(new Set());
+  // Même sérialisation que loadAdForSlot (feed reels) — sans elle, les appels
+  // multi-slots (voir les boucles `for` qui appellent loadSearchAdForSlot pour
+  // plusieurs slots d'un coup) partent en parallèle avec la même exclusion et le
+  // backend renvoie la même pub gagnante à tous les emplacements de la grille.
+  const searchAdQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const loadSearchAdForSlot = useCallback((slotIdx: number, allowRepeat = false) => {
     if (loadingSearchAdSlotsRef.current.has(slotIdx) || searchAdSlotsRef.current.has(slotIdx)) return;
     loadingSearchAdSlotsRef.current.add(slotIdx);
-    const recentExcluded = allowRepeat ? [] : Array.from(servedSearchAdIdsRef.current).slice(-20);
-    const excludeIds = recentExcluded.join(',');
-    const qs = excludeIds ? `&exclude_ids=${encodeURIComponent(excludeIds)}` : '';
-    apiClient.get<SearchAdData | null>(`/api/v1/ads/feed/next?placement=search${qs}`)
-      .then(r => {
-        loadingSearchAdSlotsRef.current.delete(slotIdx);
-        if (!mountedRef.current) return;
-        if (!r.data) {
-          if (excludeIds) loadSearchAdForSlot(slotIdx, true);
-          return;
-        }
-        servedSearchAdIdsRef.current.add(r.data.id);
-        setSearchAdSlots(prev => {
-          const next = new Map(prev);
-          next.set(slotIdx, r.data as SearchAdData);
-          return next;
-        });
-      })
-      .catch(() => { loadingSearchAdSlotsRef.current.delete(slotIdx); });
+
+    const fetchOne = (repeat: boolean): Promise<void> => {
+      const recentExcluded = repeat ? [] : Array.from(servedSearchAdIdsRef.current).slice(-20);
+      const excludeIds = recentExcluded.join(',');
+      const qs = excludeIds ? `&exclude_ids=${encodeURIComponent(excludeIds)}` : '';
+      return apiClient.get<SearchAdData | null>(`/api/v1/ads/feed/next?placement=search${qs}`)
+        .then(r => {
+          if (!mountedRef.current) return;
+          if (!r.data) {
+            if (excludeIds) return fetchOne(true);
+            return;
+          }
+          servedSearchAdIdsRef.current.add(r.data.id);
+          setSearchAdSlots(prev => {
+            const next = new Map(prev);
+            next.set(slotIdx, r.data as SearchAdData);
+            return next;
+          });
+        })
+        .catch(() => {});
+    };
+
+    searchAdQueueRef.current = searchAdQueueRef.current
+      .then(() => fetchOne(allowRepeat))
+      .finally(() => { loadingSearchAdSlotsRef.current.delete(slotIdx); });
   }, []);
 
   // Refs stables pour éviter les closures stales
@@ -630,6 +724,20 @@ export const ReelsScreen: React.FC = () => {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── App mise en arrière-plan / reprise ───────────────────────────────────
+  // Se contente d'horodater le passage en arrière-plan ; c'est useFocusEffect
+  // qui décide au retour si ça justifie un vrai reset (cf. BACKGROUND_STALE_MS
+  // plus bas). Ne relance rien ici directement : l'écran peut très bien être
+  // backgroundé alors qu'il n'est même pas l'écran actif (autre onglet ouvert).
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'background' || state === 'inactive') {
+        backgroundedAtRef.current = Date.now();
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
   // ── Focus ─────────────────────────────────────────────────────────────────
   // paramsRef.current est toujours frais (mis à jour à chaque render, avant useFocusEffect)
   useFocusEffect(useCallback(() => {
@@ -686,8 +794,40 @@ export const ReelsScreen: React.FC = () => {
       if (!didFocusOnceRef.current) {
         load(false);
       } else {
+        // Retour d'un vrai séjour en arrière-plan (app mise en veille puis
+        // reprise) au-delà de BACKGROUND_STALE_MS : reset complet, page=1,
+        // nouveau pool — sans ça le composant restant monté par React
+        // Navigation, l'utilisateur retombait indéfiniment sur le contenu
+        // déjà en mémoire du tout premier chargement.
+        const backgroundedAt = backgroundedAtRef.current;
+        backgroundedAtRef.current = null;
+        const backgroundedFor = backgroundedAt ? Date.now() - backgroundedAt : 0;
+        if (backgroundedFor > BACKGROUND_STALE_MS) {
+          load(false);
+          return () => {
+            setScreenFocused(false);
+            try { activePlayerRef.current?.pause(); } catch {}
+            requestAnimationFrame(() => sendViewForCurrent());
+          };
+        }
         const age = Date.now() - lastLoadedAtRef.current;
         if (age > 90_000) load(true);
+        // Ré-ancre la position sur le reel en cours au retour de focus. Sans ça,
+        // si la FlatList a été virtualisée pendant qu'on était sur une autre page,
+        // le contentOffset restauré par RN pouvait être légèrement décalé —
+        // onScrollUpdate arrondissait alors sur un index voisin et lançait la
+        // mauvaise vidéo ("scroll au hasard"). Verrou isScrollingRef posé pour
+        // qu'onScrollUpdate ignore cette correction. Différé d'une frame : la liste
+        // doit être remontée/mesurée avant le scrollToOffset.
+        const idx = currentIdxRef.current;
+        if (idx > 0) {
+          isScrollingRef.current = true;
+          if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
+          scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 600);
+          requestAnimationFrame(() => {
+            listRef.current?.scrollToOffset({ offset: SCREEN_H * toRenderedIndex(idx), animated: false });
+          });
+        }
       }
     }
 
@@ -878,7 +1018,9 @@ export const ReelsScreen: React.FC = () => {
           screenW={SCREEN_W}
           screenH={SCREEN_H}
           insetBottom={insets.bottom}
+          ui={ui}
           onAuthorPress={onAuthorPress}
+          onEnd={goNextReel}
         />
       );
     }
@@ -905,9 +1047,10 @@ export const ReelsScreen: React.FC = () => {
         onEnd={goNextReel}
         activePlayerRef={activePlayerRef}
         audioOwnerRef={audioOwnerRef}
+        ui={ui}
       />
     );
-  }, [currentIndex, screenFocused, fullscreenAd, searchOpen, muted, insets.bottom, colors, myId, myAvatar, myInitial, toggleMute, onAuthorPress, goNextReel, SCREEN_W, SCREEN_H, isWifi]);
+  }, [currentIndex, screenFocused, fullscreenAd, searchOpen, muted, insets.bottom, colors, myId, myAvatar, myInitial, toggleMute, onAuthorPress, goNextReel, SCREEN_W, SCREEN_H, isWifi, ui]);
 
   // ── Render: loading ───────────────────────────────────────────────────────
   if (loading && reels.length === 0) {
@@ -1173,6 +1316,14 @@ export const ReelsScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
         disableIntervalMomentum
+        // Ancre le reel visible quand `feedWithAds` change AU-DESSUS de la position
+        // courante — c'était la cause du "l'écran glisse au hasard" au retour sur
+        // Reels : une pub qui finit de charger (loadAdForSlot) est insérée dans
+        // feedWithAds tous les AD_INTERVAL reels ; sans cette prop, tout ce qui est
+        // en dessous du point d'insertion se décale d'un plein écran et onScrollUpdate
+        // se retrouve sur un autre index (mauvaise vidéo qui se lance). minIndexForVisible:0
+        // parce qu'ici l'item 0 EST du contenu (pas de header), et pas d'autoscroll.
+        maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
         onScroll={e => onScrollUpdate(e.nativeEvent.contentOffset.y)}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig.current}
@@ -1233,20 +1384,20 @@ export const ReelsScreen: React.FC = () => {
       {/* Header flottant */}
       <View style={[s.floatingHeader, { top: insets.top + 6 }]} pointerEvents="box-none">
         <BackButton onPress={() => nav.canGoBack() ? nav.goBack() : nav.navigate('Feed' as any)} transparent color="#fff" />
-        <Text style={s.reelHeaderTitle}>
+        <Text style={[s.reelHeaderTitle, { fontSize: ui.headerTitle }]} numberOfLines={1}>
           {userMode ? getAuthorLabel(reels[0]?.author) : 'Reels'}
         </Text>
         {!userMode && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }} pointerEvents="box-none">
-            <TouchableOpacity onPress={openSearch} style={s.iconBtn}>
-              <Icon name="search" size={20} color="#fff" />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 }} pointerEvents="box-none">
+            <TouchableOpacity onPress={openSearch} style={[s.iconBtn, { width: Math.round(36 * ui.scale), height: Math.round(36 * ui.scale), borderRadius: Math.round(18 * ui.scale) }]}>
+              <Icon name="search" size={ui.headerIcon} color="#fff" />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setTab('mine')}
               style={[s.myReelsBtn, { backgroundColor: colors.primary + '30', borderColor: colors.primary + '60' }]}
             >
-              <Icon name="user" size={14} color="#fff" />
-              <Text style={s.myReelsBtnText}>Mes reels</Text>
+              <Icon name="user" size={Math.round(14 * ui.scale)} color="#fff" />
+              <Text style={[s.myReelsBtnText, { fontSize: Math.round(13 * ui.scale) }]}>Mes reels</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -1327,8 +1478,12 @@ export const ReelsScreen: React.FC = () => {
                   ListFooterComponent={loadingMoreSearch ? (
                     <View style={{ paddingVertical: 16 }}><GofolyxLoader variant="reel" color="#ffffff" /></View>
                   ) : null}
-                  renderItem={({ item: m }) => {
-                    if (m._kind === 'ad') return <SearchAdCard ad={m.ad} onOpenFullscreen={setFullscreenAd} />;
+                  renderItem={({ item: m, index }) => {
+                    if (m._kind === 'ad') return (
+                      <Animated.View entering={FadeIn.delay(index * 45).duration(200)} style={{ flex: 1 }}>
+                        <SearchAdCard ad={m.ad} onOpenFullscreen={setFullscreenAd} />
+                      </Animated.View>
+                    );
                     const item = m.reel;
                     return (
                       <TouchableOpacity style={s.searchCard} onPress={() => pickSearchResult(item)} activeOpacity={0.9}>
@@ -1404,6 +1559,7 @@ export const ReelsScreen: React.FC = () => {
               screenW={SCREEN_W}
               screenH={SCREEN_H}
               insetBottom={insets.bottom}
+              ui={ui}
               onAuthorPress={onAuthorPress}
             />
             <TouchableOpacity
@@ -1433,33 +1589,41 @@ interface AdData {
   creative_url?: string;
   thumbnail_url?: string;
   advertiser_id?: string;
+  advertiser_name?: string;
+  advertiser_logo?: string;
 }
 
-const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW: number; screenH: number; insetBottom: number; onAuthorPress: (userId: string) => void }> = memo(({
-  ad, isActive, muted, screenW, screenH, insetBottom, onAuthorPress,
+const AD_SKIP_MS = 3000;
+
+const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW: number; screenH: number; insetBottom: number; ui: ReelUI; onAuthorPress: (userId: string) => void; onEnd?: () => void }> = memo(({
+  ad, isActive, muted, screenW, screenH, insetBottom, ui, onAuthorPress, onEnd,
 }) => {
-  const safeBottom = Math.max(insetBottom, Platform.OS === 'android' ? 56 : 0);
-  const isVideo = !!(ad.creative_url && (ad.creative_url.includes('.m3u8') || ad.creative_url.includes('/hls/') || ad.creative_url.includes('video')));
+  const isVideo = adIsVideo(ad);
   const player = useVideoPlayer(
     isVideo && ad.creative_url ? { uri: ad.creative_url } : 'about:blank',
-    p => { p.loop = true; p.muted = muted; p.volume = muted ? 0 : 1; },
+    p => { p.loop = false; p.muted = muted; p.volume = muted ? 0 : 1; },
   );
-
-  // Image publicitaire statique — rendue en "contain" (voir plus bas), jamais rognée
-  // quel que soit son ratio (l'annonceur ne fournit pas toujours un visuel au format
-  // exact de l'écran).
   const staticImageUri = !isVideo ? (ad.creative_url || ad.thumbnail_url) : undefined;
 
   useEffect(() => {
     if (!isVideo) return;
     try { if (isActive) player.play(); else player.pause(); } catch {}
   }, [isActive, isVideo, player]);
-
   useEffect(() => {
     try { player.muted = muted; player.volume = muted ? 0 : 1; } catch {}
   }, [muted, player]);
 
-  // Track impression une seule fois
+  // Avance automatiquement au reel suivant à la fin de la pub — pas de loop,
+  // sinon la pub video se répète indéfiniment tant que l'utilisateur ne swipe pas.
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
+  useEffect(() => {
+    if (!isVideo) return;
+    const sub = player.addEventListener('onEnd', () => { onEndRef.current?.(); });
+    return () => sub.remove();
+  }, [isVideo, player]);
+
+  // Impression une seule fois
   const impressionSent = useRef(false);
   useEffect(() => {
     if (isActive && !impressionSent.current) {
@@ -1468,44 +1632,34 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
     }
   }, [isActive, ad.id]);
 
-  // cta_url peut contenir soit un lien web, soit un numéro de téléphone brut (l'admin
-  // saisit l'un ou l'autre sans distinction de champ côté backend) — on détecte le
-  // type pour adapter le CTA affiché ("En savoir plus" vs "Contactez-nous") et le
-  // schéma d'ouverture (tel: pour composer, http(s) sinon).
-  const rawCta   = (ad.cta_url ?? '').trim();
-  const isPhone  = !!rawCta && !/^https?:\/\//i.test(rawCta) && /^[+()\d\s.-]{6,}$/.test(rawCta.replace(/^tel:/i, ''));
-  const ctaPhone = isPhone ? rawCta.replace(/^tel:/i, '') : null;
-
+  const rawCta = (ad.cta_url ?? '').trim();
+  const phone  = adIsPhone(rawCta);
   const handleCta = () => {
     apiClient.post(`/api/v1/ads/${ad.id}/click`, {}).catch(() => {});
     if (!rawCta) return;
-    // Numéro de téléphone — même choix que pour un numéro détecté dans une légende
-    // (RichText) : WhatsApp/Appeler/Copier, cohérent partout dans l'app.
-    if (isPhone && ctaPhone) {
-      openPhoneMenu(ctaPhone);
-      return;
-    }
+    if (phone) { openPhoneMenu(rawCta.replace(/^tel:/i, '')); return; }
     Linking.openURL(rawCta).catch(() => {});
   };
 
-  const badgePulse = useSharedValue(1);
+  // ── Skip façon YouTube — anneau qui se remplit sur AD_SKIP_MS puis bouton actif ──
+  const skipFill = useSharedValue(0);
+  const [skipReady, setSkipReady] = useState(false);
   useEffect(() => {
-    badgePulse.value = withRepeat(withSequence(withTiming(0.4, { duration: 700 }), withTiming(1, { duration: 700 })), -1, true);
-  }, [badgePulse]);
-  const badgeDotStyle = useAnimatedStyle(() => ({ opacity: badgePulse.value }));
+    if (!isActive) { skipFill.value = 0; setSkipReady(false); return; }
+    skipFill.value = withTiming(1, { duration: AD_SKIP_MS, easing: Easing.linear });
+    const t = setTimeout(() => setSkipReady(true), AD_SKIP_MS);
+    return () => clearTimeout(t);
+  }, [isActive, skipFill]);
+  const skipRingStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(skipFill.value, [0, 1], [0.4, 1]),
+    transform: [{ rotate: `${interpolate(skipFill.value, [0, 1], [0, 300])}deg` }],
+  }));
 
-  // Pastille CTA style TikTok — pulsation douce pour attirer l'oeil sans être intrusive
-  const ctaPulse = useSharedValue(1);
-  useEffect(() => {
-    ctaPulse.value = withRepeat(withSequence(withTiming(1.02, { duration: 1100 }), withTiming(1, { duration: 1100 })), -1, true);
-  }, [ctaPulse]);
-  const ctaPulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: ctaPulse.value }] }));
+  const safeTop = insetBottom > 0 ? 96 : 86;
 
   return (
     <View style={{ width: screenW, height: screenH, backgroundColor: '#000' }}>
-
-      {/* ── Fond flouté agrandi — comble l'espace vide autour du média en "contain",
-          jamais de bandes noires nues quel que soit le ratio du créatif publicitaire. ── */}
+      {/* Fond flouté agrandi */}
       {(ad.thumbnail_url || staticImageUri) && (
         <Image
           source={{ uri: ad.thumbnail_url || staticImageUri }}
@@ -1514,9 +1668,9 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
           blurRadius={Platform.OS === 'android' ? 16 : 32}
         />
       )}
-      <View pointerEvents="none" style={{ position: 'absolute', width: screenW, height: screenH, backgroundColor: 'rgba(0,0,0,0.4)' }} />
+      <View pointerEvents="none" style={{ position: 'absolute', width: screenW, height: screenH, backgroundColor: 'rgba(0,0,0,0.32)' }} />
 
-      {/* ── Media plein écran — toujours "contain", jamais rogné ── */}
+      {/* Média — contain, jamais rogné */}
       {isVideo && ad.creative_url ? (
         <VideoView player={player} style={{ position: 'absolute', width: screenW, height: screenH }} resizeMode="contain" controls={false} />
       ) : staticImageUri ? (
@@ -1525,60 +1679,57 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
         <LinearGradient colors={['#1a0533', '#0d1b4b', '#0a2a1a']} style={{ position: 'absolute', width: screenW, height: screenH }} />
       )}
 
-      {/* ── Voile léger en haut pour lisibilité du header, quel que soit le média ── */}
-      <LinearGradient
-        colors={['#00000070', 'transparent']}
-        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 140 }}
-        pointerEvents="none"
-      />
+      <LinearGradient colors={['#00000070', 'transparent']} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 130 }} pointerEvents="none" />
+      <LinearGradient colors={['transparent', '#00000090', '#000000F8']} locations={[0, 0.42, 1]} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: screenH * 0.62 }} pointerEvents="none" />
 
-      {/* ── Badge "Sponsorisé" — sous le header flottant (bouton retour + titre "Reels"),
-          jamais à la même hauteur pour éviter tout chevauchement. Aligné à droite pour
-          rester lisible même quand le header est en mode recherche/mes reels. ── */}
-      <View style={{ position: 'absolute', top: insetBottom > 0 ? 96 : 86, right: 14, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(20,18,30,0.68)', borderRadius: 20, paddingHorizontal: 11, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)' }}>
-        <Animated.View style={[{ width: 6, height: 6, borderRadius: 3, backgroundColor: REEL_LIKE }, badgeDotStyle]} />
-        <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700', letterSpacing: 0.3 }}>Sponsorisé</Text>
-      </View>
-
-      {/* ── Gradient bas — plus profond pour porter le bloc CTA sans écraser le média,
-          et suffisamment opaque en bas pour rester lisible même par-dessus un média qui
-          a lui-même du texte incrusté jusqu'au bord (ex: sous-titres brûlés dans la vidéo). ── */}
-      <LinearGradient
-        colors={['transparent', '#00000095', '#000000FA']}
-        locations={[0, 0.4, 1]}
-        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: screenH * 0.66 }}
-        pointerEvents="none"
-      />
-
-      {/* ── CTA style TikTok — pastille compacte unique, fixe en bas, pulsation douce
-          pour attirer l'oeil sans etre intrusive. Titre + bouton regroupes au lieu du
-          bloc auteur/description/CTA plein-largeur precedent. ── */}
-      <Animated.View style={[
-        { position: 'absolute', bottom: Math.max(insetBottom, 8) + 6, left: 16, right: 16, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: 'rgba(0,0,0,0.55)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
-        ctaPulseStyle,
-      ]}>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          disabled={!ad.advertiser_id}
-          onPress={() => ad.advertiser_id && onAuthorPress(ad.advertiser_id)}
-          style={{ flex: 1, minWidth: 0 }}
-        >
-          <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }} numberOfLines={1}>{ad.title}</Text>
-        </TouchableOpacity>
-
-        {rawCta ? (
-          <TouchableOpacity activeOpacity={0.88} onPress={handleCta}
-            style={{ flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fff', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 }}
+      {/* ── Top line : « Annonce » + skip ── */}
+      <View style={[adSlideS.topline, { top: safeTop }]} pointerEvents="box-none">
+        <Text style={[adSlideS.annonce, { fontSize: Math.round(10.5 * ui.scale) }]}>Annonce</Text>
+        {onEnd ? (
+          <TouchableOpacity
+            style={adSlideS.skip}
+            disabled={!skipReady}
+            activeOpacity={0.7}
+            onPress={() => { if (skipReady) onEnd?.(); }}
           >
-            <Icon name={isPhone ? 'phone' : 'external-link'} size={13} color={REEL_MUSIC} />
-            <Text style={{ color: REEL_MUSIC, fontSize: 13, fontWeight: '800' }}>
-              {ad.cta_text || (isPhone ? 'Contactez-nous' : 'En savoir plus')}
-            </Text>
+            {skipReady ? (
+              <>
+                <Text style={adSlideS.skipTxt}>Passer</Text>
+                <Icon name="skip-forward" size={13} color="#fff" />
+              </>
+            ) : (
+              <Animated.View style={[adSlideS.skipRing, skipRingStyle]} />
+            )}
           </TouchableOpacity>
         ) : null}
-      </Animated.View>
+      </View>
+
+      {/* ── En-tête annonceur (bas-gauche, aligné sur un reel normal) ── */}
+      <View style={[adSlideS.adv, { bottom: 118 }]} pointerEvents="box-none">
+        <AdvertiserRow ad={ad} variant="dark" onPressAdvertiser={onAuthorPress} />
+        {ad.description ? (
+          <Text style={adSlideS.advDesc} numberOfLines={2}>{ad.description}</Text>
+        ) : ad.title ? (
+          <Text style={adSlideS.advDesc} numberOfLines={2}>{ad.title}</Text>
+        ) : null}
+      </View>
+
+      {/* ── CTA éditorial : hairline → carte, une accroche, puis stable ── */}
+      {rawCta ? (
+        <AdCTA ad={ad} context="reels" activated={isActive} onPress={handleCta} />
+      ) : null}
     </View>
   );
+});
+
+const adSlideS = StyleSheet.create({
+  topline:  { position: 'absolute', left: 14, right: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  annonce:  { color: 'rgba(255,255,255,0.6)', fontWeight: '600', letterSpacing: 1, textTransform: 'uppercase' },
+  skip:     { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 22, minWidth: 22, justifyContent: 'center' },
+  skipTxt:  { color: '#fff', fontSize: 11.5, fontWeight: '700' },
+  skipRing: { width: 15, height: 15, borderRadius: 8, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.35)', borderTopColor: '#fff' },
+  adv:      { position: 'absolute', left: 18, right: 92 },
+  advDesc:  { fontSize: 12, color: 'rgba(255,255,255,0.82)', marginTop: 7, lineHeight: 17, textShadowColor: 'rgba(0,0,0,0.85)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
 });
 
 // ─── SearchAdCard — carte pub format grille (overlay recherche, placement="search") ──
@@ -1648,7 +1799,7 @@ const SearchAdCard: React.FC<{ ad: SearchAdCardData; onOpenFullscreen: (ad: Sear
   // responder de gesture-handler et son tap peut être perdu — c'était la
   // cause du clic mort sur les pubs de la grille recherche.
   return (
-    <GHTouchableOpacity style={s.searchCard} onPress={handlePress} activeOpacity={0.9}>
+    <GHTouchableOpacity style={[s.searchCard, s.searchAdCell]} onPress={handlePress} activeOpacity={0.9}>
       {isVideo ? (
         <VideoView player={player} style={StyleSheet.flatten([s.searchThumb, s.searchAdThumbCompact])} resizeMode="cover" controls={false} />
       ) : showFallback ? (
@@ -1664,9 +1815,9 @@ const SearchAdCard: React.FC<{ ad: SearchAdCardData; onOpenFullscreen: (ad: Sear
         />
       )}
       <LinearGradient colors={['transparent', 'rgba(0,0,0,0.35)', 'rgba(0,0,0,0.94)']} locations={[0.25, 0.6, 1]} style={s.searchCardGrad} />
-      <View style={s.searchAdBadge}>
-        <Text style={s.searchAdBadgeText}>Sponsorisé</Text>
-      </View>
+      {/* Repère éditorial : filet gradient 2px en haut + mot « Annonce » (fini la pastille rose) */}
+      <LinearGradient colors={['#7B3FF2', '#E0389A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.searchAdRule} />
+      <Text style={s.searchAdMark}>Annonce</Text>
       <View style={s.searchCardInfo}>
         <Text style={s.searchCardAuthor} numberOfLines={1}>{ad.title}</Text>
         {ad.description ? <Text style={s.searchCardCaption} numberOfLines={2}>{ad.description}</Text> : null}
@@ -1701,12 +1852,13 @@ interface VideoSlideProps {
   onEnd:                () => void;
   activePlayerRef?:     React.RefObject<{ pause: () => void } | null>;
   audioOwnerRef?:       React.RefObject<string | null>;
+  ui:                   ReelUI;
 }
 
 const VideoSlide: React.FC<VideoSlideProps> = memo(({
   reel, isActive, isPreload, isWifi, muted, screenW, screenH, insetBottom,
   colors, currentUserId, currentUserAvatar, currentUserInitial = 'M',
-  onToggleMute, onAuthorPress, onEnd, activePlayerRef, audioOwnerRef,
+  onToggleMute, onAuthorPress, onEnd, activePlayerRef, audioOwnerRef, ui,
 }) => {
   const nav = useNavigation<Nav>();
 
@@ -2285,6 +2437,19 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const skipLeftAnim  = useAnimatedStyle(() => ({ opacity: skipLeftOpacity.value,  transform: [{ scale: skipLeftScale.value }] }));
   const skipRightAnim = useAnimatedStyle(() => ({ opacity: skipRightOpacity.value, transform: [{ scale: skipRightScale.value }] }));
 
+  // Rotation continue du disque musique (façon TikTok) — ne tourne que quand le
+  // reel est actif et a une musique, sinon on fige la valeur pour ne pas faire
+  // tourner un disque hors écran pour rien.
+  const musicDiscRot = useSharedValue(0);
+  useEffect(() => {
+    if (isActive && reel.music_name) {
+      musicDiscRot.value = withRepeat(withTiming(360, { duration: 4000 }), -1, false);
+    } else {
+      musicDiscRot.value = 0;
+    }
+  }, [isActive, reel.music_name, musicDiscRot]);
+  const musicDiscAnim = useAnimatedStyle(() => ({ transform: [{ rotate: `${musicDiscRot.value}deg` }] }));
+
   const showPlayIconAnim = useCallback(() => {
     playIconScale.value = 0.6; playIconOpacity.value = 0;
     playIconScale.value = withSpring(1, { damping: 10, stiffness: 200 });
@@ -2631,14 +2796,14 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       )}
 
       <GestureDetector gesture={Gesture.Simultaneous(hPanFail, tapGesture)}>
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 80, bottom: safeBottom + COMMENT_BAR_H }} />
+        <View style={{ position: 'absolute', top: 0, left: 0, right: ui.reelInfoRight, bottom: safeBottom + COMMENT_BAR_H }} />
       </GestureDetector>
 
       <Animated.View pointerEvents="none" style={[s.skipRipple, s.skipRippleLeft,  skipLeftAnim]}><Text style={s.skipRippleTxt}>{skipLeftLabel}</Text></Animated.View>
       <Animated.View pointerEvents="none" style={[s.skipRipple, s.skipRippleRight, skipRightAnim]}><Text style={s.skipRippleTxt}>{skipRightLabel}</Text></Animated.View>
 
       <Animated.View style={playIconAnim} pointerEvents="none">
-        <View style={s.playPauseCircle}><Icon name={paused ? 'play' : 'pause'} size={36} color="#fff" /></View>
+        <View style={[s.playPauseCircle, { width: ui.playPause, height: ui.playPause, borderRadius: ui.playPause / 2 }]}><Icon name={paused ? 'play' : 'pause'} size={ui.playPauseIcon} color="#fff" /></View>
       </Animated.View>
 
       <Animated.View pointerEvents="none" style={heartAnim}>
@@ -2661,7 +2826,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
 
       <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} pointerEvents="box-none">
 
-        <View style={[s.reelInfo, { bottom: safeBottom + COMMENT_BAR_H }]} pointerEvents="box-none">
+        <View style={[s.reelInfo, { bottom: safeBottom + COMMENT_BAR_H, right: ui.reelInfoRight }]} pointerEvents="box-none">
           {refInfo && (
             <View style={s.refBand}>
               <View style={[s.refKindDot, { backgroundColor: refInfo.color }]} />
@@ -2690,20 +2855,24 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                   isLive={(reel.author as any)?.is_live}
                 />
               </TouchableOpacity>
-              {!isOwnReel && (
+              {!isOwnReel && reel.author?.id && !isFollowing && (
                 <TouchableOpacity
-                  style={s.avatarPlusBtn}
+                  style={s.avatarFollowBtn}
                   activeOpacity={0.85}
-                  onPress={() => nav.navigate('CreateReel', { sourceReelId: reel.id, sourceReelUrl: reel.hls_url ?? undefined })}
+                  disabled={followLoading}
+                  onPress={handleFollow}
                 >
-                  <Icon name="plus" size={9} color="#fff" />
+                  {followLoading
+                    ? <ActivityIndicator size="small" color="#fff" />
+                    : <Icon name="plus" size={11} color="#fff" />
+                  }
                 </TouchableOpacity>
               )}
             </View>
             <TouchableOpacity activeOpacity={0.8} onPress={() => reel.author?.id && onAuthorPress(reel.author.id)} style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Text style={s.authorName} numberOfLines={1}>{getAuthorLabel(reel.author)}</Text>
-                {reel.author?.is_verified && <VerifiedBadge size={12} />}
+                <Text style={[s.authorName, { fontSize: ui.authorName }]} numberOfLines={1}>{getAuthorLabel(reel.author)}</Text>
+                {reel.author?.is_verified && <VerifiedBadge size={Math.round(12 * ui.scale)} />}
               </View>
               {/* Badge visible uniquement par le createur, jamais par les autres
                   spectateurs (cf. ai_analysis_status : "pending" tant que
@@ -2735,7 +2904,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
             )}
           </View>
 
-          {captionSt ? <RichText text={captionSt} textStyle={s.caption} primaryColor="#93C5FD" maxLines={3} showLinkPreview={false} /> : null}
+          {captionSt ? <RichText text={captionSt} textStyle={[s.caption, { fontSize: ui.caption, lineHeight: Math.round(ui.caption * 1.42) }]} primaryColor="#93C5FD" maxLines={3} showLinkPreview={false} /> : null}
 
           {reel.music_name ? (
             <View style={s.musicBand} pointerEvents="none">
@@ -2768,36 +2937,50 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         <HeartRain active={isActive} likeCount={likes} contentId={reel.id} />
         <LikeNamesFeed active={isActive} likeCount={likes} contentId={reel.id} kind="reel" />
 
-        <View style={[s.actions, { bottom: safeBottom + COMMENT_BAR_H }]}>
-          <TouchableOpacity style={s.muteBtn} onPress={onToggleMute} activeOpacity={0.8}>
-            <Icon name={muted ? 'volume-x' : 'volume-2'} size={14} color="#fff" />
+        <View style={[s.actions, { bottom: safeBottom + COMMENT_BAR_H, gap: ui.railGap }]}>
+          <TouchableOpacity style={[s.muteBtn, { width: ui.muteBtn, height: ui.muteBtn, borderRadius: ui.muteBtn / 2 }]} onPress={onToggleMute} activeOpacity={0.8}>
+            <Icon name={muted ? 'volume-x' : 'volume-2'} size={ui.muteIcon} color="#fff" />
           </TouchableOpacity>
-          <ActionBtn icon="heart" useMCIcon label={formatCount(likes)} color={liked ? REEL_LIKE : '#fff'} onPress={handleLike} active={liked} activeBackground="rgba(224,56,154,0.25)" activeBorder={REEL_LIKE} activeGlow={REEL_LIKE} />
-          {!commentsDisabledSt && <ActionBtn icon="comment" useMCIcon label={formatCount(commentCount)} color="#fff" onPress={() => setShowComments(true)} />}
-          <ActionBtn icon="share-variant" useMCIcon label={formatCount(shareCount)} color="#fff" onPress={handleShare} />
-          <ActionBtn icon="eye" useMCIcon label={formatCount(reel.view_count ?? 0)} color="#fff" />
-          {!isOwnReel && <ActionBtn icon="gift" label="Cadeau" color="#FFD700" onPress={() => setShowGiftPicker(true)} activeBackground="rgba(255,215,0,0.18)" activeBorder="rgba(255,215,0,0.5)" active />}
+          <ActionBtn ui={ui} icon="heart" useMCIcon label={formatCount(likes)} color={liked ? REEL_LIKE : '#fff'} onPress={handleLike} active={liked} activeBackground="rgba(224,56,154,0.25)" activeBorder={REEL_LIKE} activeGlow={REEL_LIKE} />
+          {!commentsDisabledSt && <ActionBtn ui={ui} icon="comment" useMCIcon label={formatCount(commentCount)} color="#fff" onPress={() => setShowComments(true)} />}
+          <ActionBtn ui={ui} icon="share-variant" useMCIcon label={formatCount(shareCount)} color="#fff" onPress={handleShare} />
+          {/* Vues : simple indicateur, pas un bouton (rien à ouvrir) — allège la
+              colonne d'un cran. Masqué sous 1 vue (reel neuf). */}
+          {(reel.view_count ?? 0) > 0 && (
+            <View style={[s.actionBtn, { gap: Math.round(3 * ui.scale) }]} pointerEvents="none">
+              <View style={[s.actionCircle, { width: ui.actionCircle, height: ui.actionCircle, borderRadius: ui.actionCircle / 2 }]}><MCIcon name="eye" size={ui.actionIconMC} color="#fff" /></View>
+              <Text style={[s.actionLabel, { fontSize: ui.actionLabel }]}>{formatCount(reel.view_count ?? 0)}</Text>
+            </View>
+          )}
+          {!isOwnReel && <ActionBtn ui={ui} icon="gift" label="Cadeau" color="#FFD700" onPress={() => setShowGiftPicker(true)} activeBackground="rgba(255,215,0,0.18)" activeBorder="rgba(255,215,0,0.5)" active />}
           {/* Bouton ... — regroupe Remix, Cable, Signalement pour non-proprio */}
           {!isOwnReel && (
-            <TouchableOpacity style={s.actionBtn} onPress={() => setShowRemix(true)} activeOpacity={0.8}>
-              <View style={s.actionCircle}>
-                <Icon name="more-horizontal" size={14} color="#fff" />
+            <TouchableOpacity style={[s.actionBtn, { gap: Math.round(3 * ui.scale) }]} onPress={() => setShowRemix(true)} activeOpacity={0.8}>
+              <View style={[s.actionCircle, { width: ui.actionCircle, height: ui.actionCircle, borderRadius: ui.actionCircle / 2 }]}>
+                <Icon name="more-horizontal" size={ui.actionIcon} color="#fff" />
               </View>
-              <Text style={s.actionLabel}>Plus</Text>
+              <Text style={[s.actionLabel, { fontSize: ui.actionLabel }]}>Plus</Text>
             </TouchableOpacity>
           )}
           {isOwnReel && (
-            <TouchableOpacity style={s.actionBtn} onPress={() => setShowOwnerMenu(true)} activeOpacity={0.8}>
-              <View style={s.actionCircle}>
-                <Icon name="more-vertical" size={14} color="#fff" />
+            <TouchableOpacity style={[s.actionBtn, { gap: Math.round(3 * ui.scale) }]} onPress={() => setShowOwnerMenu(true)} activeOpacity={0.8}>
+              <View style={[s.actionCircle, { width: ui.actionCircle, height: ui.actionCircle, borderRadius: ui.actionCircle / 2 }]}>
+                <Icon name="more-vertical" size={ui.actionIcon} color="#fff" />
               </View>
             </TouchableOpacity>
           )}
-          {/* Bouton disque musique — en bas de la colonne, comme TikTok */}
+          {/* Disque musique animé façon TikTok — tourne en continu, affiche l'avatar
+              de l'auteur au centre. Remplace l'ancien carré blanc statique qui
+              n'apportait rien (le titre est déjà dans musicBand sous la caption). */}
           {reel.music_name ? (
-            <View style={s.musicDisc} pointerEvents="none">
-              <MCIcon name="music-note" size={16} color="#000" />
-            </View>
+            <Animated.View style={[s.musicDisc, { width: ui.musicDisc, height: ui.musicDisc, borderRadius: ui.musicDisc / 2 }, musicDiscAnim]} pointerEvents="none">
+              {reel.author?.avatar_url
+                ? <Image source={{ uri: reel.author.avatar_url }} style={[s.musicDiscAvatar, { borderRadius: ui.musicDisc / 2 }]} />
+                : <View style={[s.musicDiscAvatar, { borderRadius: ui.musicDisc / 2, backgroundColor: REEL_MUSIC, alignItems: 'center', justifyContent: 'center' }]}>
+                    <MCIcon name="music-note" size={Math.round(16 * ui.scale)} color="#fff" />
+                  </View>
+              }
+            </Animated.View>
           ) : null}
         </View>
 
@@ -3089,7 +3272,13 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           onShareCountChange={() => { if (mountedRef.current) setShareCount(v => v + 1); }}
         />
         {showGiftPicker && reel.author?.id && (
-          <GiftPickerModal reelId={reel.id} receiverId={String(reel.author.id)} receiverName={reel.author.display_name ?? reel.author.username ?? 'Créateur'} onClose={() => setShowGiftPicker(false)} />
+          <GiftPickerModal
+            reelId={reel.id}
+            receiverId={String(reel.author.id)}
+            receiverName={reel.author.display_name ?? reel.author.username ?? 'Créateur'}
+            receiverAvatar={reel.author.avatar_url ?? null}
+            onClose={() => setShowGiftPicker(false)}
+          />
         )}
 
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'position' : undefined} style={[s.commentBarWrap, { bottom: safeBottom }]} keyboardVerticalOffset={0}>
@@ -3106,7 +3295,10 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
             >
               <GestureDetector gesture={scrubGesture}>
                 <View style={{ height: 20, justifyContent: 'center' }}>
-                  <View style={{ height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.3)' }}>
+                  {/* Track un peu plus contrastée (0.35) + ombre portée légère —
+                      restait par endroits invisible sur fond vidéo clair à 0.3
+                      sans ombre. Partie remplie #fff pleine. */}
+                  <View style={{ height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.35)', shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 2 }}>
                     <Animated.View style={[{ height: 3, backgroundColor: '#fff', borderRadius: 2 }, progressBarAnim]} />
                   </View>
                 </View>
@@ -3131,7 +3323,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
               placeholderTextColor="rgba(255,255,255,0.5)"
               onFocus={() => handleFocusBar(true)}
               onBlur={() => handleFocusBar(false)}
-              style={s.commentBarInput}
+              style={[s.commentBarInput, { fontSize: ui.commentBar }]}
               returnKeyType="send"
               onSubmitEditing={handleSendComment}
               maxLength={300}
@@ -3160,20 +3352,21 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
 const ActionBtn: React.FC<{
   icon: string; iconActive?: string; label: string; color: string; onPress?: () => void;
   active?: boolean; activeBackground?: string; activeBorder?: string; activeGlow?: string;
-  useMCIcon?: boolean;
-}> = ({ icon, iconActive, label, color, onPress, active, activeBackground, activeBorder, activeGlow, useMCIcon }) => {
+  useMCIcon?: boolean; ui: ReelUI;
+}> = ({ icon, iconActive, label, color, onPress, active, activeBackground, activeBorder, activeGlow, useMCIcon, ui }) => {
   const iconName = (active && iconActive) ? iconActive : icon;
   return (
-    <TouchableOpacity style={s.actionBtn} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity style={[s.actionBtn, { gap: Math.round(3 * ui.scale) }]} onPress={onPress} activeOpacity={0.7}>
       <View style={[
         s.actionCircle,
+        { width: ui.actionCircle, height: ui.actionCircle, borderRadius: ui.actionCircle / 2 },
         active && activeBackground ? { backgroundColor: activeBackground } : {},
         active && activeBorder     ? { borderColor: activeBorder, borderWidth: 1.5 } : {},
         active && activeGlow       ? { shadowColor: activeGlow, shadowOpacity: 0.55, shadowRadius: 8, shadowOffset: { width: 0, height: 0 }, elevation: 6 } : {},
       ]}>
-        {useMCIcon ? <MCIcon name={iconName} size={16} color={color} /> : <Icon name={iconName} size={14} color={color} />}
+        {useMCIcon ? <MCIcon name={iconName} size={ui.actionIconMC} color={color} /> : <Icon name={iconName} size={ui.actionIcon} color={color} />}
       </View>
-      {!!label && <Text style={[s.actionLabel, { color }]}>{label}</Text>}
+      {!!label && <Text style={[s.actionLabel, { color, fontSize: ui.actionLabel }]}>{label}</Text>}
     </TouchableOpacity>
   );
 };
@@ -3184,14 +3377,16 @@ const s = StyleSheet.create({
   root: { flex: 1 },
   bottomGradient: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '80%' },
 
-  floatingHeader: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, zIndex: 10 },
+  floatingHeader: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, gap: 10, zIndex: 10 },
   iconBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.15)' },
-  reelHeaderTitle: { color: '#fff', fontSize: 22, fontWeight: '800', letterSpacing: 0.3 },
-  myReelsBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: RR.pill, borderWidth: 1 },
+  // flexShrink + minWidth:0 : le titre (nom d'auteur potentiellement long en
+  // userMode) se tronque au lieu de pousser search/"Mes reels" hors écran.
+  reelHeaderTitle: { color: '#fff', fontSize: 22, fontWeight: '800', letterSpacing: 0.3, flexShrink: 1, minWidth: 0, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+  myReelsBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: RR.pill, borderWidth: 1, flexShrink: 0 },
   myReelsBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
   searchFab:      { position: 'absolute', right: 16, width: 46, height: 46, borderRadius: 23, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center', zIndex: 10 },
 
-  playPauseCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' },
+  playPauseCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: OVERLAY_SURFACE, alignItems: 'center', justifyContent: 'center' },
   bufferOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.2)', zIndex: 6, gap: 10 },
   bufferText: { color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '500' },
   errorOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.75)', zIndex: 7, gap: 10 },
@@ -3200,16 +3395,22 @@ const s = StyleSheet.create({
   retryBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, backgroundColor: 'rgba(255,255,255,0.15)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)', borderRadius: RR.pill, paddingHorizontal: 20, paddingVertical: 10 },
   retryText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
-  reelInfo:   { position: 'absolute', left: 14, right: 72, gap: 6, zIndex: 3 },
+  // right: 84 — dégage la colonne d'actions (désormais 44px + marge). maxHeight
+  // borne la pile de bandes (caption 3 lignes + musique + source + refBand +
+  // FriendsWhoLiked) : au-delà, elle se contente de tronquer au lieu de remonter
+  // derrière la colonne d'actions et le header.
+  reelInfo:   { position: 'absolute', left: 14, right: 84, gap: 6, zIndex: 3, maxHeight: '46%' },
   authorRow:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  avatarPlusBtn: { position: 'absolute', bottom: -3, right: -3, width: 15, height: 15, borderRadius: RR.chip, backgroundColor: REEL_MUSIC, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#000' },
+  // Bouton "suivre" compact sur l'avatar (ancien "+" de remix retiré : doublon
+  // avec "Plus → Remixer", et sans label il était illisible). N'apparaît que pour
+  // les reels d'autrui non déjà suivis.
+  avatarFollowBtn: { position: 'absolute', bottom: -6, alignSelf: 'center', width: 18, height: 18, borderRadius: 9, backgroundColor: REEL_LIKE, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#000' },
 
   musicBand:    { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: REEL_MUSIC, borderRadius: RR.card, paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start', maxWidth: '80%', marginTop: 3 },
   musicBandTxt: { color: '#fff', fontSize: 10, fontWeight: '700', flexShrink: 1 },
   musicBandDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.6)' },
-  musicDisc:    { width: 38, height: 38, borderRadius: RR.media, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
 
-  sourceBand:  { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: RR.chip, paddingHorizontal: 7, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', alignSelf: 'flex-start', maxWidth: '100%' },
+  sourceBand:  { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: OVERLAY_SURFACE, borderRadius: RR.chip, paddingHorizontal: 7, paddingVertical: 4, borderWidth: 1, borderColor: OVERLAY_BORDER, alignSelf: 'flex-start', maxWidth: '100%' },
   sourceThumb: { width: 16, height: 16, borderRadius: 4, overflow: 'hidden' },
   sourceText:  { color: 'rgba(255,255,255,0.75)', fontSize: 10 },
   authorName: { color: '#fff', fontWeight: '800', fontSize: 13, textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
@@ -3217,17 +3418,21 @@ const s = StyleSheet.create({
   analysisPendingBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 },
   analysisPendingText:  { color: 'rgba(255,255,255,0.85)', fontSize: 10, fontWeight: '600' },
 
-  refBand:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RR.chip, paddingHorizontal: 8, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', alignSelf: 'flex-start', maxWidth: '100%' },
+  refBand:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: OVERLAY_SURFACE, borderRadius: RR.chip, paddingHorizontal: 8, paddingVertical: 5, borderWidth: 1, borderColor: OVERLAY_BORDER, alignSelf: 'flex-start', maxWidth: '100%' },
   refKindDot: { width: 6, height: 6, borderRadius: 3 },
   refThumb:   { width: 26, height: 26, borderRadius: RR.chip, overflow: 'hidden' },
   refKind:    { color: 'rgba(255,255,255,0.55)', fontSize: 8, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   refLabel:   { color: '#fff', fontSize: 11, fontWeight: '700' },
 
-  actions:      { position: 'absolute', right: 8, alignItems: 'center', gap: 8, zIndex: 3 },
-  actionBtn:    { alignItems: 'center', gap: 2 },
-  actionCircle: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)' },
-  actionLabel:  { fontSize: 9, fontWeight: '700', color: '#fff', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
-  muteBtn:      { width: 27, height: 27, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.5)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
+  // Colonne d'actions — cercles 44px (zone tactile mini recommandée) au lieu de
+  // 32, icônes 22 au lieu de 14-16, label 11 au lieu de 9. gap 14 pour aérer.
+  actions:      { position: 'absolute', right: 8, alignItems: 'center', gap: 14, zIndex: 3 },
+  actionBtn:    { alignItems: 'center', gap: 3 },
+  actionCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: OVERLAY_SURFACE, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: OVERLAY_BORDER },
+  actionLabel:  { fontSize: 11, fontWeight: '700', color: '#fff', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+  muteBtn:      { width: 34, height: 34, borderRadius: 17, backgroundColor: OVERLAY_SURFACE, borderWidth: 1, borderColor: OVERLAY_BORDER, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
+  musicDisc:       { width: 40, height: 40, borderRadius: 20, backgroundColor: '#000', borderWidth: 3, borderColor: 'rgba(255,255,255,0.85)', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginTop: 2 },
+  musicDiscAvatar: { width: '100%', height: '100%', borderRadius: 20 },
 
   loadMoreIndicator: { position: 'absolute', bottom: 80, alignSelf: 'center', zIndex: 10 },
 
@@ -3326,8 +3531,9 @@ const s = StyleSheet.create({
   // pub en grille reste plus lisible avec une hauteur réduite, proche 4/5.
   searchAdThumbCompact: { aspectRatio: 4 / 5 },
   searchAdFallback:     { backgroundColor: '#2A2340', alignItems: 'center', justifyContent: 'center' },
-  searchAdBadge:        { position: 'absolute', top: 8, left: 8, backgroundColor: 'rgba(224,56,154,0.85)', borderRadius: RR.chip, paddingHorizontal: 7, paddingVertical: 3 },
-  searchAdBadgeText:    { color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.2 },
+  searchAdCell:         { borderWidth: 1, borderColor: 'rgba(123,63,242,0.28)' },
+  searchAdRule:         { position: 'absolute', top: 0, left: 0, right: 0, height: 2, zIndex: 2 },
+  searchAdMark:         { position: 'absolute', top: 9, left: 9, color: 'rgba(255,255,255,0.72)', fontSize: 9, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
   searchAdCtaRow:       { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
   searchAdCtaText:      { color: '#fff', fontSize: 10, fontWeight: '700', flex: 1 },
   searchCenterState:    { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, paddingBottom: 60 },

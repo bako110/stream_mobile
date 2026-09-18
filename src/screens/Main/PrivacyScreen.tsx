@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Switch, Platform, ActivityIndicator,
+  StyleSheet, Switch, Platform, ActivityIndicator, StatusBar,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { BackButton } from '../../components/common';
 import { userService } from '../../services/userService';
@@ -59,14 +60,8 @@ const DEFAULT_SETTINGS: PrivacySettings = {
   privacy_allow_comments:  true,
   privacy_read_receipts:   true,
   privacy_show_typing:     true,
-  call_privacy:            'everyone',
-  call_e2e_encryption:     true,
-  call_silence_unknown:    false,
 };
 
-// Champs booléens uniquement — call_privacy (string) est géré séparément
-// dans SettingsCallsPrivacyScreen.tsx, pas sur cet écran de confidentialité
-// générale du profil.
 const BOOLEAN_KEYS = (Object.keys(DEFAULT_SETTINGS) as (keyof PrivacySettings)[])
   .filter(k => typeof DEFAULT_SETTINGS[k] === 'boolean');
 
@@ -75,13 +70,13 @@ function coerceBooleans(data: any): PrivacySettings {
   for (const key of BOOLEAN_KEYS) {
     if (key in data) (result[key] as boolean) = Boolean(data[key]);
   }
-  if (typeof data.call_privacy === 'string') result.call_privacy = data.call_privacy;
   return result;
 }
 
 export const PrivacyScreen: React.FC<Props> = ({ navigation }) => {
   const { theme } = useTheme();
   const { colors } = theme;
+  const insets = useSafeAreaInsets();
 
   const [loading,  setLoading]  = useState(true);
   const [saving,   setSaving]   = useState<keyof PrivacySettings | null>(null);
@@ -124,7 +119,12 @@ export const PrivacyScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
-      <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle={theme.isDark ? 'light-content' : 'dark-content'}
+      />
+      <View style={[s.header, { paddingTop: insets.top + (Platform.OS === 'android' ? 8 : 6), backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
         <BackButton onPress={() => navigation.goBack()} />
         <Text style={[s.title, { color: colors.textPrimary }]}>Confidentialité</Text>
         <View style={{ width: 40 }} />
@@ -229,7 +229,7 @@ const s = StyleSheet.create({
   root:   { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'android' ? 48 : 56, paddingBottom: 14,
+    paddingBottom: 14,
     paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth,
   },
   title:   { fontSize: 18, fontWeight: '800' },

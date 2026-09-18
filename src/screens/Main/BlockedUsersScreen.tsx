@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
-  Image, StyleSheet, ActivityIndicator, Platform,
+  Image, StyleSheet, ActivityIndicator, Platform, StatusBar,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { SkeletonUserList, BackButton } from '../../components/common';
 import { apiClient, Endpoints } from '../../api';
@@ -25,6 +26,7 @@ export const BlockedUsersScreen: React.FC = () => {
   const { theme } = useTheme();
   const { colors, fontSize } = theme;
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
 
   const [users,      setUsers]      = useState<BlockedUser[]>([]);
   const [loading,    setLoading]    = useState(true);
@@ -75,8 +77,14 @@ export const BlockedUsersScreen: React.FC = () => {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle={theme.isDark ? 'light-content' : 'dark-content'}
+      />
+
       {/* Header — même pattern que PrivacyScreen */}
-      <View style={[styles.header, { backgroundColor: colors.surface }]}>
+      <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === 'android' ? 8 : 6), backgroundColor: colors.surface }]}>
         <BackButton onPress={() => navigation.goBack()} />
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Utilisateurs bloqués</Text>
         <View style={{ width: 40 }} />
@@ -150,7 +158,7 @@ const styles = StyleSheet.create({
   root:              { flex: 1 },
   header:            {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'android' ? 48 : 56, paddingBottom: 14, paddingHorizontal: 16,
+    paddingBottom: 14, paddingHorizontal: 16,
   },
 headerTitle:       { fontSize: 18, fontWeight: '800' },
   center:            { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },

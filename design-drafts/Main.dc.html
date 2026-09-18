@@ -1,0 +1,149 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    :root {
+      --primary: #7B3FF2;
+      --ink-1: #0E0D1F;
+      --ink-2: #4E4C6A;
+      --ink-3: #9290AE;
+      --hair: #E7E6F2;
+      --surface: #FFFFFF;
+      --bg: #F6F5FB;
+      --r-media: 12px;
+      --r-card: 16px;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "SF Pro Text", -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--ink-1); -webkit-font-smoothing: antialiased; }
+    a { color: var(--primary); } a:hover { color: #6A2FE0; }
+    .frame { width: 390px; padding: 22px 0 44px; }
+    .kicker { font-size: 10.5px; font-weight: 800; letter-spacing: 1.4px; color: var(--ink-3); text-transform: uppercase; padding: 0 16px; margin: 0 0 4px; }
+    .lede { font-size: 12.5px; color: var(--ink-2); padding: 0 16px; margin: 0 0 18px; line-height: 1.55; }
+    .state { font-size: 10px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; color: var(--primary); padding: 0 16px; margin: 22px 0 8px; display: flex; align-items: center; gap: 6px; }
+    .state::before { content: ""; width: 14px; height: 1.5px; background: var(--primary); }
+    .note { padding: 10px 16px 0; font-size: 11px; color: var(--ink-2); line-height: 1.6; }
+    .note b { color: var(--ink-1); font-weight: 700; }
+    .note code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 10px; background: rgba(123,63,242,0.08); color: #5A2FC0; padding: 1px 4px; border-radius: 4px; }
+
+    /* neighbour post (context) */
+    .post { background: var(--surface); margin: 0 12px 8px; border-radius: var(--r-card); border: 1px solid var(--hair); padding: 12px; display: flex; gap: 10px; opacity: 0.5; }
+    .post .pa { width: 34px; height: 34px; border-radius: 17px; background: #DED9F5; flex-shrink: 0; }
+    .post .pl { height: 9px; border-radius: 5px; background: #E9E6F6; }
+
+    /* ── Ad card — editorial: no heavy chrome, hairline separators ── */
+    .ad {
+      background: var(--surface);
+      margin: 0 12px 8px;
+      border-radius: var(--r-card);
+      border: 1px solid var(--hair);
+      overflow: hidden;
+    }
+    .ad-head { display: flex; align-items: center; gap: 10px; padding: 14px 14px 0; }
+    .ad-logo { width: 30px; height: 30px; border-radius: 8px; object-fit: cover; flex-shrink: 0; background: #EDE9FB; }
+    .ad-logo-fb { width: 30px; height: 30px; border-radius: 8px; background: #1E1B2E; color: #fff; font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; letter-spacing: -0.3px; }
+    .ad-adv { font-size: 12.5px; font-weight: 650; color: var(--ink-1); letter-spacing: -0.1px; }
+    .ad-meta { font-size: 10.5px; font-weight: 500; color: var(--ink-3); margin-top: 1px; letter-spacing: 0.1px; }
+    .ad-x { margin-left: auto; color: #C9C7DC; }
+
+    .ad-copy { padding: 10px 14px 12px; }
+    .ad-hl { font-size: 15px; font-weight: 680; line-height: 21px; letter-spacing: -0.2px; color: var(--ink-1); margin: 0; }
+    .ad-sub { font-size: 13px; line-height: 19px; color: var(--ink-2); margin: 5px 0 0; }
+
+    .ad-media { margin: 0 14px 14px; border-radius: var(--r-media); overflow: hidden; aspect-ratio: 1.6; background: linear-gradient(135deg, #ECE7FB 0%, #F7E9F3 100%); position: relative; }
+    .ad-media .frost { position: absolute; inset: 0; background: radial-gradient(120% 90% at 20% 15%, rgba(123,63,242,0.14), transparent 55%); }
+
+    /* editorial CTA — a text link at rest, becomes a quiet button on scroll-stop */
+    .cta-rest { display: flex; align-items: center; gap: 6px; margin: 0 14px 14px; padding-top: 12px; border-top: 1px solid var(--hair); }
+    .cta-rest .link { font-size: 13px; font-weight: 650; color: var(--primary); letter-spacing: -0.1px; }
+    .cta-rest .dom { margin-left: auto; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; color: var(--ink-3); text-transform: uppercase; }
+
+    .cta-live { display: flex; align-items: center; margin: 0 14px 14px; padding-top: 12px; border-top: 1px solid var(--hair); gap: 12px; }
+    .cta-live .txt { flex: 1; min-width: 0; }
+    .cta-live .dom { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; color: var(--ink-3); text-transform: uppercase; }
+    .cta-live .sub { font-size: 11.5px; color: var(--ink-2); margin-top: 2px; }
+    .cta-live .btn { position: relative; overflow: hidden; flex-shrink: 0; display: flex; align-items: center; gap: 6px; background: var(--ink-1); color: #fff; font-size: 12.5px; font-weight: 700; letter-spacing: -0.1px; padding: 10px 15px; border-radius: 10px; }
+    .cta-live .btn .shine { position: absolute; top: 0; bottom: 0; width: 36%; left: 88%; background: linear-gradient(105deg, transparent, rgba(255,255,255,0.4), transparent); }
+    .cta-live .btn svg { transform: translateX(2px); }
+
+    svg { display: block; }
+    .tl { margin: 12px 16px 0; padding: 12px 14px; background: #fff; border: 1px solid var(--hair); border-radius: 12px; }
+    .tl h4 { margin: 0 0 8px; font-size: 10px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: var(--ink-3); }
+    .tl .row { display: flex; gap: 10px; font-size: 11px; color: var(--ink-2); padding: 3px 0; line-height: 1.5; }
+    .tl .t { font-family: ui-monospace, Menlo, monospace; font-size: 10px; color: var(--primary); flex-shrink: 0; width: 62px; font-weight: 600; }
+  </style>
+</helmet>
+
+<div class="frame">
+
+  <p class="kicker">Feed · carte publicitaire</p>
+  <p class="lede">Direction <b>premium éditorial</b> : aucun bloc coloré, aucune ombre lourde. Séparateurs en filet, typo resserrée. Le CTA est un <b>lien texte au repos</b>, il ne devient un bouton discret que quand la carte s'immobilise à l'écran.</p>
+
+  <div class="post"><div class="pa"></div><div style="flex:1"><div class="pl" style="width:40%;margin-top:4px"></div><div class="pl" style="width:80%;margin-top:8px"></div></div></div>
+
+  <p class="state">Au repos</p>
+  <div class="ad">
+    <div class="ad-head">
+      <div class="ad-logo-fb">NS</div>
+      <div style="flex:1; min-width:0;">
+        <div class="ad-adv">Nova Studio</div>
+        <div class="ad-meta">Sponsorisé · novastudio.com</div>
+      </div>
+      <span class="ad-x"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg></span>
+    </div>
+    <div class="ad-copy">
+      <p class="ad-hl">Une vidéo pro en trois minutes, sans logiciel</p>
+      <p class="ad-sub">Modèles animés, sous-titres automatiques, export 4K. Sept jours d'essai.</p>
+    </div>
+    <div class="ad-media"><div class="frost"></div></div>
+    <div class="cta-rest">
+      <span class="link">Découvrir Nova Studio</span>
+      <span class="dom">novastudio.com</span>
+    </div>
+  </div>
+
+  <p class="state">Après immobilisation (~450 ms d'arrêt au scroll)</p>
+  <div class="ad">
+    <div class="ad-head">
+      <div class="ad-logo-fb">AT</div>
+      <div style="flex:1; min-width:0;">
+        <div class="ad-adv">Atlas Coffee</div>
+        <div class="ad-meta">Sponsorisé · atlascoffee.fr</div>
+      </div>
+      <span class="ad-x"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg></span>
+    </div>
+    <div class="ad-copy">
+      <p class="ad-hl">Ton café de spécialité, torréfié à la commande</p>
+      <p class="ad-sub">Livré chaque semaine. Annule quand tu veux.</p>
+    </div>
+    <div class="ad-media"><div class="frost"></div></div>
+    <div class="cta-live">
+      <div class="txt">
+        <div class="dom">Atlascoffee.fr</div>
+        <div class="sub">−20 % sur la première commande</div>
+      </div>
+      <div class="btn">
+        <span class="shine"></span>
+        Commander
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="tl">
+    <h4>Timeline — entrée + CTA</h4>
+    <div class="row"><span class="t">viewport</span><span>carte visible ≥ 60 % → <code>FadeInDown.duration(260).easing(cubic 0.22,1,0.36,1)</code>, translateY 14→0. Une seule fois (flag par slot).</span></div>
+    <div class="row"><span class="t">scroll-stop</span><span>≥ 450 ms sans mouvement → le lien texte <b>se replie</b> (<code>height/opacity</code> 180 ms) et le bloc bouton <b>se déplie</b> (crossfade 220 ms).</span></div>
+    <div class="row"><span class="t">+120 ms</span><span>accroche unique : <code>shine</code> balaie le bouton (left 88 %→−40 %, 520 ms, ease-out). Puis <b>plus rien</b>.</span></div>
+    <div class="row"><span class="t">tap</span><span><code>scale 0.97</code> (spring 120 ms) + <code>/ads/:id/click</code> → ouverture lien.</span></div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

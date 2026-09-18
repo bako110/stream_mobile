@@ -12,6 +12,11 @@ import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { toastService, showConfirm } from '../../services';
+import { useWalletPinGate } from '../../hooks/useWalletPinGate';
+import { useUser } from '../../context/UserContext';
+
+
+
 
 interface UserResult {
   id: string;
@@ -30,6 +35,8 @@ export default function TransferScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<TransferRouteParams, 'Transfer'>>();
   const insets = useSafeAreaInsets();
+  const { runWithPin, pinModal } = useWalletPinGate();
+  const { currentUser } = useUser();
 
   const prefilled = route.params?.recipientId
     ? {
@@ -61,16 +68,21 @@ export default function TransferScreen() {
     setSearching(true);
     try {
       const res = await apiClient.get<any>(`${Endpoints.search.query}?q=${encodeURIComponent(q)}&type=users&limit=8`);
-      const list = res.data?.users ?? res.data?.results ?? (Array.isArray(res.data) ? res.data : []);
-      setResults(list);
+      const list: UserResult[] = res.data?.users ?? res.data?.results ?? (Array.isArray(res.data) ? res.data : []);
+      // On ne peut pas se transférer à soi-même → jamais dans la liste.
+      setResults(currentUser?.id ? list.filter(u => u.id !== currentUser.id) : list);
     } catch { setResults([]); }
     finally { setSearching(false); }
-  }, []);
+  }, [currentUser?.id]);
 
   const handleSend = async () => {
     if (!selected) return toastService.warning('Destinataire manquant', 'Sélectionne un utilisateur.');
+    if (currentUser?.id && selected.id === currentUser.id) {
+      return toastService.warning('Destinataire invalide', 'Tu ne peux pas te transférer des GoGold à toi-même.');
+    }
     const GoGold = parseInt(amount, 10);
     if (!GoGold || GoGold < 1) return toastService.warning('Montant invalide', 'Entre un nombre de GoGold valide.');
+    if (GoGold > 1_000_000) return toastService.warning('Montant trop élevé', 'Maximum 1 000 000 GoGold par transfert.');
     if (balance !== null && GoGold > balance) return toastService.warning('Solde insuffisant', `Tu as ${balance} GoGold disponibles.`);
 
     showConfirm(
@@ -82,15 +94,17 @@ export default function TransferScreen() {
           text: 'Confirmer', onPress: async () => {
             setSending(true);
             try {
-              const res = await apiClient.post<{ new_balance: number; message: string }>(
+              const res = await runWithPin(extra => apiClient.post<{ new_balance: number; message: string }>(
                 Endpoints.wallet.transfer,
-                { receiver_id: selected.id, gogold_amount: GoGold, note: note || null },
-              );
+                { receiver_id: selected.id, gogold_amount: GoGold, note: note || null, ...extra },
+              ));
               setBalance(res.data?.new_balance ?? null);
               toastService.success('Transfert réussi ✓', res.data?.message ?? `${GoGold} GoGold envoyés.`);
               navigation.goBack();
             } catch (e: any) {
-              toastService.error('Erreur', e?.message ?? 'Transfert échoué');
+              if (e?.message !== 'pin_cancelled') {
+                toastService.error('Erreur', e?.message ?? 'Transfert échoué');
+              }
             } finally { setSending(false); }
           },
         },
@@ -238,6 +252,7 @@ export default function TransferScreen() {
           </LinearGradient>
         </TouchableOpacity>
       </ScrollView>
+      {pinModal}
     </View>
   );
 }

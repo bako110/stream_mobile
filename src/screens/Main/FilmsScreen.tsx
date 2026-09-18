@@ -589,7 +589,7 @@ export const FilmsScreen: React.FC = () => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
 
       {/* ── HEADER FIXE : retour + tabs + filtre ── */}
       <View style={{ backgroundColor: colors.background, paddingTop: insets.top + 8, paddingHorizontal: H_PAD, paddingBottom: hasActiveFilter ? 6 : 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>

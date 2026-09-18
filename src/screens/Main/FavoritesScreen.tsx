@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
-  Image, StyleSheet, StatusBar,
+  Image, StyleSheet, StatusBar, Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -137,10 +137,18 @@ export const FavoritesScreen: React.FC = () => {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle={theme.isDark ? 'light-content' : 'dark-content'}
+      />
+
+      {/* Cale de status bar — bande opaque derrière la barre système, couleur du
+          header, pour que l'icône batterie/heure reste lisible en scroll. */}
+      <View style={{ height: insets.top, backgroundColor: colors.surface }} />
 
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 8, backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+      <View style={[styles.header, { paddingTop: Platform.OS === 'android' ? 8 : 6, backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
         <BackButton onPress={() => nav.goBack()} />
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Favoris</Text>
         <View style={{ width: 38 }} />

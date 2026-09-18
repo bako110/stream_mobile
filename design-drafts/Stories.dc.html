@@ -1,0 +1,95 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "SF Pro Text", -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; background: #0A0A11; color: #fff; -webkit-font-smoothing: antialiased; }
+    a { color: #C9B3FF; } a:hover { color: #fff; }
+    .wrap { width: 390px; padding: 22px 0 44px; }
+    .kicker { font-size: 10.5px; font-weight: 800; letter-spacing: 1.4px; color: #6A6884; text-transform: uppercase; padding: 0 16px; margin: 0 0 4px; }
+    .lede { font-size: 12.5px; color: #9997B2; padding: 0 16px; margin: 0 0 18px; line-height: 1.55; }
+    .state { font-size: 10px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; color: #B79BFF; padding: 0 16px; margin: 20px 0 8px; display: flex; align-items: center; gap: 6px; }
+    .state::before { content: ""; width: 14px; height: 1.5px; background: #B79BFF; }
+    .tl { margin: 12px 16px 0; padding: 12px 14px; background: #12121C; border: 1px solid #23233A; border-radius: 12px; }
+    .tl h4 { margin: 0 0 8px; font-size: 10px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: #6A6884; }
+    .tl .row { display: flex; gap: 10px; font-size: 11px; color: #9997B2; padding: 3px 0; line-height: 1.55; }
+    .tl .row b { color: #E7E5F5; font-weight: 650; }
+    .tl code { font-family: ui-monospace, Menlo, monospace; font-size: 10px; background: rgba(183,155,255,0.12); color: #C9B3FF; padding: 1px 4px; border-radius: 4px; }
+    .tl .t { font-family: ui-monospace, Menlo, monospace; font-size: 10px; color: #B79BFF; flex-shrink: 0; width: 62px; font-weight: 600; }
+
+    .story { position: relative; width: 344px; height: 612px; margin: 10px auto 4px; border-radius: 26px; overflow: hidden; background: #131019; }
+    .cr { position: absolute; inset: 0; background: linear-gradient(172deg, #2A0B4A 0%, #5B2FC0 48%, #B23A86 100%); }
+    .cr::after { content: ""; position: absolute; inset: 0; background: radial-gradient(140% 100% at 80% 8%, rgba(255,255,255,0.10), transparent 55%); }
+    .gb { position: absolute; left: 0; right: 0; bottom: 0; height: 52%; background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.5) 58%, rgba(0,0,0,0.9)); }
+
+    .bars { position: absolute; top: 14px; left: 12px; right: 12px; display: flex; gap: 4px; }
+    .bars i { flex: 1; height: 2px; border-radius: 2px; background: rgba(255,255,255,0.28); overflow: hidden; }
+    .bars i.done { background: #fff; }
+    .bars i.cur::after { content: ""; display: block; height: 100%; width: 40%; background: #fff; }
+
+    .top { position: absolute; top: 28px; left: 16px; right: 16px; display: flex; align-items: center; justify-content: space-between; }
+    .spon { font-size: 10px; font-weight: 600; letter-spacing: 1px; color: rgba(255,255,255,0.55); text-transform: uppercase; }
+    .close { width: 28px; height: 28px; border-radius: 14px; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; }
+
+    /* bottom — one line of copy, editorial */
+    .body { position: absolute; left: 20px; right: 20px; bottom: 96px; }
+    .body .h { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .body .av { width: 30px; height: 30px; border-radius: 15px; background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; }
+    .body .nm { font-size: 13px; font-weight: 700; text-shadow: 0 1px 8px rgba(0,0,0,0.55); }
+    .body .cp { font-size: 15px; font-weight: 550; line-height: 21px; color: rgba(255,255,255,0.92); text-shadow: 0 1px 8px rgba(0,0,0,0.4); letter-spacing: -0.1px; }
+
+    /* swipe-up — ghost handle */
+    .swipe { position: absolute; left: 0; right: 0; bottom: 30px; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+    .swipe .chev { color: rgba(255,255,255,0.85); }
+    .swipe .txt { font-size: 12px; font-weight: 700; letter-spacing: 0.3px; text-shadow: 0 1px 6px rgba(0,0,0,0.5); }
+    .swipe .grip { width: 40px; height: 3.5px; border-radius: 2px; background: rgba(255,255,255,0.45); }
+    svg { display: block; }
+  </style>
+</helmet>
+
+<div class="wrap">
+
+  <p class="kicker">Stories · slide sponsorisé</p>
+  <p class="lede">Plein écran net, <b>une seule phrase d'accroche</b>, pas de bloc. Le CTA est une <b>poignée fantôme</b> en bas : elle fait deux rebonds à l'ouverture pour signaler le geste, puis se fige. Migration <code>Animated legacy → reanimated</code>.</p>
+
+  <p class="state">Slide sponsorisé</p>
+  <div class="story">
+    <div class="cr"></div><div class="gb"></div>
+    <div class="bars"><i class="done"></i><i class="done"></i><i class="cur"></i><i></i></div>
+    <div class="top">
+      <span class="spon">Sponsorisé</span>
+      <span class="close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span>
+    </div>
+    <div class="body">
+      <div class="h">
+        <div class="av"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M12 3v18M3 12h18" stroke-linecap="round"/></svg></div>
+        <span class="nm">Bloom Skincare</span>
+      </div>
+      <p class="cp">Une routine visage en deux gestes. Sans parfum, testée dermato.</p>
+    </div>
+    <div class="swipe">
+      <span class="chev"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 15 6-6 6 6"/></svg></span>
+      <span class="txt">En savoir plus</span>
+      <span class="grip"></span>
+    </div>
+  </div>
+
+  <div class="tl">
+    <h4>Timeline — slide sponsorisé</h4>
+    <div class="row"><span class="t">t0</span><span>slide monté. Barre <b>identique aux stories normales</b> (2 px, blanche, 5 s) — aujourd'hui isolée en haut à 44 px, on l'aligne.</span></div>
+    <div class="row"><span class="t">t+180</span><span><code>.body</code> (accroche + auteur) en <code>FadeInUp.delay(180).duration(300)</code>, translateY 12→0.</span></div>
+    <div class="row"><span class="t">t+400</span><span>poignée : <code>chev</code>+<code>txt</code> font <b>2 rebonds</b> <code>translateY(0→−5→0)</code> via <code>withRepeat(withSequence(...), 2)</code>, spring doux. Puis <b>immobile</b>.</span></div>
+    <div class="row"><span class="t">geste</span><span>swipe vertical ↑ sur le slide, OU tap poignée → <code>/ads/:id/click</code> + <code>Linking.openURL(cta_url)</code>. Tap ailleurs → groupe suivant (comportement story conservé).</span></div>
+    <div class="row"><span class="t">créatif</span><span>si image : <b>Ken Burns très lent</b> optionnel — <code>scale 1→1.06</code> sur 5 s, <code>withTiming</code> linéaire. Une passe, pas de retour.</span></div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

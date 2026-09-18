@@ -1,8 +1,6 @@
 /**
- * FCM + Notifee — push notifications & full-screen incoming call alerts.
- *
- * - Foreground: handled by WebSocket + NotificationToast (no FCM needed)
- * - Background/quit: FCM wakes the app, Notifee shows a full-screen call UI
+ * FCM + Notifee — push notifications (messages, activité, abonnements…).
+ * Les appels 1‑à‑1 ont été retirés de l'app (migrés vers une app dédiée).
  *
  * Call setupFCM() once after login.
  * Call removeFCMToken() on logout.
@@ -12,7 +10,6 @@ import {
   requestPermission,
   getToken,
   onTokenRefresh,
-  onMessage,
   onNotificationOpenedApp,
   getInitialNotification,
   deleteToken,
@@ -21,18 +18,16 @@ import type { FirebaseMessagingTypes } from '@react-native-firebase/messaging';
 import notifee, {
   AndroidImportance,
   AndroidVisibility,
-  AndroidCategory,
+  AndroidStyle,
   EventType,
 } from '@notifee/react-native';
+import type { NotificationAndroid } from '@notifee/react-native';
 import { Platform } from 'react-native';
 import { apiClient } from '../api/client';
 import { Endpoints } from '../api/endpoints';
 import { navigate } from '../navigation/navigationRef';
-import { storage } from '../utils/storage';
-import { STORAGE_KEYS } from '../utils/constants';
 
 // ── Channel IDs — incrémenter le suffixe pour forcer recréation si besoin ─────
-const CHANNEL_CALLS         = 'incoming_calls_v6';
 const CHANNEL_MESSAGES      = 'messages_v6';
 const CHANNEL_NOTIFS        = 'notifications_v6';
 // Publications des personnes suivies (post/reel/story) — signal discret,
@@ -42,7 +37,7 @@ const CHANNEL_FRIEND_ACTIVITY = 'friend_activity_v1';
 async function _createChannels(): Promise<void> {
   if (Platform.OS !== 'android') return;
 
-  // Supprimer les anciens canaux
+  // Supprimer les anciens canaux (dont ceux d'appel, désormais inutilisés)
   await notifee.deleteChannel('incoming_calls').catch(() => {});
   await notifee.deleteChannel('messages').catch(() => {});
   await notifee.deleteChannel('notifications').catch(() => {});
@@ -58,16 +53,8 @@ async function _createChannels(): Promise<void> {
   await notifee.deleteChannel('incoming_calls_v5').catch(() => {});
   await notifee.deleteChannel('messages_v5').catch(() => {});
   await notifee.deleteChannel('notifications_v5').catch(() => {});
+  await notifee.deleteChannel('incoming_calls_v6').catch(() => {});
 
-  await notifee.createChannel({
-    id:               CHANNEL_CALLS,
-    name:             'Appels entrants',
-    importance:       AndroidImportance.HIGH,
-    visibility:       AndroidVisibility.PUBLIC,
-    vibration:        true,
-    vibrationPattern: [500, 300, 500, 300],
-    sound:            'incoming_call',
-  });
   await notifee.createChannel({
     id:               CHANNEL_MESSAGES,
     name:             'Messages',
@@ -96,135 +83,57 @@ async function _createChannels(): Promise<void> {
   });
 }
 
-// ── Show full-screen incoming call notification ───────────────────────────────
-export async function showIncomingCallNotification(
-  callerId: string,
-  callerName: string,
-  callerAvatar: string | null,
-  callType: 'voice' | 'video',
-  callId?: string | null,
-): Promise<void> {
-  await notifee.displayNotification({
-    id:    `call_${callerId}`,
-    title: callerName,
-    body:  callType === 'video' ? 'Appel vidéo' : 'Appel vocal',
-    android: {
-      channelId:        CHANNEL_CALLS,
-      category:         AndroidCategory.CALL,
-      importance:       AndroidImportance.HIGH,
-      visibility:       AndroidVisibility.PUBLIC,
-      fullScreenAction: {
-        id:             'default',
-        // Opens MainActivity which triggers the deep-link via onNotificationOpenedApp
-      },
-      actions: [
-        {
-          title:    'Refuser',
-          pressAction: { id: 'decline' },
-        },
-        {
-          title:    'Accepter',
-          pressAction: { id: 'accept', launchActivity: 'default' },
-        },
-      ],
-      pressAction: { id: 'default', launchActivity: 'default' },
-      sound: 'incoming_call',
-    },
-    data: {
-      type:        'call_offer',
-      call_type:   callType,
-      caller_id:   callerId,
-      caller_name: callerName,
-      caller_avatar: callerAvatar ?? '',
-      call_id:     callId ?? '',
-    },
-  });
-}
+// ── Imagerie Android commune : avatar rond (largeIcon) + grande image ─────────
+// Donne à TOUTES les notifs le rendu WhatsApp/TikTok : photo de profil de
+// l'acteur en pastille ronde à gauche, et grande image dépliable quand le
+// contenu en a une (post/reel/story/pièce jointe image).
+//
+// Notifee accepte directement une URL http(s) pour `largeIcon` et pour
+// `style.picture` sur Android (il télécharge et met en cache lui-même) — pas
+// besoin de gérer un download/fichier local ici.
+//
+// Champs lus dans le payload FCM (envoyés par le backend) :
+//   - actor_avatar / sender_avatar / caller_avatar  → largeIcon rond
+//   - image                                         → BigPictureStyle
+function _androidImagery(
+  data: Record<string, string> | undefined,
+  bodyForStyle?: string,
+): Partial<NotificationAndroid> {
+  if (!data) return {};
+  const avatar =
+    data.actor_avatar || data.sender_avatar || data.caller_avatar || '';
+  const picture = data.image || '';
 
-// ── Cancel the call notification (on hangup) ─────────────────────────────────
-export async function cancelCallNotification(callerId: string): Promise<void> {
-  await notifee.cancelNotification(`call_${callerId}`);
+  const hasAvatar  = !!avatar  && /^https?:\/\//i.test(avatar);
+  const hasPicture = !!picture && /^https?:\/\//i.test(picture);
+
+  const out: Partial<NotificationAndroid> = {};
+  if (hasAvatar) {
+    out.largeIcon = avatar;
+    out.circularLargeIcon = true; // pastille ronde façon WhatsApp
+  }
+  if (hasPicture) {
+    out.style = {
+      type:      AndroidStyle.BIGPICTURE,
+      picture,
+      // Android masque le largeIcon quand la notif est dépliée : on le re-pose
+      // ici pour que l'avatar reste visible replié ET déplié (comme WhatsApp).
+      // `null` = pas d'avatar → on laisse Android masquer (comportement voulu).
+      ...(hasAvatar ? { largeIcon: avatar } : {}),
+      ...(bodyForStyle ? { summary: bodyForStyle } : {}),
+    };
+  }
+  return out;
 }
 
 // ── Handle notification action press (background) ────────────────────────────
 export function setupNotifeeBackgroundHandler(): void {
   notifee.onBackgroundEvent(async ({ type, detail }) => {
-    if (type === EventType.ACTION_PRESS) {
-      const actionId = detail.pressAction?.id;
-      const data     = detail.notification?.data as Record<string, string> | undefined;
-
-      await notifee.cancelNotification(detail.notification!.id!);
-
-      if (actionId === 'decline') {
-        // Rejeter via REST avec le token stocké dans MMKV
-        if (data?.caller_id) {
-          try {
-            const token = storage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-            if (token) {
-              const { API_BASE_URL } = require('../utils/constants');
-              await fetch(`${API_BASE_URL}/api/v1/messages/call/reject`, {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body:    JSON.stringify({ caller_id: data.caller_id }),
-              });
-            }
-          } catch {}
-        }
-      } else if (actionId === 'accept') {
-        // Stocker l'intention dans MMKV — l'app la lira au démarrage
-        if (data) {
-          storage.setItem('pending_call_accept', JSON.stringify({
-            caller_id:    data.caller_id,
-            caller_name:  data.caller_name,
-            caller_avatar: data.caller_avatar ?? '',
-            call_type:    data.call_type ?? 'voice',
-            call_id:      data.call_id ?? null,
-          }));
-        }
-      }
-      // Pour 'default' (tap) : l'app s'ouvre via getInitialNotification
-    }
-    if (type === EventType.DISMISSED) {
+    if (type === EventType.ACTION_PRESS || type === EventType.DISMISSED) {
       await notifee.cancelNotification(detail.notification!.id!);
     }
+    // Pour 'default' (tap) : l'app s'ouvre via getInitialNotification
   });
-}
-
-// ── Fetch GET /call/pending avec un access token garanti frais ───────────────
-// Le token stocke peut avoir expire pendant que l'app etait tuee/en arriere-plan
-// (headless task — pas de garantie que RootNavigator ait deja tourne pour
-// enregistrer le refresh via apiClient). Sur 401, on rafraichit directement via
-// fetch (independant d'apiClient/authService) puis on retente une fois.
-async function _fetchPendingCallWithRefresh(apiBaseUrl: string): Promise<any | null> {
-  let token = storage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-  if (!token) return null;
-
-  const doFetch = (t: string) => fetch(`${apiBaseUrl}/api/v1/messages/call/pending`, {
-    headers: { Authorization: `Bearer ${t}` },
-  });
-
-  let res = await doFetch(token);
-  if (res.status === 401) {
-    const refreshToken = storage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
-    if (!refreshToken) return null;
-    try {
-      const refreshRes = await fetch(`${apiBaseUrl}/api/v1/auth/refresh`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ refresh_token: refreshToken }),
-      });
-      if (!refreshRes.ok) return null;
-      const refreshed = await refreshRes.json();
-      token = refreshed.access_token;
-      storage.setItem(STORAGE_KEYS.ACCESS_TOKEN, refreshed.access_token);
-      storage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshed.refresh_token);
-      res = await doFetch(token!);
-    } catch {
-      return null;
-    }
-  }
-  if (!res.ok) return null;
-  return res.json();
 }
 
 // ── Handle FCM message (background/quit) ─────────────────────────────────────
@@ -242,67 +151,6 @@ export async function handleBackgroundFCM(
   const title = (data.title as string) ?? 'Gofolyx';
   const body  = (data.body  as string) ?? '';
 
-  if (type === 'call_offer') {
-    const callerId   = (data.caller_id    as string) ?? '';
-    const callerName = (data.caller_name  as string) ?? 'Appel';
-    const callerAvatar = (data.caller_avatar as string) || '';
-    const callType   = (data.call_type as string) === 'video' ? 'video' : 'voice';
-
-    // Récupérer le SDP complet depuis le backend (le headless task peut faire fetch)
-    let offer: any = null;
-    let callId: string | null = (data.call_id as string) || null;
-    try {
-      const { API_BASE_URL } = require('../utils/constants');
-      const payload = await _fetchPendingCallWithRefresh(API_BASE_URL);
-      if (payload) {
-        offer  = payload.sdp ?? null;
-        callId = payload.call_id ?? callId;
-      }
-    } catch {}
-
-    // Stocker dans MMKV — l'app lira ça au retour au foreground
-    storage.setItem('pending_incoming_call', JSON.stringify({
-      caller_id:    callerId,
-      caller_name:  callerName,
-      caller_avatar: callerAvatar,
-      call_type:    callType,
-      call_id:      callId,
-      offer,
-      received_at:  Date.now(),
-    }));
-
-    // L'écran d'appel plein écran vient TOUJOURS de Notifee (fullScreenAction) —
-    // un ConnectionService self-managed n'affiche par lui-même AUCUNE UI système
-    // (contrairement à ce qu'on pensait) : il ne fait qu'intégrer l'appel au
-    // système Telecom (routage audio natif, bouton volume, interruption par un
-    // appel GSM classique). Sans cette notification, l'appel restait invisible
-    // même quand reportIncomingCall() "réussissait" silencieusement.
-    const { callConnectionService } = require('../services/callConnectionService');
-    if (callConnectionService.isAvailable) {
-      try { await callConnectionService.reportIncomingCall(callerId, callerName, callType === 'video'); } catch {}
-    }
-    await showIncomingCallNotification(callerId, callerName, callerAvatar || null, callType, callId);
-    return;
-  }
-
-  if (type === 'missed_call') {
-    const callerName  = (data.caller_name as string) || 'Appel manqué';
-    const callLabel   = (data.call_type as string) === 'video' ? 'vidéo' : 'vocal';
-    await notifee.displayNotification({
-      title: callerName,
-      body:  `Appel ${callLabel} manqué`,
-      android: {
-        channelId:    CHANNEL_NOTIFS,
-        importance:   AndroidImportance.HIGH,
-        sound:        'notification_sound',
-        smallIcon:    'ic_notification',
-        pressAction:  { id: 'default', launchActivity: 'default' },
-      },
-      data: data as Record<string, string>,
-    });
-    return;
-  }
-
   if (type === 'message') {
     const msgTitle = (data.sender_name as string) || title;
     const msgBody  = body || 'Vous avez reçu un message';
@@ -314,7 +162,9 @@ export async function handleBackgroundFCM(
         importance:   AndroidImportance.HIGH,
         sound:        'message_sound',
         vibrationPattern: [300, 200, 300, 200],
+        smallIcon:    'ic_notification',
         pressAction:  { id: 'default', launchActivity: 'default' },
+        ..._androidImagery(data as Record<string, string>, msgBody),
       },
       data: data as Record<string, string>,
     });
@@ -333,6 +183,7 @@ export async function handleBackgroundFCM(
         vibrationPattern: [300, 200, 300],
         smallIcon:        'ic_notification',
         pressAction:      { id: 'default', launchActivity: 'default' },
+        ..._androidImagery(data as Record<string, string>, body),
       },
       ios: {
         sound: 'notification_sound.wav',
@@ -354,6 +205,7 @@ export async function handleBackgroundFCM(
         vibrationPattern: [300, 200, 300],
         smallIcon:        'ic_notification',
         pressAction:      { id: 'default', launchActivity: 'default' },
+        ..._androidImagery(data as Record<string, string>, body),
       },
       ios: {
         sound: 'notification_sound.wav',
@@ -373,7 +225,9 @@ export async function handleBackgroundFCM(
       android: {
         channelId:   CHANNEL_FRIEND_ACTIVITY,
         importance:  AndroidImportance.LOW,
+        smallIcon:   'ic_notification',
         pressAction: { id: 'default', launchActivity: 'default' },
+        ..._androidImagery(data as Record<string, string>, body),
       },
       ios: { sound: undefined },
       data: data as Record<string, string>,
@@ -390,7 +244,9 @@ export async function handleBackgroundFCM(
       importance:   AndroidImportance.HIGH,
       sound:        'notification_sound',
       vibrationPattern: [250, 250],
+      smallIcon:    'ic_notification',
       pressAction:  { id: 'default', launchActivity: 'default' },
+      ..._androidImagery(data as Record<string, string>, body),
     },
     data: data as Record<string, string>,
   });
@@ -401,20 +257,7 @@ export async function handleBackgroundFCM(
 function _handleNotificationOpen(data?: Record<string, string>): void {
   if (!data) return;
   const type = data.type;
-  if (type === 'call_offer') {
-    navigate('Call', {
-      partnerId:    data.caller_id   ?? data.from,
-      partnerName:  data.caller_name ?? '',
-      partnerAvatar: data.caller_avatar || null,
-      callType:     (data.call_type as 'voice' | 'video') ?? 'voice',
-      isIncoming:   true,
-      autoAccept:   data._accept === 'true',
-      offer:        undefined,
-      callId:       data.call_id || null,
-    });
-  } else if (type === 'missed_call') {
-    navigate('Messages', { initialTab: 'calls' });
-  } else if (type === 'message') {
+  if (type === 'message') {
     navigate('Chat', { partnerId: data.sender_id, partnerName: data.sender_name ?? '' });
   } else if (type === 'subscription_expired') {
     const missingGoGold = parseInt(data.missing_gogold ?? '0', 10);
@@ -481,44 +324,7 @@ async function _unregisterToken(token: string): Promise<void> {
 }
 
 // ── Main setup (call after login) ─────────────────────────────────────────────
-// Reprend un appel accepté depuis la notification pendant que l'app était en
-// arrière-plan/tuée. Appelé en tout premier dans setupFCM() — avant permissions,
-// token FCM et enregistrement réseau — pour qu'un souci sur ces étapes annexes
-// (lentes, potentiellement en échec) ne retarde/empêche jamais la reprise d'un
-// appel déjà accepté par l'utilisateur (sinon: splash → accueil, appel perdu).
-export function resumePendingCallAccept(): void {
-  const pendingRaw = storage.getItem('pending_call_accept');
-  if (!pendingRaw) return;
-  storage.removeItem('pending_call_accept');
-  try {
-    const pending = JSON.parse(pendingRaw);
-    let offer: any = null;
-    let callId: string | null = pending.call_id ?? null;
-    const incomingRaw = storage.getItem('pending_incoming_call');
-    if (incomingRaw) {
-      storage.removeItem('pending_incoming_call');
-      try {
-        const incoming = JSON.parse(incomingRaw);
-        offer  = incoming.offer ?? null;
-        callId = incoming.call_id ?? callId;
-      } catch {}
-    }
-    navigate('Call', {
-      partnerId:    pending.caller_id,
-      partnerName:  pending.caller_name ?? 'Inconnu',
-      partnerAvatar: pending.caller_avatar || null,
-      callType:     pending.call_type ?? 'voice',
-      isIncoming:   true,
-      autoAccept:   true,
-      offer,
-      callId,
-    });
-  } catch {}
-}
-
 export async function setupFCM(): Promise<void> {
-  resumePendingCallAccept();
-
   await _createChannels();
 
   const m = getMessaging();
@@ -538,60 +344,17 @@ export async function setupFCM(): Promise<void> {
 
   onTokenRefresh(m, _registerToken);
 
-  // Foreground FCM — fallback si le WS n'a pas livré le call_offer
-  // (ex: multi-instance backend, Redis down, WS flap)
-  onMessage(m, async (remoteMessage: FirebaseMessagingTypes.RemoteMessage) => {
-    const data = remoteMessage?.data;
-    if (!data || data.type !== 'call_offer') return;
-    const callerId    = (data.caller_id    as string) ?? '';
-    const callerName  = (data.caller_name  as string) ?? 'Appel';
-    const callerAvatar = (data.caller_avatar as string) || '';
-    const callType    = (data.call_type as string) === 'video' ? 'video' : 'voice';
-    // Attendre 1s — si le WS a livré, il a déjà navigué. Sinon on prend le relais.
-    await new Promise<void>(r => setTimeout(() => r(), 1000));
-    // Vérifier si CallScreen est déjà ouvert (navigationRef)
-    const { navigationRef: navRef } = require('../navigation/navigationRef');
-    const currentRoute = navRef.getCurrentRoute?.();
-    if (currentRoute?.name === 'Call') return;
-    let offer: any = null;
-    try {
-      const { API_BASE_URL } = require('../utils/constants');
-      const payload = await _fetchPendingCallWithRefresh(API_BASE_URL);
-      if (payload) offer = payload.sdp ?? null;
-    } catch {}
-    navigate('Call', {
-      partnerId:    callerId,
-      partnerName:  callerName,
-      partnerAvatar: callerAvatar || null,
-      callType,
-      isIncoming:   true,
-      offer,
-    });
-  });
-
   // App opened from background notification tap
   onNotificationOpenedApp(m, (msg: FirebaseMessagingTypes.RemoteMessage) => {
     _handleNotificationOpen(msg.data as Record<string, string>);
   });
 
-  // Notifee foreground action handler
+  // Notifee foreground action handler — tap sur la notif → navigation
   notifee.onForegroundEvent(({ type, detail }) => {
-    if (type === EventType.ACTION_PRESS) {
-      const actionId = detail.pressAction?.id;
-      const data     = detail.notification?.data as Record<string, string> | undefined;
+    if (type === EventType.ACTION_PRESS && detail.pressAction?.id === 'default') {
+      const data = detail.notification?.data as Record<string, string> | undefined;
       notifee.cancelNotification(detail.notification!.id!);
-      if (actionId === 'accept') {
-        _handleNotificationOpen({ ...data, _accept: 'true' } as Record<string, string>);
-      } else if (actionId === 'decline') {
-        // Envoyer call_hangup via WebSocket (app est active)
-        if (data?.caller_id) {
-          try {
-            apiClient.post(`/api/v1/messages/call/reject`, { caller_id: data.caller_id });
-          } catch {}
-        }
-      } else if (actionId === 'default') {
-        _handleNotificationOpen(data);
-      }
+      _handleNotificationOpen(data);
     }
   });
 

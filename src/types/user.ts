@@ -31,6 +31,8 @@ export interface User {
   verification_requested_at?: string | null;
   referral_code?: string | null;
   gofolyx_id?: string | null;
+  // true si un code PIN wallet est défini (exigé pour cadeau/transfert/retrait)
+  has_wallet_pin?: boolean;
   last_login_at: string | null;
   created_at: string;
   updated_at: string;

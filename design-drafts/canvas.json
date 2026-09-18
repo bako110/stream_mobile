@@ -1,0 +1,12 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html",      "x": 0,    "y": 0, "w": 390, "h": 1260, "title": "Feed" },
+    { "file": "Reels.dc.html",     "x": 510,  "y": 0, "w": 390, "h": 1640, "title": "Reels" },
+    { "file": "Stories.dc.html",   "x": 1020, "y": 0, "w": 390, "h": 1060, "title": "Stories" },
+    { "file": "Recherche.dc.html", "x": 1530, "y": 0, "w": 390, "h": 1120, "title": "Recherche" }
+  ],
+  "annotations": [
+    { "id": "brief", "x": 0, "y": -170, "w": 900, "text": "Refonte globale — direction PREMIUM ÉDITORIAL.\nLa pub se fond, le contenu domine. Aucun bloc coloré, aucune ombre lourde, aucune pulsation permanente.\n\nSystème d'apparition du CTA, partout identique :\n1. entrée chorégraphiée (fade + slide court + léger overshoot)\n2. UNE accroche (shine qui balaie 1× / hairline qui se déplie / poignée qui rebondit 2×)\n3. puis STABLE — ne réagit plus qu'au tap\n\nFeed    : CTA = lien texte au repos → devient bouton discret après 450 ms d'arrêt au scroll\nReels   : overlay minimal → hairline CTA se déplie à t+900, crossfade en carte à t+1200, skip à t+3000\nStories : 1 phrase d'accroche, poignée swipe-up fantôme (2 rebonds), migration reanimated\nRecherche : filet gradient 2px + mot « Annonce » (fini la pastille rose), entrées staggerées\n\nPré-requis backend : _serialize() dans ads.py doit exposer advertiser_name + advertiser_logo (déjà en base via advertiser_id → users)." }
+  ],
+  "launch": { "view": "canvas" }
+}

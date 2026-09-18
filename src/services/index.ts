@@ -18,8 +18,6 @@ export { planningService } from './planningService';
 export type { PlanningItem, CreatePlanningEntry } from './planningService';
 export { activityService } from './activityService';
 export type { ActivityItem, ActivityActor } from './activityService';
-export { callHistoryService } from './callHistoryService';
-export type { CallRecord, CallDirection } from './callHistoryService';
 export { feedPreferenceService } from './feedPreferenceService';
 export { reportService } from './reportService';
 export type { ReportContentType, ReportReason, CreateReportPayload } from './reportService';

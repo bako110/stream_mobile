@@ -25,12 +25,14 @@ import Icon from 'react-native-vector-icons/Feather';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { useWsEvents } from '../../hooks/useWsEvents';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { BackButton, PriceWithLocal } from '../../components/common';
 import { showConfirm } from '../../services';
+import { showWithdrawUnavailable } from '../../utils/withdrawAlert';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface WalletBalance {
@@ -225,6 +227,7 @@ const WalletScreen: React.FC = () => {
   const { theme } = useTheme();
   const { colors } = theme;
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
 
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -377,12 +380,24 @@ const WalletScreen: React.FC = () => {
     );
   };
 
+  // Status bar : translucide sur Android (le contenu passe dessous), icônes
+  // adaptées au thème. Le header réserve `insets.top` pour ne jamais passer
+  // sous l'encoche / la barre système.
+  const statusBar = (
+    <StatusBar
+      translucent
+      backgroundColor="transparent"
+      barStyle={theme.isDark ? 'light-content' : 'dark-content'}
+    />
+  );
+  const headerPadTop = insets.top + (IS_SMALL ? 6 : 10);
+
   // ── Loading ──────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <View style={s.container}>
-        <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
-        <View style={s.header}>
+        {statusBar}
+        <View style={[s.header, { paddingTop: headerPadTop }]}>
           <Text style={s.headerTitle}>Mon Portefeuille</Text>
         </View>
         <WalletSkeleton />
@@ -394,6 +409,7 @@ const WalletScreen: React.FC = () => {
   if (error && !balance) {
     return (
       <View style={[s.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        {statusBar}
         <Icon name="wifi-off" size={48} color={colors.textSecondary} />
         <Text style={[s.emptyTitle, { marginTop: 16 }]}>{error}</Text>
         <TouchableOpacity style={s.retryBtn} onPress={() => { setLoading(true); fetchData().finally(() => setLoading(false)); }}>
@@ -405,14 +421,14 @@ const WalletScreen: React.FC = () => {
 
   return (
     <View style={s.container}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+      {statusBar}
 
       {/* Header */}
-      <View style={s.header}>
+      <View style={[s.header, { paddingTop: headerPadTop }]}>
         <BackButton onPress={() => navigation.goBack()} />
         <Text style={[s.headerTitle, { flex: 1, textAlign: 'center' }]}>Mon Portefeuille</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Withdraw')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Icon name="clock" size={22} color={colors.textSecondary} />
+        <TouchableOpacity onPress={() => navigation.navigate('SettingsWallet')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Icon name="settings" size={22} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
 
@@ -454,7 +470,7 @@ const WalletScreen: React.FC = () => {
             <TouchableOpacity
               key={a.screen}
               style={s.actionBtn}
-              onPress={() => navigation.navigate(a.screen)}
+              onPress={() => (a.screen === 'Withdraw' ? showWithdrawUnavailable() : navigation.navigate(a.screen))}
             >
               <View style={[s.actionIcon, { backgroundColor: `${a.color}22` }]}>
                 {(a as any).mci
@@ -537,7 +553,7 @@ const styles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: IS_SMALL ? 14 : 20,
-    paddingTop: IS_SMALL ? 44 : 56,
+    // paddingTop fourni dynamiquement (insets.top + marge) dans le JSX
     paddingBottom: IS_SMALL ? 8 : 12,
     backgroundColor: colors.background,
   },

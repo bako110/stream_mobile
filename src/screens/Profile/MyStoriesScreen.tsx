@@ -2,9 +2,10 @@
 import {
   View, Text, TouchableOpacity, Image,
   StyleSheet, RefreshControl, Platform,
-  FlatList, Modal, Linking,
+  FlatList, Modal, Linking, StatusBar,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialIcon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -158,6 +159,7 @@ const row = StyleSheet.create({
 export const MyStoriesScreen: React.FC<Props> = ({ navigation }) => {
   const { theme } = useTheme();
   const { colors } = theme;
+  const insets = useSafeAreaInsets();
   const nav = useNavigation<any>();
 
 
@@ -232,8 +234,13 @@ export const MyStoriesScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle={theme.isDark ? 'light-content' : 'dark-content'}
+      />
       {/* ── Header ── */}
-      <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+      <View style={[s.header, { paddingTop: insets.top + (Platform.OS === 'android' ? 8 : 6), backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <BackButton onPress={() => navigation.goBack()} />
         <Text style={[s.title, { color: colors.textPrimary }]}>Mon statut</Text>
         <View style={{ width: 40 }} />
@@ -329,10 +336,6 @@ export const MyStoriesScreen: React.FC<Props> = ({ navigation }) => {
             setViewerOpen(false);
             nav.navigate('Chat', { partnerId, partnerName, avatarUrl });
           }}
-          onNavigateToCall={(partnerId, partnerName, callType, avatarUrl) => {
-            setViewerOpen(false);
-            nav.navigate('Call', { partnerId, partnerName, partnerAvatar: avatarUrl, callType, isIncoming: false });
-          }}
         />
       )}
 
@@ -350,7 +353,6 @@ const s = StyleSheet.create({
   root: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'android' ? 48 : 56,
     paddingBottom: 14, paddingHorizontal: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },

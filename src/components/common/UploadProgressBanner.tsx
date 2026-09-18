@@ -46,7 +46,8 @@ export const UploadProgressBar: React.FC<{ bottomOffset?: number }> = () => {
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const status = job?.status ?? null;
-  const isActive   = status === 'queued' || status === 'compressing' || status === 'uploading';
+  const isActive   = status === 'queued' || status === 'compressing' || status === 'uploading' || status === 'processing';
+  const isProcessing = status === 'processing';
   const isDone     = status === 'done';
   const isError    = status === 'error';
   const shouldShow = isActive || isDone || isError;
@@ -83,14 +84,24 @@ export const UploadProgressBar: React.FC<{ bottomOffset?: number }> = () => {
   if (!shown || !job) return null;
 
   const noun = NOUN[job.type] ?? 'Publication';
+  const nounLower = noun.toLowerCase();
   const accent = isError ? colors.error : isDone ? colors.success : colors.primary;
   const label  = isError
-    ? `Échec — ${noun.toLowerCase()} non publié`
+    ? `Échec — ${nounLower} non publié`
     : isDone
       ? `${noun} publié${noun === 'Publication' ? 'e' : ''} ✓`
-      : `${noun} en cours d'envoi…`;
+      : status === 'compressing'
+        ? `Préparation de la vidéo…`
+        : isProcessing
+          // Phase 2 : fichier reçu, le serveur prépare la version streamable.
+          ? `Traitement en cours…  (${nounLower} bientôt en ligne)`
+          : `Envoi ${noun === 'Publication' ? 'de la publication' : `du ${nounLower}`}…`;
 
-  const pct = isActive && job.progress > 0 && job.progress < 100 ? `${Math.round(job.progress)} %` : null;
+  // Pas de % pendant "processing" : le serveur travaille, la barre resterait
+  // figée et donnerait l'impression d'un blocage → on passe en indéterminé.
+  const pct = isActive && !isProcessing && job.progress > 0 && job.progress < 100
+    ? `${Math.round(job.progress)} %`
+    : null;
 
   return (
     <Animated.View
@@ -109,10 +120,17 @@ export const UploadProgressBar: React.FC<{ bottomOffset?: number }> = () => {
         {pct && <Text style={[st.pct, { color: colors.textTertiary }]}>{pct}</Text>}
       </View>
 
-      {/* Barre de progression fine sous la pill pendant l'envoi */}
-      {isActive && (
+      {/* Barre de progression sous la pill. Déterminée pendant l'envoi ;
+          indéterminée (fine, pleine largeur, teintée) pendant le traitement
+          serveur pour ne pas donner l'impression d'un blocage. */}
+      {isActive && !isProcessing && (
         <View style={[st.track, { backgroundColor: colors.divider }]}>
           <View style={[st.fill, { backgroundColor: accent, width: `${Math.max(8, Math.min(100, job.progress))}%` }]} />
+        </View>
+      )}
+      {isProcessing && (
+        <View style={[st.track, { backgroundColor: accent + '33' }]}>
+          <View style={[st.fill, { backgroundColor: accent, width: '100%', opacity: 0.5 }]} />
         </View>
       )}
     </Animated.View>

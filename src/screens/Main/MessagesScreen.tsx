@@ -82,7 +82,7 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
   const { theme, isDark } = useTheme();
   const { colors }        = theme;
   const nav               = useNavigation<any>();
-  const { clearUnreadMessages, addListener, removeListener, missedCallCount, sendMessage: sendWsMessage, isConnected, liveUserIds } = useWs();
+  const { clearUnreadMessages, addListener, removeListener, sendMessage: sendWsMessage, isConnected, liveUserIds } = useWs();
 
   const [convSelectedIds,   setConvSelectedIds]   = useState<Set<string>>(new Set());
   const [convSelectMode,    setConvSelectMode]    = useState(false);
@@ -98,13 +98,10 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
   const { currentUser } = useUser();
 
   // Callbacks pour StoryBar/StoryViewer — même signature attendue par le composant
-  // partagé avec FeedScreen ("Répondre"/"Appeler" depuis une story ouvre le chat/
-  // appel directement, cohérent avec le fait d'être déjà dans l'écran messagerie).
+  // partagé avec FeedScreen ("Répondre" depuis une story ouvre le chat directement,
+  // cohérent avec le fait d'être déjà dans l'écran messagerie).
   const onStoryNavigateToChat = useCallback((partnerId: string, partnerName: string, avatarUrl?: string) => {
     nav.navigate('Chat' as any, { partnerId, partnerName, avatarUrl });
-  }, [nav]);
-  const onStoryNavigateToCall = useCallback((partnerId: string, partnerName: string, callType: 'voice' | 'video') => {
-    nav.navigate('Call' as any, { partnerId, partnerName, callType, isIncoming: false });
   }, [nav]);
 
 
@@ -338,17 +335,6 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
 
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <TouchableOpacity
-                  style={[styles.iconBtn, { backgroundColor: '#36D9A020' }]}
-                  onPress={() => nav.navigate('CallHistory' as any)}
-                >
-                  <Icon name="phone" size={18} color="#36D9A0" />
-                  {missedCallCount > 0 && (
-                    <View style={[styles.miniBadge, { backgroundColor: '#E0389A' }]}>
-                      <Text style={styles.miniBadgeText}>{missedCallCount > 9 ? '9+' : missedCallCount}</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity
                   style={[styles.iconBtn, { backgroundColor: colors.primary + '18' }]}
                   onPress={() => {
                     setSearchOpen(o => !o);
@@ -393,7 +379,6 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
             colors={colors}
             conversations={conversations}
             onNavigateToChat={onStoryNavigateToChat}
-            onNavigateToCall={onStoryNavigateToCall}
           />
         )}
       </View>

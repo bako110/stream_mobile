@@ -16,11 +16,7 @@ import { authService } from '../services/authService';
 export type WsPayload =
   | { type: 'message'; id: string; sender_id: string; receiver_id: string; content: string; message_type?: string; attachment_url?: string; attachment_meta?: any; created_at: string; read: boolean }
   | { type: 'read';    partner_id: string }
-  | { type: 'pong' }
-  | { type: 'call_offer';  from: string; to?: string; call_type: 'voice' | 'video'; sdp: any }
-  | { type: 'call_answer'; from: string; to?: string; sdp: any }
-  | { type: 'call_ice';    from: string; to?: string; candidate: any }
-  | { type: 'call_hangup'; from: string; to?: string };
+  | { type: 'pong' };
 
 const WS_BASE = API_BASE_URL.replace(/^http/, 'ws');
 const MAX_RETRIES = 6;

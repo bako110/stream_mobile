@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
-  StyleSheet, ActivityIndicator, RefreshControl, Platform,
+  StyleSheet, ActivityIndicator, RefreshControl, Platform, StatusBar,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -40,6 +41,7 @@ async function fetchAllFollowingIds(userId: string): Promise<Set<string>> {
 export const FollowingScreen: React.FC = () => {
   const { theme } = useTheme();
   const { colors } = theme;
+  const insets = useSafeAreaInsets();
   const nav = useNavigation<Nav>();
   const route = useRoute<any>();
 
@@ -240,9 +242,14 @@ export const FollowingScreen: React.FC = () => {
 
   return (
     <View style={[st.root, { backgroundColor: colors.background }]}>
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle={theme.isDark ? 'light-content' : 'dark-content'}
+      />
 
       {/* Header */}
-      <View style={[st.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+      <View style={[st.header, { paddingTop: insets.top + (Platform.OS === 'android' ? 8 : 6), backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
         <BackButton onPress={() => nav.goBack()} />
         <Text style={[st.title, { color: colors.textPrimary }]}>Réseau</Text>
         <View style={{ width: 40 }} />
@@ -308,7 +315,6 @@ const st = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? 48 : 56,
     paddingBottom: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },

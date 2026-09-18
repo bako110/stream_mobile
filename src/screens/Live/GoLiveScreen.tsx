@@ -9,6 +9,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { AvatarWithBadge } from '../../components/common/AvatarWithBadge';
@@ -40,6 +41,7 @@ export const GoLiveScreen: React.FC = () => {
   const { colors } = theme;
   const { currentUser } = useUser();
   const nav = useNavigation<Nav>();
+  const insets = useSafeAreaInsets();
 
   // Form
   const [title,       setTitle]       = useState('');
@@ -178,10 +180,14 @@ export const GoLiveScreen: React.FC = () => {
 
   return (
     <View style={[st.root, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle={theme.isDark ? 'light-content' : 'dark-content'}
+      />
 
       {/* Header */}
-      <View style={[st.header, { backgroundColor: colors.surface }]}>
+      <View style={[st.header, { paddingTop: insets.top + (Platform.OS === 'android' ? 8 : 6), backgroundColor: colors.surface }]}>
         <TouchableOpacity onPress={() => nav.goBack()} style={st.backBtn}>
           <Icon name="x" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
@@ -557,7 +563,6 @@ const st = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? 44 : 56,
     paddingBottom: 14,
   },
   backBtn:     { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },

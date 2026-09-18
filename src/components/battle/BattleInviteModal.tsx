@@ -1,7 +1,6 @@
 /**
  * Ecoute globalement les invitations de battle recues (evenement WS "battle_invite")
- * et affiche un modal Accepter/Refuser, quel que soit l'ecran actuellement affiche —
- * meme pattern que IncomingCallHandler pour les appels.
+ * et affiche un modal Accepter/Refuser, quel que soit l'ecran actuellement affiche.
  */
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, Vibration } from 'react-native';
