@@ -658,12 +658,14 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
     const mp4Url = r.mp4_url ?? undefined;
     return { url: r.hls_url ?? r.url, mp4Url, duration, thumbnailUrl };
   };
-  const doUploadAudio = async (uri: string) => {
+  const doUploadAudio = async (uri: string, title?: string | null) => {
     const ext = uri.split('.').pop()?.toLowerCase()??'mp4';
     const mime: Record<string,string> = { mp3:'audio/mpeg', m4a:'audio/x-m4a', aac:'audio/aac', wav:'audio/wav', ogg:'audio/ogg', mp4:'audio/mp4' };
     const fileName = `s_${Date.now()}.${ext}`;
-    // Ajoute au catalogue partagé (recherche/populaires) — non-bloquant, en parallèle
-    soundService.uploadFromUri(uri, fileName);
+    // Ajoute au catalogue partagé (recherche/populaires) — non-bloquant, en parallèle.
+    // title explicite (nom réel choisi par l'utilisateur) sinon le serveur retombe
+    // sur fileName (un nom technique généré ci-dessus, pas un titre affichable).
+    soundService.uploadFromUri(uri, fileName, title ?? undefined);
     return (await uploadAudioFile(uri, fileName, mime[ext]??'audio/mp4', 'stories')).url;
   };
 
@@ -698,12 +700,12 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
           // Démarre le cache du MP4 R2 en arrière-plan pour lecture offline future
           if (mp4_url) cacheInBackground(mp4_url).catch(() => {});
         } else if (_mode === 'voice') {
-          audio_url = _audioUri!.startsWith('http') ? _audioUri! : await doUploadAudio(_audioUri!);
+          audio_url = _audioUri!.startsWith('http') ? _audioUri! : await doUploadAudio(_audioUri!, _audioName);
           media_type = 'voice'; background_color = '#1A237E'; duration_sec = 15;
         }
 
         if (_audioUri && _mode !== 'voice') {
-          audio_url = _audioUri.startsWith('http') ? _audioUri : await doUploadAudio(_audioUri);
+          audio_url = _audioUri.startsWith('http') ? _audioUri : await doUploadAudio(_audioUri, _audioName);
           if (_mode === 'text') { media_type = 'audio'; }
           duration_sec = 15;
         }
