@@ -4,6 +4,7 @@
  */
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, Vibration } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import { useWs } from '../../context/WebSocketContext';
@@ -27,6 +28,7 @@ export const BattleInviteModal: React.FC = () => {
   const { theme } = useTheme();
   const { colors } = theme;
   const nav = useNavigation<any>();
+  const insets = useSafeAreaInsets();
 
   const [invite, setInvite] = useState<BattleInvitePayload | null>(null);
   const [responding, setResponding] = useState(false);
@@ -73,9 +75,11 @@ export const BattleInviteModal: React.FC = () => {
   if (!invite) return null;
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={close}>
+    <Modal visible transparent animationType="slide" onRequestClose={close} statusBarTranslucent>
       <View style={styles.backdrop}>
-        <View style={[styles.card, { backgroundColor: colors.surface }]}>
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={close} />
+        <View style={[styles.card, { backgroundColor: colors.surface, paddingBottom: 24 + insets.bottom }]}>
+          <View style={[styles.handle, { backgroundColor: colors.divider }]} />
           <View style={[styles.iconWrap, { backgroundColor: '#7B3FF222' }]}>
             <Icon name="zap" size={28} color="#7B3FF2" />
           </View>
@@ -120,8 +124,9 @@ export const BattleInviteModal: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 24 },
-  card: { width: '100%', maxWidth: 340, borderRadius: 24, padding: 24, alignItems: 'center', gap: 10 },
+  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' },
+  card: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 24, paddingTop: 24, alignItems: 'center', gap: 10 },
+  handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 14 },
   iconWrap: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   avatar: { width: 64, height: 64, borderRadius: 32 },
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },

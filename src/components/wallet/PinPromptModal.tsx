@@ -9,6 +9,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
 import { PinPad } from '../common/PinPad';
@@ -31,6 +32,7 @@ export const PinPromptModal: React.FC<Props> = ({
 }) => {
   const { theme } = useTheme();
   const { colors } = theme;
+  const insets = useSafeAreaInsets();
   const [pin, setPin] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -54,9 +56,11 @@ export const PinPromptModal: React.FC<Props> = ({
       : undefined);
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <View style={m.overlay}>
-        <View style={[m.card, { backgroundColor: colors.surface }]}>
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
+        <View style={[m.sheet, { backgroundColor: colors.surface, paddingBottom: 20 + insets.bottom }]}>
+          <View style={[m.handle, { backgroundColor: colors.divider }]} />
           <TouchableOpacity style={m.close} onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Icon name="x" size={20} color={colors.textTertiary} />
           </TouchableOpacity>
@@ -94,10 +98,11 @@ export const PinPromptModal: React.FC<Props> = ({
 };
 
 const m = StyleSheet.create({
-  overlay:  { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.55)', padding: 20 },
-  card:     { width: '100%', maxWidth: 360, borderRadius: 20, paddingHorizontal: 20, paddingTop: 26, paddingBottom: 24, alignItems: 'center' },
+  overlay:  { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' },
+  sheet:    { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 10, alignItems: 'center' },
+  handle:   { width: 36, height: 4, borderRadius: 2, marginBottom: 14 },
   close:    { position: 'absolute', top: 14, right: 14, padding: 4 },
-  iconWrap: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  iconWrap: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginBottom: 12, marginTop: 6 },
   title:    { fontSize: 16, fontWeight: '800', textAlign: 'center' },
   desc:     { fontSize: 13, textAlign: 'center', marginTop: 6, lineHeight: 18 },
   loading:  { height: 316, alignItems: 'center', justifyContent: 'center' },

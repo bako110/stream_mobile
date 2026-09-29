@@ -12,6 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
@@ -168,6 +169,7 @@ export const SettingsSecurityScreen: React.FC = () => {
   const nav = useNavigation<any>();
   const { theme } = useTheme();
   const { colors } = theme;
+  const insets = useSafeAreaInsets();
 
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
@@ -386,14 +388,17 @@ export const SettingsSecurityScreen: React.FC = () => {
       <Modal
         visible={stepUpTarget !== null}
         transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={handleStepUpCancel}
+        statusBarTranslucent
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={m.overlay}
         >
-          <View style={[m.card, { backgroundColor: colors.surface }]}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={handleStepUpCancel} />
+          <View style={[m.sheet, { backgroundColor: colors.surface, paddingBottom: 22 + insets.bottom }]}>
+            <View style={[m.handle, { backgroundColor: colors.divider }]} />
             <View style={[m.iconWrap, { backgroundColor: colors.primary + '15' }]}>
               <Icon name="lock" size={22} color={colors.primary} />
             </View>
@@ -454,8 +459,9 @@ const s = StyleSheet.create({
 });
 
 const m = StyleSheet.create({
-  overlay:   { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 24 },
-  card:      { width: '100%', maxWidth: 360, borderRadius: 18, padding: 22, alignItems: 'center' },
+  overlay:   { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' },
+  sheet:     { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 22, paddingTop: 10, alignItems: 'center' },
+  handle:    { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 14 },
   iconWrap:  { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   title:     { fontSize: 16, fontWeight: '800', textAlign: 'center' },
   desc:      { fontSize: 13, textAlign: 'center', marginTop: 6, lineHeight: 18 },

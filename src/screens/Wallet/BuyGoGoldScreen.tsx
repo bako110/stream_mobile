@@ -8,6 +8,7 @@ import { useStripe } from '@stripe/stripe-react-native';
 import { BackButton } from '../../components/common';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api';
 import { Endpoints } from '../../api/endpoints';
@@ -128,7 +129,7 @@ const BuyGoGoldScreen: React.FC = () => {
   if (step === 'success') {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 16 }}>
-        <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+        <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
         <View style={[s.iconCircle, { backgroundColor: '#22C55E22' }]}>
           <Icon name="check-circle" size={40} color="#22C55E" />
         </View>
@@ -137,7 +138,7 @@ const BuyGoGoldScreen: React.FC = () => {
           +{goGoldAdded.toLocaleString('fr-FR')} GoGold ajoutés à votre portefeuille
         </Text>
         {finalBalance != null && (
-          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textTertiary }}>
+          <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: colors.textTertiary }}>
             Nouveau solde : {finalBalance.toLocaleString('fr-FR')} GoGold
           </Text>
         )}
@@ -150,7 +151,7 @@ const BuyGoGoldScreen: React.FC = () => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <BackButton onPress={() => navigation.goBack()} />
@@ -212,21 +213,6 @@ const BuyGoGoldScreen: React.FC = () => {
               })}
             </View>
 
-            {selected && (() => {
-              const pkg = packages.find(p => p.id === selected)!;
-              const total = pkg.gogold + bonusOf(pkg);
-              const price = priceOf(pkg);
-              return (
-                <TouchableOpacity
-                  style={[s.payBtn, { opacity: 0.6 }]}
-                  onPress={() => handleBuyPackage(pkg)}
-                  activeOpacity={0.85}
-                >
-                  <Icon name="credit-card" size={16} color="#fff" />
-                  <Text style={s.payBtnText}>Paiement carte bientôt disponible</Text>
-                </TouchableOpacity>
-              );
-            })()}
           </>
         ) : (
           <View style={[s.customBox, { backgroundColor: colors.surface ?? colors.backgroundSecondary, borderColor: colors.border }]}>
@@ -243,21 +229,41 @@ const BuyGoGoldScreen: React.FC = () => {
               <Text style={[s.inputSuffix, { color: colors.textTertiary }]}>€</Text>
             </View>
             {customAmount > 0 && (
-              <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+              <Text style={{ fontSize: FontSize.sm, color: colors.textSecondary }}>
                 Vous recevrez {customGoGold.toLocaleString('fr-FR')} GoGold
               </Text>
             )}
+          </View>
+        )}
+        {/* Espace reservé en bas du scroll pour ne jamais faire chevaucher le
+            dernier contenu (grille de packs / bloc montant libre) avec le
+            bouton Payer FIXE ci-dessous — sans ça, la dernière rangée de
+            packs se retrouverait masquée derrière le bouton une fois affiché. */}
+        <View style={{ height: 90 }} />
+      </ScrollView>
+
+      {/* Bouton Payer FIXE en bas de l'écran (2026-09) — affiché DÈS qu'un
+          pack est sélectionné ou qu'un montant libre valide est saisi, sans
+          jamais nécessiter de scroll pour le voir (corrige : le bouton
+          n'apparaissait auparavant que dans le flux du ScrollView, juste
+          après la grille de packs — invisible sans scroller dès que la
+          grille dépassait la hauteur d'écran visible). */}
+      {((!customMode && selected) || (customMode && customValid)) && (() => {
+        const selectedPkg = !customMode ? packages.find(p => p.id === selected) : null;
+        const onPress = selectedPkg ? () => handleBuyPackage(selectedPkg) : handleBuyCustom;
+        return (
+          <View style={[s.payBar, { paddingBottom: insets.bottom + 12, backgroundColor: colors.background, borderTopColor: colors.border }]}>
             <TouchableOpacity
               style={[s.payBtn, { opacity: 0.6 }]}
-              onPress={handleBuyCustom}
+              onPress={onPress}
               activeOpacity={0.85}
             >
               <Icon name="credit-card" size={16} color="#fff" />
               <Text style={s.payBtnText}>Paiement carte bientôt disponible</Text>
             </TouchableOpacity>
           </View>
-        )}
-      </ScrollView>
+        );
+      })()}
     </View>
   );
 };
@@ -272,8 +278,8 @@ const s = StyleSheet.create({
   headerTitle: {
     flex: 1,
     textAlign: 'center',
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
   },
   iconCircle: {
     width: 96,
@@ -283,8 +289,8 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 8,
   },
-  title: { fontSize: 22, fontWeight: '800', textAlign: 'center' },
-  subtitle: { fontSize: 14, textAlign: 'center', lineHeight: 22 },
+  title: { fontSize: FontSize['2xl'], fontWeight: FontWeight.extraBold, textAlign: 'center' },
+  subtitle: { fontSize: FontSize.base, textAlign: 'center', lineHeight: 22 },
   webBtn: {
     paddingHorizontal: 28,
     paddingVertical: 14,
@@ -292,7 +298,7 @@ const s = StyleSheet.create({
     marginTop: 8,
     backgroundColor: '#7B3FF2',
   },
-  webBtnText: { fontSize: 15, fontWeight: '700', color: '#FFF' },
+  webBtnText: { fontSize: FontSize.basePlus, fontWeight: FontWeight.bold, color: '#FFF' },
   infoBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -301,10 +307,10 @@ const s = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
   },
-  infoText: { flex: 1, fontSize: 12, lineHeight: 17 },
+  infoText: { flex: 1, fontSize: FontSize.sm, lineHeight: 17 },
   toggleRow: { flexDirection: 'row', gap: 6, padding: 4, borderRadius: 16 },
   toggleBtn: { flex: 1, paddingVertical: 9, borderRadius: 12, alignItems: 'center' },
-  toggleText: { fontSize: 12, fontWeight: '700' },
+  toggleText: { fontSize: FontSize.sm, fontWeight: FontWeight.bold },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   card: {
     width: '47%',
@@ -317,12 +323,21 @@ const s = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10,
     backgroundColor: '#7B3FF2',
   },
-  popularText: { fontSize: 9, fontWeight: '800', color: '#fff', letterSpacing: 0.5 },
-  cardName: { fontSize: 13, fontWeight: '800', marginBottom: 6 },
-  cardGoGold: { fontSize: 22, fontWeight: '800' },
-  cardLabel: { fontSize: 11 },
-  cardBonus: { fontSize: 11, fontWeight: '700', color: '#22C55E', marginTop: 2 },
-  cardPrice: { fontSize: 15, fontWeight: '800', marginTop: 8 },
+  popularText: { fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold, color: '#fff', letterSpacing: 0.5 },
+  cardName: { fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold, marginBottom: 6 },
+  cardGoGold: { fontSize: FontSize['2xl'], fontWeight: FontWeight.extraBold },
+  cardLabel: { fontSize: FontSize.xsPlus },
+  cardBonus: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, color: '#22C55E', marginTop: 2 },
+  cardPrice: { fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold, marginTop: 8 },
+  payBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    borderTopWidth: 1,
+  },
   payBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -332,15 +347,15 @@ const s = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: '#7B3FF2',
   },
-  payBtnText: { fontSize: 13, fontWeight: '800', color: '#fff' },
+  payBtnText: { fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold, color: '#fff' },
   customBox: { borderRadius: 16, borderWidth: 1, padding: 18, gap: 14 },
-  customLabel: { fontSize: 14, fontWeight: '700' },
+  customLabel: { fontSize: FontSize.base, fontWeight: FontWeight.bold },
   inputRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10,
   },
-  input: { flex: 1, fontSize: 20, fontWeight: '800' },
-  inputSuffix: { fontSize: 18, fontWeight: '800' },
+  input: { flex: 1, fontSize: FontSize.xl, fontWeight: FontWeight.extraBold },
+  inputSuffix: { fontSize: FontSize.lg, fontWeight: FontWeight.extraBold },
 });
 
 export default BuyGoGoldScreen;

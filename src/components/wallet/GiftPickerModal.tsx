@@ -129,6 +129,14 @@ export const GiftPickerModal: React.FC<Props> = ({
       >
         <View style={[s.handle, { backgroundColor: colors.divider }]} />
 
+        {/* Bandeau de guidage — aide les nouveaux utilisateurs à comprendre le flux */}
+        <View style={[s.hintBanner, { backgroundColor: colors.primary + '14', borderColor: colors.primary + '30' }]}>
+          <Icon name="info" size={13} color={colors.primary} />
+          <Text style={[s.hintBannerText, { color: colors.primary }]} numberOfLines={2}>
+            Choisis un cadeau puis appuie sur Envoyer pour le faire parvenir à {receiverName}.
+          </Text>
+        </View>
+
         {/* En-tête : destinataire + solde */}
         <View style={s.header}>
           <View style={s.receiver}>
@@ -262,6 +270,14 @@ const s = StyleSheet.create({
     width: 40, height: 4, borderRadius: 2,
     alignSelf: 'center', marginBottom: 12,
   },
+
+  hintBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginHorizontal: 20, marginBottom: 12,
+    paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: 12, borderWidth: 1,
+  },
+  hintBannerText: { flex: 1, fontSize: 11.5, fontWeight: '600', lineHeight: 15 },
 
   header: {
     flexDirection: 'row', alignItems: 'center', gap: 12,

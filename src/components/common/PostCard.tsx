@@ -17,6 +17,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { AppColors } from '../../theme/colors';
 import { FeedCardLayout, FeedRadius, FeedActionIcon, getFeedCardStyle } from '../../theme/feed';
+import { FontSize, FontWeight } from '../../theme';
 import type { Post } from '../../types/post';
 import { postService } from '../../services/postService';
 import { saveService } from '../../services/saveService';
@@ -141,7 +142,7 @@ const ImageGrid: React.FC<{ urls: string[]; onPressImage: (i: number) => void }>
         <ImgTile uri={shown[3]} style={{ flex: 1, width: W }} radius={{ br: RADIUS }} onPress={() => onPressImage(3)}
           overlay={extra > 0 ? (
             <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.58)', alignItems: 'center', justifyContent: 'center', borderBottomRightRadius: RADIUS }]}>
-              <Text style={{ color: '#fff', fontSize: 26, fontWeight: '900', letterSpacing: -1 }}>+{extra}</Text>
+              <Text style={{ color: '#fff', fontSize: FontSize['2xl'], fontWeight: FontWeight.black, letterSpacing: -1 }}>+{extra}</Text>
             </View>
           ) : null} />
       </View>
@@ -424,14 +425,14 @@ const PostCardInner: React.FC<PostCardProps> = ({
               <Text style={[pc.authorName, { color: colors.textPrimary }]} numberOfLines={1}>{name}</Text>
               {author?.is_verified && (
                 <View style={[pc.verifiedBadge, { backgroundColor: colors.info }]}>
-                  <Icon name="check" size={8} color="#fff" />
+                  <Icon name="check" size={6} color="#fff" />
                 </View>
               )}
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
               <Text style={[pc.time, { color: colors.textTertiary }]}>{timeAgo(post.created_at)}</Text>
               <View style={[pc.dot, { backgroundColor: colors.textDisabled }]} />
-              <Icon name={post.is_private ? 'users' : 'globe'} size={10} color={colors.textTertiary} />
+              <Icon name={post.is_private ? 'users' : 'globe'} size={8} color={colors.textTertiary} />
             </View>
             {/* Badge visible uniquement par le createur, cf. ReelsScreen.tsx
                 pour le meme pattern — indicateur discret, pas bloquant. */}
@@ -441,7 +442,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
                 onPress={() => nav.navigate('AiAnalysisStatus', { contentType: 'post', contentId: post.id, initialStatus: post.ai_analysis_status })}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 }}>
                 <ActivityIndicator size="small" color={colors.textTertiary} />
-                <Text style={{ color: colors.textTertiary, fontSize: 10, fontWeight: '600' }}>Vérification en cours…</Text>
+                <Text style={{ color: colors.textTertiary, fontSize: FontSize.xs, fontWeight: FontWeight.semiBold }}>Vérification en cours…</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -451,49 +452,40 @@ const PostCardInner: React.FC<PostCardProps> = ({
           {!isOwn && (
             <TouchableOpacity
               style={[pc.followChip, {
-                backgroundColor: isFollowing ? 'transparent' : colors.primary + '15',
-                borderColor: isFollowing ? colors.border : colors.primary + '40',
+                backgroundColor: isFollowing ? 'transparent' : colors.backgroundSecondary,
+                borderColor: colors.border,
               }]}
               onPress={onToggleFollow}
               activeOpacity={0.75}
             >
-              <Text style={{ fontSize: 11, fontWeight: '700', color: isFollowing ? colors.textTertiary : colors.primary }}>
+              <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, color: isFollowing ? colors.textTertiary : colors.textPrimary }}>
                 {isFollowing ? 'Suivi' : 'Suivre'}
               </Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity style={pc.moreBtn} onPress={() => setMenuOpen(true)}>
-            <Icon name="more-horizontal" size={18} color={colors.textTertiary} />
+            <Icon name="more-horizontal" size={14} color={colors.textTertiary} />
           </TouchableOpacity>
         </View>
       </View>
 
       {/* ── Body texte — toujours au même endroit, avec ou sans média ────────── */}
-      {(displayBody || post.feeling) ? (
+      {displayBody ? (
         <TouchableOpacity
           onPress={hasMedia ? undefined : onPress}
           activeOpacity={hasMedia ? 1 : 0.7}
           disabled={hasMedia}
           style={pc.bodyWrap}
         >
-          {displayBody ? (
-            <RichText
-              text={displayBody}
-              maxLines={hasMedia ? 4 : 6}
-              textStyle={[pc.body, { color: colors.textPrimary }]}
-              primaryColor={colors.primary}
-              moreLabel="Lire la suite"
-              lessLabel="Voir moins"
-              // L'aperçu de lien est géré par la carte <LinkPreviewCard> plus bas
-              // (post.link_url) — RichText ne doit PAS en afficher un 2e.
-              showLinkPreview={false}
-            />
-          ) : null}
-          {post.feeling && (
-            <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: displayBody ? 6 : 0 }}>
-              — se sent <Text style={{ fontWeight: '700', color: colors.primary }}>{post.feeling}</Text>
-            </Text>
-          )}
+          <RichText
+            text={displayBody}
+            maxLines={hasMedia ? 4 : 6}
+            textStyle={[pc.body, { color: colors.textPrimary }]}
+            primaryColor={colors.primary}
+            // L'aperçu de lien est géré par la carte <LinkPreviewCard> plus bas
+            // (post.link_url) — RichText ne doit PAS en afficher un 2e.
+            showLinkPreview={false}
+          />
         </TouchableOpacity>
       ) : null}
 
@@ -514,7 +506,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
                 )}
                 <View style={pc.videoPlayOverlay}>
                   <View style={pc.videoPlayCircle}>
-                    <Icon name="play" size={30} color="#fff" style={{ marginLeft: 3 }} />
+                    <Icon name="play" size={24} color="#fff" style={{ marginLeft: 3 }} />
                   </View>
                 </View>
               </View>
@@ -563,15 +555,15 @@ const PostCardInner: React.FC<PostCardProps> = ({
           {likeCount === 0 && <View style={pc.countsGrow} />}
           {!commentsDisabledSt && commentCount > 0 && (
             <TouchableOpacity onPress={() => setCommentsOpen(true)} style={pc.countChipRight}>
-              <View style={[pc.commentCountIcon, { backgroundColor: colors.primary }]}>
-                <MCIcon name="comment-outline" size={11} color="#fff" />
+              <View style={[pc.commentCountIcon, { backgroundColor: colors.textTertiary }]}>
+                <MCIcon name="comment-outline" size={9} color="#fff" />
               </View>
               <Text style={[pc.countText, { color: colors.textTertiary }]}>{fmtN(commentCount)}</Text>
             </TouchableOpacity>
           )}
           {shareCount > 0 && (
             <View style={[pc.countChipRight, { marginLeft: commentCount > 0 ? 12 : ('auto' as any) }]}>
-              <MCIcon name="share-outline" size={13} color={colors.textTertiary} />
+              <MCIcon name="share-outline" size={10} color={colors.textTertiary} />
               <Text style={[pc.countText, { color: colors.textTertiary }]}>{fmtN(shareCount)}</Text>
             </View>
           )}
@@ -625,7 +617,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
           <MCIcon
             name={saved ? 'bookmark' : 'bookmark-outline'}
             size={FeedActionIcon.size}
-            color={saved ? colors.primary : colors.textSecondary}
+            color={saved ? colors.textPrimary : colors.textSecondary}
           />
         </TouchableOpacity>
       </View>
@@ -646,16 +638,17 @@ const PostCardInner: React.FC<PostCardProps> = ({
               </Text>
             </View>
 
-            {/* Groupe 1 */}
+            {/* Groupe 1 — icônes neutres : seule une action destructive/irréversible
+                (Supprimer) justifie une couleur, le reste reste sobre. */}
             <View style={[pc.menuGroup, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
-              <MenuRow icon="bookmark" color={saved ? '#F59E0B' : colors.textPrimary}
-                iconBg={saved ? '#F59E0B18' : colors.backgroundSecondary}
+              <MenuRow icon="bookmark" color={colors.textPrimary}
+                iconBg={colors.background}
                 label={saved ? 'Retirer des favoris' : 'Sauvegarder'}
                 sub={saved ? 'Dans vos favoris' : 'Retrouver plus tard'}
                 colors={colors}
                 onPress={() => { setMenuOpen(false); handleSave(); }} />
               <View style={[pc.menuDiv, { backgroundColor: colors.divider }]} />
-              <MenuRow icon="share-2" color={colors.textPrimary} iconBg={colors.backgroundSecondary}
+              <MenuRow icon="share-2" color={colors.textPrimary} iconBg={colors.background}
                 label="Partager" sub="Via les apps installées" colors={colors}
                 onPress={() => { setMenuOpen(false); setShareOpen(true); }} />
             </View>
@@ -665,8 +658,8 @@ const PostCardInner: React.FC<PostCardProps> = ({
               <View style={[pc.menuGroup, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
                 <MenuRow
                   icon={isFollowing ? 'user-x' : 'user-plus'}
-                  color={isFollowing ? '#EF4444' : colors.primary}
-                  iconBg={isFollowing ? '#EF444418' : colors.primary + '18'}
+                  color={colors.textPrimary}
+                  iconBg={colors.background}
                   label={isFollowing ? `Ne plus suivre ${name}` : `Suivre ${name}`}
                   sub={isFollowing ? 'Retirer du fil' : 'Voir ses prochains contenus'}
                   colors={colors}
@@ -677,21 +670,21 @@ const PostCardInner: React.FC<PostCardProps> = ({
             {/* Groupe 3 — proprio */}
             {isOwn && (
               <View style={[pc.menuGroup, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
-                <MenuRow icon="edit-2" color={colors.primary} iconBg={colors.primary + '18'}
+                <MenuRow icon="edit-2" color={colors.textPrimary} iconBg={colors.background}
                   label="Modifier" sub="Editer le contenu" colors={colors}
                   onPress={() => { setMenuOpen(false); setEditOpen(true); }} />
                 <View style={[pc.menuDiv, { backgroundColor: colors.divider }]} />
                 <MenuRow
                   icon={commentsDisabledSt ? 'message-circle' : 'message-square'}
-                  color={commentsDisabledSt ? '#10B981' : '#F59E0B'}
-                  iconBg={commentsDisabledSt ? '#10B98118' : '#F59E0B18'}
+                  color={colors.textPrimary}
+                  iconBg={colors.background}
                   label={commentsDisabledSt ? 'Activer les commentaires' : 'Desactiver les commentaires'}
                   sub={commentsDisabledSt ? 'Permettre les commentaires' : 'Bloquer les commentaires'}
                   colors={colors}
                   onPress={handleToggleComments}
                 />
                 <View style={[pc.menuDiv, { backgroundColor: colors.divider }]} />
-                <MenuRow icon="trash-2" color="#EF4444" iconBg="#EF444418"
+                <MenuRow icon="trash-2" color={colors.error} iconBg={colors.background}
                   label="Supprimer" sub="Action irréversible" colors={colors}
                   onPress={() => { setMenuOpen(false); handleDelete(); }} />
               </View>
@@ -702,13 +695,13 @@ const PostCardInner: React.FC<PostCardProps> = ({
               <View style={[pc.menuGroup, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
                 {onHide && (
                   <>
-                    <MenuRow icon="eye-off" color={colors.textSecondary} iconBg={colors.backgroundSecondary}
+                    <MenuRow icon="eye-off" color={colors.textPrimary} iconBg={colors.background}
                       label="Pas intéressé" sub="Masquer ce post du fil" colors={colors}
                       onPress={() => { setMenuOpen(false); onHide(); }} />
                     <View style={[pc.menuDiv, { backgroundColor: colors.divider }]} />
                   </>
                 )}
-                <MenuRow icon="flag" color={colors.error} iconBg={colors.error + '18'}
+                <MenuRow icon="flag" color={colors.error} iconBg={colors.background}
                   label="Signaler" sub="Contenu inapproprié" colors={colors}
                   onPress={() => { setMenuOpen(false); setReportOpen(true); }} />
               </View>
@@ -762,10 +755,10 @@ const PostCardInner: React.FC<PostCardProps> = ({
               placeholderTextColor={colors.textTertiary} placeholder="Écris quelque chose..." />
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <TouchableOpacity style={[pc.editBtn, { borderWidth: 1, borderColor: colors.border }]} onPress={() => setEditOpen(false)}>
-                <Text style={{ fontWeight: '600', color: colors.textSecondary }}>Annuler</Text>
+                <Text style={{ fontWeight: FontWeight.semiBold, color: colors.textSecondary }}>Annuler</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[pc.editBtn, { backgroundColor: colors.primary, opacity: editSaving ? 0.6 : 1 }]} onPress={handleSaveEdit} disabled={editSaving}>
-                <Text style={{ fontWeight: '700', color: '#fff' }}>{editSaving ? 'Envoi...' : 'Enregistrer'}</Text>
+                <Text style={{ fontWeight: FontWeight.bold, color: '#fff' }}>{editSaving ? 'Envoi...' : 'Enregistrer'}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -803,16 +796,15 @@ const pc = StyleSheet.create({
   header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: PAD, paddingTop: PAD, paddingBottom: 8, gap: 8 },
   headerLeft:   { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   avatarWrap:   { overflow: 'visible' },
-  authorName:   { fontSize: 13.5, fontWeight: '700', letterSpacing: -0.1 },
-  time:         { fontSize: 11, fontWeight: '500' },
+  authorName:   { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, letterSpacing: -0.1 },
+  time:         { fontSize: FontSize.xsPlus, fontWeight: FontWeight.medium },
   dot:          { width: 3, height: 3, borderRadius: 1.5 },
-  verifiedBadge:{ width: 14, height: 14, borderRadius: 7, backgroundColor: '#1D9BF0', alignItems: 'center', justifyContent: 'center' },
+  verifiedBadge:{ width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
   followChip:   { paddingHorizontal: 10, paddingVertical: 4, borderRadius: FeedRadius.chip, borderWidth: 1 },
   moreBtn:      { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   // Content
-  feeling:      { paddingHorizontal: PAD, paddingBottom: 5, fontSize: 13, fontStyle: 'italic' },
   bodyWrap:     { paddingHorizontal: PAD, paddingBottom: 10, paddingTop: 1 },
-  body:         { fontSize: 14.5, lineHeight: 21, letterSpacing: 0.1 },
+  body:         { fontSize: FontSize.base, lineHeight: 21, letterSpacing: 0.1 },
   // Media — encadré dans la carte, coins arrondis propres
   mediaWrap:    { paddingHorizontal: PAD, paddingBottom: 10 },
   mediaClip:    { borderRadius: RADIUS, overflow: 'hidden', backgroundColor: '#0d0d1a' },
@@ -822,7 +814,7 @@ const pc = StyleSheet.create({
   countsRow:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: PAD, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth },
   countsGrow:       { flex: 1, minWidth: 0 },
   countChipRight:   { flexDirection: 'row', alignItems: 'center', gap: 5, marginLeft: 'auto' },
-  countText:        { fontSize: 12, fontWeight: '500' },
+  countText:        { fontSize: FontSize.sm, fontWeight: FontWeight.medium },
   commentCountIcon: { width: 18, height: 18, borderRadius: FeedRadius.full, alignItems: 'center', justifyContent: 'center' },
   // Action bar — icônes seules, 44px de cible, réparties également
   actionBar:    { flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: PAD - 4, paddingVertical: 2 },
@@ -833,25 +825,25 @@ const pc = StyleSheet.create({
   sheet:        { borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingTop: 10, paddingHorizontal: 14, gap: 9 },
   sheetHandle:  { width: 38, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 6 },
   sheetTitle:   { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center', paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, marginBottom: 2 },
-  sheetTitleText:{ fontSize: 12, fontWeight: '600' },
+  sheetTitleText:{ fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
   menuGroup:    { borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
   menuRow:      { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 14 },
   menuIconWrap: { width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  menuLabel:    { fontSize: 15, fontWeight: '600' },
-  menuSub:      { fontSize: 12, marginTop: 1 },
+  menuLabel:    { fontSize: FontSize.basePlus, fontWeight: FontWeight.semiBold },
+  menuSub:      { fontSize: FontSize.sm, marginTop: 1 },
   menuDiv:      { height: StyleSheet.hairlineWidth },
   cancelBtn:    { borderRadius: 16, paddingVertical: 16, alignItems: 'center', borderWidth: StyleSheet.hairlineWidth, marginTop: 2 },
-  cancelText:   { fontSize: 16, fontWeight: '600' },
+  cancelText:   { fontSize: FontSize.md, fontWeight: FontWeight.semiBold },
   // Edit modal
   editSheet:    { borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 20, gap: 14 },
-  editTitle:    { fontSize: 16, fontWeight: '700' },
-  editInput:    { borderRadius: 12, padding: 14, fontSize: 15, minHeight: 110, textAlignVertical: 'top' },
+  editTitle:    { fontSize: FontSize.md, fontWeight: FontWeight.bold },
+  editInput:    { borderRadius: 12, padding: 14, fontSize: FontSize.basePlus, minHeight: 110, textAlignVertical: 'top' },
   editBtn:      { flex: 1, padding: 14, borderRadius: 12, alignItems: 'center' },
   // Video modal
   vfClose:      { position: 'absolute', top: 48, right: 16, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
   vfDetails:    { position: 'absolute', bottom: 108, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 20, paddingVertical: 11, borderRadius: 30 },
-  vfDetailsTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  vfDetailsTxt: { color: '#fff', fontSize: FontSize.base, fontWeight: FontWeight.bold },
   vfActionBar:  { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingBottom: 28, paddingTop: 14, backgroundColor: 'rgba(0,0,0,0.35)' },
   vfActionBtn:  { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, height: 44 },
-  vfActionCount:{ color: '#fff', fontSize: 11, fontWeight: '600' },
+  vfActionCount:{ color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold },
 });

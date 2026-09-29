@@ -14,6 +14,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { BackButton, GofolyxLoader } from '../../components/common';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
 import { toastService, showConfirm } from '../../services';
@@ -173,12 +174,12 @@ export const CommunityFundDetailScreen: React.FC = () => {
       <View style={[st.header, { paddingTop: insets.top + 8, borderBottomColor: colors.divider, backgroundColor: colors.surface }]}>
         <BackButton onPress={() => nav.goBack()} />
         <View style={{ flex: 1 }}>
-          <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '800' }} numberOfLines={1}>
+          <Text style={{ color: colors.textPrimary, fontSize: FontSize.md, fontWeight: FontWeight.extraBold }} numberOfLines={1}>
             {cotisation.title}
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 1 }}>
             <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: statusColor }} />
-            <Text style={{ color: statusColor, fontSize: 11, fontWeight: '700' }}>{statusLabel}</Text>
+            <Text style={{ color: statusColor, fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold }}>{statusLabel}</Text>
           </View>
         </View>
         {isAdmin && (
@@ -209,7 +210,7 @@ export const CommunityFundDetailScreen: React.FC = () => {
                 />
                 <View style={{ padding: 16, gap: 12 }}>
                   {cotisation.description ? (
-                    <Text style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 19 }}>
+                    <Text style={{ color: colors.textSecondary, fontSize: FontSize.smPlus, lineHeight: 19 }}>
                       {cotisation.description}
                     </Text>
                   ) : null}
@@ -217,11 +218,11 @@ export const CommunityFundDetailScreen: React.FC = () => {
                   {/* Progression */}
                   <View>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <Text style={{ color: colors.textPrimary, fontWeight: '800', fontSize: 22 }}>
+                      <Text style={{ color: colors.textPrimary, fontWeight: FontWeight.extraBold, fontSize: FontSize['2xl'] }}>
                         {cotisation.collected_gogold.toLocaleString('fr-FR')}
-                        <Text style={{ fontSize: 13, fontWeight: '400', color: colors.textTertiary }}> GoGold</Text>
+                        <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.regular, color: colors.textTertiary }}> GoGold</Text>
                       </Text>
-                      <Text style={{ color: colors.textTertiary, fontSize: 13, alignSelf: 'flex-end' }}>
+                      <Text style={{ color: colors.textTertiary, fontSize: FontSize.smPlus, alignSelf: 'flex-end' }}>
                         sur {cotisation.target_amount_gogold.toLocaleString('fr-FR')}
                       </Text>
                     </View>
@@ -232,7 +233,7 @@ export const CommunityFundDetailScreen: React.FC = () => {
                         style={[st.progressFill, { width: `${Math.min(cotisation.progress_pct, 100)}%` as any }]}
                       />
                     </View>
-                    <Text style={{ color: '#7B3FF2', fontWeight: '800', fontSize: 13, marginTop: 6 }}>
+                    <Text style={{ color: '#7B3FF2', fontWeight: FontWeight.extraBold, fontSize: FontSize.smPlus, marginTop: 6 }}>
                       {cotisation.progress_pct}% collecté
                     </Text>
                   </View>
@@ -247,10 +248,10 @@ export const CommunityFundDetailScreen: React.FC = () => {
                     ].map(s => (
                       <View key={s.lbl} style={{ flex: 1, backgroundColor: s.color + '12',
                         borderRadius: 12, padding: 9, alignItems: 'center' }}>
-                        <Text style={{ color: s.color, fontSize: 15, fontWeight: '900' }}>
+                        <Text style={{ color: s.color, fontSize: FontSize.basePlus, fontWeight: FontWeight.black }}>
                           {s.val}{s.suffix}
                         </Text>
-                        <Text style={{ color: colors.textTertiary, fontSize: 9, marginTop: 2 }}>{s.lbl}</Text>
+                        <Text style={{ color: colors.textTertiary, fontSize: FontSize['2xs'], marginTop: 2 }}>{s.lbl}</Text>
                       </View>
                     ))}
                   </View>
@@ -258,7 +259,7 @@ export const CommunityFundDetailScreen: React.FC = () => {
                   {cotisation.deadline && (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <Icon name="clock" size={13} color={colors.textTertiary} />
-                      <Text style={{ color: colors.textTertiary, fontSize: 12 }}>
+                      <Text style={{ color: colors.textTertiary, fontSize: FontSize.sm }}>
                         Deadline : {new Date(cotisation.deadline).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}
                       </Text>
                     </View>
@@ -272,11 +273,11 @@ export const CommunityFundDetailScreen: React.FC = () => {
               <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 12 }}>
                 <TouchableOpacity onPress={handleClose} style={[st.adminBtn, { backgroundColor: '#3B82F615', borderColor: '#3B82F640', flex: 1 }]}>
                   <Icon name="check-square" size={14} color="#3B82F6" />
-                  <Text style={{ color: '#3B82F6', fontWeight: '700', fontSize: 13 }}>Clôturer</Text>
+                  <Text style={{ color: '#3B82F6', fontWeight: FontWeight.bold, fontSize: FontSize.smPlus }}>Clôturer</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={handleCancel} style={[st.adminBtn, { backgroundColor: '#EF444415', borderColor: '#EF444440', flex: 1 }]}>
                   <Icon name="x-circle" size={14} color="#EF4444" />
-                  <Text style={{ color: '#EF4444', fontWeight: '700', fontSize: 13 }}>Annuler + rembourser</Text>
+                  <Text style={{ color: '#EF4444', fontWeight: FontWeight.bold, fontSize: FontSize.smPlus }}>Annuler + rembourser</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -302,10 +303,10 @@ export const CommunityFundDetailScreen: React.FC = () => {
                   >
                     <Icon name="shield" size={18} color="#fff" />
                     <View>
-                      <Text style={{ color: '#fff', fontSize: 15, fontWeight: '900' }}>
+                      <Text style={{ color: '#fff', fontSize: FontSize.basePlus, fontWeight: FontWeight.black }}>
                         Demander le retrait
                       </Text>
-                      <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 11 }}>
+                      <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: FontSize.xsPlus }}>
                         Requiert approbation admin + trésorier
                       </Text>
                     </View>
@@ -330,14 +331,14 @@ export const CommunityFundDetailScreen: React.FC = () => {
                     borderColor: filter === f.key ? '#7B3FF2' : colors.divider,
                   }]}
                 >
-                  <Text style={{ color: filter === f.key ? '#fff' : colors.textSecondary, fontSize: 12, fontWeight: '600' }}>
+                  <Text style={{ color: filter === f.key ? '#fff' : colors.textSecondary, fontSize: FontSize.sm, fontWeight: FontWeight.semiBold }}>
                     {f.label} ({f.count})
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '700',
+            <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold,
               paddingHorizontal: 16, marginBottom: 8 }}>
               {filtered.length} MEMBRE{filtered.length !== 1 ? 'S' : ''}
             </Text>
@@ -352,7 +353,7 @@ export const CommunityFundDetailScreen: React.FC = () => {
                 <Image source={{ uri: item.avatar_url }} style={st.avatar} />
               ) : (
                 <View style={[st.avatar, { backgroundColor: '#7B3FF222', alignItems: 'center', justifyContent: 'center' }]}>
-                  <Text style={{ color: '#7B3FF2', fontWeight: '800', fontSize: 14 }}>
+                  <Text style={{ color: '#7B3FF2', fontWeight: FontWeight.extraBold, fontSize: FontSize.base }}>
                     {(item.display_name || item.username || '?')[0].toUpperCase()}
                   </Text>
                 </View>
@@ -360,16 +361,16 @@ export const CommunityFundDetailScreen: React.FC = () => {
 
               {/* Infos */}
               <View style={{ flex: 1 }}>
-                <Text style={{ color: colors.textPrimary, fontWeight: '700', fontSize: 14 }} numberOfLines={1}>
+                <Text style={{ color: colors.textPrimary, fontWeight: FontWeight.bold, fontSize: FontSize.base }} numberOfLines={1}>
                   {item.display_name || item.username || 'Inconnu'}
                 </Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 }}>
                   <View style={[st.statusPill, { backgroundColor: cfg.bg }]}>
                     <Icon name={cfg.icon} size={10} color={cfg.color} />
-                    <Text style={{ color: cfg.color, fontSize: 10, fontWeight: '700' }}>{cfg.label}</Text>
+                    <Text style={{ color: cfg.color, fontSize: FontSize.xs, fontWeight: FontWeight.bold }}>{cfg.label}</Text>
                   </View>
                   {item.paid_at && (
-                    <Text style={{ color: colors.textTertiary, fontSize: 11 }}>
+                    <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus }}>
                       {new Date(item.paid_at).toLocaleDateString('fr-FR')}
                     </Text>
                   )}
@@ -379,15 +380,15 @@ export const CommunityFundDetailScreen: React.FC = () => {
               {/* Montant */}
               <View style={{ alignItems: 'flex-end', gap: 4 }}>
                 {item.status === 'paid' ? (
-                  <Text style={{ color: '#10B981', fontWeight: '800', fontSize: 14 }}>
+                  <Text style={{ color: '#10B981', fontWeight: FontWeight.extraBold, fontSize: FontSize.base }}>
                     +{item.gogold_paid} GoGold
                   </Text>
                 ) : item.status === 'pending' ? (
-                  <Text style={{ color: '#F59E0B', fontWeight: '600', fontSize: 12 }}>
+                  <Text style={{ color: '#F59E0B', fontWeight: FontWeight.semiBold, fontSize: FontSize.sm }}>
                     En attente
                   </Text>
                 ) : (
-                  <Text style={{ color: '#3B82F6', fontWeight: '600', fontSize: 12 }}>
+                  <Text style={{ color: '#3B82F6', fontWeight: FontWeight.semiBold, fontSize: FontSize.sm }}>
                     Exempté
                   </Text>
                 )}
@@ -401,7 +402,7 @@ export const CommunityFundDetailScreen: React.FC = () => {
                   >
                     {exempting === item.user_id
                       ? <ActivityIndicator size="small" color="#3B82F6" />
-                      : <Text style={{ color: '#3B82F6', fontSize: 10, fontWeight: '700' }}>Exempter</Text>
+                      : <Text style={{ color: '#3B82F6', fontSize: FontSize.xs, fontWeight: FontWeight.bold }}>Exempter</Text>
                     }
                   </TouchableOpacity>
                 )}
@@ -412,7 +413,7 @@ export const CommunityFundDetailScreen: React.FC = () => {
         ListEmptyComponent={
           <View style={{ alignItems: 'center', paddingTop: 32, gap: 8 }}>
             <Icon name="users" size={32} color={colors.textTertiary} />
-            <Text style={{ color: colors.textTertiary, fontSize: 14 }}>
+            <Text style={{ color: colors.textTertiary, fontSize: FontSize.base }}>
               Aucun membre dans ce filtre
             </Text>
           </View>

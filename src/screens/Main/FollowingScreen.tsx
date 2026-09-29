@@ -20,8 +20,7 @@ type Nav = NativeStackNavigationProp<MainStackParamList>;
 
 const AVATAR_SZ = 48;
 
-// Le serveur plafonne `limit` à 50 (422 au-delà) — pagine côté client pour
-// récupérer tous les IDs suivis sans dépasser cette limite.
+
 async function fetchAllFollowingIds(userId: string): Promise<Set<string>> {
   const ids = new Set<string>();
   const FETCH_LIMIT = 50;

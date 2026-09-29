@@ -21,48 +21,53 @@ import { getStoreUrl } from '../../utils/constants';
 
 // ── Config visuelle ────────────────────────────────────────────────────────────
 
-const CFG: Record<string, { icon: string; grad: [string, string] }> = {
-  follow:                    { icon: 'user-plus',      grad: ['#3B82F6', '#60A5FA'] },
-  reaction:                  { icon: 'heart',          grad: ['#EF4444', '#FCA5A5'] },
-  comment:                   { icon: 'message-circle', grad: ['#3B82F6', '#93C5FD'] },
-  mention:                   { icon: 'at-sign',        grad: ['#06B6D4', '#67E8F9'] },
-  profile_view:              { icon: 'eye',            grad: ['#F59E0B', '#FCD34D'] },
-  story_view:                { icon: 'eye',            grad: ['#F59E0B', '#FCD34D'] },
-  concert_created:           { icon: 'music',          grad: ['#7B3FF2', '#A78BFA'] },
-  event_created:             { icon: 'calendar',       grad: ['#E0389A', '#F472B6'] },
-  concert_going:             { icon: 'headphones',     grad: ['#FF7A2F', '#FCA5A5'] },
-  event_going:               { icon: 'map-pin',        grad: ['#36D9A0', '#6EE7B7'] },
-  community_joined:          { icon: 'users',          grad: ['#9B65F5', '#C4B5FD'] },
-  reel_posted:               { icon: 'film',           grad: ['#E0389A', '#FB7185'] },
-  post_posted:               { icon: 'file-text',      grad: ['#7B3FF2', '#A78BFA'] },
-  story_posted:              { icon: 'circle',         grad: ['#F59E0B', '#FCD34D'] },
-  subscription:              { icon: 'star',           grad: ['#36D9A0', '#6EE7B7'] },
-  welcome:                   { icon: 'gift',           grad: ['#7B3FF2', '#E0389A'] },
-  ticket:                    { icon: 'tag',            grad: ['#FF7A2F', '#FCD34D'] },
-  concert_live:              { icon: 'radio',          grad: ['#EF4444', '#FF7A2F'] },
-  system:                    { icon: 'shield',         grad: ['#6366F1', '#8B5CF6'] },
-  security:                  { icon: 'lock',           grad: ['#EF4444', '#F97316'] },
-  planning_invite:           { icon: 'calendar',       grad: ['#7B3FF2', '#9B65F5'] },
-  planning_invite_response:  { icon: 'check-circle',   grad: ['#10B981', '#34D399'] },
-  planning_reminder:         { icon: 'clock',          grad: ['#F59E0B', '#FBBF24'] },
-  planning_cancelled:        { icon: 'x-circle',       grad: ['#EF4444', '#F87171'] },
-  content_removed:           { icon: 'alert-triangle', grad: ['#EF4444', '#F97316'] },
-  app_update:                { icon: 'download',       grad: ['#7B3FF2', '#E0389A'] },
-  verification_renewed:      { icon: 'check-circle',   grad: ['#1D9BF0', '#60A5FA'] },
-  verification_payment_failed: { icon: 'alert-triangle', grad: ['#F59E0B', '#FBBF24'] },
-  verification_revoked:      { icon: 'shield-off',     grad: ['#EF4444', '#F87171'] },
-  boost_started:             { icon: 'zap',            grad: ['#9B65F5', '#C4B5FD'] },
-  boost_expiring:            { icon: 'clock',          grad: ['#F59E0B', '#FBBF24'] },
-  boost_ended:               { icon: 'check-circle',   grad: ['#6B7280', '#9CA3AF'] },
-  ad_started:                { icon: 'trending-up',    grad: ['#F97316', '#FB923C'] },
-  ad_ended:                  { icon: 'flag',           grad: ['#6B7280', '#9CA3AF'] },
+// Une seule couleur d'accent pour toutes les notifications "normales" —
+// seules les alertes réelles (contenu retiré, sécurité, vérification révoquée,
+// erreur de paiement, refus modération) gardent le rouge, pour rester
+// immédiatement reconnaissables comme des cas à traiter d'urgence.
+const DANGER = '#EF4444';
+const CFG: Record<string, { icon: string; danger?: boolean }> = {
+  follow:                    { icon: 'user-plus' },
+  reaction:                  { icon: 'heart' },
+  comment:                   { icon: 'message-circle' },
+  mention:                   { icon: 'at-sign' },
+  profile_view:              { icon: 'eye' },
+  story_view:                { icon: 'eye' },
+  concert_created:           { icon: 'music' },
+  event_created:             { icon: 'calendar' },
+  concert_going:             { icon: 'headphones' },
+  event_going:               { icon: 'map-pin' },
+  community_joined:          { icon: 'users' },
+  reel_posted:               { icon: 'film' },
+  post_posted:               { icon: 'file-text' },
+  story_posted:              { icon: 'circle' },
+  subscription:              { icon: 'star' },
+  welcome:                   { icon: 'gift' },
+  ticket:                    { icon: 'tag' },
+  concert_live:              { icon: 'radio' },
+  system:                    { icon: 'shield' },
+  security:                  { icon: 'lock',           danger: true },
+  planning_invite:           { icon: 'calendar' },
+  planning_invite_response:  { icon: 'check-circle' },
+  planning_reminder:         { icon: 'clock' },
+  planning_cancelled:        { icon: 'x-circle',       danger: true },
+  content_removed:           { icon: 'alert-triangle', danger: true },
+  app_update:                { icon: 'download' },
+  verification_renewed:      { icon: 'check-circle' },
+  verification_payment_failed: { icon: 'alert-triangle', danger: true },
+  verification_revoked:      { icon: 'shield-off',     danger: true },
+  boost_started:             { icon: 'zap' },
+  boost_expiring:            { icon: 'clock' },
+  boost_ended:               { icon: 'check-circle' },
+  ad_started:                { icon: 'trending-up' },
+  ad_ended:                  { icon: 'flag' },
   // Moderation IA (2026-08) — verdict apres analyse automatique d'un reel
   // publie par l'utilisateur (cf. recommendation_system/ai_service).
-  reel_analysis_cleared:     { icon: 'check-circle',   grad: ['#10B981', '#34D399'] },
-  reel_analysis_limited:     { icon: 'alert-circle',   grad: ['#F59E0B', '#FBBF24'] },
-  reel_analysis_removed:     { icon: 'alert-triangle', grad: ['#EF4444', '#F87171'] },
+  reel_analysis_cleared:     { icon: 'check-circle' },
+  reel_analysis_limited:     { icon: 'alert-circle' },
+  reel_analysis_removed:     { icon: 'alert-triangle', danger: true },
 };
-const DEFAULT_CFG = { icon: 'bell', grad: ['#7B3FF2', '#9B65F5'] as [string, string] };
+const DEFAULT_CFG = { icon: 'bell', danger: false };
 
 // Types "sociaux purs" qui ouvrent toujours le profil de l'acteur — 'reaction'
 // et 'comment' ont été retirés de cette liste : ils portent un ref_type/ref_id
@@ -457,6 +462,7 @@ const SWIPE_THRESHOLD = -80;
 
 const NotifCard: React.FC<CardProps> = React.memo(({ item, colors, fontSize, selectMode, selected, onPress, onDelete, onMarkRead }) => {
   const cfg    = CFG[item.notification_type] ?? DEFAULT_CFG;
+  const badgeColor = cfg.danger ? DANGER : colors.primary;
   const isRead = item.is_read;
   const [expanded, setExpanded]   = useState(false);
   const [truncated, setTruncated] = useState(false);
@@ -552,21 +558,21 @@ const NotifCard: React.FC<CardProps> = React.memo(({ item, colors, fontSize, sel
             {item.image_url ? (
               <View style={s.mediaWrap}>
                 <Image source={{ uri: item.image_url }} style={s.media} />
-                <LinearGradient colors={cfg.grad as [string, string]} style={s.typeBadge}>
+                <View style={[s.typeBadge, { backgroundColor: badgeColor }]}>
                   <Icon name={cfg.icon} size={9} color="#fff" />
-                </LinearGradient>
+                </View>
               </View>
             ) : item.actor?.avatar_url ? (
               <View style={s.avatarWrap}>
                 <Image source={{ uri: item.actor.avatar_url }} style={s.avatar} />
-                <LinearGradient colors={cfg.grad as [string, string]} style={s.typeBadge}>
+                <View style={[s.typeBadge, { backgroundColor: badgeColor }]}>
                   <Icon name={cfg.icon} size={9} color="#fff" />
-                </LinearGradient>
+                </View>
               </View>
             ) : (
-              <LinearGradient colors={cfg.grad as [string, string]} style={s.iconWrap}>
+              <View style={[s.iconWrap, { backgroundColor: badgeColor }]}>
                 <Icon name={cfg.icon} size={20} color="#fff" />
-              </LinearGradient>
+              </View>
             )}
 
             {/* Texte */}

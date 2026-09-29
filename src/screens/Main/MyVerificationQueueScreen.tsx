@@ -160,7 +160,7 @@ export const MyVerificationQueueScreen: React.FC = () => {
         </View>
       ) : items.length === 0 ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 12 }}>
-          <Icon name="shield" size={48} color="#10B981" />
+          <Icon name="shield" size={48} color={colors.primary} />
           <Text style={[s.title, { color: colors.textPrimary, textAlign: 'center' }]}>Tout est en ordre</Text>
           <Text style={{ fontSize: 13, color: colors.textTertiary, textAlign: 'center' }}>
             Aucun de vos contenus n'est en attente de vérification ou signalé.

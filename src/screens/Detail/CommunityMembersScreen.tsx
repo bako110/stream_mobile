@@ -8,6 +8,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { GofolyxLoader, BackButton } from '../../components/common';
 import { AvatarWithBadge } from '../../components/common/AvatarWithBadge';
@@ -81,7 +82,7 @@ const MemberAvatar: React.FC<{ member: CommunityMemberData; size: number; border
       backgroundColor: color + '22', borderWidth: 1.5, borderColor: color + '60',
       alignItems: 'center', justifyContent: 'center',
     }}>
-      <Text style={{ fontSize: size * 0.36, fontWeight: '800', color }}>{initials}</Text>
+      <Text style={{ fontSize: size * 0.36, fontWeight: FontWeight.extraBold, color }}>{initials}</Text>
     </View>
   );
 };
@@ -119,17 +120,17 @@ const PodiumCard: React.FC<{
         <View style={{ width: 30, height: 30, borderRadius: 15,
           backgroundColor: mc + '22', borderWidth: 1, borderColor: mc + '55',
           alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontSize: 14 }}>{MEDAL[rank]}</Text>
+          <Text style={{ fontSize: FontSize.base }}>{MEDAL[rank]}</Text>
         </View>
         <MemberAvatar member={member} size={rank === 1 ? 54 : 42} border={mc} />
-        <Text style={{ color: '#fff', fontSize: rank === 1 ? 13 : 12, fontWeight: '700', textAlign: 'center' }} numberOfLines={1}>
+        <Text style={{ color: '#fff', fontSize: rank === 1 ? 13 : 12, fontWeight: FontWeight.bold, textAlign: 'center' }} numberOfLines={1}>
           {member.display_name || member.username}
         </Text>
         {GoGold > 0 && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3,
             backgroundColor: '#F59E0B22', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 }}>
-            <Text style={{ fontSize: 11 }}>⚡</Text>
-            <Text style={{ color: '#F59E0B', fontSize: 12, fontWeight: '800' }}>
+            <Text style={{ fontSize: FontSize.xsPlus }}>⚡</Text>
+            <Text style={{ color: '#F59E0B', fontSize: FontSize.sm, fontWeight: FontWeight.extraBold }}>
               {GoGold >= 1000 ? `${(GoGold / 1000).toFixed(1)}k` : GoGold}
             </Text>
           </View>
@@ -149,34 +150,34 @@ const MemberCard: React.FC<{ member: CommunityMemberData; rank?: number; onPress
       style={[st.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       {/* Rang */}
       {rank && (
-        <Text style={{ color: colors.textTertiary, fontSize: 12, fontWeight: '700', width: 24, textAlign: 'center' }}>
+        <Text style={{ color: colors.textTertiary, fontSize: FontSize.sm, fontWeight: FontWeight.bold, width: 24, textAlign: 'center' }}>
           #{rank}
         </Text>
       )}
       <MemberAvatar member={member} size={46} />
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-          <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '700', flexShrink: 1 }} numberOfLines={1}>
+          <Text style={{ color: colors.textPrimary, fontSize: FontSize.basePlus, fontWeight: FontWeight.bold, flexShrink: 1 }} numberOfLines={1}>
             {member.display_name || member.username}
           </Text>
           <View style={{ backgroundColor: roleColor + '20', borderRadius: 6, borderWidth: 1,
             borderColor: roleColor + '50', paddingHorizontal: 7, paddingVertical: 2 }}>
-            <Text style={{ color: roleColor, fontSize: 10, fontWeight: '700' }}>
+            <Text style={{ color: roleColor, fontSize: FontSize.xs, fontWeight: FontWeight.bold }}>
               {ROLE_LABEL[member.role] ?? member.role}
             </Text>
           </View>
         </View>
-        <Text style={{ color: colors.textTertiary, fontSize: 12 }}>@{member.username}</Text>
+        <Text style={{ color: colors.textTertiary, fontSize: FontSize.sm }}>@{member.username}</Text>
         {member.joined_at && (
-          <Text style={{ color: colors.textTertiary, fontSize: 11 }}>
+          <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus }}>
             Depuis {new Date(member.joined_at).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' })}
           </Text>
         )}
       </View>
       {GoGold > 0 && (
         <View style={{ alignItems: 'flex-end', gap: 2 }}>
-          <Text style={{ color: '#F59E0B', fontSize: 13, fontWeight: '800' }}>⚡ {GoGold >= 1000 ? `${(GoGold / 1000).toFixed(1)}k` : GoGold}</Text>
-          <Text style={{ color: colors.textTertiary, fontSize: 10 }}>GoGold</Text>
+          <Text style={{ color: '#F59E0B', fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold }}>⚡ {GoGold >= 1000 ? `${(GoGold / 1000).toFixed(1)}k` : GoGold}</Text>
+          <Text style={{ color: colors.textTertiary, fontSize: FontSize.xs }}>GoGold</Text>
         </View>
       )}
       <Icon name="chevron-right" size={15} color={colors.textTertiary} style={{ marginLeft: 4 }} />
@@ -264,10 +265,10 @@ export default function CommunityMembersScreen({ route }: Props) {
         <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
           <Icon name="lock" size={28} color={colors.textTertiary} />
         </View>
-        <Text style={{ color: colors.textPrimary, fontSize: 18, fontWeight: '800', textAlign: 'center' }}>
+        <Text style={{ color: colors.textPrimary, fontSize: FontSize.lg, fontWeight: FontWeight.extraBold, textAlign: 'center' }}>
           Liste privée
         </Text>
-        <Text style={{ color: colors.textSecondary, fontSize: 14, textAlign: 'center', lineHeight: 20 }}>
+        <Text style={{ color: colors.textSecondary, fontSize: FontSize.base, textAlign: 'center', lineHeight: 20 }}>
           {blockedForPublic
             ? 'Rejoins la communauté pour voir les membres.'
             : "Seul l'administrateur peut consulter la liste des membres."}
@@ -276,7 +277,7 @@ export default function CommunityMembersScreen({ route }: Props) {
           onPress={() => navigation.goBack()}
           style={{ marginTop: 8, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 20, backgroundColor: colors.primary }}
         >
-          <Text style={{ color: '#fff', fontWeight: '700' }}>Retour</Text>
+          <Text style={{ color: '#fff', fontWeight: FontWeight.bold }}>Retour</Text>
         </TouchableOpacity>
       </View>
     );
@@ -301,10 +302,10 @@ export default function CommunityMembersScreen({ route }: Props) {
       >
         <BackButton onPress={() => navigation.goBack()} />
         <View style={{ flex: 1, alignItems: 'center' }}>
-          <Text style={{ color: colors.textPrimary, fontSize: 17, fontWeight: '800' }}>
+          <Text style={{ color: colors.textPrimary, fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold }}>
             Membres · {members.length}
           </Text>
-          <Text style={{ color: colors.textTertiary, fontSize: 11, marginTop: 1 }} numberOfLines={1}>
+          <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus, marginTop: 1 }} numberOfLines={1}>
             {communityName}
           </Text>
         </View>
@@ -315,7 +316,7 @@ export default function CommunityMembersScreen({ route }: Props) {
       <View style={[st.searchBar, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
         <Icon name="search" size={15} color={colors.primary} style={{ marginRight: 8 }} />
         <TextInput
-          style={{ flex: 1, fontSize: 14, color: colors.textPrimary, paddingVertical: 0 }}
+          style={{ flex: 1, fontSize: FontSize.base, color: colors.textPrimary, paddingVertical: 0 }}
           placeholder="Rechercher un membre..."
           placeholderTextColor={colors.textTertiary}
           value={search}
@@ -340,14 +341,14 @@ export default function CommunityMembersScreen({ route }: Props) {
                 ? { backgroundColor: colors.primary, borderColor: colors.primary }
                 : { backgroundColor: colors.surface, borderColor: colors.border }
               ]}>
-              <Text style={{ fontSize: 13, fontWeight: '600', color: active ? '#fff' : colors.textSecondary }}>
+              <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold, color: active ? '#fff' : colors.textSecondary }}>
                 {f.label}
               </Text>
               <View style={{
                 backgroundColor: active ? 'rgba(255,255,255,0.25)' : colors.backgroundSecondary,
                 borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1, marginLeft: 4,
               }}>
-                <Text style={{ fontSize: 11, fontWeight: '800', color: active ? '#fff' : colors.textTertiary }}>
+                <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, color: active ? '#fff' : colors.textTertiary }}>
                   {counts[f.key]}
                 </Text>
               </View>
@@ -378,7 +379,7 @@ export default function CommunityMembersScreen({ route }: Props) {
         ListHeaderComponent={
           showPodium ? (
             <View style={{ marginBottom: 20, paddingHorizontal: 12 }}>
-              <Text style={{ color: colors.textTertiary, fontSize: 10, fontWeight: '700',
+              <Text style={{ color: colors.textTertiary, fontSize: FontSize.xs, fontWeight: FontWeight.bold,
                 letterSpacing: 0.9, textTransform: 'uppercase', paddingHorizontal: 4, marginBottom: 12 }}>
                 TOP MEMBRES
               </Text>
@@ -387,7 +388,7 @@ export default function CommunityMembersScreen({ route }: Props) {
                 <PodiumCard member={top3[0]} rank={1} onPress={() => onPress(top3[0])} maxGoGold={maxGoGold} />
                 <PodiumCard member={top3[2]} rank={3} onPress={() => onPress(top3[2])} maxGoGold={maxGoGold} />
               </View>
-              <Text style={{ color: colors.textTertiary, fontSize: 10, fontWeight: '700',
+              <Text style={{ color: colors.textTertiary, fontSize: FontSize.xs, fontWeight: FontWeight.bold,
                 letterSpacing: 0.9, textTransform: 'uppercase', paddingHorizontal: 4,
                 marginTop: 24, marginBottom: 4 }}>
                 TOUS LES MEMBRES
@@ -398,10 +399,10 @@ export default function CommunityMembersScreen({ route }: Props) {
         ListEmptyComponent={
           <View style={{ alignItems: 'center', paddingTop: 64, gap: 10, paddingHorizontal: 32 }}>
             <Icon name="users" size={44} color={colors.textTertiary} />
-            <Text style={{ color: colors.textSecondary, fontSize: 16, fontWeight: '600' }}>
+            <Text style={{ color: colors.textSecondary, fontSize: FontSize.md, fontWeight: FontWeight.semiBold }}>
               Aucun membre trouvé
             </Text>
-            <Text style={{ color: colors.textTertiary, fontSize: 13, textAlign: 'center', lineHeight: 20 }}>
+            <Text style={{ color: colors.textTertiary, fontSize: FontSize.smPlus, textAlign: 'center', lineHeight: 20 }}>
               Essayez une autre recherche ou un autre filtre.
             </Text>
           </View>

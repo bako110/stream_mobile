@@ -11,6 +11,7 @@ import Animated, {
   useSharedValue, useAnimatedStyle,
   withSpring, withSequence, withTiming, FadeInDown,
 } from 'react-native-reanimated';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { postService } from '../../services/postService';
@@ -105,8 +106,8 @@ const ImageGrid: React.FC<{ urls: string[]; onPress: (i: number) => void }> = ({
           onPress={() => onPress(3)}
           overlay={extra > 0 ? (
             <View style={{ ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.52)', alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ color: '#fff', fontSize: 26, fontWeight: '900', letterSpacing: -1 }}>+{extra}</Text>
-              <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '600', marginTop: 2 }}>photos</Text>
+              <Text style={{ color: '#fff', fontSize: FontSize['2xl'], fontWeight: FontWeight.black, letterSpacing: -1 }}>+{extra}</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold, marginTop: 2 }}>photos</Text>
             </View>
           ) : null}
         />
@@ -170,8 +171,8 @@ const rp = StyleSheet.create({
   wrap:        { flex: 1 },
   pill:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 14 },
   pillActive:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 14 },
-  label:       { fontSize: 13, fontWeight: '700' },
-  labelActive: { fontSize: 13, fontWeight: '700', color: '#fff' },
+  label:       { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
+  labelActive: { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, color: '#fff' },
 });
 
 // ── PostDetailScreen ──────────────────────────────────────────────────────────
@@ -504,7 +505,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
                 <Text style={[s.date, { color: colors.textTertiary }]}>{fullDate(post.created_at)}</Text>
-                <Text style={{ color: colors.textTertiary, fontSize: 11 }}>·</Text>
+                <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus }}>·</Text>
                 <Icon name={post.is_private ? 'users' : 'globe'} size={11} color={colors.textTertiary} />
               </View>
               {isOwn && post.ai_analysis_status === 'pending' && (
@@ -513,7 +514,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
                   onPress={() => navigation?.navigate('AiAnalysisStatus', { contentType: 'post', contentId: post.id, initialStatus: post.ai_analysis_status })}
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 }}>
                   <ActivityIndicator size="small" color={colors.textTertiary} />
-                  <Text style={{ color: colors.textTertiary, fontSize: 10, fontWeight: '600' }}>Vérification en cours…</Text>
+                  <Text style={{ color: colors.textTertiary, fontSize: FontSize.xs, fontWeight: FontWeight.semiBold }}>Vérification en cours…</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -563,12 +564,12 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
         {post.feeling ? (
           <View style={{ paddingHorizontal: 16, paddingBottom: 10 }}>
             <View style={[s.feelingPill, { backgroundColor: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.1)' }]}>
-              <Text style={{ fontSize: 15 }}>😊</Text>
-              <Text style={{ fontSize: 13, fontStyle: 'italic', color: colors.textSecondary }}>
+              <Text style={{ fontSize: FontSize.basePlus }}>😊</Text>
+              <Text style={{ fontSize: FontSize.smPlus, fontStyle: 'italic', color: colors.textSecondary }}>
                 se sent{' '}
               </Text>
-              <Text style={{ fontSize: 13 }}>💪</Text>
-              <Text style={{ fontSize: 13, fontWeight: '800', color: '#F97316' }}>{post.feeling}</Text>
+              <Text style={{ fontSize: FontSize.smPlus }}>💪</Text>
+              <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold, color: '#F97316' }}>{post.feeling}</Text>
             </View>
           </View>
         ) : null}
@@ -805,7 +806,7 @@ const s = StyleSheet.create({
     borderBottomWidth: 0,
   },
   topBtn: { padding: 4 },
-  topTitle: { fontSize: 17, fontWeight: '700' },
+  topTitle: { fontSize: FontSize.mdPlus, fontWeight: FontWeight.bold },
 
   // Carte post — fond légèrement contrasté, coins arrondis, margin H
   postCard: {
@@ -822,10 +823,10 @@ const s = StyleSheet.create({
   },
   avatar:         { width: 46, height: 46, borderRadius: 23 },
   avatarFallback: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
-  avatarInitials: { fontSize: 17, fontWeight: '800', color: '#fff' },
+  avatarInitials: { fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold, color: '#fff' },
   verifiedDot:    { width: 16, height: 16, borderRadius: 8, backgroundColor: '#1D9BF0', alignItems: 'center', justifyContent: 'center' },
-  authorName:     { fontSize: 15, fontWeight: '700' },
-  date:           { fontSize: 12 },
+  authorName:     { fontSize: FontSize.basePlus, fontWeight: FontWeight.bold },
+  date:           { fontSize: FontSize.sm },
 
   // Feeling pill
   feelingPill: {
@@ -835,7 +836,7 @@ const s = StyleSheet.create({
   },
 
   // Corps texte
-  bodyTxt: { fontSize: 15, lineHeight: 24, letterSpacing: 0.1 },
+  bodyTxt: { fontSize: FontSize.basePlus, lineHeight: 24, letterSpacing: 0.1 },
 
   // Ligne compteurs
   countersRow: {
@@ -844,7 +845,7 @@ const s = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   countDot: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  countTxt: { fontSize: 13, fontWeight: '500' },
+  countTxt: { fontSize: FontSize.smPlus, fontWeight: FontWeight.medium },
 
   // Barre 3 boutons plats
   actionBar: {
@@ -855,7 +856,7 @@ const s = StyleSheet.create({
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 6, paddingVertical: 9,
   },
-  actionBtnTxt: { fontSize: 12, fontWeight: '600', textAlign: 'center' },
+  actionBtnTxt: { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, textAlign: 'center' },
   actionSep:    { width: StyleSheet.hairlineWidth, height: 32 },
 
   // Menu contextuel ···
@@ -867,7 +868,7 @@ const s = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 }, elevation: 10,
   },
   ctxItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 14 },
-  ctxTxt:  { fontSize: 14, fontWeight: '500' },
+  ctxTxt:  { fontSize: FontSize.base, fontWeight: FontWeight.medium },
   ctxSep:  { height: StyleSheet.hairlineWidth, marginHorizontal: 12 },
 
   // Section "Autres publications"
@@ -876,8 +877,8 @@ const s = StyleSheet.create({
     paddingHorizontal: 16, paddingTop: 18, paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  secTitle:  { fontSize: 16, fontWeight: '800' },
-  secSeeAll: { fontSize: 14, fontWeight: '700' },
+  secTitle:  { fontSize: FontSize.md, fontWeight: FontWeight.extraBold },
+  secSeeAll: { fontSize: FontSize.base, fontWeight: FontWeight.bold },
 
   // Grille portrait
   pRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingTop: 8 },
@@ -890,17 +891,17 @@ const s = StyleSheet.create({
   pStats:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
   pStatsLight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   pStat:       { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  pStatTxt:    { color: '#fff', fontSize: 11, fontWeight: '600' },
+  pStatTxt:    { color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold },
   pImgBadge:   { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 6 },
   pVideoBadge: { position: 'absolute', top: 8, right: 8, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
   pBody:       { paddingHorizontal: 10, paddingVertical: 8 },
-  pBodyTxt:    { fontSize: 12, fontWeight: '400', lineHeight: 17 },
+  pBodyTxt:    { fontSize: FontSize.sm, fontWeight: FontWeight.regular, lineHeight: 17 },
 
   // Footer
   footerLoader: { paddingVertical: 28, alignItems: 'center' },
   footerEnd:    { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 24, paddingHorizontal: 20 },
   footerLine:   { flex: 1, height: StyleSheet.hairlineWidth },
-  footerTxt:    { fontSize: 12, fontWeight: '500' },
+  footerTxt:    { fontSize: FontSize.sm, fontWeight: FontWeight.medium },
 
   // Fullscreen image (inchangé)
   fsRoot:       { flex: 1, backgroundColor: '#000' },

@@ -16,6 +16,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { BackButton, SkeletonUserProfile, VerifiedBadge, PriceWithLocal } from '../../components/common';
@@ -60,7 +61,9 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
   // pliable ouvert — sinon les vignettes deviennent démesurées et la grille
   // paraît "mal disposée" sur les grands écrans.
   const PUB_COLS  = Math.max(2, Math.min(4, Math.floor((W - 24) / 200)));
-  const REEL_COLS = Math.max(3, Math.min(6, Math.floor((W - 24) / 130)));
+  // Grille fixe 3 colonnes façon Facebook — un nombre variable selon la largeur
+  // d'écran (jusqu'à 6 avant) rendait les vignettes trop petites et serrées.
+  const REEL_COLS = 3;
   const pubGridCardW  = (W - 24 - 8 * (PUB_COLS - 1)) / PUB_COLS;
   const reelCardW     = (W - 24 - 5 * (REEL_COLS - 1)) / REEL_COLS;
   const { userId } = route.params;
@@ -387,6 +390,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
 
         {/* ── Avatar ──────────────────────────────────────────────────── */}
         <View style={styles.avatarSection}>
+          <View style={styles.avatarBadgeAnchor}>
           <TouchableOpacity
             activeOpacity={profile.avatar_url || profileIsLive ? 0.85 : 1}
             disabled={joiningLive}
@@ -427,14 +431,10 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
               </View>
             )}
           </TouchableOpacity>
-          {!profileIsLive && profileIsOnline != null && (
-            <View style={[styles.onlineBadge, { borderColor: colors.background, backgroundColor: profileIsOnline ? '#22C55E' : '#92400E' }]} />
+          {!profileIsLive && profileIsOnline && (
+            <View style={[styles.onlineBadge, { borderColor: colors.background, backgroundColor: '#22C55E' }]} />
           )}
-          {profile.is_verified && (
-            <View style={[styles.verifiedBadge, { backgroundColor: colors.primary }]}>
-              <Icon name="check" size={10} color="#fff" />
-            </View>
-          )}
+          </View>
         </View>
 
         {/* ── Nom + Bio + Détails ─────────────────────────────────────── */}
@@ -449,7 +449,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
           {profile.role === 'artist' && (
             <View style={[styles.roleBadge, { backgroundColor: colors.primary + '18' }]}>
               <Icon name="music" size={11} color={colors.primary} />
-              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Artiste</Text>
+              <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, color: colors.primary }}>Artiste</Text>
             </View>
           )}
           {profile.bio && (
@@ -463,7 +463,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                 <View style={styles.detailRow}>
                   <Icon name="map-pin" size={14} color={colors.textTertiary} />
                   <Text style={[styles.detailText, { color: colors.textPrimary }]}>
-                    Habite à <Text style={{ fontWeight: '700' }}>{profile.location}</Text>
+                    Habite à <Text style={{ fontWeight: FontWeight.bold }}>{profile.location}</Text>
                   </Text>
                 </View>
               ) : null}
@@ -483,7 +483,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                 <View style={styles.detailRow}>
                   <Icon name="clock" size={14} color={colors.textTertiary} />
                   <Text style={[styles.detailText, { color: colors.textPrimary }]}>
-                    Membre depuis <Text style={{ fontWeight: '700' }}>{formatDate(profile.created_at)}</Text>
+                    Membre depuis <Text style={{ fontWeight: FontWeight.bold }}>{formatDate(profile.created_at)}</Text>
                   </Text>
                 </View>
               ) : null}
@@ -575,7 +575,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                   recipientAvatar: profile!.avatar_url ?? undefined,
                 })}
               >
-                <Text style={{ fontSize: 16 }}>🪙</Text>
+                <Text style={{ fontSize: FontSize.md }}>🪙</Text>
                 <Text style={[styles.msgBtnLabel, { color: '#F59E0B' }]}>Envoyer</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -744,10 +744,6 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                       const thumb = p.thumbnail_url ?? p.media_url ?? p.image_url ?? p.image_urls?.[0] ?? p.media?.[0]?.url;
                       const likes  = p.likes_count  ?? p.like_count  ?? 0;
                       const cmts   = p.comments_count ?? p.comment_count ?? 0;
-                      // body = champ réel du modèle Post pour un post texte — caption/content
-                      // n'existent pas dessus, donc sans body ici un post texte simple
-                      // n'affichait ni image ni texte, juste un carré dégradé vide.
-                      const label  = p.title ?? p.body ?? p.caption ?? p.content ?? '';
                       return (
                         <TouchableOpacity
                           key={`post-${post.id}`}
@@ -755,25 +751,18 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                           activeOpacity={0.8}
                           onPress={() => navigation.navigate('PostDetail', { postId: post.id })}
                         >
-                          {/* Wrapper dédié pour l'image/dégradé + son overlay de stats — gridOverlay
-                              doit se coller au bas de l'IMAGE, pas de toute la carte (qui inclut
-                              aussi la légende en dessous) : sans ce wrapper, position:absolute
-                              bottom:0 se calait par rapport à la carte entière et recouvrait le
-                              texte de la légende au lieu du bas de la vignette. */}
+                          {/* Vignette — carte simple façon Facebook : vraie photo si dispo,
+                              sinon juste une icône neutre (jamais de texte du post écrasé
+                              dedans, illisible à cette taille et incohérent visuellement
+                              avec les vignettes qui ont une vraie photo). Plus de légende
+                              sous la carte non plus — la grille reste une grille d'images. */}
                           <View style={styles.reelThumbWrap}>
                             {thumb ? (
                               <Image source={{ uri: thumb }} style={styles.reelThumb} resizeMode="cover" />
                             ) : (
-                              <LinearGradient
-                                colors={[colors.gradientStart + '80', colors.gradientEnd + '40']}
-                                style={[styles.reelThumb, styles.reelThumbTextWrap]}
-                              >
-                                {label ? (
-                                  <Text style={styles.reelThumbText} numberOfLines={4}>{label}</Text>
-                                ) : (
-                                  <Icon name="file-text" size={24} color="rgba(255,255,255,0.6)" />
-                                )}
-                              </LinearGradient>
+                              <View style={[styles.reelThumb, styles.reelThumbTextWrap, { backgroundColor: colors.backgroundSecondary }]}>
+                                <Icon name="file-text" size={24} color={colors.textTertiary} />
+                              </View>
                             )}
                             <View style={styles.gridOverlay}>
                               <View style={styles.gridMetaRow}>
@@ -784,11 +773,6 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                               </View>
                             </View>
                           </View>
-                          {thumb && label ? (
-                            <Text style={[styles.reelCaption, { color: colors.textSecondary }]} numberOfLines={1}>
-                              {label}
-                            </Text>
-                          ) : null}
                         </TouchableOpacity>
                       );
                     })}
@@ -856,13 +840,13 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                                 <View style={styles.pubMetaItem}>
                                   <Icon name="tag" size={10} color={accent} />
                                   {item.ticket_price === 0 ? (
-                                    <Text style={[styles.pubMetaText, { color: accent, fontWeight: '700' }]}>
+                                    <Text style={[styles.pubMetaText, { color: accent, fontWeight: FontWeight.bold }]}>
                                       Gratuit
                                     </Text>
                                   ) : (
                                     <PriceWithLocal
                                       amountEur={item.ticket_price}
-                                      style={[styles.pubMetaText, { color: accent, fontWeight: '700' }]}
+                                      style={[styles.pubMetaText, { color: accent, fontWeight: FontWeight.bold }]}
                                     />
                                   )}
                                 </View>
@@ -896,12 +880,9 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                     {reel.thumbnail_url ? (
                       <Image source={{ uri: reel.thumbnail_url }} style={styles.reelThumb} resizeMode="cover" />
                     ) : (
-                      <LinearGradient
-                        colors={[colors.gradientStart + '80', colors.gradientEnd + '40']}
-                        style={[styles.reelThumb, { alignItems: 'center', justifyContent: 'center' }]}
-                      >
-                        <Icon name="play" size={24} color="rgba(255,255,255,0.7)" />
-                      </LinearGradient>
+                      <View style={[styles.reelThumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.backgroundSecondary }]}>
+                        <Icon name="play" size={24} color={colors.textTertiary} />
+                      </View>
                     )}
                     {/* overlay meta : vues + likes */}
                     <View style={styles.gridOverlay}>
@@ -912,11 +893,6 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                         <Text style={styles.gridMetaText}>{reel.likes_count ?? 0}</Text>
                       </View>
                     </View>
-                    {reel.caption ? (
-                      <Text style={[styles.reelCaption, { color: colors.textSecondary }]} numberOfLines={1}>
-                        {reel.caption}
-                      </Text>
-                    ) : null}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -938,7 +914,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                 <View style={styles.aboutRow}>
                   <Icon name="map-pin" size={16} color={colors.textTertiary} />
                   <Text style={[styles.aboutText, { color: colors.textPrimary }]}>
-                    Habite à <Text style={{ fontWeight: '700' }}>{profile.location}</Text>
+                    Habite à <Text style={{ fontWeight: FontWeight.bold }}>{profile.location}</Text>
                   </Text>
                 </View>
               ) : null}
@@ -958,7 +934,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                 <View style={styles.aboutRow}>
                   <Icon name="gift" size={16} color={colors.textTertiary} />
                   <Text style={[styles.aboutText, { color: colors.textPrimary }]}>
-                    Né(e) le <Text style={{ fontWeight: '700' }}>{formatDate(profile.date_of_birth)}</Text>
+                    Né(e) le <Text style={{ fontWeight: FontWeight.bold }}>{formatDate(profile.date_of_birth)}</Text>
                   </Text>
                 </View>
               ) : null}
@@ -979,14 +955,14 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
               {profile.is_verified && (
                 <View style={styles.aboutRow}>
                   <Icon name="check-circle" size={16} color={colors.accentGreen} />
-                  <Text style={[styles.aboutText, { color: colors.accentGreen, fontWeight: '600' }]}>Compte vérifié</Text>
+                  <Text style={[styles.aboutText, { color: colors.accentGreen, fontWeight: FontWeight.semiBold }]}>Compte vérifié</Text>
                 </View>
               )}
               {profile.created_at ? (
                 <View style={styles.aboutRow}>
                   <Icon name="clock" size={16} color={colors.textTertiary} />
                   <Text style={[styles.aboutText, { color: colors.textPrimary }]}>
-                    Membre depuis <Text style={{ fontWeight: '700' }}>{formatDate(profile.created_at)}</Text>
+                    Membre depuis <Text style={{ fontWeight: FontWeight.bold }}>{formatDate(profile.created_at)}</Text>
                   </Text>
                 </View>
               ) : null}
@@ -1051,12 +1027,12 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                       <Image source={{ uri: u.avatar_url }} style={styles.listAvatar} />
                     ) : (
                       <View style={[styles.listAvatarFallback, { backgroundColor: colors.primary + '18' }]}>
-                        <Text style={{ color: colors.primary, fontWeight: '700' }}>{name[0].toUpperCase()}</Text>
+                        <Text style={{ color: colors.primary, fontWeight: FontWeight.bold }}>{name[0].toUpperCase()}</Text>
                       </View>
                     )}
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }}>{name}</Text>
-                      {u.username && <Text style={{ fontSize: 12, color: colors.textTertiary }}>@{u.username}</Text>}
+                      <Text style={{ fontSize: FontSize.base, fontWeight: FontWeight.semiBold, color: colors.textPrimary }}>{name}</Text>
+                      {u.username && <Text style={{ fontSize: FontSize.sm, color: colors.textTertiary }}>@{u.username}</Text>}
                     </View>
                   </TouchableOpacity>
                 );
@@ -1089,26 +1065,35 @@ const styles = StyleSheet.create({
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     flexDirection: 'column', justifyContent: 'space-between',
   },
-  headerTitle: { color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: 0.2 },
+  headerTitle: { color: '#fff', fontSize: FontSize.xl, fontWeight: FontWeight.extraBold, letterSpacing: 0.2 },
 
   avatarSection: { alignItems: 'center', marginTop: -44 },
+  // Enveloppe l'avatar avec sa taille EXACTE (88px, comme avatarRing) : sert de
+  // référence de position pour onlineBadge (absolute). Une largeur explicite
+  // est nécessaire ici — alignSelf/alignItems seuls ne suffisent pas à
+  // contraindre la largeur d'une View non-flex dans ce contexte, le badge se
+  // recalait alors sur toute la largeur de avatarSection (donc côté gauche
+  // de l'écran) au lieu du bord droit réel de la photo.
+  avatarBadgeAnchor: { width: 88, height: 88, alignSelf: 'center' },
   avatarRing: { width: 88, height: 88, borderRadius: 44, borderWidth: 4, overflow: 'hidden' },
   avatar: { width: 80, height: 80, borderRadius: 40 },
   avatarFallback: { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center' },
-  avatarInitial: { color: '#fff', fontSize: 28, fontWeight: '800' },
-  verifiedBadge: { position: 'absolute', bottom: 2, right: -2, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
-  onlineBadge:   { position: 'absolute', bottom: 4, left: -2, width: 18, height: 18, borderRadius: 9, backgroundColor: '#22C55E', borderWidth: 3 },
+  avatarInitial: { color: '#fff', fontSize: FontSize['3xl'], fontWeight: FontWeight.extraBold },
+  // Chevauche le bord du cercle de la photo (80px avatar + 4px bordure ring de
+  // chaque côté) — même logique que AvatarWithBadge : légèrement en dehors du
+  // bord réel de la photo, pas collé à l'intérieur.
+  onlineBadge:   { position: 'absolute', bottom: 2, right: 2, width: 18, height: 18, borderRadius: 9, backgroundColor: '#22C55E', borderWidth: 3 },
   avatarRingLive: { width: 92, height: 92, borderRadius: 46, padding: 3, alignItems: 'center', justifyContent: 'center' },
   liveBadgeProfile: { position: 'absolute', alignSelf: 'center', bottom: -4, backgroundColor: '#F0365A', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 },
-  liveBadgeProfileText: { color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.4 },
+  liveBadgeProfileText: { color: '#fff', fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold, letterSpacing: 0.4 },
 
   infoSection: {
     alignItems: 'center', marginHorizontal: 16, marginTop: 10,
     borderRadius: 16, padding: 16, gap: 4,
   },
-  displayName: { fontSize: 22, fontWeight: '800', textAlign: 'center' },
-  username: { fontSize: 14 },
-  bio: { fontSize: 14, textAlign: 'center', marginTop: 4, lineHeight: 20 },
+  displayName: { fontSize: FontSize['2xl'], fontWeight: FontWeight.extraBold, textAlign: 'center' },
+  username: { fontSize: FontSize.base },
+  bio: { fontSize: FontSize.base, textAlign: 'center', marginTop: 4, lineHeight: 20 },
   roleBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
@@ -1116,14 +1101,14 @@ const styles = StyleSheet.create({
 
   detailsSection: { marginTop: 10, gap: 6, alignSelf: 'stretch' },
   detailRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  detailText: { fontSize: 13 },
+  detailText: { fontSize: FontSize.smPlus },
 
   statsRow: {
     flexDirection: 'row', marginHorizontal: 16, marginTop: 16, borderRadius: 12, paddingVertical: 14,
   },
   statItem: { flex: 1, alignItems: 'center' },
-  statNum: { fontSize: 18, fontWeight: '800' },
-  statLabel: { fontSize: 11, marginTop: 2 },
+  statNum: { fontSize: FontSize.lg, fontWeight: FontWeight.extraBold },
+  statLabel: { fontSize: FontSize.xsPlus, marginTop: 2 },
   statDivider: { width: StyleSheet.hairlineWidth, marginVertical: 4 },
 
   actionRow: {
@@ -1132,9 +1117,9 @@ const styles = StyleSheet.create({
 
   friendsSection:  { marginTop: 10, paddingTop: 14, paddingBottom: 16 },
   friendsHeader:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 12 },
-  friendsTitle:    { fontSize: 16, fontWeight: '800' },
-  friendsCount:    { fontSize: 11, marginTop: 2 },
-  friendsSeeAll:   { fontSize: 13, fontWeight: '700' },
+  friendsTitle:    { fontSize: FontSize.md, fontWeight: FontWeight.extraBold },
+  friendsCount:    { fontSize: FontSize.xsPlus, marginTop: 2 },
+  friendsSeeAll:   { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
   friendsScroll:   { paddingHorizontal: 16, gap: FRIEND_GAP, paddingBottom: 4 },
 
   // Largeurs derivees de FRIEND_CARD_W retirees d'ici — appliquees en style
@@ -1147,22 +1132,22 @@ const styles = StyleSheet.create({
 
   friendAvtWrap:   { borderWidth: 3, overflow: 'hidden', alignSelf: 'center' },
   friendAvtImg:    { alignItems: 'center', justifyContent: 'center' },
-  friendInitial:   { color: '#fff', fontWeight: '800' },
+  friendInitial:   { color: '#fff', fontWeight: FontWeight.extraBold },
   friendVerified:  { position: 'absolute', bottom: 1, right: 1, width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
 
   friendCardBody:  { alignItems: 'center', paddingHorizontal: 6, paddingBottom: 10, gap: 2 },
-  friendName:      { fontSize: 11, fontWeight: '700', textAlign: 'center' },
-  friendHandle:    { fontSize: 10, textAlign: 'center' },
+  friendName:      { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, textAlign: 'center' },
+  friendHandle:    { fontSize: FontSize.xs, textAlign: 'center' },
   followBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     paddingVertical: 11, borderRadius: 10, borderWidth: 1,
   },
-  followLabel: { fontSize: 15, fontWeight: '700' },
+  followLabel: { fontSize: FontSize.basePlus, fontWeight: FontWeight.bold },
   msgBtn: {
     minWidth: 64, paddingHorizontal: 8, paddingVertical: 9, borderRadius: 12,
     alignItems: 'center', justifyContent: 'center', borderWidth: 1, gap: 3,
   },
-  msgBtnLabel: { fontSize: 10, fontWeight: '700' },
+  msgBtnLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.bold },
 
   // ── Tabs ──────────────────────────────────────────────────────────────────
   tabBar: {
@@ -1173,12 +1158,12 @@ const styles = StyleSheet.create({
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 6, paddingVertical: 12,
   },
-  tabLabel: { fontSize: 13, fontWeight: '600' },
+  tabLabel: { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
 
   // ── Content ───────────────────────────────────────────────────────────────
   contentSection: { paddingVertical: 12 },
   emptyContent: { alignItems: 'center', paddingVertical: 48, gap: 10 },
-  emptyText: { fontSize: 14 },
+  emptyText: { fontSize: FontSize.base },
 
   // Publication grid (2 colonnes adaptatives) — compacte : gap/padding resserres,
   // thumbnail legerement plus bas (4/5 au lieu de 3/4) pour plus de densite sans
@@ -1193,14 +1178,14 @@ const styles = StyleSheet.create({
   },
   pubGridThumb: { width: '100%', aspectRatio: 4 / 5 },
   pubGridBody: { padding: 8, gap: 4 },
-  pubGridTitle: { fontSize: 12.5, fontWeight: '700', lineHeight: 16 },
+  pubGridTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, lineHeight: 16 },
   pubTypeBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start',
     paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
   },
-  pubTypeText: { fontSize: 9.5, fontWeight: '800' },
+  pubTypeText: { fontSize: 9.5, fontWeight: FontWeight.extraBold },
   pubMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  pubMetaText: { fontSize: 10.5 },
+  pubMetaText: { fontSize: FontSize.xs },
 
   // Reels / Posts grid
   reelsGrid: {
@@ -1214,7 +1199,6 @@ const styles = StyleSheet.create({
   reelThumbWrap: { position: 'relative' },
   reelThumb: { width: '100%', aspectRatio: 9 / 16 },
   reelThumbTextWrap: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, paddingVertical: 10 },
-  reelThumbText: { color: '#fff', fontSize: 12, fontWeight: '600', textAlign: 'center', lineHeight: 16 },
   gridOverlay: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     paddingHorizontal: 6, paddingVertical: 5,
@@ -1222,18 +1206,16 @@ const styles = StyleSheet.create({
   },
   gridMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   gridMetaText: {
-    color: '#fff', fontSize: 10, fontWeight: '700',
+    color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.bold,
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 2, marginRight: 4,
   },
-  reelCaption: { fontSize: 11, paddingHorizontal: 6, paddingVertical: 4, lineHeight: 14 },
-
   // About
   aboutSection: { gap: 14, marginTop: 8 },
   aboutRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  aboutText: { fontSize: 14, flex: 1 },
+  aboutText: { fontSize: FontSize.base, flex: 1 },
   aboutBioBox: { padding: 16, borderRadius: 12, marginTop: 8, gap: 6 },
-  aboutBioTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 1 },
-  aboutBioText: { fontSize: 14, lineHeight: 20 },
+  aboutBioTitle: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, letterSpacing: 1 },
+  aboutBioText: { fontSize: FontSize.base, lineHeight: 20 },
 
   // Profil privé
   privateBox: {
@@ -1241,8 +1223,8 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center', gap: 10,
   },
-  privateTitle: { fontSize: 17, fontWeight: '700', textAlign: 'center' },
-  privateSubtitle: { fontSize: 13, textAlign: 'center', lineHeight: 18 },
+  privateTitle: { fontSize: FontSize.mdPlus, fontWeight: FontWeight.bold, textAlign: 'center' },
+  privateSubtitle: { fontSize: FontSize.smPlus, textAlign: 'center', lineHeight: 18 },
 
   sectionDivider: { height: 8, marginVertical: 8 },
 
@@ -1251,7 +1233,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 8,
     padding: 12, borderRadius: 10, marginTop: 4,
   },
-  privacyNoteText: { fontSize: 12, flex: 1, lineHeight: 16 },
+  privacyNoteText: { fontSize: FontSize.sm, flex: 1, lineHeight: 16 },
 
   // Followers/Following modal
   listOverlay: {
@@ -1265,7 +1247,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 20, paddingTop: 16, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  listTitle: { fontSize: 18, fontWeight: '800' },
+  listTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.extraBold },
   listClose: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   listItem: {
     flexDirection: 'row', alignItems: 'center', gap: 12,

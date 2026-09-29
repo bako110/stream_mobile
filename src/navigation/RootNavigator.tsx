@@ -24,6 +24,7 @@ import { UpdateBanner } from '../components/common/UpdateBanner';
 import { DownloadToast } from '../components/common/DownloadToast';
 import { cleanupImageCache } from '../services/imageCacheService';
 import { cleanup as cleanupVideoCache } from '../services/videoCacheService';
+import { cleanup as cleanupReelVideoCache } from '../services/reelVideoCacheService';
 
 
 type AppState = 'splash' | 'onboarding' | 'auth' | 'completeProfile' | 'main';
@@ -122,6 +123,7 @@ export const RootNavigator: React.FC = () => {
       setTimeout(() => {
         cleanupImageCache().catch(() => {});
         cleanupVideoCache().catch(() => {});
+        cleanupReelVideoCache().catch(() => {});
       }, 1000);
       navigatePendingUrl();
     };
@@ -172,6 +174,7 @@ export const RootNavigator: React.FC = () => {
     setTimeout(() => {
       cleanupImageCache().catch(() => {});
       cleanupVideoCache().catch(() => {});
+      cleanupReelVideoCache().catch(() => {});
     }, 1000);
     navigatePendingUrl();
   };

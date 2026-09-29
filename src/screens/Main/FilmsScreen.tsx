@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { contentService } from '../../services';
 import { apiClient } from '../../api/client';
@@ -266,19 +267,19 @@ const HeroSlide: React.FC<{ item: FilmItem; purchased: boolean; onPress: () => v
 const hs = StyleSheet.create({
   content:      { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 18, paddingBottom: 28 },
   premiumBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', backgroundColor: '#E8501A', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 5, marginBottom: 10 },
-  premiumText:  { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  premiumText:  { color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.extraBold, letterSpacing: 1 },
   accessBadge:  { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', backgroundColor: '#10b98122', borderWidth: 1, borderColor: '#10b981', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 5, marginBottom: 10 },
-  accessText:   { color: '#10b981', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  title:        { color: '#fff', fontSize: 26, fontWeight: '900', lineHeight: 31, letterSpacing: -0.5, marginBottom: 8 },
+  accessText:   { color: '#10b981', fontSize: FontSize.xs, fontWeight: FontWeight.extraBold, letterSpacing: 1 },
+  title:        { color: '#fff', fontSize: FontSize['2xl'], fontWeight: FontWeight.black, lineHeight: 31, letterSpacing: -0.5, marginBottom: 8 },
   meta:         { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
-  metaText:     { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: '600' },
-  metaDot:      { color: 'rgba(255,255,255,0.35)', fontSize: 10 },
-  synopsis:     { color: 'rgba(255,255,255,0.55)', fontSize: 13, lineHeight: 19, marginBottom: 16 },
+  metaText:     { color: 'rgba(255,255,255,0.7)', fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
+  metaDot:      { color: 'rgba(255,255,255,0.35)', fontSize: FontSize.xs },
+  synopsis:     { color: 'rgba(255,255,255,0.55)', fontSize: FontSize.smPlus, lineHeight: 19, marginBottom: 16 },
   buttons:      { flexDirection: 'row', gap: 10 },
   btnWatch:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#fff', paddingVertical: 12, borderRadius: 10 },
-  btnWatchText: { color: '#000', fontSize: 14, fontWeight: '800' },
+  btnWatchText: { color: '#000', fontSize: FontSize.base, fontWeight: FontWeight.extraBold },
   btnMore:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 10 },
-  btnMoreText:  { color: '#fff', fontSize: 14, fontWeight: '700' },
+  btnMoreText:  { color: '#fff', fontSize: FontSize.base, fontWeight: FontWeight.bold },
   indicators:   { position: 'absolute', bottom: 120, left: 18, flexDirection: 'row', gap: 5, alignItems: 'center' },
   dot:          { height: 3, borderRadius: 2 },
   dotActive:    { width: 22, backgroundColor: '#fff' },
@@ -312,7 +313,7 @@ const TabSelector: React.FC<{
           >
             {active ? (
               <LinearGradient
-                colors={[colors.gradientStart ?? '#7B3FF2', colors.gradientEnd ?? '#5B8DEF']}
+                colors={[colors.primary, colors.primary]}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                 style={tabs_s.btnInner}
               >
@@ -337,8 +338,8 @@ const tabs_s = StyleSheet.create({
   btn:       { flex: 1, borderRadius: 10, overflow: 'hidden' },
   btnActive: {},
   btnInner:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9 },
-  label:     { fontSize: 13, fontWeight: '600' },
-  labelActive: { fontSize: 13, fontWeight: '700', color: '#fff' },
+  label:     { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
+  labelActive: { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, color: '#fff' },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -436,13 +437,13 @@ const card = StyleSheet.create({
   placeholder:  { alignItems: 'center', justifyContent: 'center' },
   gradient:     { position: 'absolute', bottom: 0, left: 0, right: 0, height: '60%' },
   premBadge:    { position: 'absolute', top: 8, right: 8, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#E8501A', paddingHorizontal: 7, paddingVertical: 4, borderRadius: 7 },
-  premBadgeTxt: { color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
+  premBadgeTxt: { color: '#fff', fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold, letterSpacing: 0.3 },
   ratingBadge:  { position: 'absolute', top: 8, left: 8, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6 },
-  ratingText:   { color: '#FFB800', fontSize: 10, fontWeight: '700' },
+  ratingText:   { color: '#FFB800', fontSize: FontSize.xs, fontWeight: FontWeight.bold },
   overlay:      { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 10 },
-  overlayTitle: { color: '#fff', fontSize: 12, fontWeight: '800', lineHeight: 16, marginBottom: 2 },
+  overlayTitle: { color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.extraBold, lineHeight: 16, marginBottom: 2 },
   overlayMeta:  { flexDirection: 'row' },
-  overlayMetaTxt: { color: 'rgba(255,255,255,0.6)', fontSize: 10, fontWeight: '500' },
+  overlayMetaTxt: { color: 'rgba(255,255,255,0.6)', fontSize: FontSize.xs, fontWeight: FontWeight.medium },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -460,8 +461,8 @@ const SectionHeader: React.FC<{ label: string; count: number; colors: any }> = (
 
 const sh = StyleSheet.create({
   row:   { paddingHorizontal: H_PAD, paddingTop: 20, paddingBottom: 14 },
-  title: { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
-  sub:   { fontSize: 12, fontWeight: '500', marginTop: 2 },
+  title: { fontSize: FontSize.xl, fontWeight: FontWeight.extraBold, letterSpacing: -0.3 },
+  sub:   { fontSize: FontSize.sm, fontWeight: FontWeight.medium, marginTop: 2 },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -799,25 +800,25 @@ const ss = StyleSheet.create({
   grid:       { paddingHorizontal: H_PAD, gap: GUTTER },
   row:        { flexDirection: 'row', gap: GUTTER },
   empty:      { alignItems: 'center', paddingTop: 60, gap: 10 },
-  emptyTitle: { fontSize: 17, fontWeight: '800' },
-  emptySub:   { fontSize: 13, fontWeight: '500' },
+  emptyTitle: { fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold },
+  emptySub:   { fontSize: FontSize.smPlus, fontWeight: FontWeight.medium },
 });
 
 const filt = StyleSheet.create({
   filterBtn:    { width: 40, height: 40, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
   filterDot:    { position: 'absolute', top: 7, right: 7, width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
   activeChip:   { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },
-  activeChipTxt:{ fontSize: 12, fontWeight: '600' },
+  activeChipTxt:{ fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
   overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
   sheet:        { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12, maxHeight: '80%' },
   handle:       { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
   sheetHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  sheetTitle:   { fontSize: 18, fontWeight: '800' },
-  resetTxt:     { fontSize: 13, fontWeight: '600' },
-  sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 1, marginBottom: 12, paddingHorizontal: 2 },
+  sheetTitle:   { fontSize: FontSize.lg, fontWeight: FontWeight.extraBold },
+  resetTxt:     { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
+  sectionTitle: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, letterSpacing: 1, marginBottom: 12, paddingHorizontal: 2 },
   tagsWrap:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tag:          { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth },
-  tagTxt:       { fontSize: 13, fontWeight: '600' },
+  tagTxt:       { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
   applyBtn:     { marginTop: 20, marginBottom: 8, paddingVertical: 15, borderRadius: 14, alignItems: 'center' },
-  applyTxt:     { color: '#fff', fontSize: 15, fontWeight: '800' },
+  applyTxt:     { color: '#fff', fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold },
 });

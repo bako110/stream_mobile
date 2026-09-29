@@ -13,6 +13,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import Svg, { Path } from 'react-native-svg';
+import { FontSize, FontWeight } from '../../theme';
 
 const { width: W, height: H } = Dimensions.get('window');
 const PREVIEW_H = H * 0.62;
@@ -143,7 +144,7 @@ const TrimBar: React.FC<{ duration: number; onChange: (s: number, e: number) => 
 
 const tb = StyleSheet.create({
   wrap:     { paddingHorizontal: 24, gap: 10, marginTop: 4 },
-  time:     { color: '#fff', fontSize: 14, fontWeight: '700', textAlign: 'center' },
+  time:     { color: '#fff', fontSize: FontSize.base, fontWeight: FontWeight.bold, textAlign: 'center' },
   track:    { height: 48, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 10, position: 'relative' },
   sel:      { position: 'absolute', top: 0, bottom: 0, backgroundColor: 'rgba(123,63,242,0.35)', borderWidth: 2, borderColor: '#7B3FF2', borderRadius: 6 },
   handle:   { position: 'absolute', top: 0, bottom: 0, width: 22, backgroundColor: '#7B3FF2', borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
@@ -151,7 +152,7 @@ const tb = StyleSheet.create({
   hR:       { borderTopLeftRadius: 0, borderBottomLeftRadius: 0 },
   bar:      { width: 3, height: 20, backgroundColor: '#fff', borderRadius: 2 },
   playBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'rgba(123,63,242,0.25)', borderRadius: 20, paddingVertical: 8, paddingHorizontal: 16, alignSelf: 'center' },
-  playLabel:{ color: '#fff', fontSize: 13, fontWeight: '600' },
+  playLabel:{ color: '#fff', fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
 });
 
 // ── DraggableSticker ──────────────────────────────────────────────────────────
@@ -709,7 +710,7 @@ const st = StyleSheet.create({
   iconBtnOn:    { backgroundColor: 'rgba(123,63,242,0.25)', borderWidth: 1, borderColor: '#7B3FF2' },
   doneBtn:      { borderRadius: 20, overflow: 'hidden' },
   doneBtnInner: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 9 },
-  doneLabel:    { color: '#fff', fontWeight: '700', fontSize: 14 },
+  doneLabel:    { color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.base },
 
   previewWrap: { alignItems: 'center', flex: 1, justifyContent: 'center' },
   frame:       { borderRadius: 14, overflow: 'hidden', backgroundColor: '#111' },
@@ -718,7 +719,7 @@ const st = StyleSheet.create({
   toolBar:   { flexDirection: 'row', paddingHorizontal: 8, paddingVertical: 6, gap: 2, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.08)' },
   toolBtn:   { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, paddingVertical: 7, borderRadius: 10 },
   toolBtnOn: { backgroundColor: 'rgba(123,63,242,0.18)' },
-  toolLabel: { fontSize: 10, color: 'rgba(255,255,255,0.45)', fontWeight: '600' },
+  toolLabel: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.45)', fontWeight: FontWeight.semiBold },
   toolLabelOn:{ color: '#7B3FF2' },
 
   panel:    { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
@@ -730,30 +731,30 @@ const st = StyleSheet.create({
   wBtnOn:   { backgroundColor: 'rgba(123,63,242,0.2)' },
   eraserBtn:  { flexDirection: 'row', alignItems: 'center', gap: 5, marginLeft: 'auto', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.08)' },
   eraserBtnOn:{ backgroundColor: 'rgba(123,63,242,0.18)', borderWidth: 1, borderColor: '#7B3FF2' },
-  eraserLabel:{ color: 'rgba(255,255,255,0.55)', fontSize: 12, fontWeight: '600' },
-  hint:     { color: 'rgba(255,255,255,0.6)', fontSize: 13, textAlign: 'center' },
-  hintSub:  { color: 'rgba(255,255,255,0.35)', fontSize: 11, textAlign: 'center' },
+  eraserLabel:{ color: 'rgba(255,255,255,0.55)', fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
+  hint:     { color: 'rgba(255,255,255,0.6)', fontSize: FontSize.smPlus, textAlign: 'center' },
+  hintSub:  { color: 'rgba(255,255,255,0.35)', fontSize: FontSize.xsPlus, textAlign: 'center' },
 
   modalBg:    { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.7)' },
   textModal:  { backgroundColor: '#1A1A2E', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 10 },
-  modalTitle: { color: '#fff', fontWeight: '800', fontSize: 16, marginBottom: 2 },
-  textInput:  { backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: 14, fontSize: 20, color: '#fff', minHeight: 72, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-  pickerLabel:{ color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: '700', letterSpacing: 0.7, textTransform: 'uppercase' },
+  modalTitle: { color: '#fff', fontWeight: FontWeight.extraBold, fontSize: FontSize.md, marginBottom: 2 },
+  textInput:  { backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: 14, fontSize: FontSize.xl, color: '#fff', minHeight: 72, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  pickerLabel:{ color: 'rgba(255,255,255,0.45)', fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, letterSpacing: 0.7, textTransform: 'uppercase' },
   bgRow:      { flexDirection: 'row', gap: 8 },
   bgBtn:      { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.08)' },
   bgBtnOn:    { backgroundColor: 'rgba(123,63,242,0.22)', borderWidth: 1, borderColor: '#7B3FF2' },
-  bgBtnLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: '600' },
+  bgBtnLabel: { color: 'rgba(255,255,255,0.6)', fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
   textOpts:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  textOptLabel:{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginRight: 4 },
+  textOptLabel:{ color: 'rgba(255,255,255,0.5)', fontSize: FontSize.sm, marginRight: 4 },
   szBtn:      { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.07)' },
   szBtnOn:    { backgroundColor: 'rgba(123,63,242,0.25)' },
-  szBtnLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: '600' },
+  szBtnLabel: { color: 'rgba(255,255,255,0.6)', fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
   boldBtn:    { width: 36, height: 36, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.07)', alignItems: 'center', justifyContent: 'center', marginLeft: 'auto' },
   boldBtnOn:  { backgroundColor: 'rgba(123,63,242,0.25)' },
-  boldLabel:  { color: 'rgba(255,255,255,0.6)', fontSize: 18, fontWeight: '900' },
+  boldLabel:  { color: 'rgba(255,255,255,0.6)', fontSize: FontSize.lg, fontWeight: FontWeight.black },
   addBtn:     { borderRadius: 16, overflow: 'hidden', marginTop: 4 },
   addBtnInner:{ paddingVertical: 13, alignItems: 'center' },
-  addBtnLabel:{ color: '#fff', fontWeight: '700', fontSize: 15 },
+  addBtnLabel:{ color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.basePlus },
 
   stickerModal:{ backgroundColor: '#1A1A2E', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 12 },
   stickerGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

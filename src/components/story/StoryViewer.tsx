@@ -27,11 +27,12 @@ import Reanimated, {
   useSharedValue as useRSharedValue, useAnimatedStyle as useRAnimatedStyle,
   withTiming as withRTiming, withDelay as withRDelay, withRepeat as withRRepeat,
   withSequence as withRSequence, withSpring as withRSpring, Easing as REasing,
-  interpolate as rInterpolate, FadeInUp as RFadeInUp,
+  interpolate as rInterpolate, FadeInUp as RFadeInUp, cancelAnimation as cancelRAnimation,
 } from 'react-native-reanimated';
 import { Gesture as RGesture, GestureDetector as RGestureDetector, GestureHandlerRootView as RGHRootView } from 'react-native-gesture-handler';
-import { AdvertiserRow as AdAdvertiserRow, adIsVideo as adIsVideoFn, adIsPhone as adIsPhoneFn } from '../ads';
+import { AdvertiserRow as AdAdvertiserRow, AdFullscreenPlayer, adIsVideo as adIsVideoFn, adIsPhone as adIsPhoneFn, adCtaLabel } from '../ads';
 import { openPhoneMenu as openAdPhoneMenu } from '../../utils/phoneMenu';
+import { FontSize, FontWeight } from '../../theme';
 
 const AudioRecorderPlayerModule = require('react-native-audio-recorder-player');
 const AudioRecorderPlayerClass = AudioRecorderPlayerModule.default || AudioRecorderPlayerModule;
@@ -44,7 +45,7 @@ const FONT_MAP: Record<string, { fontFamily?: string; fontWeight?: 'normal' | 'b
   serif:     { fontFamily: 'serif',                 fontWeight: 'normal' },
   mono:      { fontFamily: 'monospace',             fontWeight: 'bold' },
   cursive:   { fontFamily: 'cursive',               fontWeight: 'normal' },
-  condensed: { fontFamily: 'sans-serif-condensed',  fontWeight: '900' },
+  condensed: { fontFamily: 'sans-serif-condensed',  fontWeight: FontWeight.black },
   italic:    { fontFamily: 'serif',                 fontWeight: 'normal', fontStyle: 'italic' },
 };
 
@@ -77,6 +78,19 @@ const BUFFER_CFG = {
   bufferForPlaybackAfterRebufferMs: 1500,   // 1.5s après rebuffer
 };
 
+// Palier reseau lent/inconnu (2026-09, cf. networkService.NetworkQuality, meme
+// principe que ReelsScreen.tsx) : BUFFER_CFG ci-dessus visait 8-60s de buffer
+// quel que soit le reseau -- sur une vraie connexion 2G/3G, cet objectif
+// n'est jamais atteint a temps, causant des blocages en pleine lecture au
+// lieu d'une histoire fluide. Cible nettement plus modeste, pour demarrer
+// et enchainer sans a-coups meme si le debit reel est faible.
+const SLOW_BUFFER_CFG = {
+  minBufferMs:                      3000,
+  maxBufferMs:                      15000,
+  bufferForPlaybackMs:              800,
+  bufferForPlaybackAfterRebufferMs: 2500,
+};
+
 // Buffer réduit pour les voisins PRÉCHARGÉS (pas encore affichés) — un voisin n'a besoin
 // que de quelques secondes pour démarrer instantanément, pas de 60s de vidéo entière
 // téléchargée pour rien s'il n'est jamais atteint.
@@ -86,6 +100,26 @@ const PRELOAD_BUFFER_CFG = {
   bufferForPlaybackMs:              500,
   bufferForPlaybackAfterRebufferMs: 1500,
 };
+
+// Meme principe que PRELOAD_BUFFER_CFG, encore plus prudent — cf. SLOW_BUFFER_CFG.
+const SLOW_PRELOAD_BUFFER_CFG = {
+  minBufferMs:                      1500,
+  maxBufferMs:                      5000,
+  bufferForPlaybackMs:              800,
+  bufferForPlaybackAfterRebufferMs: 2500,
+};
+
+/** Choisit le bufferConfig adapte a la qualite reseau courante — 'fast'
+ * (wifi/4G+/5G) garde le comportement d'origine, 'slow'/'unknown' bascule
+ * sur la config reduite. `active` distingue la story affichee (BUFFER_CFG/
+ * SLOW_BUFFER_CFG, plus genereux) du voisin preload (PRELOAD_BUFFER_CFG/
+ * SLOW_PRELOAD_BUFFER_CFG). */
+function pickBufferConfig(active: boolean) {
+  const quality = networkService.getQuality();
+  const slow = quality === 'slow' || quality === 'unknown';
+  if (active) return slow ? SLOW_BUFFER_CFG : BUFFER_CFG;
+  return slow ? SLOW_PRELOAD_BUFFER_CFG : PRELOAD_BUFFER_CFG;
+}
 
 // ── Image avec fondu au chargement ───────────────────────────────────────────
 const StoryImageView = React.memo(({ uri, bgColor }: { uri: string; bgColor?: string }) => {
@@ -137,7 +171,7 @@ const StoryVideoView: React.FC<{ uri: string; paused: boolean; onReady: () => vo
   const playUri = (!usedFallback && resolvedUri) ? resolvedUri : uri;
 
   const player = useVideoPlayer(
-    { uri: playUri, bufferConfig: BUFFER_CFG },
+    { uri: playUri, bufferConfig: pickBufferConfig(true) },
     p => {
       p.loop   = false;
       p.muted  = false;
@@ -159,7 +193,7 @@ const StoryVideoView: React.FC<{ uri: string; paused: boolean; onReady: () => vo
     let currentUri: string | undefined;
     try { currentUri = player.source?.uri; } catch { /* source pas encore prête */ }
     if (!resolvedUri || resolvedUri === currentUri) return;
-    player.replaceSourceAsync({ uri: resolvedUri, bufferConfig: BUFFER_CFG }).catch(() => {});
+    player.replaceSourceAsync({ uri: resolvedUri, bufferConfig: pickBufferConfig(true) }).catch(() => {});
   }, [resolvedUri]);
 
   useEffect(() => {
@@ -216,7 +250,7 @@ const VideoPreloader: React.FC<{ uri: string }> = ({ uri }) => {
   const isWifi = networkService.isWifi();
 
   const player = useVideoPlayer(
-    { uri: playUri, bufferConfig: isWifi ? BUFFER_CFG : PRELOAD_BUFFER_CFG },
+    { uri: playUri, bufferConfig: isWifi ? pickBufferConfig(true) : pickBufferConfig(false) },
     p => { p.muted = true; p.volume = 0; },
   );
   useEffect(() => {
@@ -234,16 +268,19 @@ const VideoPreloader: React.FC<{ uri: string }> = ({ uri }) => {
 
 const BAR_COUNT = 20;
 
-const MusicWidget: React.FC<{ audioUrl: string; audioName?: string | null; accent: string; playing: boolean; mediaType: string }> = ({
+const MusicWidget: React.FC<{ audioUrl?: string | null; audioName?: string | null; accent: string; playing: boolean; mediaType: string }> = ({
   audioUrl, audioName, mediaType, playing,
 }) => {
   // Vrai titre (audio_name, résolu depuis le catalogue Sound côté backend) —
   // fallback sur le nom de fichier de l'URL seulement pour les anciennes
-  // stories publiées avant l'ajout de ce champ.
+  // stories publiées avant l'ajout de ce champ. audio_url peut être absent
+  // (vidé après fusion serveur musique+vidéo, cf. render_content_with_music) :
+  // le badge reste affiché via audio_name, seule la lecture séparée s'arrête.
   const trackName = (() => {
     if (audioName && audioName.trim()) {
       return audioName.length > 30 ? audioName.slice(0, 30) + '…' : audioName;
     }
+    if (!audioUrl) return 'Musique';
     try {
       const seg = audioUrl.split('/').pop()?.split('?')[0] ?? '';
       const clean = decodeURIComponent(seg).replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
@@ -301,26 +338,37 @@ interface AdInfo {
   advertiser_id?: string; advertiser_name?: string; advertiser_logo?: string;
 }
 
-const StoryAdSlide: React.FC<{ ad: AdInfo; onSkip: () => void; onClose: () => void }> = ({ ad, onSkip, onClose }) => {
+const StoryAdSlide: React.FC<{
+  ad: AdInfo; onSkip: () => void; onClose: () => void;
+  onPauseTimer?: () => void; onResumeTimer?: () => void;
+}> = ({ ad, onSkip, onClose, onPauseTimer, onResumeTimer }) => {
   const { width: W, height: H } = Dimensions.get('window');
   const adInsets = useSafeAreaInsets();
   const isVideo = adIsVideoFn(ad);
-  const adPlayer = useVideoPlayer(
-    isVideo && ad.creative_url ? { uri: ad.creative_url } : 'about:blank',
-    p => { p.loop = true; p.muted = false; p.volume = 1; },
-  );
-  useEffect(() => {
-    if (!isVideo) return;
-    try { adPlayer.play(); } catch {}
-    return () => { try { adPlayer.pause(); } catch {} };
-  }, [isVideo, adPlayer]);
+  // Aucun autoplay ici : une pub vidéo ne joue jamais inline dans le slide story —
+  // un tap ouvre le lecteur plein écran dédié (AdFullscreenPlayer, avec son + CTA),
+  // le timer d'avancement automatique du parent est mis en pause pendant ce temps.
+  const [fullscreenOpen, setFullscreenOpen] = useState(false);
+  const openFullscreen = useCallback(() => {
+    onPauseTimer?.();
+    setFullscreenOpen(true);
+  }, [onPauseTimer]);
+  const closeFullscreen = useCallback(() => {
+    setFullscreenOpen(false);
+    onResumeTimer?.();
+  }, [onResumeTimer]);
 
   // ── reanimated : progression 5 s, entrée du contenu, rebond de la poignée ──
   const prog = useRSharedValue(0);
   const kburns = useRSharedValue(0);
   const handleY = useRSharedValue(0);
+  // Balayage lumineux qui traverse la poignée CTA — même effet que AdCTA (Feed/
+  // Reels/Recherche), répété avec pause pour attirer l'œil sans être agressif.
+  const handleShine = useRSharedValue(0);
+  // Pulsation douce synchronisée avec le shine (même cycle) — renforce l'appel
+  // sans mouvement continu, même principe que AdCTA.
+  const handlePulse = useRSharedValue(1);
   useEffect(() => {
-    prog.value = withRTiming(1, { duration: 5000, easing: REasing.linear });
     if (!isVideo && (ad.creative_url || ad.thumbnail_url)) {
       kburns.value = withRTiming(1, { duration: 5000, easing: REasing.linear });
     }
@@ -331,14 +379,47 @@ const StoryAdSlide: React.FC<{ ad: AdInfo; onSkip: () => void; onClose: () => vo
         withRSpring(0, { damping: 9, stiffness: 200 }),
       ), 2, false,
     ));
-  }, [prog, kburns, handleY, isVideo, ad.creative_url, ad.thumbnail_url]);
+    handleShine.value = withRDelay(900, withRRepeat(
+      withRSequence(
+        withRTiming(1, { duration: 500, easing: REasing.out(REasing.quad) }),
+        withRTiming(0, { duration: 0 }),
+        withRDelay(3400, withRTiming(0, { duration: 0 })),
+      ), -1, false,
+    ));
+    handlePulse.value = withRDelay(900, withRRepeat(
+      withRSequence(
+        withRTiming(1.05, { duration: 250, easing: REasing.out(REasing.quad) }),
+        withRTiming(1, { duration: 250, easing: REasing.in(REasing.quad) }),
+        withRDelay(3400, withRTiming(1, { duration: 0 })),
+      ), -1, false,
+    ));
+  }, [prog, kburns, handleY, handleShine, handlePulse, isVideo, ad.creative_url, ad.thumbnail_url]);
+
+  // Barre de progression visuelle — suspendue tant que le lecteur plein écran
+  // est ouvert (cohérent avec le timer parent mis en pause via onPauseTimer),
+  // reprend à 5s pleines à sa fermeture.
+  useEffect(() => {
+    if (fullscreenOpen) {
+      cancelRAnimation(prog);
+    } else {
+      prog.value = 0;
+      prog.value = withRTiming(1, { duration: 5000, easing: REasing.linear });
+    }
+  }, [fullscreenOpen, prog]);
 
   const progStyle = useRAnimatedStyle(() => ({ width: `${prog.value * 100}%` }));
   const kburnsStyle = useRAnimatedStyle(() => ({ transform: [{ scale: rInterpolate(kburns.value, [0, 1], [1, 1.06]) }] }));
-  const handleStyle = useRAnimatedStyle(() => ({ transform: [{ translateY: handleY.value }] }));
+  const handleShineStyle = useRAnimatedStyle(() => ({
+    transform: [{ translateX: rInterpolate(handleShine.value, [0, 1], [-70, 70]) }],
+    opacity: handleShine.value > 0 && handleShine.value < 1 ? 1 : 0,
+  }));
+  const handleStyle = useRAnimatedStyle(() => ({
+    transform: [{ translateY: handleY.value }, { scale: handlePulse.value }],
+  }));
 
   const rawCta = (ad.cta_url ?? '').trim();
   const phone = adIsPhoneFn(rawCta);
+  const storyAdCta = adCtaLabel(ad);
   const openCta = () => {
     apiClient.post(`/api/v1/ads/${ad.id}/click`).catch(() => {});
     if (!rawCta) { onSkip(); return; }
@@ -370,9 +451,10 @@ const StoryAdSlide: React.FC<{ ad: AdInfo; onSkip: () => void; onClose: () => vo
       <View style={{ width: W, height: H, backgroundColor: '#000' }}>
         <StatusBar hidden translucent />
 
-        {/* Media */}
-        {isVideo && ad.creative_url ? (
-          <VideoView player={adPlayer} style={{ position: 'absolute', width: W, height: H }} resizeMode="cover" controls={false} />
+        {/* Media — pub vidéo : jamais jouée inline, juste la miniature + bouton
+            play qui ouvre le lecteur plein écran dédié (son + CTA géré à part). */}
+        {isVideo && (ad.thumbnail_url || ad.creative_url) ? (
+          <Reanimated.Image source={{ uri: ad.thumbnail_url || ad.creative_url }} style={[{ position: 'absolute', width: W, height: H }, kburnsStyle]} resizeMode="cover" />
         ) : (ad.creative_url || ad.thumbnail_url) ? (
           <Reanimated.Image source={{ uri: ad.creative_url || ad.thumbnail_url }} style={[{ position: 'absolute', width: W, height: H }, kburnsStyle]} resizeMode="cover" />
         ) : (
@@ -387,6 +469,21 @@ const StoryAdSlide: React.FC<{ ad: AdInfo; onSkip: () => void; onClose: () => vo
           locations={[0.4, 0.7, 1]}
           style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: H * 0.52 }}
         />
+
+        {/* Bouton play — au-dessus de la couche de gestes pour capter son tap en
+            priorité (sinon le tap générique "suivant" l'emporterait). Ouvre le
+            lecteur plein écran dédié, ne joue jamais la vidéo ici. */}
+        {isVideo && ad.creative_url && (
+          <TouchableOpacity
+            onPress={openFullscreen}
+            activeOpacity={0.85}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name="play" size={26} color="#fff" style={{ marginLeft: 3 }} />
+            </View>
+          </TouchableOpacity>
+        )}
 
         {/* Couche gestes PLEIN ÉCRAN, derrière les boutons : tap → suivant,
             swipe ↑ → CTA. Les TouchableOpacity (X, poignée) sont au-dessus et
@@ -405,7 +502,7 @@ const StoryAdSlide: React.FC<{ ad: AdInfo; onSkip: () => void; onClose: () => vo
 
         {/* Sponsorisé + fermer */}
         <View style={{ position: 'absolute', top: adInsets.top + 20, left: 16, right: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 10, fontWeight: '600', letterSpacing: 1, textTransform: 'uppercase' }}>Sponsorisé</Text>
+          <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: FontSize.xs, fontWeight: FontWeight.semiBold, letterSpacing: 1, textTransform: 'uppercase' }}>Sponsorisé</Text>
           <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} style={{ backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 14, padding: 6 }}>
             <Icon name="x" size={16} color="#fff" />
           </TouchableOpacity>
@@ -416,23 +513,38 @@ const StoryAdSlide: React.FC<{ ad: AdInfo; onSkip: () => void; onClose: () => vo
           <View style={{ marginBottom: 10 }}>
             <AdAdvertiserRow ad={ad as any} variant="dark" />
           </View>
-          <Text style={{ color: 'rgba(255,255,255,0.92)', fontSize: 15, fontWeight: '500', lineHeight: 21, letterSpacing: -0.1 }} numberOfLines={2}>
+          <Text style={{ color: 'rgba(255,255,255,0.92)', fontSize: FontSize.basePlus, fontWeight: FontWeight.medium, lineHeight: 21, letterSpacing: -0.1 }} numberOfLines={2}>
             {ad.description || ad.title}
           </Text>
         </Reanimated.View>
 
-        {/* Poignée swipe-up */}
+        {/* Poignée swipe-up — balayage lumineux périodique (voir handleShine),
+            même effet que AdCTA (Feed/Recherche) pour attirer l'œil. */}
         <Reanimated.View style={[{ position: 'absolute', left: 0, right: 0, bottom: 30, alignItems: 'center' }, handleStyle]}>
-          <TouchableOpacity activeOpacity={0.8} onPress={openCta} style={{ alignItems: 'center', gap: 5 }}>
+          <TouchableOpacity activeOpacity={0.8} onPress={openCta} style={{ alignItems: 'center', gap: 5, overflow: 'hidden', paddingHorizontal: 4 }}>
+            <Reanimated.View
+              pointerEvents="none"
+              style={[
+                { position: 'absolute', top: -4, bottom: -4, width: 26, backgroundColor: 'rgba(255,255,255,0.55)', transform: [{ skewX: '-18deg' }] },
+                handleShineStyle,
+              ]}
+            />
             <Icon name="chevron-up" size={20} color="rgba(255,255,255,0.85)" />
-            <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700', letterSpacing: 0.3, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 }}>
-              {ad.cta_text || (phone ? 'Contactez-nous' : 'En savoir plus')}
+            <Text style={{ color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.bold, letterSpacing: 0.3, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 }}>
+              {storyAdCta.text}
             </Text>
             <View style={{ width: 40, height: 3.5, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.45)' }} />
           </TouchableOpacity>
         </Reanimated.View>
       </View>
       </RGHRootView>
+
+      {/* Lecteur plein écran dédié — même pattern que le Feed (AdFullscreenPlayer) :
+          jamais de lecture inline dans le slide story, seul un tap explicite sur
+          le bouton play ouvre ce lecteur avec son + CTA. */}
+      <Modal visible={fullscreenOpen} animationType="slide" onRequestClose={closeFullscreen} statusBarTranslucent>
+        {fullscreenOpen && <AdFullscreenPlayer ad={ad} onClose={closeFullscreen} />}
+      </Modal>
     </Modal>
   );
 };
@@ -1065,6 +1177,21 @@ export const StoryViewer: React.FC<Props> = ({
         stopAudio();
         onClose();
       }}
+      // Le lecteur plein écran dédié (tap sur le bouton play) suspend l'avance
+      // automatique de 5s le temps que l'utilisateur regarde/lise la pub, puis
+      // relance un nouveau délai de 5s à sa fermeture.
+      onPauseTimer={() => {
+        if (storyAdTimerRef.current) clearTimeout(storyAdTimerRef.current);
+      }}
+      onResumeTimer={() => {
+        if (storyAdTimerRef.current) clearTimeout(storyAdTimerRef.current);
+        storyAdTimerRef.current = setTimeout(() => {
+          setShowStoryAd(false);
+          setPaused(false);
+          setGroupIdx(nextGroupIdxRef.current);
+          setStoryIdx(0);
+        }, 5000);
+      }}
     />;
   }
 
@@ -1207,8 +1334,11 @@ export const StoryViewer: React.FC<Props> = ({
           </View>
         ) : null}
 
-        {/* ── Music widget ───────────────────────────────────────────────── */}
-        {story.audio_url && (
+        {/* ── Music widget ─────────────────────────────────────────────────
+            audio_url peut être vidé une fois la musique fusionnée dans la
+            vidéo côté serveur (cf. render_content_with_music) — le badge
+            reste affiché tant qu'audio_name est là. */}
+        {(story.audio_url || story.audio_name) && (
           <MusicWidget
             audioUrl={story.audio_url}
             audioName={story.audio_name}
@@ -1398,11 +1528,11 @@ export const StoryViewer: React.FC<Props> = ({
               <Image source={{ uri: likeToast.avatar }} style={s.likeToastAvatar} />
             ) : (
               <View style={[s.likeToastAvatar, { backgroundColor: accent, alignItems: 'center', justifyContent: 'center' }]}>
-                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>{likeToast.name[0].toUpperCase()}</Text>
+                <Text style={{ color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.sm }}>{likeToast.name[0].toUpperCase()}</Text>
               </View>
             )}
             <Text style={s.likeToastText}>
-              <Text style={{ fontWeight: '800' }}>{likeToast.name}</Text> a aimé ta story ❤️
+              <Text style={{ fontWeight: FontWeight.extraBold }}>{likeToast.name}</Text> a aimé ta story ❤️
             </Text>
           </View>
         )}
@@ -1644,11 +1774,11 @@ const s = StyleSheet.create({
   },
   avatar:        { width: 38, height: 38, borderRadius: 19 },
   avatarFallback:{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
-  avatarLetter:  { color: '#fff', fontWeight: '700', fontSize: 15 },
-  authorName:    { color: '#fff', fontWeight: '700', fontSize: 14 },
+  avatarLetter:  { color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.basePlus },
+  authorName:    { color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.base },
   metaRow:       { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
   typeDot:       { width: 5, height: 5, borderRadius: 3 },
-  timeAgo:       { color: 'rgba(255,255,255,0.65)', fontSize: 11 },
+  timeAgo:       { color: 'rgba(255,255,255,0.65)', fontSize: FontSize.xsPlus },
 
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   hBtn:        { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.3)' },
@@ -1668,7 +1798,7 @@ const s = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   captionText: {
-    color: '#fff', fontSize: 15, fontWeight: '500', textAlign: 'center',
+    color: '#fff', fontSize: FontSize.basePlus, fontWeight: FontWeight.medium, textAlign: 'center',
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
 
@@ -1691,8 +1821,8 @@ const s = StyleSheet.create({
   },
   groupNavAvatar:       { width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)' },
   groupNavAvatarFallback:{ backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
-  groupNavInitial:      { color: '#fff', fontSize: 11, fontWeight: '800' },
-  groupNavName:         { color: '#fff', fontSize: 11, fontWeight: '600', maxWidth: 70 },
+  groupNavInitial:      { color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold },
+  groupNavName:         { color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold, maxWidth: 70 },
 
   // ── Bottom bar (like / views) ─────────────────────────────────────────────────
   bottomBar: {
@@ -1704,13 +1834,13 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
   },
-  viewsBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  viewsBtnText: { color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.bold },
   likeBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: 'rgba(0,0,0,0.45)',
     paddingHorizontal: 16, paddingVertical: 9, borderRadius: 24,
   },
-  likeBtnText: { fontSize: 13, fontWeight: '800' },
+  likeBtnText: { fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold },
 
   // ── Floating heart ────────────────────────────────────────────────────────────
   floatingHeart: {
@@ -1730,7 +1860,7 @@ const s = StyleSheet.create({
     zIndex: 40,
   },
   likeToastAvatar: { width: 32, height: 32, borderRadius: 16 },
-  likeToastText:   { color: '#fff', fontSize: 13, flex: 1 },
+  likeToastText:   { color: '#fff', fontSize: FontSize.smPlus, flex: 1 },
 
   // ── Sheets ────────────────────────────────────────────────────────────────────
   sheetOverlay: {
@@ -1752,7 +1882,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 20, paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  viewersPanelTitle: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  viewersPanelTitle: { color: '#fff', fontSize: FontSize.md, fontWeight: FontWeight.extraBold },
 
   // Onglets Vues / Réponses
   panelTabs: {
@@ -1769,10 +1899,10 @@ const s = StyleSheet.create({
   panelTabActive: {
     borderBottomColor: 'transparent',
   },
-  panelTabText: { fontSize: 13, fontWeight: '700' },
-  replyContent:  { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2, lineHeight: 17 },
+  panelTabText: { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
+  replyContent:  { color: 'rgba(255,255,255,0.7)', fontSize: FontSize.sm, marginTop: 2, lineHeight: 17 },
   emptyBox: { alignItems: 'center', paddingVertical: 44, gap: 12 },
-  emptyText:{ color: 'rgba(255,255,255,0.35)', fontSize: 14 },
+  emptyText:{ color: 'rgba(255,255,255,0.35)', fontSize: FontSize.base },
 
   viewerRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
@@ -1781,10 +1911,10 @@ const s = StyleSheet.create({
   },
   viewerAvatar:        { width: 44, height: 44, borderRadius: 22 },
   viewerAvatarFallback:{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  viewerAvatarLetter:  { color: '#fff', fontWeight: '700', fontSize: 16 },
+  viewerAvatarLetter:  { color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.md },
   viewerInfo:          { flex: 1 },
-  viewerName:          { color: '#fff', fontSize: 14, fontWeight: '600' },
-  viewerMeta:          { color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: 2 },
+  viewerName:          { color: '#fff', fontSize: FontSize.base, fontWeight: FontWeight.semiBold },
+  viewerMeta:          { color: 'rgba(255,255,255,0.4)', fontSize: FontSize.xsPlus, marginTop: 2 },
   viewerActions:       { flexDirection: 'row', gap: 8 },
   vActBtn: {
     width: 34, height: 34, borderRadius: 17,
@@ -1801,23 +1931,23 @@ const s = StyleSheet.create({
     paddingHorizontal: 20, paddingVertical: 16,
   },
   menuIconBox: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  menuText:    { flex: 1, color: '#fff', fontSize: 15, fontWeight: '500' },
+  menuText:    { flex: 1, color: '#fff', fontSize: FontSize.basePlus, fontWeight: FontWeight.medium },
   menuCancel:  { justifyContent: 'center', marginTop: 4, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.08)' },
-  menuCancelText: { flex: 1, textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: 15, fontWeight: '500' },
+  menuCancelText: { flex: 1, textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: FontSize.basePlus, fontWeight: FontWeight.medium },
 
   // ── Edit modal ────────────────────────────────────────────────────────────────
   editOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
   editSheet:   { backgroundColor: '#12121E', borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 20 },
-  editTitle:   { color: '#fff', fontSize: 16, fontWeight: '800', marginBottom: 16 },
+  editTitle:   { color: '#fff', fontSize: FontSize.md, fontWeight: FontWeight.extraBold, marginBottom: 16 },
   editInput:   {
     backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 14,
-    color: '#fff', fontSize: 15, padding: 14, minHeight: 90, textAlignVertical: 'top',
+    color: '#fff', fontSize: FontSize.basePlus, padding: 14, minHeight: 90, textAlignVertical: 'top',
   },
   editBtns:       { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 16 },
   editCancelBtn:  { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.08)' },
-  editCancelText: { color: 'rgba(255,255,255,0.6)', fontWeight: '600' },
+  editCancelText: { color: 'rgba(255,255,255,0.6)', fontWeight: FontWeight.semiBold },
   editSaveGrad:   { borderRadius: 12, overflow: 'hidden', paddingHorizontal: 22, paddingVertical: 12 },
-  editSaveText:   { color: '#fff', fontWeight: '800' },
+  editSaveText:   { color: '#fff', fontWeight: FontWeight.extraBold },
 
   // ── Reply bar (style WhatsApp) ────────────────────────────────────────────────
   replyBar: {
@@ -1849,7 +1979,7 @@ const s = StyleSheet.create({
   replyInputText: {
     flex: 1,
     color: '#fff',
-    fontSize: 14,
+    fontSize: FontSize.base,
     padding: 0,
   },
   replyEmoji: {
@@ -1881,7 +2011,7 @@ const s = StyleSheet.create({
     borderRadius: 20,
     zIndex: 50,
   },
-  replySentText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  replySentText: { color: '#fff', fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
 });
 
 // ── MusicWidget styles — indicateur minimal : icône + titre, une seule ligne ─
@@ -1902,8 +2032,8 @@ const mw = StyleSheet.create({
   },
   trackName: {
     color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semiBold,
     flexShrink: 1,
   },
   eqRow: {

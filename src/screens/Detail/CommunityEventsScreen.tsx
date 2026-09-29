@@ -20,6 +20,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { ExpandableText, GofolyxLoader, BackButton } from '../../components/common';
 import { communityService } from '../../services/communityService';
@@ -809,20 +810,20 @@ const styles = StyleSheet.create({
 
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1 },
   headerMiddle: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  headerTitle: { fontSize: 18, fontWeight: '700', letterSpacing: 0.2 },
+  headerTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, letterSpacing: 0.2 },
   countBadge: { minWidth: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
-  countBadgeText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
+  countBadgeText: { color: '#FFFFFF', fontSize: FontSize.sm, fontWeight: FontWeight.bold },
   addBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
 
   tabsBar: { flexGrow: 0 },
   tabsBarContent: { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
   tab: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20, borderWidth: 1, marginRight: 8 },
-  tabText: { fontSize: 14 },
+  tabText: { fontSize: FontSize.base },
 
   summaryBar: { flexDirection: 'row', paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
   summaryItem: { flex: 1, alignItems: 'center', gap: 2 },
-  summaryVal: { fontSize: 18, fontWeight: '800' },
-  summaryLbl: { fontSize: 10, fontWeight: '600', letterSpacing: 0.5 },
+  summaryVal: { fontSize: FontSize.lg, fontWeight: FontWeight.extraBold },
+  summaryLbl: { fontSize: FontSize.xs, fontWeight: FontWeight.semiBold, letterSpacing: 0.5 },
   summaryDivider: { width: StyleSheet.hairlineWidth },
 
   listArea: { flex: 1 },
@@ -831,35 +832,35 @@ const styles = StyleSheet.create({
   cover: { height: 130, justifyContent: 'space-between', padding: 12 },
   coverCenter: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   dateCircle: { borderRadius: 50, paddingHorizontal: 16, paddingVertical: 8, alignItems: 'center' },
-  dateCircleDay: { color: '#fff', fontSize: 28, fontWeight: '900', lineHeight: 32 },
-  dateCircleMon: { color: 'rgba(255,255,255,0.75)', fontSize: 11, fontWeight: '700', letterSpacing: 0.8 },
+  dateCircleDay: { color: '#fff', fontSize: FontSize['3xl'], fontWeight: FontWeight.black, lineHeight: 32 },
+  dateCircleMon: { color: 'rgba(255,255,255,0.75)', fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, letterSpacing: 0.8 },
   coverBadges: { flexDirection: 'row', gap: 6, justifyContent: 'flex-end' },
   badge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-  badgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
+  badgeText: { color: '#FFFFFF', fontSize: FontSize.xs, fontWeight: FontWeight.extraBold, letterSpacing: 0.8 },
   adminActions: { position: 'absolute', top: 10, left: 10, flexDirection: 'row', gap: 6 },
   adminBtn: { backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 8, padding: 6 },
   deleteBtn: { position: 'absolute', bottom: 10, left: 10, backgroundColor: 'rgba(239,68,68,0.18)', borderRadius: 8, padding: 6 },
 
   cardBody: { padding: 14, gap: 6 },
-  cardTitle: { fontSize: 17, fontWeight: '700', lineHeight: 24, marginBottom: 2 },
+  cardTitle: { fontSize: FontSize.mdPlus, fontWeight: FontWeight.bold, lineHeight: 24, marginBottom: 2 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  metaText: { fontSize: 13, flex: 1 },
-  eventDesc: { fontSize: 12, lineHeight: 17, marginTop: 2 },
-  organizerText: { fontSize: 11, marginTop: 2 },
+  metaText: { fontSize: FontSize.smPlus, flex: 1 },
+  eventDesc: { fontSize: FontSize.sm, lineHeight: 17, marginTop: 2 },
+  organizerText: { fontSize: FontSize.xsPlus, marginTop: 2 },
   countsRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
   countPill: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-  countText: { fontSize: 12, fontWeight: '700' },
+  countText: { fontSize: FontSize.sm, fontWeight: FontWeight.bold },
 
   divider: { height: StyleSheet.hairlineWidth, marginHorizontal: 14 },
   cardFooter: { padding: 12, paddingHorizontal: 14 },
   rsvpBtn: { borderRadius: 12, paddingVertical: 13, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' },
-  rsvpBtnText: { fontSize: 14, fontWeight: '700', letterSpacing: 0.2 },
+  rsvpBtnText: { fontSize: FontSize.base, fontWeight: FontWeight.bold, letterSpacing: 0.2 },
 
   empty: { alignItems: 'center', justifyContent: 'center', paddingVertical: 72, paddingHorizontal: 32, gap: 12 },
-  emptyTitle: { fontSize: 17, fontWeight: '700', textAlign: 'center' },
-  emptySub: { fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  emptyTitle: { fontSize: FontSize.mdPlus, fontWeight: FontWeight.bold, textAlign: 'center' },
+  emptySub: { fontSize: FontSize.smPlus, textAlign: 'center', lineHeight: 20 },
   emptyCreateBtn: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, paddingHorizontal: 20, paddingVertical: 12, marginTop: 8 },
-  emptyCreateText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  emptyCreateText: { color: '#fff', fontSize: FontSize.basePlus, fontWeight: FontWeight.bold },
 
   // Modal form
   modalOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.62)' },
@@ -867,22 +868,22 @@ const styles = StyleSheet.create({
   modalSheet: { borderTopLeftRadius: 22, borderTopRightRadius: 22, overflow: 'hidden' },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 4 },
   sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
-  sheetTitle: { flex: 1, fontSize: 17, fontWeight: '700', textAlign: 'center' },
+  sheetTitle: { flex: 1, fontSize: FontSize.mdPlus, fontWeight: FontWeight.bold, textAlign: 'center' },
   saveBtn: { borderRadius: 12, paddingHorizontal: 16, paddingVertical: 9 },
-  saveBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  saveBtnText: { color: '#fff', fontSize: FontSize.base, fontWeight: FontWeight.bold },
 
   formContent: { paddingHorizontal: 16, paddingBottom: 24 },
-  formLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, marginBottom: 6 },
+  formLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, letterSpacing: 0.8, marginBottom: 6 },
   formField: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 11 },
-  formInput: { flex: 1, fontSize: 15, paddingVertical: 0 },
+  formInput: { flex: 1, fontSize: FontSize.basePlus, paddingVertical: 0 },
 
   toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 12, borderWidth: 1, padding: 12, marginTop: 14 },
   toggleIcon: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  toggleLabel: { fontSize: 14, fontWeight: '600' },
-  toggleDesc: { fontSize: 11, marginTop: 2 },
+  toggleLabel: { fontSize: FontSize.base, fontWeight: FontWeight.semiBold },
+  toggleDesc: { fontSize: FontSize.xsPlus, marginTop: 2 },
 
   colorRow: { flexDirection: 'row', gap: 10, marginBottom: 12, flexWrap: 'wrap' },
   colorDot: { width: 32, height: 32, borderRadius: 16 },
   colorPreview: { borderRadius: 12, height: 56, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  colorPreviewText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  colorPreviewText: { color: '#fff', fontSize: FontSize.base, fontWeight: FontWeight.bold },
 });

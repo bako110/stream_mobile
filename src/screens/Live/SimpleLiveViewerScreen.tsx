@@ -33,6 +33,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
+import { FontSize, FontWeight } from '../../theme';
 import { liveService } from '../../services/liveService';
 import { battleService } from '../../services/battleService';
 import { toastService, showConfirm } from '../../services';
@@ -102,7 +103,7 @@ interface GiftTick {
 
 const Av: React.FC<{ name: string; size: number; color?: string }> = ({ name, size, color = '#F0365A' }) => (
   <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: color, alignItems: 'center', justifyContent: 'center' }}>
-    <Text style={{ color: '#fff', fontWeight: '800', fontSize: size * 0.38 }}>{(name || '?')[0].toUpperCase()}</Text>
+    <Text style={{ color: '#fff', fontWeight: FontWeight.extraBold, fontSize: size * 0.38 }}>{(name || '?')[0].toUpperCase()}</Text>
   </View>
 );
 
@@ -199,7 +200,7 @@ const StageAccessSheet: React.FC<{
         {/* Titre */}
         <View style={sas.titleRow}>
           <LinearGradient colors={['#F0365A', '#9B65F5']} style={sas.lockIcon} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-            <Text style={{ fontSize: 18 }}>🎤</Text>
+            <Text style={{ fontSize: FontSize.lg }}>🎤</Text>
           </LinearGradient>
           <View style={{ flex: 1 }}>
             <Text style={sas.title}>Monter sur scène</Text>
@@ -252,7 +253,7 @@ const StageAccessSheet: React.FC<{
             activeOpacity={0.85}
           >
             <LinearGradient colors={['#F0365A', '#9B65F5']} style={sas.payBtnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-              <Text style={{ fontSize: 18 }}>💳</Text>
+              <Text style={{ fontSize: FontSize.lg }}>💳</Text>
               <Text style={sas.payBtnText}>Recharger mon solde</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -271,7 +272,7 @@ const StageAccessSheet: React.FC<{
               {loading || balanceLoading
                 ? <ActivityIndicator color="#fff" size="small" />
                 : <>
-                    <Text style={{ fontSize: 18 }}>{isGoGold ? '🪙' : requiredGiftEmoji}</Text>
+                    <Text style={{ fontSize: FontSize.lg }}>{isGoGold ? '🪙' : requiredGiftEmoji}</Text>
                     <Text style={sas.payBtnText}>
                       {isGoGold
                         ? `Payer ${requiredGoGold} GoGold · Lever la main`
@@ -306,8 +307,8 @@ const sas = StyleSheet.create({
   },
   titleRow:   { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 20 },
   lockIcon:   { width: 50, height: 50, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  title:      { color: '#fff', fontSize: 18, fontWeight: '900' },
-  subtitle:   { color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 2 },
+  title:      { color: '#fff', fontSize: FontSize.lg, fontWeight: FontWeight.black },
+  subtitle:   { color: 'rgba(255,255,255,0.5)', fontSize: FontSize.sm, marginTop: 2 },
 
   conditionBox: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
@@ -315,9 +316,9 @@ const sas = StyleSheet.create({
     borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
     padding: 16, marginBottom: 12,
   },
-  conditionEmoji: { fontSize: 32 },
-  conditionLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '600', marginBottom: 3 },
-  conditionValue: { color: '#F59E0B', fontSize: 18, fontWeight: '800' },
+  conditionEmoji: { fontSize: FontSize['4xl'] },
+  conditionLabel: { color: 'rgba(255,255,255,0.5)', fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, marginBottom: 3 },
+  conditionValue: { color: '#F59E0B', fontSize: FontSize.lg, fontWeight: FontWeight.extraBold },
 
   balanceRow: {
     flexDirection: 'row', alignItems: 'center',
@@ -325,19 +326,19 @@ const sas = StyleSheet.create({
     borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
     paddingHorizontal: 16, paddingVertical: 12, marginBottom: 20,
   },
-  balanceLabel: { flex: 1, color: 'rgba(255,255,255,0.55)', fontSize: 13 },
-  balanceValue: { color: '#3FEDB6', fontSize: 15, fontWeight: '800' },
-  balanceShort: { color: '#F0365A', fontSize: 12, fontWeight: '700' },
+  balanceLabel: { flex: 1, color: 'rgba(255,255,255,0.55)', fontSize: FontSize.smPlus },
+  balanceValue: { color: '#3FEDB6', fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold },
+  balanceShort: { color: '#F0365A', fontSize: FontSize.sm, fontWeight: FontWeight.bold },
 
   refundNote: {
-    color: 'rgba(255,255,255,0.35)', fontSize: 11, textAlign: 'center',
+    color: 'rgba(255,255,255,0.35)', fontSize: FontSize.xsPlus, textAlign: 'center',
     marginBottom: 12, lineHeight: 16, paddingHorizontal: 8,
   },
   payBtn:      { borderRadius: 18, overflow: 'hidden', marginBottom: 10 },
   payBtnGrad:  { height: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  payBtnText:  { color: '#fff', fontSize: 16, fontWeight: '800' },
+  payBtnText:  { color: '#fff', fontSize: FontSize.md, fontWeight: FontWeight.extraBold },
   cancelBtn:   { alignItems: 'center', paddingVertical: 10 },
-  cancelText:  { color: 'rgba(255,255,255,0.4)', fontSize: 13 },
+  cancelText:  { color: 'rgba(255,255,255,0.4)', fontSize: FontSize.smPlus },
 });
 
 // ── Zone vidéo multi-participants ─────────────────────────────────────────────
@@ -434,7 +435,7 @@ const MultiVideoView: React.FC<{
             onPress={() => onGift(spotlightTrack.participant.identity, spotlightName)}
             activeOpacity={0.8}
           >
-            <Text style={{ fontSize: 20 }}>🎁</Text>
+            <Text style={{ fontSize: FontSize.xl }}>🎁</Text>
           </TouchableOpacity>
         )}
 
@@ -1031,7 +1032,7 @@ const RoomContent: React.FC<{
                 <View style={[st.actionIconCircle, handRaised && { backgroundColor: 'rgba(255,215,0,0.2)', borderColor: '#FFD700' }]}>
                   {checkingStage
                     ? <ActivityIndicator size="small" color="#FFD700" />
-                    : <Text style={{ fontSize: 14 }}>{handRaised ? '✋' : '🖐️'}</Text>
+                    : <Text style={{ fontSize: FontSize.base }}>{handRaised ? '✋' : '🖐️'}</Text>
                   }
                 </View>
               </TouchableOpacity>
@@ -1674,15 +1675,15 @@ const mv = StyleSheet.create({
     zIndex: 12, paddingHorizontal: 12,
   },
   noVideo:       { justifyContent: 'center', alignItems: 'center', backgroundColor: '#111', gap: 12 },
-  noVideoText:   { color: '#999', fontSize: 14 },
+  noVideoText:   { color: '#999', fontSize: FontSize.base },
   noVideoBg:     { justifyContent: 'center', alignItems: 'center', backgroundColor: '#0e0e0e', gap: 12 },
   // Fond quand caméra désactivée — style TikTok (avatar centré sur fond sombre/flou)
   noCamBg:       { justifyContent: 'center', alignItems: 'center', backgroundColor: '#0a0a12', gap: 14 },
   noCamAvatar:   { width: 120, height: 120, borderRadius: 60, borderWidth: 3, borderColor: '#F0365A' },
-  noCamName:     { color: '#fff', fontSize: 18, fontWeight: '800' },
+  noCamName:     { color: '#fff', fontSize: FontSize.lg, fontWeight: FontWeight.extraBold },
   noCamMicRow:   { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
-  noCamMicText:  { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
-  spotlightName: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  noCamMicText:  { color: 'rgba(255,255,255,0.7)', fontSize: FontSize.sm },
+  spotlightName: { color: '#fff', fontSize: FontSize.md, fontWeight: FontWeight.bold },
   spotlightAvatar: { width: 96, height: 96, borderRadius: 48, marginBottom: 4 },
   spotGiftBtn: {
     display: 'none',
@@ -1697,7 +1698,7 @@ const mv = StyleSheet.create({
   },
   thumbNoCam:  { justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a1a', flex: 1 },
   thumbGrad:   { position: 'absolute', bottom: 0, left: 0, right: 0, height: 32, justifyContent: 'flex-end', paddingBottom: 4 },
-  thumbLabel:  { color: '#fff', fontSize: 9, textAlign: 'center', paddingHorizontal: 2 },
+  thumbLabel:  { color: '#fff', fontSize: FontSize['2xs'], textAlign: 'center', paddingHorizontal: 2 },
   thumbGiftBtn:{ position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10, padding: 2 },
 });
 
@@ -1706,7 +1707,7 @@ const mv = StyleSheet.create({
 const st = StyleSheet.create({
   root:        { flex: 1, backgroundColor: '#050010' },
   center:      { justifyContent: 'center', alignItems: 'center' },
-  connectText: { color: 'rgba(255,255,255,0.5)', marginTop: 14, fontSize: 14, fontWeight: '500' },
+  connectText: { color: 'rgba(255,255,255,0.5)', marginTop: 14, fontSize: FontSize.base, fontWeight: FontWeight.medium },
 
   gradTop:    { position: 'absolute', top: 0, left: 0, right: 0, height: 200, zIndex: 5 } as any,
   gradBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 320, zIndex: 5 } as any,
@@ -1727,10 +1728,10 @@ const st = StyleSheet.create({
     backgroundColor: '#F0365A', borderWidth: 1.5, borderColor: '#050010',
   },
   hostMeta:  { flexShrink: 1 },
-  hostName:  { color: '#fff', fontSize: 11, fontWeight: '700', letterSpacing: 0.2 },
+  hostName:  { color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, letterSpacing: 0.2 },
   hostTimerRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 1 },
-  liveTagText: { color: '#F0365A', fontWeight: '900', fontSize: 8, letterSpacing: 0.4 },
-  timerText:   { color: 'rgba(255,255,255,0.7)', fontSize: 8, fontWeight: '600' },
+  liveTagText: { color: '#F0365A', fontWeight: FontWeight.black, fontSize: 8, letterSpacing: 0.4 },
+  timerText:   { color: 'rgba(255,255,255,0.7)', fontSize: 8, fontWeight: FontWeight.semiBold },
 
   subPillsRow: {
     position: 'absolute', left: 12,
@@ -1742,13 +1743,13 @@ const st = StyleSheet.create({
     backgroundColor: 'rgba(123,63,242,0.7)', borderRadius: 8,
     paddingHorizontal: 6, paddingVertical: 3,
   },
-  privateText: { color: '#fff', fontWeight: '700', fontSize: 9 },
+  privateText: { color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize['2xs'] },
   monetPill: {
     backgroundColor: 'rgba(245,158,11,0.25)', borderRadius: 8,
     paddingHorizontal: 6, paddingVertical: 3,
     borderWidth: 1, borderColor: 'rgba(245,158,11,0.5)',
   },
-  monetPillText: { color: '#F59E0B', fontSize: 9, fontWeight: '700' },
+  monetPillText: { color: '#F59E0B', fontSize: FontSize['2xs'], fontWeight: FontWeight.bold },
 
   participantsPill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
@@ -1762,8 +1763,8 @@ const st = StyleSheet.create({
     backgroundColor: '#9B65F5', alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: '#050010',
   },
-  participantAvatarText: { color: '#fff', fontSize: 7, fontWeight: '800' },
-  viewerCount: { color: '#fff', fontSize: 10, fontWeight: '800' },
+  participantAvatarText: { color: '#fff', fontSize: 7, fontWeight: FontWeight.extraBold },
+  viewerCount: { color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.extraBold },
   likeWrap:    { marginLeft: 0 },
 
   settingsBtn:       { padding: 2, position: 'relative' },
@@ -1779,7 +1780,7 @@ const st = StyleSheet.create({
     backgroundColor: '#F0365A', alignItems: 'center', justifyContent: 'center',
     zIndex: 1, borderWidth: 1.5, borderColor: '#050010',
   },
-  settingsBadgeText: { color: '#fff', fontSize: 8, fontWeight: '900' },
+  settingsBadgeText: { color: '#fff', fontSize: 8, fontWeight: FontWeight.black },
 
   // ── Badge sur scène ──────────────────────────────────────────────────────
   onStageBadge: {
@@ -1792,7 +1793,7 @@ const st = StyleSheet.create({
     borderRadius: 20, paddingHorizontal: 16, paddingVertical: 7,
   },
   onStageDot:  { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
-  onStageText: { color: '#fff', fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
+  onStageText: { color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.extraBold, letterSpacing: 0.5 },
 
   // ── Zone bas (chat + barre actions) ─────────────────────────────────────
   // paddingBottom réel appliqué inline (base + insets.bottom, voir usage)
@@ -1808,15 +1809,15 @@ const st = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 6,
     maxWidth: 230, flexDirection: 'row', flexWrap: 'wrap',
   },
-  chatUser: { color: '#9B65F5', fontSize: 12, fontWeight: '800' },
-  chatText: { color: 'rgba(255,255,255,0.92)', fontSize: 13 },
+  chatUser: { color: '#9B65F5', fontSize: FontSize.sm, fontWeight: FontWeight.extraBold },
+  chatText: { color: 'rgba(255,255,255,0.92)', fontSize: FontSize.smPlus },
 
   sysRow:  { marginBottom: 3, alignSelf: 'flex-start' },
-  sysText: { color: 'rgba(255,255,255,0.38)', fontSize: 10, fontStyle: 'italic' },
+  sysText: { color: 'rgba(255,255,255,0.38)', fontSize: FontSize.xs, fontStyle: 'italic' },
 
   modRow:     { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 },
   modBtn:     { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(240,54,90,0.12)', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
-  modBtnText: { color: '#F0365A', fontSize: 9, fontWeight: '700' as const },
+  modBtnText: { color: '#F0365A', fontSize: FontSize['2xs'], fontWeight: FontWeight.bold },
 
   // ── Cible cadeau (quand ≠ hôte) ──────────────────────────────────────────
   giftTargetPill: {
@@ -1826,7 +1827,7 @@ const st = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 4,
     borderWidth: 1, borderColor: 'rgba(255,215,0,0.3)',
   },
-  giftTargetText: { color: '#FFD700', fontSize: 11, fontWeight: '700', maxWidth: 160 },
+  giftTargetText: { color: '#FFD700', fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, maxWidth: 160 },
 
   // ── Barre d'actions ──────────────────────────────────────────────────────
   actionBar: {
@@ -1841,7 +1842,7 @@ const st = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
     minHeight: 38,
   },
-  chatField: { flex: 1, color: '#fff', fontSize: 13, paddingVertical: Platform.OS === 'ios' ? 8 : 5 },
+  chatField: { flex: 1, color: '#fff', fontSize: FontSize.smPlus, paddingVertical: Platform.OS === 'ios' ? 8 : 5 },
   inputEmojiWrap: { alignItems: 'center', justifyContent: 'center', marginRight: 2 },
   sendBtn:   {
     backgroundColor: '#F0365A', borderRadius: 17, padding: 7, margin: 2,
@@ -1849,7 +1850,7 @@ const st = StyleSheet.create({
   },
   editCancelBtn: { padding: 5 },
   chatPlaceholder: { flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1, paddingVertical: 8 },
-  chatPlaceholderText: { color: 'rgba(255,255,255,0.38)', fontSize: 13 },
+  chatPlaceholderText: { color: 'rgba(255,255,255,0.38)', fontSize: FontSize.smPlus },
 
   actionIconWrap:   { alignItems: 'center', justifyContent: 'center' },
   actionIconCircle: {
@@ -1870,10 +1871,10 @@ const st = StyleSheet.create({
     borderRadius: 28, padding: 40, marginHorizontal: 28,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
   },
-  endedTitle:   { color: '#fff', fontSize: 22, fontWeight: '900' },
-  endedSub:     { color: 'rgba(255,255,255,0.45)', fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  endedTitle:   { color: '#fff', fontSize: FontSize['2xl'], fontWeight: FontWeight.black },
+  endedSub:     { color: 'rgba(255,255,255,0.45)', fontSize: FontSize.base, textAlign: 'center', lineHeight: 20 },
   endedBtn:     { marginTop: 8, backgroundColor: '#F0365A', borderRadius: 26, paddingHorizontal: 40, paddingVertical: 14 },
-  endedBtnText: { color: '#fff', fontWeight: '900', fontSize: 15, letterSpacing: 0.3 },
+  endedBtnText: { color: '#fff', fontWeight: FontWeight.black, fontSize: FontSize.basePlus, letterSpacing: 0.3 },
 });
 
 // ── Styles gift ticker ────────────────────────────────────────────────────────
@@ -1889,10 +1890,10 @@ const gt = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 8,
     borderRadius: 22, paddingHorizontal: 12, paddingVertical: 8,
   },
-  emoji:  { fontSize: 20 },
+  emoji:  { fontSize: FontSize.xl },
   info:   { flex: 1 },
-  sender: { color: '#fff', fontSize: 11, fontWeight: '800' },
-  detail: { color: 'rgba(255,255,255,0.7)', fontSize: 10 },
+  sender: { color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold },
+  detail: { color: 'rgba(255,255,255,0.7)', fontSize: FontSize.xs },
 
   // ── MVP / top donateurs (portage du battle, BattleScreen.tsx) ──────────────────
   donorsCards: {
@@ -1906,10 +1907,10 @@ const gt = StyleSheet.create({
     paddingVertical: 5, paddingHorizontal: 7, paddingLeft: 4,
   },
   donorCardAvatar: { width: 28, height: 28, borderRadius: 14 },
-  donorCardName: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  donorCardGift: { color: 'rgba(255,255,255,0.65)', fontSize: 10, marginTop: 1 },
-  donorCardEmoji: { fontSize: 17 },
-  donorCardCount: { color: '#FDE68A', fontSize: 12, fontWeight: '900' },
+  donorCardName: { color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold },
+  donorCardGift: { color: 'rgba(255,255,255,0.65)', fontSize: FontSize.xs, marginTop: 1 },
+  donorCardEmoji: { fontSize: FontSize.mdPlus },
+  donorCardCount: { color: '#FDE68A', fontSize: FontSize.sm, fontWeight: FontWeight.black },
 
   mvpRow: {
     position: 'absolute', left: 12,
@@ -1919,7 +1920,7 @@ const gt = StyleSheet.create({
   mvpAvatar: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: '#0B0812' },
   mvpAvatarFallback: { borderWidth: 2, borderColor: '#0B0812', borderRadius: 13 },
   mvpBadge: { marginLeft: 4, backgroundColor: '#FFD700', borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1.5 },
-  mvpBadgeText: { color: '#000', fontSize: 8, fontWeight: '900' },
+  mvpBadgeText: { color: '#000', fontSize: 8, fontWeight: FontWeight.black },
 });
 
 // ── Styles menu scène ─────────────────────────────────────────────────────────
@@ -1944,7 +1945,7 @@ const sm = StyleSheet.create({
     alignSelf: 'center', marginBottom: 16,
   },
   title: {
-    color: '#3FEDB6', fontSize: 13, fontWeight: '800',
+    color: '#3FEDB6', fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold,
     letterSpacing: 0.5, marginBottom: 14,
     textAlign: 'center',
   },
@@ -1964,7 +1965,7 @@ const sm = StyleSheet.create({
     backgroundColor: 'rgba(240,54,90,0.12)',
     borderColor: '#F0365A',
   },
-  rowText: { flex: 1, color: '#fff', fontSize: 15, fontWeight: '600' },
+  rowText: { flex: 1, color: '#fff', fontSize: FontSize.basePlus, fontWeight: FontWeight.semiBold },
   dot: { width: 8, height: 8, borderRadius: 4 },
   separator: {
     height: StyleSheet.hairlineWidth,

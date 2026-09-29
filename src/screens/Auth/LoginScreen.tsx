@@ -11,6 +11,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import Svg, { Path } from 'react-native-svg';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { Input, PhoneInput, DEFAULT_COUNTRY } from '../../components/common';
 import type { Country } from '../../components/common';
@@ -336,7 +337,7 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onNeedsVerificati
                 Contactez le support pour en savoir plus.
               </Text>
               {blockedInfo.blockedAt ? (
-                <Text style={{ fontSize: 11, color: colors.textTertiary, marginBottom: 8 }}>
+                <Text style={{ fontSize: FontSize.xsPlus, color: colors.textTertiary, marginBottom: 8 }}>
                   Bloqué le {blockedInfo.blockedAt}
                 </Text>
               ) : null}
@@ -348,7 +349,7 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onNeedsVerificati
                 <Text style={[styles.blockedContactText, { color: '#EF4444' }]}>Contacter le support</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => setBlockedInfo(null)} style={{ marginTop: 8 }}>
-                <Text style={{ fontSize: 12, color: colors.textTertiary }}>Retour</Text>
+                <Text style={{ fontSize: FontSize.sm, color: colors.textTertiary }}>Retour</Text>
               </TouchableOpacity>
             </Animated.View>
           ) : null}
@@ -464,50 +465,50 @@ const styles = StyleSheet.create({
   heroCircle1:  { position: 'absolute', width: 180, height: 180, borderRadius: 90, top: -40, right: -40 },
   heroCircle2:  { position: 'absolute', width: 120, height: 120, borderRadius: 60, bottom: 20, left: -30 },
   heroContent:  { flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 30 },
-  heroTitle:    { fontSize: 30, fontWeight: '800', color: '#fff', letterSpacing: 0.3 },
-  heroSub:      { fontSize: 14, color: 'rgba(255,255,255,0.80)', marginTop: 6, fontWeight: '400' },
+  heroTitle:    { fontSize: 30, fontWeight: FontWeight.extraBold, color: '#fff', letterSpacing: 0.3 },
+  heroSub:      { fontSize: FontSize.base, color: 'rgba(255,255,255,0.80)', marginTop: 6, fontWeight: FontWeight.regular },
 
   // Form
   qrBtn:        { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, paddingHorizontal: 15, borderRadius: 16, borderWidth: 1.2 },
   qrIconWrap:   { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  qrBtnTitle:   { fontSize: 13, fontWeight: '700' },
-  qrBtnSub:     { fontSize: 11, marginTop: 1 },
+  qrBtnTitle:   { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
+  qrBtnSub:     { fontSize: FontSize.xsPlus, marginTop: 1 },
   sep:          { flexDirection: 'row', alignItems: 'center', marginVertical: 18 },
   line:         { flex: 1, height: 1 },
-  orLabel:      { marginHorizontal: 14, fontSize: 13, fontWeight: '500' },
+  orLabel:      { marginHorizontal: 14, fontSize: FontSize.smPlus, fontWeight: FontWeight.medium },
   togglePill:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20, borderWidth: 1 },
-  toggleText:   { fontSize: 11, fontWeight: '700' },
+  toggleText:   { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold },
   switchLink:   { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
-  switchLinkText:{ fontSize: 13, fontWeight: '600' },
+  switchLinkText:{ fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
 
-  errorMsg:     { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, marginTop: 12, fontSize: 13, fontWeight: '500' },
+  errorMsg:     { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, marginTop: 12, fontSize: FontSize.smPlus, fontWeight: FontWeight.medium },
   forgotRow:    { alignItems: 'flex-end', marginTop: 12, marginBottom: 8 },
-  forgotText:   { fontSize: 13, fontWeight: '600' },
+  forgotText:   { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
 
   // Bouton submit style screenshot
   submitBtn:    { height: 52, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
-  submitBtnText:{ color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 0.3 },
+  submitBtnText:{ color: '#fff', fontSize: FontSize.md, fontWeight: FontWeight.extraBold, letterSpacing: 0.3 },
 
   registerRow:  { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 24 },
-  registerLabel:{ fontSize: 14 },
-  registerLink: { fontSize: 14, fontWeight: '700' },
+  registerLabel:{ fontSize: FontSize.base },
+  registerLink: { fontSize: FontSize.base, fontWeight: FontWeight.bold },
 
   cguRow:       { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', marginTop: 14 },
-  cguText:      { fontSize: 12 },
-  cguLink:      { fontSize: 12, fontWeight: '700', textDecorationLine: 'underline' },
+  cguText:      { fontSize: FontSize.sm },
+  cguLink:      { fontSize: FontSize.sm, fontWeight: FontWeight.bold, textDecorationLine: 'underline' },
 
   socialRow:        { marginTop: 20, gap: 14 },
   socialDividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   socialDivider:    { flex: 1, height: 1 },
-  socialOrText:     { fontSize: 12, fontWeight: '500' },
+  socialOrText:     { fontSize: FontSize.sm, fontWeight: FontWeight.medium },
   socialBtns:       { flexDirection: 'row', gap: 12 },
   socialBtn:        { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13, borderRadius: 14, borderWidth: 1 },
-  socialBtnText:    { fontSize: 14, fontWeight: '700' },
+  socialBtnText:    { fontSize: FontSize.base, fontWeight: FontWeight.bold },
 
   blockedBox:        { borderRadius: 16, borderWidth: 1, padding: 18, marginTop: 16, alignItems: 'center' },
-  blockedTitle:      { fontSize: 17, fontWeight: '800', marginBottom: 6 },
-  blockedReason:     { fontSize: 13, marginBottom: 6, textAlign: 'center' },
-  blockedSub:        { fontSize: 13, textAlign: 'center', lineHeight: 20, marginBottom: 12 },
+  blockedTitle:      { fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold, marginBottom: 6 },
+  blockedReason:     { fontSize: FontSize.smPlus, marginBottom: 6, textAlign: 'center' },
+  blockedSub:        { fontSize: FontSize.smPlus, textAlign: 'center', lineHeight: 20, marginBottom: 12 },
   blockedContactBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1 },
-  blockedContactText:{ fontSize: 13, fontWeight: '700' },
+  blockedContactText:{ fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
 });

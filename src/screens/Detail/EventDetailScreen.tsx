@@ -17,6 +17,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { VideoView, useVideoPlayer } from 'react-native-video';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { SkeletonDetail, CommentsBottomSheet, ExpandableText, BackButton, GofolyxLoader, FriendsWhoLiked, PriceWithLocal } from '../../components/common';
 import { TicketPaymentSheet } from '../../components/wallet/TicketPaymentSheet';
@@ -147,7 +148,7 @@ const HeroCarousel: React.FC<{
             flexDirection: 'row', alignItems: 'center', gap: 5,
             backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20 }}>
           <Icon name="play-circle" size={14} color="#fff" />
-          <Text style={{ fontSize: 11, fontWeight: '800', color: '#fff' }}>Vidéo</Text>
+          <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, color: '#fff' }}>Vidéo</Text>
         </TouchableOpacity>
       )}
 
@@ -176,7 +177,7 @@ const HeroInfoCard: React.FC<{
   colors: AppColors;
 }> = ({ title, accent, eventType, isFree, isOnline, organizerName, organizerAvatar, showAiPending, onAiPendingPress, colors }) => (
   <View style={{ backgroundColor: colors.surface, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12, gap: 8 }}>
-    <Text style={{ fontSize: 17, fontWeight: '800', color: colors.textPrimary, lineHeight: 22, letterSpacing: -0.2 }}>
+    <Text style={{ fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold, color: colors.textPrimary, lineHeight: 22, letterSpacing: -0.2 }}>
       {title}
     </Text>
     {organizerName && (
@@ -186,11 +187,11 @@ const HeroInfoCard: React.FC<{
             <Image source={{ uri: organizerAvatar }} style={{ width: 24, height: 24 }} resizeMode="cover" />
           ) : (
             <LinearGradient colors={[accent, accent + '88']} style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ fontSize: 9, fontWeight: '900', color: '#fff' }}>{getInitials(organizerName)}</Text>
+              <Text style={{ fontSize: FontSize['2xs'], fontWeight: FontWeight.black, color: '#fff' }}>{getInitials(organizerName)}</Text>
             </LinearGradient>
           )}
         </View>
-        <Text style={{ fontSize: 12.5, fontWeight: '600', color: colors.textSecondary }}>{organizerName}</Text>
+        <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, color: colors.textSecondary }}>{organizerName}</Text>
       </View>
     )}
     {/* Badge visible uniquement par l'organisateur, cf. ReelsScreen.tsx pour
@@ -198,22 +199,22 @@ const HeroInfoCard: React.FC<{
     {showAiPending && (
       <TouchableOpacity activeOpacity={0.7} onPress={onAiPendingPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
         <ActivityIndicator size="small" color={colors.textTertiary} />
-        <Text style={{ color: colors.textTertiary, fontSize: 10, fontWeight: '600' }}>Vérification en cours…</Text>
+        <Text style={{ color: colors.textTertiary, fontSize: FontSize.xs, fontWeight: FontWeight.semiBold }}>Vérification en cours…</Text>
       </TouchableOpacity>
     )}
     {/* Badges — petits, discrets, sous le titre plutôt que sur l'image */}
     <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
       <View style={{ backgroundColor: accent + '15', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 }}>
-        <Text style={{ fontSize: 9, fontWeight: '800', color: accent, letterSpacing: 0.4 }}>{eventType.toUpperCase()}</Text>
+        <Text style={{ fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold, color: accent, letterSpacing: 0.4 }}>{eventType.toUpperCase()}</Text>
       </View>
       {isFree && (
         <View style={{ backgroundColor: '#36D9A022', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 }}>
-          <Text style={{ fontSize: 9, fontWeight: '800', color: '#1F9D6E', letterSpacing: 0.4 }}>GRATUIT</Text>
+          <Text style={{ fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold, color: '#1F9D6E', letterSpacing: 0.4 }}>GRATUIT</Text>
         </View>
       )}
       {isOnline && (
         <View style={{ backgroundColor: '#3B82F622', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 }}>
-          <Text style={{ fontSize: 9, fontWeight: '800', color: '#3B82F6', letterSpacing: 0.4 }}>EN LIGNE</Text>
+          <Text style={{ fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold, color: '#3B82F6', letterSpacing: 0.4 }}>EN LIGNE</Text>
         </View>
       )}
     </View>
@@ -223,7 +224,7 @@ const HeroInfoCard: React.FC<{
 // ── SectionHeader ─────────────────────────────────────────────────────────────
 
 const SectionHeader: React.FC<{ label: string; colors: AppColors }> = ({ label, colors }) => (
-  <Text style={{ fontSize: 11, fontWeight: '800', letterSpacing: 1.2, color: colors.textTertiary, marginBottom: 10, textTransform: 'uppercase' }}>
+  <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, letterSpacing: 1.2, color: colors.textTertiary, marginBottom: 10, textTransform: 'uppercase' }}>
     {label}
   </Text>
 );
@@ -245,12 +246,12 @@ const InfoRow: React.FC<InfoRowProps> = ({ icon, label, value, color, colors, di
         <Icon name={icon} size={17} color={color} />
       </View>
       <View style={{ flex: 1, gap: 2 }}>
-        <Text style={{ fontSize: 11, color: colors.textTertiary, fontWeight: '500' }}>{label}</Text>
-        <Text style={{ fontSize: 14, fontWeight: '700', color: onPress ? color : colors.textPrimary, lineHeight: 18 }}>{value}</Text>
+        <Text style={{ fontSize: FontSize.xsPlus, color: colors.textTertiary, fontWeight: FontWeight.medium }}>{label}</Text>
+        <Text style={{ fontSize: FontSize.base, fontWeight: FontWeight.bold, color: onPress ? color : colors.textPrimary, lineHeight: 18 }}>{value}</Text>
       </View>
       {rightBadge && (
         <View style={{ backgroundColor: color + '15', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
-          <Text style={{ fontSize: 11, fontWeight: '700', color }}>{rightBadge}</Text>
+          <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, color }}>{rightBadge}</Text>
         </View>
       )}
       {onPress && <Icon name="chevron-right" size={15} color={color} />}
@@ -314,11 +315,11 @@ const TierCard: React.FC<{
 
       {/* Label + description */}
       <View style={{ flex: 1, gap: 2 }}>
-        <Text style={{ fontSize: 13, fontWeight: '900', color: active ? tier.color : colors.textPrimary, letterSpacing: 0.2 }}>
+        <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.black, color: active ? tier.color : colors.textPrimary, letterSpacing: 0.2 }}>
           {tier.label.toUpperCase()}
         </Text>
         {tier.sub && (
-          <Text style={{ fontSize: 11, color: colors.textTertiary, fontWeight: '500' }}>{tier.sub}</Text>
+          <Text style={{ fontSize: FontSize.xsPlus, color: colors.textTertiary, fontWeight: FontWeight.medium }}>{tier.sub}</Text>
         )}
       </View>
 
@@ -326,10 +327,10 @@ const TierCard: React.FC<{
       <View style={{ alignItems: 'flex-end', gap: 2 }}>
         <PriceWithLocal
           amountEur={tier.price}
-          style={{ fontSize: 17, fontWeight: '900', color: active ? tier.color : colors.textPrimary }}
+          style={{ fontSize: FontSize.mdPlus, fontWeight: FontWeight.black, color: active ? tier.color : colors.textPrimary }}
           localStyle={{ color: colors.textTertiary }}
         />
-        <Text style={{ fontSize: 10, color: colors.textTertiary, fontWeight: '500' }}>
+        <Text style={{ fontSize: FontSize.xs, color: colors.textTertiary, fontWeight: FontWeight.medium }}>
           + {fees.toLocaleString('fr')} frais
         </Text>
       </View>
@@ -537,7 +538,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
   if (!event) return (
     <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
       <Icon name="alert-circle" size={48} color={colors.textTertiary} />
-      <Text style={{ color: colors.textTertiary, fontSize: 15 }}>Événement introuvable</Text>
+      <Text style={{ color: colors.textTertiary, fontSize: FontSize.basePlus }}>Événement introuvable</Text>
     </View>
   );
 
@@ -621,7 +622,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
                   <Icon name="radio" size={20} color="#fff" />
                   <Text style={ds.ctaText}>Regarder en direct</Text>
                   <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, marginLeft: 'auto' as any }}>
-                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#fff' }}>LIVE</Text>
+                    <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, color: '#fff' }}>LIVE</Text>
                   </View>
                 </LinearGradient>
               </TouchableOpacity>
@@ -630,8 +631,8 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
               <View style={[ds.infoBanner, { borderColor: accent + '55', backgroundColor: accent + '10' }]}>
                 <Icon name="clock" size={20} color={accent} />
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '800', color: accent }}>Live programmé</Text>
-                  {scheduledIn && <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>Démarre {scheduledIn}</Text>}
+                  <Text style={{ fontSize: FontSize.base, fontWeight: FontWeight.extraBold, color: accent }}>Live programmé</Text>
+                  {scheduledIn && <Text style={{ fontSize: FontSize.sm, color: colors.textSecondary, marginTop: 2 }}>Démarre {scheduledIn}</Text>}
                 </View>
               </View>
             )}
@@ -648,7 +649,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
             {isCompleted && event.live_id && !hasReplay && (
               <View style={[ds.infoBanner, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}>
                 <Icon name="film" size={18} color={colors.textTertiary} />
-                <Text style={{ fontSize: 14, color: colors.textTertiary }}>Replay non disponible</Text>
+                <Text style={{ fontSize: FontSize.base, color: colors.textTertiary }}>Replay non disponible</Text>
               </View>
             )}
           </View>
@@ -659,10 +660,10 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
           <View style={[ds.datePill, { backgroundColor: accent + '12', borderColor: accent + '30' }]}>
             <Icon name="calendar" size={13} color={accent} />
             <View>
-              <Text style={{ fontSize: 12, fontWeight: '800', color: accent }}>
+              <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.extraBold, color: accent }}>
                 {formatDate(event.starts_at)}
               </Text>
-              <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 1 }}>
+              <Text style={{ fontSize: FontSize.xsPlus, color: colors.textTertiary, marginTop: 1 }}>
                 {formatTime(event.starts_at)}{event.ends_at ? ` – ${formatTime(event.ends_at)}` : ''}
               </Text>
             </View>
@@ -671,7 +672,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
             <TouchableOpacity onPress={handleRemind} disabled={remindLoading}
               style={[ds.remindBtn, { backgroundColor: reminded ? accent + '15' : colors.backgroundSecondary, borderColor: reminded ? accent : colors.border }]}>
               {remindLoading ? <ActivityIndicator size="small" color={accent} /> : <Icon name="bell" size={14} color={reminded ? accent : colors.textTertiary} />}
-              <Text style={{ fontSize: 12, fontWeight: '700', color: reminded ? accent : colors.textTertiary }}>
+              <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: reminded ? accent : colors.textTertiary }}>
                 {reminded ? 'Rappel actif' : 'Me rappeler'}
               </Text>
             </TouchableOpacity>
@@ -725,7 +726,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
           <View style={ds.section}>
             <SectionHeader label="À propos" colors={colors} />
             <ExpandableText text={event.description} maxLines={4}
-              textStyle={{ fontSize: 14, lineHeight: 22, color: colors.textSecondary }}
+              textStyle={{ fontSize: FontSize.base, lineHeight: 22, color: colors.textSecondary }}
               primaryColor={accent} />
           </View>
         ) : null}
@@ -777,18 +778,18 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Icon name="users" size={14} color={accent} />
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>
+                  <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, color: colors.textPrimary }}>
                     {event.current_attendees.toLocaleString('fr')} inscrits
                   </Text>
                 </View>
-                <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textTertiary }}>
+                <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, color: colors.textTertiary }}>
                   sur {event.max_attendees.toLocaleString('fr')} places
                 </Text>
               </View>
               <View style={{ height: 6, borderRadius: 3, backgroundColor: colors.backgroundTertiary, overflow: 'hidden' }}>
                 <View style={{ height: '100%', borderRadius: 3, width: `${capacityPct * 100}%`, backgroundColor: accent }} />
               </View>
-              <Text style={{ fontSize: 12, color: capacityPct > 0.9 ? colors.error : colors.textTertiary, fontWeight: '600' }}>
+              <Text style={{ fontSize: FontSize.sm, color: capacityPct > 0.9 ? colors.error : colors.textTertiary, fontWeight: FontWeight.semiBold }}>
                 {capacityPct >= 1 ? 'Complet' : `${Math.round((1 - capacityPct) * event.max_attendees)} place${(1 - capacityPct) * event.max_attendees > 1 ? 's' : ''} restante${(1 - capacityPct) * event.max_attendees > 1 ? 's' : ''}`}
               </Text>
             </View>
@@ -811,7 +812,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
               onPress={() => nav.navigate('Attendees' as any, { eventId, eventTitle: event.title })}
               style={[ds.ctaSecondary, { flex: 1, backgroundColor: '#10B98114' }]}>
               <Icon name="users" size={16} color="#10B981" />
-              <Text style={{ fontSize: 14, fontWeight: '700', color: '#10B981' }}>
+              <Text style={{ fontSize: FontSize.base, fontWeight: FontWeight.bold, color: '#10B981' }}>
                 Inscrits{event.current_attendees > 0 ? ` (${event.current_attendees})` : ''}
               </Text>
             </TouchableOpacity>
@@ -847,10 +848,10 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
                 <View style={{ marginLeft: 'auto' as any, alignItems: 'flex-end', gap: 1 }}>
                   <PriceWithLocal
                     amountEur={activeTier.price + Math.round(activeTier.price * FEES_RATE)}
-                    style={{ fontSize: 14, fontWeight: '900', color: '#fff' }}
+                    style={{ fontSize: FontSize.base, fontWeight: FontWeight.black, color: '#fff' }}
                     localStyle={{ color: 'rgba(255,255,255,0.65)' }}
                   />
-                  <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.65)', fontWeight: '600' }}>frais inclus</Text>
+                  <Text style={{ fontSize: FontSize['2xs'], color: 'rgba(255,255,255,0.65)', fontWeight: FontWeight.semiBold }}>frais inclus</Text>
                 </View>
               )}
             </LinearGradient>
@@ -889,7 +890,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
                 ? <ActivityIndicator size="small" color={colors.primary} />
                 : <MCIcon name={event?.comments_disabled ? 'comment-check-outline' : 'comment-off-outline'} size={22} color={colors.primary} />
               }
-              <Text style={{ fontSize: 15, fontWeight: '600', color: colors.textPrimary }}>
+              <Text style={{ fontSize: FontSize.basePlus, fontWeight: FontWeight.semiBold, color: colors.textPrimary }}>
                 {event?.comments_disabled ? 'Activer les commentaires' : 'Desactiver les commentaires'}
               </Text>
             </TouchableOpacity>
@@ -923,7 +924,7 @@ const ds = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 10,
     paddingVertical: 16, paddingHorizontal: 20, borderRadius: 16,
   },
-  ctaText: { fontSize: 16, fontWeight: '800', color: '#fff' },
+  ctaText: { fontSize: FontSize.md, fontWeight: FontWeight.extraBold, color: '#fff' },
   ctaSecondary: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 6, paddingVertical: 14, borderRadius: 14,
@@ -940,7 +941,7 @@ const ds = StyleSheet.create({
     flex: 1, flexDirection: 'row', alignItems: 'center',
     justifyContent: 'center', gap: 6, paddingVertical: 13,
   },
-  socialBtnText: { fontSize: 13, fontWeight: '600' },
+  socialBtnText: { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
   socialSep: { width: StyleSheet.hairlineWidth, height: 22 },
 
   // Section wrapper

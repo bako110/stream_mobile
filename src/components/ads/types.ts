@@ -42,6 +42,34 @@ export function adIsPhone(cta?: string): boolean {
   return !/^https?:\/\//i.test(raw) && /^[+()\d\s.-]{6,}$/.test(raw.replace(/^tel:/i, ''));
 }
 
+/**
+ * cta_url pointe vers une fiche Play Store (Android) ou App Store (iOS) —
+ * le CTA s'adapte alors automatiquement ("Installer" + icône téléchargement),
+ * comme Facebook Ads le fait pour les pubs d'installation d'app.
+ */
+export function adIsAppStore(cta?: string): boolean {
+  const raw = (cta ?? '').trim().toLowerCase();
+  if (!raw) return false;
+  return (
+    raw.includes('play.google.com/store/apps') ||
+    raw.includes('apps.apple.com') ||
+    raw.includes('itunes.apple.com')
+  );
+}
+
+/**
+ * Libellé + icône du bouton CTA — s'adapte au type de lien plutôt que de
+ * toujours afficher un texte générique : "Appeler" pour un numéro,
+ * "Installer" pour un lien de store, "En savoir plus" par défaut (ou le
+ * cta_text explicite fourni par l'annonceur, qui reste toujours prioritaire).
+ */
+export function adCtaLabel(a: Pick<AdData, 'cta_text' | 'cta_url'>): { text: string; icon: string } {
+  if (a.cta_text) return { text: a.cta_text, icon: adIsPhone(a.cta_url) ? 'phone' : adIsAppStore(a.cta_url) ? 'download' : 'arrow-right' };
+  if (adIsPhone(a.cta_url)) return { text: 'Contactez-nous', icon: 'phone' };
+  if (adIsAppStore(a.cta_url)) return { text: 'Installer', icon: 'download' };
+  return { text: 'En savoir plus', icon: 'arrow-right' };
+}
+
 /** Nom affiché de l'annonceur : le nom réel si le backend l'a fourni, sinon le domaine. */
 export function adAdvertiserLabel(a: AdData): string {
   return (a.advertiser_name ?? '').trim() || adDomain(a) || a.title;

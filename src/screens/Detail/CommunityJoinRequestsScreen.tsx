@@ -8,6 +8,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { GofolyxLoader, BackButton } from '../../components/common';
 import { communityService } from '../../services/communityService';
@@ -319,16 +320,16 @@ const styles = (colors: any) => StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  headerTitle: { fontSize: 16, fontWeight: '700' },
-  headerSub: { fontSize: 12, marginTop: 1 },
+  headerTitle: { fontSize: FontSize.md, fontWeight: FontWeight.bold },
+  headerSub: { fontSize: FontSize.sm, marginTop: 1 },
   badge: {
     minWidth: 28, height: 28, borderRadius: 14,
     alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8,
   },
-  badgeTxt: { fontSize: 13, fontWeight: '700' },
+  badgeTxt: { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 },
-  emptyTitle: { fontSize: 16, fontWeight: '700', textAlign: 'center' },
-  emptySub: { fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  emptyTitle: { fontSize: FontSize.md, fontWeight: FontWeight.bold, textAlign: 'center' },
+  emptySub: { fontSize: FontSize.smPlus, textAlign: 'center', lineHeight: 20 },
   list: { padding: 16, paddingBottom: 40 },
 
   card: {
@@ -340,29 +341,29 @@ const styles = (colors: any) => StyleSheet.create({
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatar: { width: 46, height: 46, borderRadius: 23 },
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },
-  avatarLetter: { fontSize: 18, fontWeight: '700' },
-  name: { fontSize: 15, fontWeight: '700' },
-  username: { fontSize: 12, marginTop: 1 },
-  date: { fontSize: 11, marginTop: 3 },
+  avatarLetter: { fontSize: FontSize.lg, fontWeight: FontWeight.bold },
+  name: { fontSize: FontSize.basePlus, fontWeight: FontWeight.bold },
+  username: { fontSize: FontSize.sm, marginTop: 1 },
+  date: { fontSize: FontSize.xsPlus, marginTop: 3 },
   coinPill: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
     paddingHorizontal: 8, paddingVertical: 4,
     borderRadius: 10, borderWidth: 1,
   },
-  coinText: { fontSize: 11, fontWeight: '700' },
+  coinText: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold },
   actions: { flexDirection: 'row', gap: 10 },
   btnReject: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 6, borderWidth: 1, borderRadius: 12,
     paddingVertical: 10, paddingHorizontal: 16,
   },
-  btnRejectTxt: { fontSize: 13, fontWeight: '600' },
+  btnRejectTxt: { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
   btnApprove: { borderRadius: 12, overflow: 'hidden' },
   btnApproveInner: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 6, paddingVertical: 10, paddingHorizontal: 16,
   },
-  btnApproveTxt: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  btnApproveTxt: { color: '#fff', fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
 
   // Modal
   modalRoot: { flex: 1, justifyContent: 'flex-end', alignItems: 'center' },
@@ -373,19 +374,19 @@ const styles = (colors: any) => StyleSheet.create({
   },
   modalHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   modalIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  modalTitle: { fontSize: 15, fontWeight: '800' },
-  modalSub: { fontSize: 12, marginTop: 1 },
-  fieldLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  modalTitle: { fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold },
+  modalSub: { fontSize: FontSize.sm, marginTop: 1 },
+  fieldLabel: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, letterSpacing: 0.5 },
   input: {
     borderWidth: 1, borderRadius: 12,
     padding: 12, minHeight: 72,
-    textAlignVertical: 'top', fontSize: 14,
+    textAlignVertical: 'top', fontSize: FontSize.base,
   },
-  charCount: { fontSize: 10, textAlign: 'right', marginTop: -4 },
-  modalNote: { fontSize: 12, lineHeight: 18 },
+  charCount: { fontSize: FontSize.xs, textAlign: 'right', marginTop: -4 },
+  modalNote: { fontSize: FontSize.sm, lineHeight: 18 },
   rejectBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 8, paddingVertical: 14, borderRadius: 14, marginTop: 4,
   },
-  rejectBtnTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  rejectBtnTxt: { color: '#fff', fontSize: FontSize.basePlus, fontWeight: FontWeight.bold },
 });

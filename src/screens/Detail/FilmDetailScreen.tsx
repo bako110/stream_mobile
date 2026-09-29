@@ -9,6 +9,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { BackButton, ShareBottomSheet, PriceWithLocal } from '../../components/common';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { contentService, toastService, showConfirm } from '../../services';
 import { apiClient } from '../../api/client';
@@ -44,7 +45,7 @@ const Chip: React.FC<{ icon: string; label: string; colors: any }> = ({ icon, la
 );
 const chip = StyleSheet.create({
   wrap: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: StyleSheet.hairlineWidth },
-  txt:  { fontSize: 12, fontWeight: '600' },
+  txt:  { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -63,8 +64,8 @@ const InfoLine: React.FC<{ icon: string; label: string; value: string; colors: a
 const il = StyleSheet.create({
   row:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
   iconBox: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  label:   { flex: 1, fontSize: 13, fontWeight: '500' },
-  value:   { fontSize: 13, fontWeight: '700', maxWidth: '50%', textAlign: 'right' },
+  label:   { flex: 1, fontSize: FontSize.smPlus, fontWeight: FontWeight.medium },
+  value:   { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, maxWidth: '50%', textAlign: 'right' },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -563,7 +564,7 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             <View style={[pw.balanceRow, { borderColor: colors.border }]}>
               <Icon name="credit-card" size={15} color={colors.textTertiary} />
               <Text style={[pw.balanceTxt, { color: colors.textSecondary }]}>
-                Votre solde : <Text style={{ color: walletGoGold !== null && walletGoGold >= goGoldRequired ? '#10B981' : '#EF4444', fontWeight: '700' }}>
+                Votre solde : <Text style={{ color: walletGoGold !== null && walletGoGold >= goGoldRequired ? '#10B981' : '#EF4444', fontWeight: FontWeight.bold }}>
                   {walletGoGold ?? '…'} GoGold
                 </Text>
               </Text>
@@ -627,42 +628,42 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 const s = StyleSheet.create({
   backBtn:      { position: 'absolute', left: 14, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
   premBadge:    { position: 'absolute', right: 14, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#E8501A', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
-  premText:     { color: '#fff', fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
-  premPrice:    { color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '600', marginLeft: 2 },
+  premText:     { color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, letterSpacing: 0.8 },
+  premPrice:    { color: 'rgba(255,255,255,0.85)', fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold, marginLeft: 2 },
 
   body:         { paddingHorizontal: 16 },
   headerRow:    { flexDirection: 'row', gap: 14, marginTop: 16, marginBottom: 16, alignItems: 'flex-start' },
   poster:       { width: POSTER_W, height: POSTER_H, borderRadius: 12, marginTop: -(POSTER_H * 0.45) },
-  title:        { fontSize: 22, fontWeight: '900', lineHeight: 28, letterSpacing: -0.4 },
-  originalTitle:{ fontSize: 13, fontWeight: '500', fontStyle: 'italic' },
+  title:        { fontSize: FontSize['2xl'], fontWeight: FontWeight.black, lineHeight: 28, letterSpacing: -0.4 },
+  originalTitle:{ fontSize: FontSize.smPlus, fontWeight: FontWeight.medium, fontStyle: 'italic' },
   ratingRow:    { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  ratingVal:    { fontSize: 12, fontWeight: '600', marginLeft: 4 },
-  duration:     { fontSize: 12, fontWeight: '500' },
+  ratingVal:    { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, marginLeft: 4 },
+  duration:     { fontSize: FontSize.sm, fontWeight: FontWeight.medium },
 
   chips:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
 
   cta:          { gap: 10, marginBottom: 8 },
   ctaPrimaryOuter: { borderRadius: 13, overflow: 'hidden' },
   ctaPrimary:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 15 },
-  ctaPrimaryText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  ctaPrimaryText: { color: '#fff', fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold },
   resumeBarBg:  { height: 3, borderRadius: 2, backgroundColor: 'rgba(123,63,242,0.15)', overflow: 'hidden', marginTop: -2 },
   resumeBarFill:{ height: 3, borderRadius: 2, backgroundColor: '#7B3FF2' },
   ctaRow:       { flexDirection: 'row', gap: 10 },
   ctaSecBtn:    { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth },
-  ctaSecText:   { fontSize: 13, fontWeight: '700' },
+  ctaSecText:   { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
   ctaIconBtn:   { width: 46, height: 46, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
 
   section:      { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 20, marginTop: 10, marginBottom: 6 },
-  sectionTitle: { fontSize: 16, fontWeight: '800', marginBottom: 14 },
-  synopsisText: { fontSize: 14, lineHeight: 23, fontWeight: '400' },
-  synExpand:    { fontSize: 13, fontWeight: '700' },
+  sectionTitle: { fontSize: FontSize.md, fontWeight: FontWeight.extraBold, marginBottom: 14 },
+  synopsisText: { fontSize: FontSize.base, lineHeight: 23, fontWeight: FontWeight.regular },
+  synExpand:    { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
 
   infoBlock:    { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, overflow: 'hidden' },
 
   statsRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingVertical: 16, marginBottom: 4 },
   statItem:     { flex: 1, alignItems: 'center', gap: 4 },
-  statVal:      { fontSize: 18, fontWeight: '800' },
-  statLabel:    { fontSize: 11, fontWeight: '500' },
+  statVal:      { fontSize: FontSize.lg, fontWeight: FontWeight.extraBold },
+  statLabel:    { fontSize: FontSize.xsPlus, fontWeight: FontWeight.medium },
   statDivider:  { width: StyleSheet.hairlineWidth, height: 36 },
 });
 
@@ -672,24 +673,24 @@ const pw = StyleSheet.create({
 
   header:       { alignItems: 'center', gap: 10, marginBottom: 4 },
   lockCircle:   { width: 60, height: 60, borderRadius: 30, backgroundColor: '#E8501A', alignItems: 'center', justifyContent: 'center' },
-  title:        { fontSize: 20, fontWeight: '900' },
-  subtitle:     { fontSize: 13, textAlign: 'center' },
+  title:        { fontSize: FontSize.xl, fontWeight: FontWeight.black },
+  subtitle:     { fontSize: FontSize.smPlus, textAlign: 'center' },
 
   priceRow:     { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth },
-  priceLabel:   { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 },
-  priceValue:   { fontSize: 18, fontWeight: '900' },
-  priceEur:     { fontSize: 14, fontWeight: '500' },
+  priceLabel:   { fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 },
+  priceValue:   { fontSize: FontSize.lg, fontWeight: FontWeight.black },
+  priceEur:     { fontSize: FontSize.base, fontWeight: FontWeight.medium },
 
   balanceRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },
-  balanceTxt:   { fontSize: 13, fontWeight: '500', flex: 1 },
-  balanceShort: { fontSize: 12, color: '#EF4444', fontWeight: '700' },
+  balanceTxt:   { fontSize: FontSize.smPlus, fontWeight: FontWeight.medium, flex: 1 },
+  balanceShort: { fontSize: FontSize.sm, color: '#EF4444', fontWeight: FontWeight.bold },
 
   infoRow:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  infoTxt:      { fontSize: 13 },
+  infoTxt:      { fontSize: FontSize.smPlus },
 
   btnBuy:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#E8501A', borderRadius: 14, padding: 16 },
   btnRecharge:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#7B3FF2', borderRadius: 14, padding: 16 },
-  btnTxt:       { color: '#fff', fontSize: 15, fontWeight: '800' },
+  btnTxt:       { color: '#fff', fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold },
   btnCancel:    { alignItems: 'center', paddingVertical: 10 },
-  cancelTxt:    { fontSize: 14, fontWeight: '600' },
+  cancelTxt:    { fontSize: FontSize.base, fontWeight: FontWeight.semiBold },
 });

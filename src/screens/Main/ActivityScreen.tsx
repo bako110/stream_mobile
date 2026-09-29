@@ -12,7 +12,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import { SkeletonFeed } from '../../components/common';
+import { SkeletonFeed, BackButton } from '../../components/common';
 import { activityService } from '../../services/activityService';
 import { userService } from '../../services/userService';
 import { authService } from '../../services/authService';
@@ -24,24 +24,25 @@ import type { AppColors } from '../../theme/colors';
 
 type ActivityTab = 'all' | 'foryou' | 'unread';
 
+// Une seule couleur d'accent pour tous les types d'activité (plus de dégradé
+// distinct par type) — même parti pris que le reste de l'app désaturée.
 const CFG: Record<string, {
   icon: string;
-  grad: [string, string];
   label: (name: string, summary?: string | null) => string;
   action?: string;
 }> = {
-  follow:           { icon: 'user-plus',     grad: ['#3B82F6','#60A5FA'], label: (n) => `vous suit maintenant`,      action: 'Suivre en retour' },
-  event_created:    { icon: 'calendar',      grad: ['#E0389A','#F472B6'], label: (n, s) => s || `a créé un événement` },
-  concert_created:  { icon: 'music',         grad: ['#7B3FF2','#A78BFA'], label: (n, s) => s || `a créé un concert` },
-  event_going:      { icon: 'map-pin',       grad: ['#36D9A0','#6EE7B7'], label: (n, s) => s || `va à un événement` },
-  concert_going:    { icon: 'headphones',    grad: ['#FF7A2F','#FCA5A5'], label: (n, s) => s || `va à un concert` },
-  community_joined: { icon: 'users',         grad: ['#9B65F5','#C4B5FD'], label: (n, s) => s || `a rejoint une communauté` },
-  reel_posted:      { icon: 'film',          grad: ['#E0389A','#FB7185'], label: (n, s) => s || `a posté un reel` },
-  comment:          { icon: 'message-circle',grad: ['#3B82F6','#93C5FD'], label: (n, s) => s || `a commenté votre contenu` },
-  reaction:         { icon: 'heart',         grad: ['#EF4444','#FCA5A5'], label: (n, s) => s || `a réagi à votre contenu` },
-  story_view:       { icon: 'eye',           grad: ['#F59E0B','#FCD34D'], label: (n) => `a vu votre story` },
-  mention:          { icon: 'at-sign',       grad: ['#06B6D4','#67E8F9'], label: (n, s) => s || `vous a mentionné` },
-  birthday:         { icon: 'gift',          grad: ['#EC4899','#F9A8D4'], label: (n) => `fête son anniversaire aujourd'hui 🎂` },
+  follow:           { icon: 'user-plus',     label: (n) => `vous suit maintenant`,      action: 'Suivre en retour' },
+  event_created:    { icon: 'calendar',      label: (n, s) => s || `a créé un événement` },
+  concert_created:  { icon: 'music',         label: (n, s) => s || `a créé un concert` },
+  event_going:      { icon: 'map-pin',       label: (n, s) => s || `va à un événement` },
+  concert_going:    { icon: 'headphones',    label: (n, s) => s || `va à un concert` },
+  community_joined: { icon: 'users',         label: (n, s) => s || `a rejoint une communauté` },
+  reel_posted:      { icon: 'film',          label: (n, s) => s || `a posté un reel` },
+  comment:          { icon: 'message-circle',label: (n, s) => s || `a commenté votre contenu` },
+  reaction:         { icon: 'heart',         label: (n, s) => s || `a réagi à votre contenu` },
+  story_view:       { icon: 'eye',           label: (n) => `a vu votre story` },
+  mention:          { icon: 'at-sign',       label: (n, s) => s || `vous a mentionné` },
+  birthday:         { icon: 'gift',          label: (n) => `fête son anniversaire aujourd'hui 🎂` },
 };
 
 const NAVIGABLE = ['concert_created','concert_going','event_created','event_going','community_joined','reel_posted'];
@@ -177,6 +178,7 @@ export const ActivityScreen: React.FC = () => {
         colors={[colors.surface, colors.background]}
         style={[s.header, { paddingTop: insets.top + 12 }]}
       >
+        <BackButton onPress={() => nav.goBack()} />
         <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Activité</Text>
         {unreadCount > 0 && (
           <View style={[s.unreadBadge, { backgroundColor: colors.primary }]}>
@@ -306,14 +308,14 @@ const ActivityCard: React.FC<CardProps> = ({
         {item.actor?.avatar_url ? (
           <Image source={{ uri: item.actor.avatar_url }} style={s.avatar} />
         ) : (
-          <LinearGradient colors={cfg.grad} style={s.avatarFallback}>
+          <View style={[s.avatarFallback, { backgroundColor: colors.primary }]}>
             <Text style={s.avatarInitial}>{actorName[0].toUpperCase()}</Text>
-          </LinearGradient>
+          </View>
         )}
         {/* Badge icône type */}
-        <LinearGradient colors={cfg.grad} style={s.typeBadge}>
+        <View style={[s.typeBadge, { backgroundColor: colors.primary }]}>
           <Icon name={cfg.icon} size={10} color="#fff" />
-        </LinearGradient>
+        </View>
       </TouchableOpacity>
 
       {/* Texte */}

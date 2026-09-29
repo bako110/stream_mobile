@@ -228,11 +228,18 @@ export const AdminVerificationScreen: React.FC = () => {
       <Modal
         visible={!!actionItem}
         transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => !acting && setActionItem(null)}
+        statusBarTranslucent
       >
         <View style={s.modalOverlay}>
-          <View style={[s.modalBox, { backgroundColor: colors.surface }]}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => !acting && setActionItem(null)}
+          />
+          <View style={[s.modalBox, { backgroundColor: colors.surface, paddingBottom: 24 + insets.bottom }]}>
+            <View style={[s.modalHandle, { backgroundColor: colors.divider }]} />
             <Text style={[s.modalTitle, { color: colors.textPrimary }]}>
               {actionType === 'approve' ? 'Approuver la demande' : 'Refuser la demande'}
             </Text>
@@ -336,12 +343,15 @@ headerTitle: { fontSize: 16, fontWeight: '800', flex: 1, textAlign: 'center' },
 
   emptyText: { marginTop: 12, fontSize: 14 },
 
-  // Modal
+  // Modal (bottom sheet)
   modalOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.6)',
-    alignItems: 'center', justifyContent: 'center', padding: 24,
+    flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)',
   },
-  modalBox: { width: '100%', borderRadius: 20, padding: 24, gap: 12 },
+  modalBox: {
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: 24, paddingTop: 10, gap: 12,
+  },
+  modalHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 14 },
   modalTitle: { fontSize: 17, fontWeight: '800', textAlign: 'center' },
   modalSub: { fontSize: 13, textAlign: 'center', marginTop: -4 },
   noteInput: {

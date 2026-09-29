@@ -14,6 +14,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontSize, FontWeight } from '../../theme';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 const PETALS = ['🌸', '🌼', '✨', '🌟', '🎉'];
@@ -80,15 +82,18 @@ function useAutoClose(active: boolean, onClose: () => void) {
 
 export const MatchResultModal: React.FC<{ result: MatchResultData | null; onClose: () => void }> = ({ result, onClose }) => {
   useAutoClose(!!result, onClose);
+  const insets = useSafeAreaInsets();
 
   if (!result) return null;
 
   if (result.isDraw) {
     return (
-      <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-        <Animated.View entering={FadeIn.duration(300)} style={s.endedOverlay}>
+      <Modal visible transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+        <View style={s.endedOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
           <Animated.View entering={BounceIn.duration(700).delay(150)}>
-            <LinearGradient colors={['#7B3FF2', '#4C1D95']} style={s.endedCard}>
+            <LinearGradient colors={['#7B3FF2', '#4C1D95']} style={[s.endedCard, { paddingBottom: 28 + insets.bottom }]}>
+              <View style={s.handle} />
               <Animated.View entering={ZoomIn.duration(500).delay(400)}>
                 <Icon name="award" size={48} color="#FFD700" />
               </Animated.View>
@@ -100,17 +105,19 @@ export const MatchResultModal: React.FC<{ result: MatchResultData | null; onClos
               </TouchableOpacity>
             </LinearGradient>
           </Animated.View>
-        </Animated.View>
+        </View>
       </Modal>
     );
   }
 
   if (result.viewerRole === 'lost') {
     return (
-      <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-        <Animated.View entering={FadeIn.duration(300)} style={s.endedOverlay}>
+      <Modal visible transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+        <View style={s.endedOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
           <Animated.View entering={FadeIn.duration(700).delay(150)}>
-            <LinearGradient colors={['#3A3F52', '#20232F']} style={s.comfortCard}>
+            <LinearGradient colors={['#3A3F52', '#20232F']} style={[s.comfortCard, { paddingBottom: 26 + insets.bottom }]}>
+              <View style={s.handle} />
               <Animated.View entering={ZoomIn.duration(500).delay(300)}>
                 <Text style={s.comfortEmoji}>💙</Text>
               </Animated.View>
@@ -136,15 +143,16 @@ export const MatchResultModal: React.FC<{ result: MatchResultData | null; onClos
               </TouchableOpacity>
             </LinearGradient>
           </Animated.View>
-        </Animated.View>
+        </View>
       </Modal>
     );
   }
 
   // Champion — vainqueur ET spectateurs voient ce même écran doré à pétales
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <Animated.View entering={FadeIn.duration(300)} style={s.endedOverlay}>
+    <Modal visible transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+      <View style={s.endedOverlay}>
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
         {Array.from({ length: 18 }).map((_, i) => (
           <FallingPetal
             key={i}
@@ -156,7 +164,8 @@ export const MatchResultModal: React.FC<{ result: MatchResultData | null; onClos
         ))}
         <Animated.View entering={BounceIn.duration(800).delay(150)}>
           <LinearGradient colors={['#FFD700', '#FFA000', '#B8860B']} style={s.championCard}>
-            <View style={s.championInnerBorder}>
+            <View style={[s.championInnerBorder, { paddingBottom: 30 + insets.bottom }]}>
+              <View style={s.handle} />
               <Animated.View entering={ZoomIn.duration(600).delay(400)}>
                 <Text style={s.championCrown}>👑</Text>
               </Animated.View>
@@ -198,48 +207,49 @@ export const MatchResultModal: React.FC<{ result: MatchResultData | null; onClos
             </View>
           </LinearGradient>
         </Animated.View>
-      </Animated.View>
+      </View>
     </Modal>
   );
 };
 
 const s = StyleSheet.create({
-  endedOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center', zIndex: 70 },
-  endedCard: { width: '80%', borderRadius: 28, padding: 28, alignItems: 'center', gap: 12 },
-  endedTitle: { color: '#fff', fontSize: 20, fontWeight: '800' },
-  endedScore: { color: 'rgba(255,255,255,0.9)', fontSize: 28, fontWeight: '900' },
+  endedOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.75)', zIndex: 70 },
+  handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 14, backgroundColor: 'rgba(255,255,255,0.4)' },
+  endedCard: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12, paddingHorizontal: 28, alignItems: 'center', gap: 12 },
+  endedTitle: { color: '#fff', fontSize: FontSize.xl, fontWeight: FontWeight.extraBold },
+  endedScore: { color: 'rgba(255,255,255,0.9)', fontSize: FontSize['3xl'], fontWeight: FontWeight.black },
   endedBtn: { marginTop: 8, backgroundColor: '#fff', borderRadius: 20, paddingVertical: 12, paddingHorizontal: 28 },
-  endedBtnText: { color: '#4C1D95', fontSize: 14, fontWeight: '800' },
+  endedBtnText: { color: '#4C1D95', fontSize: FontSize.base, fontWeight: FontWeight.extraBold },
 
-  comfortCard: { width: '84%', borderRadius: 28, padding: 26, alignItems: 'center', gap: 10 },
-  comfortEmoji: { fontSize: 40, marginBottom: 2 },
-  comfortTitle: { color: '#fff', fontSize: 18, fontWeight: '800', textAlign: 'center' },
-  comfortSubtitle: { color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '500', textAlign: 'center', lineHeight: 19 },
-  comfortScore: { color: 'rgba(255,255,255,0.85)', fontSize: 24, fontWeight: '900', marginTop: 4 },
+  comfortCard: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12, paddingHorizontal: 26, alignItems: 'center', gap: 10 },
+  comfortEmoji: { fontSize: FontSize['5xl'], marginBottom: 2 },
+  comfortTitle: { color: '#fff', fontSize: FontSize.lg, fontWeight: FontWeight.extraBold, textAlign: 'center' },
+  comfortSubtitle: { color: 'rgba(255,255,255,0.7)', fontSize: FontSize.smPlus, fontWeight: FontWeight.medium, textAlign: 'center', lineHeight: 19 },
+  comfortScore: { color: 'rgba(255,255,255,0.85)', fontSize: FontSize['2xl'], fontWeight: FontWeight.black, marginTop: 4 },
   comfortEncourageBox: {
     flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(155,101,245,0.15)',
     borderRadius: 14, paddingVertical: 10, paddingHorizontal: 14, marginTop: 6,
     borderWidth: 1, borderColor: 'rgba(155,101,245,0.3)',
   },
-  comfortEncourageText: { color: '#C4A8FA', fontSize: 12, fontWeight: '700', flexShrink: 1 },
+  comfortEncourageText: { color: '#C4A8FA', fontSize: FontSize.sm, fontWeight: FontWeight.bold, flexShrink: 1 },
   comfortPenaltyBox: {
     flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(240,54,90,0.12)',
     borderRadius: 12, paddingVertical: 8, paddingHorizontal: 12, marginTop: 2,
     borderWidth: 1, borderColor: 'rgba(240,54,90,0.3)',
   },
-  comfortPenaltyText: { color: '#F0365A', fontSize: 11, fontWeight: '700', flexShrink: 1 },
+  comfortPenaltyText: { color: '#F0365A', fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, flexShrink: 1 },
   comfortBtn: { marginTop: 10, backgroundColor: '#fff', borderRadius: 20, paddingVertical: 12, paddingHorizontal: 28 },
-  comfortBtnText: { color: '#3A3F52', fontSize: 14, fontWeight: '800' },
+  comfortBtnText: { color: '#3A3F52', fontSize: FontSize.base, fontWeight: FontWeight.extraBold },
 
-  fallingPetal: { position: 'absolute', top: -20, fontSize: 22, zIndex: 71 },
-  championCard: { width: '86%', borderRadius: 32, padding: 4 },
+  fallingPetal: { position: 'absolute', top: -20, fontSize: FontSize['2xl'], zIndex: 71 },
+  championCard: { borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 4 },
   championInnerBorder: {
-    borderRadius: 28, paddingVertical: 30, paddingHorizontal: 24, alignItems: 'center', gap: 10,
-    backgroundColor: 'rgba(20,14,4,0.55)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.35)',
+    borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 22, paddingHorizontal: 24, alignItems: 'center', gap: 10,
+    backgroundColor: 'rgba(20,14,4,0.55)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.35)', borderBottomWidth: 0,
   },
-  championCrown: { fontSize: 40, marginBottom: 2 },
+  championCrown: { fontSize: FontSize['5xl'], marginBottom: 2 },
   championTitle: {
-    color: '#fff', fontSize: 15, fontWeight: '900', letterSpacing: 1.5, textAlign: 'center',
+    color: '#fff', fontSize: FontSize.basePlus, fontWeight: FontWeight.black, letterSpacing: 1.5, textAlign: 'center',
     textShadowColor: 'rgba(0,0,0,0.4)', textShadowRadius: 4, textShadowOffset: { width: 0, height: 1 },
   },
   championAvatarWrap: { marginTop: 8, position: 'relative' },
@@ -249,19 +259,19 @@ const s = StyleSheet.create({
   },
   championAvatarFallback: { backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
   championCrownOnAvatar: { position: 'absolute', top: -22, alignSelf: 'center', fontSize: 30 },
-  championName: { color: '#fff', fontSize: 20, fontWeight: '900', marginTop: 4 },
+  championName: { color: '#fff', fontSize: FontSize.xl, fontWeight: FontWeight.black, marginTop: 4 },
   championGogoldRow: {
     flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.3)',
     borderRadius: 16, paddingHorizontal: 16, paddingVertical: 8, marginTop: 4,
   },
-  championGogoldEmoji: { fontSize: 16 },
-  championGogoldText: { color: '#FFD700', fontSize: 16, fontWeight: '900' },
+  championGogoldEmoji: { fontSize: FontSize.md },
+  championGogoldText: { color: '#FFD700', fontSize: FontSize.md, fontWeight: FontWeight.black },
   championBonusBox: {
     flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.3)',
     borderRadius: 12, paddingVertical: 7, paddingHorizontal: 12, marginTop: 2, maxWidth: '90%',
   },
-  championBonusText: { color: '#fff', fontSize: 11, fontWeight: '700', flexShrink: 1, textAlign: 'center' },
-  championScore: { color: 'rgba(255,255,255,0.85)', fontSize: 16, fontWeight: '700', marginTop: 4 },
+  championBonusText: { color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, flexShrink: 1, textAlign: 'center' },
+  championScore: { color: 'rgba(255,255,255,0.85)', fontSize: FontSize.md, fontWeight: FontWeight.bold, marginTop: 4 },
   championBtn: { marginTop: 10, backgroundColor: '#fff', borderRadius: 20, paddingVertical: 12, paddingHorizontal: 32 },
-  championBtnText: { color: '#B8860B', fontSize: 14, fontWeight: '900' },
+  championBtnText: { color: '#B8860B', fontSize: FontSize.base, fontWeight: FontWeight.black },
 });

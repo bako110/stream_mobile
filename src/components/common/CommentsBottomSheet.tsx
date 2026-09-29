@@ -7,6 +7,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { storage } from '../../utils/storage';
@@ -109,7 +110,7 @@ const Avatar: React.FC<{ author: Comment['author']; size?: number; color: string
       width: size, height: size, borderRadius: r,
       backgroundColor: color, alignItems: 'center', justifyContent: 'center', flexShrink: 0,
     }}>
-      <Text style={{ color: '#fff', fontWeight: '700', fontSize: size * 0.38 }}>
+      <Text style={{ color: '#fff', fontWeight: FontWeight.bold, fontSize: size * 0.38 }}>
         {name[0]?.toUpperCase() ?? '?'}
       </Text>
     </View>
@@ -876,10 +877,10 @@ const st = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 13,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  headerTitle: { fontSize: 15, fontWeight: '700' },
+  headerTitle: { fontSize: FontSize.basePlus, fontWeight: FontWeight.bold },
   center:      { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
-  emptyTitle:    { fontSize: 15, fontWeight: '700', marginTop: 4 },
-  emptySubtitle: { fontSize: 13 },
+  emptyTitle:    { fontSize: FontSize.basePlus, fontWeight: FontWeight.bold, marginTop: 4 },
+  emptySubtitle: { fontSize: FontSize.smPlus },
 
   listArea:    { flex: 1 },
   bottomArea:  { borderTopWidth: StyleSheet.hairlineWidth },
@@ -895,27 +896,27 @@ const st = StyleSheet.create({
     position: 'absolute', left: -24, top: 0, bottom: 0, width: 1.5,
   },
   rowHeader:      { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
-  authorName:     { fontSize: 13, fontWeight: '700', flexShrink: 1 },
-  timeText:       { fontSize: 11, flexShrink: 0 },
-  commentText:    { fontSize: 14, lineHeight: 20 },
-  editedTag:      { fontSize: 11, fontStyle: 'italic', marginTop: 2 },
+  authorName:     { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, flexShrink: 1 },
+  timeText:       { fontSize: FontSize.xsPlus, flexShrink: 0 },
+  commentText:    { fontSize: FontSize.base, lineHeight: 20 },
+  editedTag:      { fontSize: FontSize.xsPlus, fontStyle: 'italic', marginTop: 2 },
   ownerBadge:     { paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5 },
-  ownerBadgeText: { fontSize: 10, fontWeight: '700' },
+  ownerBadgeText: { fontSize: FontSize.xs, fontWeight: FontWeight.bold },
 
   separator: { height: StyleSheet.hairlineWidth, marginLeft: 48 },
 
   // Actions
   actions: { flexDirection: 'row', alignItems: 'center', gap: 20, marginTop: 10 },
   likeBtn:    { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  likeCount:  { fontSize: 14, fontWeight: '700' },
+  likeCount:  { fontSize: FontSize.base, fontWeight: FontWeight.bold },
   replyBtn:     { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  replyBtnText: { fontSize: 13, fontWeight: '600' },
+  replyBtnText: { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
   replyCountBtn:  { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  replyCountText: { fontSize: 13, fontWeight: '700' },
+  replyCountText: { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
 
   toggleReplies: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 6 },
   toggleLine:    { width: 28, height: 1.5 },
-  toggleText:    { fontSize: 13, fontWeight: '700' },
+  toggleText:    { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
 
   // Banniere contexte
   contextBanner: {
@@ -924,7 +925,7 @@ const st = StyleSheet.create({
     borderTopWidth: 1,
   },
   contextAccent: { width: 3, height: 20, borderRadius: 2 },
-  contextText:   { flex: 1, fontSize: 12, fontWeight: '600' },
+  contextText:   { flex: 1, fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
 
   // Input
   inputRow: {
@@ -938,7 +939,7 @@ const st = StyleSheet.create({
     minHeight: 44,
   },
   input: {
-    flex: 1, fontSize: 15, lineHeight: 20,
+    flex: 1, fontSize: FontSize.basePlus, lineHeight: 20,
     maxHeight: 100, paddingVertical: 0,
   },
   sendBtn: {
@@ -951,7 +952,7 @@ const st = StyleSheet.create({
     paddingVertical: 14, marginVertical: 8,
     borderRadius: 12, borderWidth: StyleSheet.hairlineWidth,
   },
-  loadMoreText: { fontSize: 13, fontWeight: '700' },
+  loadMoreText: { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
 
   // Commentaires desactives
   disabledBar: {
@@ -959,5 +960,5 @@ const st = StyleSheet.create({
     gap: 8, paddingVertical: 14,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  disabledText: { fontSize: 13, fontWeight: '500' },
+  disabledText: { fontSize: FontSize.smPlus, fontWeight: FontWeight.medium },
 });

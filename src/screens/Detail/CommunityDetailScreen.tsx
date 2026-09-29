@@ -15,6 +15,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { communityService } from '../../services/communityService';
 import { authService } from '../../services/authService';
@@ -711,7 +712,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
     return (
       <View style={[s.root, { backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }]}>
         <Icon name="alert-circle" size={40} color={colors.textTertiary} />
-        <Text style={[{ color: colors.textTertiary, marginTop: 12, fontSize: 15 }]}>
+        <Text style={[{ color: colors.textTertiary, marginTop: 12, fontSize: FontSize.basePlus }]}>
           Communauté introuvable
         </Text>
       </View>
@@ -754,7 +755,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
             )}
             <View style={s.editCamBadge}>
               <Icon name="camera" size={12} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>Bannière</Text>
+              <Text style={{ color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.semiBold }}>Bannière</Text>
             </View>
           </View>
         </TouchableOpacity>
@@ -791,7 +792,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
               maxLength={60}
             />
           </View>
-          <Text style={[{ fontSize: 10, color: colors.textTertiary, textAlign: 'right', marginTop: 3 }]}>
+          <Text style={[{ fontSize: FontSize.xs, color: colors.textTertiary, textAlign: 'right', marginTop: 3 }]}>
             {editName.length}/60
           </Text>
         </View>
@@ -814,7 +815,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
               maxLength={300}
             />
           </View>
-          <Text style={[{ fontSize: 10, color: colors.textTertiary, textAlign: 'right', marginTop: 3 }]}>
+          <Text style={[{ fontSize: FontSize.xs, color: colors.textTertiary, textAlign: 'right', marginTop: 3 }]}>
             {editDesc.length}/300
           </Text>
         </View>
@@ -854,7 +855,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                   size={14}
                   color={(community as any).tier === 'elite' ? colors.warning : '#7B3FF2'}
                 />
-                <Text style={[s.infoSummaryTxt, { color: (community as any).tier === 'elite' ? colors.warning : '#7B3FF2', fontWeight: '700' }]}>
+                <Text style={[s.infoSummaryTxt, { color: (community as any).tier === 'elite' ? colors.warning : '#7B3FF2', fontWeight: FontWeight.bold }]}>
                   {(community as any).tier === 'elite' ? 'Elite' : 'Pro'}
                 </Text>
               </View>
@@ -880,8 +881,8 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
               style={{ flex: 1, backgroundColor: '#7B3FF222', borderWidth: 1.5, borderColor: '#7B3FF2', borderRadius: 12, paddingVertical: 10, alignItems: 'center', gap: 4 }}
             >
               <Icon name="award" size={15} color="#7B3FF2" />
-              <Text style={{ color: '#7B3FF2', fontWeight: '800', fontSize: 12 }}>PRO</Text>
-              <PriceWithLocal amountEur={9.99} suffix="/mois" style={{ color: '#7B3FF2', fontSize: 10, opacity: 0.8 }} />
+              <Text style={{ color: '#7B3FF2', fontWeight: FontWeight.extraBold, fontSize: FontSize.sm }}>PRO</Text>
+              <PriceWithLocal amountEur={9.99} suffix="/mois" style={{ color: '#7B3FF2', fontSize: FontSize.xs, opacity: 0.8 }} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => handleUpgradeTier('elite')}
@@ -889,8 +890,8 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
               style={{ flex: 1, backgroundColor: '#F59E0B22', borderWidth: 1.5, borderColor: colors.warning, borderRadius: 12, paddingVertical: 10, alignItems: 'center', gap: 4 }}
             >
               <Icon name="star" size={15} color="#F59E0B" />
-              <Text style={{ color: '#FF7A2F', fontWeight: '800', fontSize: 12 }}>ELITE</Text>
-              <PriceWithLocal amountEur={24.99} suffix="/mois" style={{ color: colors.warning, fontSize: 10, opacity: 0.8 }} />
+              <Text style={{ color: '#FF7A2F', fontWeight: FontWeight.extraBold, fontSize: FontSize.sm }}>ELITE</Text>
+              <PriceWithLocal amountEur={24.99} suffix="/mois" style={{ color: colors.warning, fontSize: FontSize.xs, opacity: 0.8 }} />
             </TouchableOpacity>
           </View>
         )}
@@ -938,7 +939,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                     alignItems: 'center',
                     justifyContent: 'center',
                   }]}>
-                    <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 15 }}>
+                    <Text style={{ color: colors.primary, fontWeight: FontWeight.bold, fontSize: FontSize.basePlus }}>
                       {(member.display_name || member.username || '?')[0].toUpperCase()}
                     </Text>
                   </View>
@@ -1031,7 +1032,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                 </Text>
               </View>
               <View style={[s.blockedCountBadge, { backgroundColor: blockedMembers.length > 0 ? '#EF444420' : colors.backgroundSecondary }]}>
-                <Text style={{ fontSize: 11, fontWeight: '800', color: blockedMembers.length > 0 ? colors.error : colors.textTertiary }}>
+                <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, color: blockedMembers.length > 0 ? colors.error : colors.textTertiary }}>
                   {blockedMembers.length}
                 </Text>
               </View>
@@ -1054,7 +1055,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                     alignItems: 'center',
                     justifyContent: 'center',
                   }]}>
-                    <Text style={{ color: '#F0365A', fontWeight: '700' }}>
+                    <Text style={{ color: '#F0365A', fontWeight: FontWeight.bold }}>
                       {(b.display_name || b.username || '?')[0].toUpperCase()}
                     </Text>
                   </View>
@@ -1170,7 +1171,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
               <Text style={[s.secLabel, { color: colors.textPrimary }]}>Chat admins seulement</Text>
               {editMembersOnly && (
                 <View style={{ backgroundColor: '#7B3FF2', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 }}>
-                  <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>ACTIF</Text>
+                  <Text style={{ color: '#fff', fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold }}>ACTIF</Text>
                 </View>
               )}
             </View>
@@ -2001,7 +2002,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                 alignItems: 'center',
                 justifyContent: 'center',
               }]}>
-                <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 14 }}>
+                <Text style={{ color: colors.primary, fontWeight: FontWeight.bold, fontSize: FontSize.base }}>
                   {(item.display_name || item.username || '?')[0].toUpperCase()}
                 </Text>
               </View>
@@ -2014,12 +2015,12 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
             </View>
             {item.role === 'admin' && (
               <View style={[s.rolePill, { backgroundColor: '#36D9A022' }]}>
-                <Text style={{ color: colors.success, fontSize: 10, fontWeight: '700' }}>ADMIN</Text>
+                <Text style={{ color: colors.success, fontSize: FontSize.xs, fontWeight: FontWeight.bold }}>ADMIN</Text>
               </View>
             )}
             {item.role === 'moderator' && (
               <View style={[s.rolePill, { backgroundColor: '#3B82F622' }]}>
-                <Text style={{ color: colors.info, fontSize: 10, fontWeight: '700' }}>MOD</Text>
+                <Text style={{ color: colors.info, fontSize: FontSize.xs, fontWeight: FontWeight.bold }}>MOD</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -2085,10 +2086,10 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                   <Icon name="shield" size={18} color="#1D9BF0" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[{ fontSize: 15, fontWeight: '800', color: colors.textPrimary }]}>
+                  <Text style={[{ fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold, color: colors.textPrimary }]}>
                     Demander la vérification
                   </Text>
-                  <Text style={[{ fontSize: 12, color: colors.textTertiary, marginTop: 1 }]}>
+                  <Text style={[{ fontSize: FontSize.sm, color: colors.textTertiary, marginTop: 1 }]}>
                     {community.name}
                   </Text>
                 </View>
@@ -2118,7 +2119,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                 maxLength={300}
                 autoFocus
               />
-              <Text style={[{ fontSize: 10, color: colors.textTertiary, textAlign: 'right', marginTop: 4 }]}>
+              <Text style={[{ fontSize: FontSize.xs, color: colors.textTertiary, textAlign: 'right', marginTop: 4 }]}>
                 {vrReason.length}/300
               </Text>
 
@@ -2150,7 +2151,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                       )}
                       <Text style={[s.vrPlanLabel, { color: selected ? '#1D9BF0' : colors.textPrimary }]}>{info.label}</Text>
                       <Text style={[s.vrPlanPrice, { color: colors.textPrimary }]}>{info.priceEur.toFixed(2)} €</Text>
-                      <Text style={{ fontSize: 10, color: colors.textTertiary }}>{perMonth.toFixed(2)} €/mois</Text>
+                      <Text style={{ fontSize: FontSize.xs, color: colors.textTertiary }}>{perMonth.toFixed(2)} €/mois</Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -2165,32 +2166,32 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                 return (
                   <View style={[s.vrFeeBox, { borderColor: canAfford ? '#1D9BF040' : '#EF444440', backgroundColor: canAfford ? '#1D9BF008' : '#EF444408' }]}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: canAfford ? colors.info : colors.error }}>
+                      <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: canAfford ? colors.info : colors.error }}>
                         Frais de vérification
                       </Text>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                         <Icon name="zap" size={13} color="#F59E0B" />
-                        <Text style={{ fontSize: 14, fontWeight: '800', color: colors.warning }}>500 GoGold</Text>
+                        <Text style={{ fontSize: FontSize.base, fontWeight: FontWeight.extraBold, color: colors.warning }}>500 GoGold</Text>
                       </View>
                     </View>
                     {hasGoGold && (
                       <View style={{ gap: 3 }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                          <Text style={{ fontSize: 11, color: colors.textTertiary }}>Votre solde</Text>
-                          <Text style={{ fontSize: 11, color: colors.textSecondary, fontWeight: '600' }}>{myGoGold} GoGold</Text>
+                          <Text style={{ fontSize: FontSize.xsPlus, color: colors.textTertiary }}>Votre solde</Text>
+                          <Text style={{ fontSize: FontSize.xsPlus, color: colors.textSecondary, fontWeight: FontWeight.semiBold }}>{myGoGold} GoGold</Text>
                         </View>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                          <Text style={{ fontSize: 11, color: colors.textTertiary }}>Solde après</Text>
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: canAfford ? colors.success : colors.error }}>
+                          <Text style={{ fontSize: FontSize.xsPlus, color: colors.textTertiary }}>Solde après</Text>
+                          <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, color: canAfford ? colors.success : colors.error }}>
                             {afterBalance} GoGold
                           </Text>
                         </View>
                       </View>
                     )}
-                    <Text style={{ fontSize: 10, color: colors.success, marginTop: 6 }}>
+                    <Text style={{ fontSize: FontSize.xs, color: colors.success, marginTop: 6 }}>
                       Remboursement automatique si la demande est refusée
                     </Text>
-                    <Text style={{ fontSize: 10, color: colors.textTertiary, marginTop: 4 }}>
+                    <Text style={{ fontSize: FontSize.xs, color: colors.textTertiary, marginTop: 4 }}>
                       Une fois approuvée, l'abonnement {BADGE_PLAN_INFO[vrPlan].label.toLowerCase()} ({BADGE_PLAN_INFO[vrPlan].priceEur.toFixed(2)} €) démarre et se renouvelle automatiquement tous les {BADGE_PLAN_INFO[vrPlan].months} mois — débité de ton wallet en tant qu'admin.
                     </Text>
                   </View>
@@ -2272,7 +2273,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                   {saving ? (
                     <ActivityIndicator size="small" color={colors.primary} />
                   ) : (
-                    <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 14 }}>
+                    <Text style={{ color: colors.primary, fontWeight: FontWeight.bold, fontSize: FontSize.base }}>
                       Enregistrer
                     </Text>
                   )}
@@ -2341,7 +2342,7 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
   },
   headerIcon: { width: 44, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { flex: 1, fontSize: 18, fontWeight: '700', textAlign: 'center' },
+  headerTitle: { flex: 1, fontSize: FontSize.lg, fontWeight: FontWeight.bold, textAlign: 'center' },
 
   // Bannière + avatar
   bannerArea: { position: 'relative', marginBottom: 44 },
@@ -2392,8 +2393,8 @@ const s = StyleSheet.create({
 
   // Infos
   infoBlock: { paddingHorizontal: 16, paddingTop: 6 },
-  communityName: { fontSize: 24, fontWeight: '800', textAlign: 'center', letterSpacing: -0.5 },
-  communityDesc: { fontSize: 13, lineHeight: 19, marginTop: 6, textAlign: 'center' },
+  communityName: { fontSize: FontSize['2xl'], fontWeight: FontWeight.extraBold, textAlign: 'center', letterSpacing: -0.5 },
+  communityDesc: { fontSize: FontSize.smPlus, lineHeight: 19, marginTop: 6, textAlign: 'center' },
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2402,7 +2403,7 @@ const s = StyleSheet.create({
     marginTop: 14,
     flexWrap: 'wrap',
   },
-  statItem: { fontSize: 13, fontWeight: '500' },
+  statItem: { fontSize: FontSize.smPlus, fontWeight: FontWeight.medium },
   statSep: { width: 1, height: 14 },
   activeDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#36D9A0' },
 
@@ -2416,7 +2417,7 @@ const s = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 20,
   },
-  roleChipText: { fontSize: 12, fontWeight: '700' },
+  roleChipText: { fontSize: FontSize.sm, fontWeight: FontWeight.bold },
 
   // Boutons action
   actionsRow: { flexDirection: 'row', gap: 10, marginTop: 18, marginBottom: 10 },
@@ -2429,7 +2430,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 18,
     borderRadius: 14,
   },
-  actionTxt: { fontWeight: '700', fontSize: 14 },
+  actionTxt: { fontWeight: FontWeight.bold, fontSize: FontSize.base },
 
   coinPill: {
     flexDirection: 'row',
@@ -2440,7 +2441,7 @@ const s = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 7,
   },
-  coinPillTxt: { color: '#FF7A2F', fontWeight: '800', fontSize: 11 },
+  coinPillTxt: { color: '#FF7A2F', fontWeight: FontWeight.extraBold, fontSize: FontSize.xsPlus },
 
   // Wallet bar
   walletBar: {
@@ -2453,14 +2454,14 @@ const s = StyleSheet.create({
     marginBottom: 8,
     gap: 10,
   },
-  walletTitle: { fontSize: 13, fontWeight: '700' },
-  walletSub: { fontSize: 11, marginTop: 2 },
+  walletTitle: { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
+  walletSub: { fontSize: FontSize.xsPlus, marginTop: 2 },
   rechargeBtn: { backgroundColor: '#EF444420', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
-  rechargeTxt: { color: '#F0365A', fontWeight: '700', fontSize: 12 },
+  rechargeTxt: { color: '#F0365A', fontWeight: FontWeight.bold, fontSize: FontSize.sm },
 
   // Info bar
   infoBar: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, paddingVertical: 6, marginBottom: 4 },
-  infoBarTxt: { flex: 1, fontSize: 12, lineHeight: 17 },
+  infoBarTxt: { flex: 1, fontSize: FontSize.sm, lineHeight: 17 },
 
   // VR buttons
   vrBtn: {
@@ -2473,7 +2474,7 @@ const s = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 10,
   },
-  vrBtnTxt: { fontSize: 13, fontWeight: '600' },
+  vrBtnTxt: { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
 
   // Locked content placeholder
   lockedBox: {
@@ -2487,12 +2488,12 @@ const s = StyleSheet.create({
     gap: 10,
   },
   lockedTitle: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: FontSize.basePlus,
+    fontWeight: FontWeight.bold,
     textAlign: 'center',
   },
   lockedSub: {
-    fontSize: 13,
+    fontSize: FontSize.smPlus,
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -2502,7 +2503,7 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 5,
   },
-  pendingBadgeTxt: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  pendingBadgeTxt: { color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold },
 
   // Nav grid 2 colonnes
   navGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 18 },
@@ -2523,7 +2524,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  navLabel: { flex: 1, fontSize: 13, fontWeight: '600' },
+  navLabel: { flex: 1, fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
 
   // Section membres
   membersSectionHeader: {
@@ -2533,8 +2534,8 @@ const s = StyleSheet.create({
     marginTop: 24,
     marginBottom: 2,
   },
-  sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 1 },
-  seeAll: { fontSize: 13, fontWeight: '600' },
+  sectionTitle: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, letterSpacing: 1 },
+  seeAll: { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
 
   memberRow: {
     flexDirection: 'row',
@@ -2545,8 +2546,8 @@ const s = StyleSheet.create({
     gap: 12,
   },
   memberAvatarSm: { width: 42, height: 42, borderRadius: 21 },
-  memberName: { fontSize: 14, fontWeight: '600' },
-  memberSub: { fontSize: 12, marginTop: 1 },
+  memberName: { fontSize: FontSize.base, fontWeight: FontWeight.semiBold },
+  memberSub: { fontSize: FontSize.sm, marginTop: 1 },
   rolePill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
 
   seeAllRow: {
@@ -2557,7 +2558,7 @@ const s = StyleSheet.create({
     paddingVertical: 16,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  seeAllTxt: { fontSize: 14, fontWeight: '600' },
+  seeAllTxt: { fontSize: FontSize.base, fontWeight: FontWeight.semiBold },
 
   // Viewer
   viewer: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
@@ -2585,9 +2586,9 @@ const s = StyleSheet.create({
     backgroundColor: '#22C55E', borderRadius: 8,
     paddingHorizontal: 6, paddingVertical: 2,
   },
-  vrPlanBadgeText: { fontSize: 9, fontWeight: '800', color: '#fff' },
-  vrPlanLabel: { fontSize: 12, fontWeight: '700' },
-  vrPlanPrice: { fontSize: 15, fontWeight: '800' },
+  vrPlanBadgeText: { fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold, color: '#fff' },
+  vrPlanLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.bold },
+  vrPlanPrice: { fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold },
 
   // Settings sheet
   settingsSheet: {
@@ -2606,7 +2607,7 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
   },
   settingsNavBtn: { width: 90, alignItems: 'center', justifyContent: 'center' },
-  settingsTitle: { flex: 1, fontSize: 16, fontWeight: '800', textAlign: 'center' },
+  settingsTitle: { flex: 1, fontSize: FontSize.md, fontWeight: FontWeight.extraBold, textAlign: 'center' },
 
   // Onglets settings
   tabBar: { flexDirection: 'row', borderBottomWidth: 1 },
@@ -2618,7 +2619,7 @@ const s = StyleSheet.create({
     gap: 5,
     paddingVertical: 12,
   },
-  tabLabel: { fontSize: 13, fontWeight: '700' },
+  tabLabel: { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
 
   // Contenu settings
   sheetBody: { paddingHorizontal: 16, paddingTop: 16 },
@@ -2655,9 +2656,9 @@ const s = StyleSheet.create({
   },
 
   // Champs form
-  fieldLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, marginBottom: 7 },
+  fieldLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, letterSpacing: 0.8, marginBottom: 7 },
   fieldBox: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10 },
-  fieldInput: { fontSize: 15, padding: 0 },
+  fieldInput: { fontSize: FontSize.basePlus, padding: 0 },
 
   // Membres (settings)
   memberSearchBar: {
@@ -2672,8 +2673,8 @@ const s = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
   },
-  memberSearchInput: { flex: 1, fontSize: 14, padding: 0 },
-  memberCountLbl: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, paddingHorizontal: 16, paddingVertical: 8 },
+  memberSearchInput: { flex: 1, fontSize: FontSize.base, padding: 0 },
+  memberCountLbl: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, letterSpacing: 0.8, paddingHorizontal: 16, paddingVertical: 8 },
   adminMemberRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -2694,7 +2695,7 @@ const s = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
   },
-  roleBtnTxt: { fontSize: 10, fontWeight: '700' },
+  roleBtnTxt: { fontSize: FontSize.xs, fontWeight: FontWeight.bold },
 
   // Settings overlay + KAV
   // Info summary
@@ -2705,7 +2706,7 @@ const s = StyleSheet.create({
     gap: 10, alignItems: 'center',
   },
   infoSummaryRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  infoSummaryTxt: { fontSize: 12, fontWeight: '500' },
+  infoSummaryTxt: { fontSize: FontSize.sm, fontWeight: FontWeight.medium },
   infoSummarySep: { width: 1, height: 14, opacity: 0.5 },
 
   settingsOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.62)' },
@@ -2717,7 +2718,7 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 4, marginLeft: 2,
   },
-  tabBadgeTxt: { color: '#fff', fontSize: 9, fontWeight: '800' },
+  tabBadgeTxt: { color: '#fff', fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold },
 
   // Prix d'entrée input
   priceInputWrap: {
@@ -2725,10 +2726,10 @@ const s = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 5,
     minWidth: 64, alignItems: 'center',
   },
-  priceInput: { fontSize: 15, fontWeight: '700', textAlign: 'center', padding: 0 },
+  priceInput: { fontSize: FontSize.basePlus, fontWeight: FontWeight.bold, textAlign: 'center', padding: 0 },
 
   // Sécurité
-  secSection: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, marginBottom: 10 },
+  secSection: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, letterSpacing: 0.8, marginBottom: 10 },
   secRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2739,16 +2740,16 @@ const s = StyleSheet.create({
     marginBottom: 8,
   },
   secIcon: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  secLabel: { fontSize: 14, fontWeight: '600' },
-  secDesc: { fontSize: 11, marginTop: 2, lineHeight: 15 },
+  secLabel: { fontSize: FontSize.base, fontWeight: FontWeight.semiBold },
+  secDesc: { fontSize: FontSize.xsPlus, marginTop: 2, lineHeight: 15 },
 
   blockedSectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 16, paddingBottom: 10, borderTopWidth: StyleSheet.hairlineWidth, marginHorizontal: 0 },
   blockedSectionLeft:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
   blockedSectionDot:    { width: 8, height: 8, borderRadius: 4, backgroundColor: '#F0365A' },
   blockedCountBadge:    { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   blockedEmpty:         { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, marginBottom: 8 },
-  blockedEmptyText:     { fontSize: 13, fontWeight: '500' },
+  blockedEmptyText:     { fontSize: FontSize.smPlus, fontWeight: FontWeight.medium },
   blockedBanner:        { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginHorizontal: 16, marginTop: 12, padding: 14, borderRadius: 14, borderWidth: 1 },
-  blockedBannerTitle:   { fontSize: 14, fontWeight: '800', marginBottom: 4 },
-  blockedBannerSub:     { fontSize: 12, lineHeight: 18 },
+  blockedBannerTitle:   { fontSize: FontSize.base, fontWeight: FontWeight.extraBold, marginBottom: 4 },
+  blockedBannerSub:     { fontSize: FontSize.sm, lineHeight: 18 },
 });

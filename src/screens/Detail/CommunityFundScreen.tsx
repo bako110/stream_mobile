@@ -13,6 +13,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { BackButton, GofolyxLoader, PriceWithLocal } from '../../components/common';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
 import { toastService, showConfirm } from '../../services';
@@ -74,14 +75,14 @@ const CotisationCard: React.FC<{
             <Icon name="dollar-sign" size={18} color={isActive ? '#fff' : colors.textTertiary} />
           </LinearGradient>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '800' }} numberOfLines={1}>
+            <Text style={{ color: colors.textPrimary, fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold }} numberOfLines={1}>
               {item.title}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
               <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: statusColor }} />
-              <Text style={{ color: statusColor, fontSize: 11, fontWeight: '700' }}>{statusLabel}</Text>
+              <Text style={{ color: statusColor, fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold }}>{statusLabel}</Text>
               {item.deadline && isActive && (
-                <Text style={{ color: colors.textTertiary, fontSize: 11 }}>
+                <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus }}>
                   · Deadline {new Date(item.deadline).toLocaleDateString('fr-FR')}
                 </Text>
               )}
@@ -110,12 +111,12 @@ const CotisationCard: React.FC<{
             />
           </View>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
-            <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
-              <Text style={{ fontWeight: '800', color: '#7B3FF2' }}>
+            <Text style={{ color: colors.textSecondary, fontSize: FontSize.sm }}>
+              <Text style={{ fontWeight: FontWeight.extraBold, color: '#7B3FF2' }}>
                 {item.collected_gogold.toLocaleString('fr-FR')}
               </Text> GoGold collectés
             </Text>
-            <Text style={{ color: colors.textTertiary, fontSize: 12 }}>
+            <Text style={{ color: colors.textTertiary, fontSize: FontSize.sm }}>
               {item.progress_pct}% · {item.member_count_paid}/{item.member_count_total} membres
             </Text>
           </View>
@@ -130,8 +131,8 @@ const CotisationCard: React.FC<{
           ].map(s => (
             <View key={s.lbl} style={{ flex: 1, alignItems: 'center' }}>
               <Icon name={s.icon} size={13} color="#7B3FF2" style={{ marginBottom: 2 }} />
-              <Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: '800' }}>{s.val}</Text>
-              <Text style={{ color: colors.textTertiary, fontSize: 10 }}>{s.lbl}</Text>
+              <Text style={{ color: colors.textPrimary, fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold }}>{s.val}</Text>
+              <Text style={{ color: colors.textTertiary, fontSize: FontSize.xs }}>{s.lbl}</Text>
             </View>
           ))}
         </View>
@@ -146,7 +147,7 @@ const CotisationCard: React.FC<{
                 gap: 8, paddingVertical: 12, borderRadius: 12 }}
             >
               <Icon name="zap" size={15} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800' }}>
+              <Text style={{ color: '#fff', fontSize: FontSize.base, fontWeight: FontWeight.extraBold }}>
                 Payer {item.amount_per_member} GoGold
               </Text>
             </LinearGradient>
@@ -156,7 +157,7 @@ const CotisationCard: React.FC<{
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
             gap: 6, backgroundColor: '#10B98115', borderRadius: 12, paddingVertical: 10 }}>
             <Icon name="check-circle" size={15} color="#10B981" />
-            <Text style={{ color: '#10B981', fontSize: 13, fontWeight: '700' }}>
+            <Text style={{ color: '#10B981', fontSize: FontSize.smPlus, fontWeight: FontWeight.bold }}>
               Payé le {item.my_contribution?.paid_at
                 ? new Date(item.my_contribution.paid_at).toLocaleDateString('fr-FR')
                 : '—'}
@@ -271,8 +272,8 @@ export const CommunityFundScreen: React.FC = () => {
       <View style={[st.header, { paddingTop: insets.top + 8, borderBottomColor: colors.divider, backgroundColor: colors.surface }]}>
         <BackButton onPress={() => nav.goBack()} />
         <View style={{ flex: 1 }}>
-          <Text style={{ color: colors.textPrimary, fontSize: 17, fontWeight: '800' }}>Cotisations</Text>
-          <Text style={{ color: colors.textTertiary, fontSize: 11 }}>{communityName}</Text>
+          <Text style={{ color: colors.textPrimary, fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold }}>Cotisations</Text>
+          <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus }}>{communityName}</Text>
         </View>
         {isAdmin && (
           <TouchableOpacity
@@ -281,7 +282,7 @@ export const CommunityFundScreen: React.FC = () => {
               backgroundColor: '#7B3FF2', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20 }}
           >
             <Icon name="plus" size={14} color="#fff" />
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>Lancer</Text>
+            <Text style={{ color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.smPlus }}>Lancer</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -302,7 +303,7 @@ export const CommunityFundScreen: React.FC = () => {
           ListHeaderComponent={cotisations.length > 0 ? (
             <LinearGradient colors={['#7B3FF215', '#E0389A10']}
               style={[st.summaryCard, { borderColor: '#7B3FF230' }]}>
-              <Text style={{ color: colors.textPrimary, fontWeight: '800', fontSize: 14, marginBottom: 10 }}>
+              <Text style={{ color: colors.textPrimary, fontWeight: FontWeight.extraBold, fontSize: FontSize.base, marginBottom: 10 }}>
                 Résumé · <Text style={{ color: '#7B3FF2' }}>{activeCount} active{activeCount !== 1 ? 's' : ''}</Text>
               </Text>
               <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -313,8 +314,8 @@ export const CommunityFundScreen: React.FC = () => {
                 ].map(s => (
                   <View key={s.lbl} style={{ flex: 1, backgroundColor: s.color + '12',
                     borderRadius: 12, padding: 10, alignItems: 'center' }}>
-                    <Text style={{ color: s.color, fontSize: 18, fontWeight: '900' }}>{s.val}</Text>
-                    <Text style={{ color: colors.textTertiary, fontSize: 10, marginTop: 2 }}>{s.lbl}</Text>
+                    <Text style={{ color: s.color, fontSize: FontSize.lg, fontWeight: FontWeight.black }}>{s.val}</Text>
+                    <Text style={{ color: colors.textTertiary, fontSize: FontSize.xs, marginTop: 2 }}>{s.lbl}</Text>
                   </View>
                 ))}
               </View>
@@ -343,10 +344,10 @@ export const CommunityFundScreen: React.FC = () => {
                 style={{ width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
                 <Icon name="dollar-sign" size={32} color="#7B3FF2" />
               </LinearGradient>
-              <Text style={{ color: colors.textPrimary, fontSize: 17, fontWeight: '900', textAlign: 'center' }}>
+              <Text style={{ color: colors.textPrimary, fontSize: FontSize.mdPlus, fontWeight: FontWeight.black, textAlign: 'center' }}>
                 Aucune cotisation
               </Text>
-              <Text style={{ color: colors.textSecondary, fontSize: 13, textAlign: 'center', lineHeight: 19 }}>
+              <Text style={{ color: colors.textSecondary, fontSize: FontSize.smPlus, textAlign: 'center', lineHeight: 19 }}>
                 {isAdmin
                   ? 'Lance une cotisation pour collecter des fonds auprès des membres.'
                   : 'L\'admin n\'a pas encore lancé de cotisation.'}
@@ -357,7 +358,7 @@ export const CommunityFundScreen: React.FC = () => {
                   <LinearGradient colors={['#7B3FF2', '#E0389A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                     style={{ paddingHorizontal: 24, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <Icon name="plus" size={15} color="#fff" />
-                    <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>Lancer une cotisation</Text>
+                    <Text style={{ color: '#fff', fontWeight: FontWeight.extraBold, fontSize: FontSize.base }}>Lancer une cotisation</Text>
                   </LinearGradient>
                 </TouchableOpacity>
               )}
@@ -378,13 +379,13 @@ export const CommunityFundScreen: React.FC = () => {
               <TouchableOpacity onPress={() => setCreateOpen(false)}>
                 <Icon name="x" size={20} color={colors.textPrimary} />
               </TouchableOpacity>
-              <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '800', flex: 1, textAlign: 'center' }}>
+              <Text style={{ color: colors.textPrimary, fontSize: FontSize.md, fontWeight: FontWeight.extraBold, flex: 1, textAlign: 'center' }}>
                 Lancer une cotisation
               </Text>
               <TouchableOpacity onPress={handleCreate} disabled={saving}>
                 {saving
                   ? <ActivityIndicator size="small" color="#7B3FF2" />
-                  : <Text style={{ color: '#7B3FF2', fontWeight: '700', fontSize: 14 }}>Créer</Text>
+                  : <Text style={{ color: '#7B3FF2', fontWeight: FontWeight.bold, fontSize: FontSize.base }}>Créer</Text>
                 }
               </TouchableOpacity>
             </View>
@@ -396,7 +397,7 @@ export const CommunityFundScreen: React.FC = () => {
                 { label: 'DESCRIPTION', value: formDesc, set: setFormDesc, placeholder: 'Expliquez l\'objectif…', multi: true },
               ].map(f => (
                 <View key={f.label}>
-                  <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '700', marginBottom: 6 }}>{f.label}</Text>
+                  <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, marginBottom: 6 }}>{f.label}</Text>
                   <TextInput
                     style={[st.input, { backgroundColor: colors.backgroundSecondary, color: colors.textPrimary, borderColor: colors.divider,
                       ...(f.multi ? { minHeight: 80, textAlignVertical: 'top' } : {}) }]}
@@ -410,29 +411,29 @@ export const CommunityFundScreen: React.FC = () => {
               ))}
 
               <View>
-                <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '700', marginBottom: 6 }}>MONTANT PAR MEMBRE (GoGold) *</Text>
+                <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, marginBottom: 6 }}>MONTANT PAR MEMBRE (GoGold) *</Text>
                 <View style={[st.input, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider,
                   flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14 }]}>
                   <Icon name="zap" size={15} color="#F59E0B" style={{ marginRight: 8 }} />
                   <TextInput
-                    style={{ flex: 1, color: colors.textPrimary, fontSize: 15, fontWeight: '700' }}
+                    style={{ flex: 1, color: colors.textPrimary, fontSize: FontSize.basePlus, fontWeight: FontWeight.bold }}
                     value={formAmount}
                     onChangeText={v => setFormAmount(v.replace(/[^0-9]/g, ''))}
                     placeholder="100"
                     placeholderTextColor={colors.textTertiary}
                     keyboardType="number-pad"
                   />
-                  <Text style={{ color: colors.textTertiary, fontSize: 12 }}>GoGold</Text>
+                  <Text style={{ color: colors.textTertiary, fontSize: FontSize.sm }}>GoGold</Text>
                 </View>
                 {formAmount ? (
-                  <Text style={{ color: colors.textTertiary, fontSize: 11, marginTop: 4 }}>
-                    = <PriceWithLocal amountEur={parseInt(formAmount || '0') / 100} style={{ color: colors.textTertiary, fontSize: 11 }} /> par membre
+                  <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus, marginTop: 4 }}>
+                    = <PriceWithLocal amountEur={parseInt(formAmount || '0') / 100} style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus }} /> par membre
                   </Text>
                 ) : null}
               </View>
 
               <View>
-                <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '700', marginBottom: 6 }}>DATE LIMITE (optionnel)</Text>
+                <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, marginBottom: 6 }}>DATE LIMITE (optionnel)</Text>
                 <TouchableOpacity
                   onPress={() => setShowDatePicker(true)}
                   style={[st.input, { backgroundColor: colors.backgroundSecondary, borderColor: formDeadline ? '#7B3FF2' : colors.divider,
@@ -440,7 +441,7 @@ export const CommunityFundScreen: React.FC = () => {
                   activeOpacity={0.75}
                 >
                   <Icon name="calendar" size={16} color={formDeadline ? '#7B3FF2' : colors.textTertiary} />
-                  <Text style={{ flex: 1, color: formDeadline ? colors.textPrimary : colors.textTertiary, fontSize: 14 }}>
+                  <Text style={{ flex: 1, color: formDeadline ? colors.textPrimary : colors.textTertiary, fontSize: FontSize.base }}>
                     {formDeadline
                       ? formDeadline.toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
                       : 'Sélectionner une date limite'}
@@ -464,7 +465,7 @@ export const CommunityFundScreen: React.FC = () => {
                   />
                 )}
                 {formDeadline && (
-                  <Text style={{ color: colors.textTertiary, fontSize: 11, marginTop: 4 }}>
+                  <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus, marginTop: 4 }}>
                     Les paiements seront automatiquement bloqués après cette date.
                   </Text>
                 )}
@@ -474,12 +475,12 @@ export const CommunityFundScreen: React.FC = () => {
               {formAmount && parseInt(formAmount) > 0 && (
                 <LinearGradient colors={['#7B3FF215', '#E0389A10']}
                   style={{ borderRadius: 14, borderWidth: 1, borderColor: '#7B3FF230', padding: 14, gap: 6 }}>
-                  <Text style={{ color: '#7B3FF2', fontWeight: '800', fontSize: 13 }}>Aperçu</Text>
-                  <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
-                    Chaque membre paiera <Text style={{ fontWeight: '800', color: colors.textPrimary }}>{formAmount} GoGold</Text>
-                    {' '}(<PriceWithLocal amountEur={parseInt(formAmount || '0') / 100} style={{ color: colors.textSecondary, fontSize: 13 }} />)
+                  <Text style={{ color: '#7B3FF2', fontWeight: FontWeight.extraBold, fontSize: FontSize.smPlus }}>Aperçu</Text>
+                  <Text style={{ color: colors.textSecondary, fontSize: FontSize.smPlus }}>
+                    Chaque membre paiera <Text style={{ fontWeight: FontWeight.extraBold, color: colors.textPrimary }}>{formAmount} GoGold</Text>
+                    {' '}(<PriceWithLocal amountEur={parseInt(formAmount || '0') / 100} style={{ color: colors.textSecondary, fontSize: FontSize.smPlus }} />)
                   </Text>
-                  <Text style={{ color: colors.textTertiary, fontSize: 12 }}>
+                  <Text style={{ color: colors.textTertiary, fontSize: FontSize.sm }}>
                     Le total collecté dépend du nombre de membres présents au lancement.
                   </Text>
                 </LinearGradient>
@@ -507,5 +508,5 @@ const st = StyleSheet.create({
   handleWrap:   { alignItems: 'center', paddingTop: 10, paddingBottom: 4 },
   handle:       { width: 40, height: 4, borderRadius: 2 },
   sheetHeader:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  input:        { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14 },
+  input:        { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: FontSize.base },
 });

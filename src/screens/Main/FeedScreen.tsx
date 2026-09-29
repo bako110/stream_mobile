@@ -32,7 +32,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useUserLocation } from '../../hooks/useUserLocation';
 import { storage } from '../../utils/storage';
 import { showConfirm } from '../../services';
-import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet, FriendsWhoLiked, CachedImage, LiveThumbnailBackground, PriceWithLocal, GofolyxLoader, PeopleSuggestions } from '../../components/common';
+import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet, FriendsWhoLiked, CachedImage, LiveThumbnailBackground, PriceWithLocal, GofolyxLoader, PeopleSuggestions, CommunityPromoHint } from '../../components/common';
 import { cacheImage } from '../../services/imageCacheService';
 import { AdvertiserRow, AdCTA, AdFullscreenPlayer, adIsVideo, type AdData } from '../../components/ads';
 import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
@@ -58,9 +58,11 @@ import type { Event } from '../../types/event';
 import type { Concert } from '../../types/concert';
 import type { Post } from '../../types/post';
 import type { AppColors } from '../../theme/colors';
+import { FontSize, FontWeight } from '../../theme';
 import { SectionHeader } from '../../components/common/SectionHeader';
 import { FeedCarousel, FeedCardLayout, FeedRadius, FeedActionIcon, getFeedCardStyle } from '../../theme/feed';
 import { feedStyles as s } from '../../styles/FeedScreen.styles';
+import { TAB_BAR_HEIGHT } from '../../styles';
 import { FILTERS, FILTER_VIDEO_OPACITY, FILTER_VIDEO_OPACITY2 } from '../Create/ReelEditorScreen';
 import type { FilterKey } from '../Create/ReelEditorScreen';
 
@@ -98,15 +100,15 @@ function getInitials(name?: string | null): string {
 // ── Styles badges (déclarés ici pour être disponibles avant FeedHeaderBadges) ─
 const badgeS = StyleSheet.create({
   badge: {
-    position: 'absolute', top: -4, right: -6,
-    minWidth: 12, height: 12, borderRadius: 6,
+    position: 'absolute', top: -5, right: -7,
+    minWidth: 14, height: 14, borderRadius: 7,
     backgroundColor: '#7B3FF2',
     alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: 2,
-    borderWidth: 1,
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
     borderColor: '#000',
   },
-  badgeText: { color: '#fff', fontSize: 7, fontWeight: '800' },
+  badgeText: { color: '#fff', fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold },
 });
 
 
@@ -201,30 +203,47 @@ const AdCard: React.FC<{
   );
 });
 
-// Créatif vidéo du feed — ne charge le flux qu'une fois la carte réellement
-// visible/immobile (settled). Bouton mute superposé.
+// Créatif vidéo du feed — jamais d'autoplay : miniature figée + bouton play
+// tant que l'utilisateur n'a pas tapé dessus explicitement. `isVisible` ne
+// sert plus qu'à mettre en pause si la carte sort de l'écran pendant la
+// lecture, jamais à déclencher la lecture elle-même.
 const FeedAdVideo: React.FC<{ uri: string; thumbnailUri?: string; isVisible: boolean }> = ({ uri, thumbnailUri, isVisible }) => {
   const [muted, setMuted] = useState(true);
-  const everVisibleRef = useRef(false);
-  if (isVisible) everVisibleRef.current = true;
+  const [userStarted, setUserStarted] = useState(false);
 
   const videoSource = useMemo(
-    () => (everVisibleRef.current ? { uri } : 'about:blank'),
-    [uri, everVisibleRef.current],
+    () => (userStarted ? { uri } : 'about:blank'),
+    [uri, userStarted],
   );
   const player = useVideoPlayer(videoSource, p => { p.loop = true; p.muted = true; });
 
   useEffect(() => {
+    if (!userStarted) return;
     if (isVisible) player.play();
     else player.pause();
-  }, [isVisible, player]);
+  }, [isVisible, userStarted, player]);
 
   const toggleMute = useCallback(() => {
     setMuted(m => { player.muted = !m; return !m; });
   }, [player]);
 
-  if (!everVisibleRef.current) {
-    return thumbnailUri ? <CachedImage uri={thumbnailUri} style={adSt.image} resizeMode="cover" /> : null;
+  if (!userStarted) {
+    // Miniature statique + bouton play cliquable — la lecture ne démarre que
+    // sur une action explicite de l'utilisateur, jamais toute seule.
+    return (
+      <TouchableOpacity activeOpacity={0.9} onPress={() => setUserStarted(true)} style={{ position: 'relative' }}>
+        {thumbnailUri ? (
+          <CachedImage uri={thumbnailUri} style={adSt.image} resizeMode="cover" />
+        ) : (
+          <View style={[adSt.image, { backgroundColor: '#1a1a2e' }]} />
+        )}
+        <View style={adSt.videoPlayOverlay} pointerEvents="none">
+          <View style={adSt.videoPlayCircle}>
+            <Icon name="play" size={24} color="#fff" style={{ marginLeft: 3 }} />
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
   }
   return (
     <View style={{ position: 'relative' }}>
@@ -238,13 +257,17 @@ const FeedAdVideo: React.FC<{ uri: string; thumbnailUri?: string; isVisible: boo
 
 const adSt = StyleSheet.create({
   copy:            { paddingHorizontal: FeedCardLayout.padH, paddingTop: 10, paddingBottom: 12 },
-  hl:              { fontSize: 15, fontWeight: '700', lineHeight: 21, letterSpacing: -0.2 },
-  sub:             { fontSize: 13, lineHeight: 19, marginTop: 5 },
+  hl:              { fontSize: FontSize.basePlus, fontWeight: FontWeight.bold, lineHeight: 21, letterSpacing: -0.2 },
+  sub:             { fontSize: FontSize.smPlus, lineHeight: 19, marginTop: 5 },
   mediaWrap:       { paddingHorizontal: FeedCardLayout.padH, paddingBottom: 0 },
   mediaClip:       { borderRadius: FeedRadius.media, overflow: 'hidden' },
   image:           { width: '100%', aspectRatio: 1.6 },
   imagePlaceholder:{ width: '100%', aspectRatio: 1.6, alignItems: 'center', justifyContent: 'center' },
   muteBtn:         { position: 'absolute', bottom: 10, right: 10, width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
+  // Indicateur "c'est une vidéo" sur la miniature statique — même design que
+  // PostCard (voile sombre + cercle play centré), avant que la lecture démarre.
+  videoPlayOverlay:{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.28)' },
+  videoPlayCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
 });
 
 // ── LiveConcertCard — mémoïsé : re-rend uniquement si ses props changent ──────
@@ -272,25 +295,25 @@ const LiveConcertCard: React.FC<LiveConcertCardProps> = React.memo(({
       <View style={{ width: FeedCarousel.cardW, height: FeedCarousel.cardH, position: 'relative' }}>
         {c.thumbnail_url
           ? <CachedImage uri={c.thumbnail_url} style={{ width: FeedCarousel.cardW, height: FeedCarousel.cardH }} />
-          : <LinearGradient colors={['#7B3FF2', '#E0389A']} style={{ width: FeedCarousel.cardW, height: FeedCarousel.cardH, alignItems: 'center', justifyContent: 'center' }}><Icon name="radio" size={28} color="#fff" /></LinearGradient>
+          : <View style={{ width: FeedCarousel.cardW, height: FeedCarousel.cardH, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2A2A38' }}><Icon name="radio" size={28} color="#fff" /></View>
         }
         <LinearGradient colors={['transparent', 'rgba(0,0,0,0.7)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 64 }} />
         <View style={{ position: 'absolute', top: 6, left: 6, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F0365A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
           <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#fff' }} />
-          <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>LIVE</Text>
+          <Text style={{ color: '#fff', fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold }}>LIVE</Text>
         </View>
         <View style={{ position: 'absolute', top: 6, right: 6, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
           <Icon name="eye" size={10} color="#fff" />
-          <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>{c.current_viewers ?? 0}</Text>
+          <Text style={{ color: '#fff', fontSize: FontSize['2xs'], fontWeight: FontWeight.bold }}>{c.current_viewers ?? 0}</Text>
         </View>
         <View style={{ position: 'absolute', bottom: 6, left: 6, right: 6 }}>
-          <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }} numberOfLines={1}>{c.title}</Text>
+          <Text style={{ color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.bold }} numberOfLines={1}>{c.title}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
             {artist?.avatar_url
               ? <CachedImage uri={artist.avatar_url} style={{ width: 14, height: 14, borderRadius: 7 }} />
-              : <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: '#fff', fontSize: 7, fontWeight: '800' }}>{initial}</Text></View>
+              : <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: '#fff', fontSize: 7, fontWeight: FontWeight.extraBold }}>{initial}</Text></View>
             }
-            <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 10, fontWeight: '600' }} numberOfLines={1}>{artistName}</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: FontSize.xs, fontWeight: FontWeight.semiBold }} numberOfLines={1}>{artistName}</Text>
           </View>
         </View>
       </View>
@@ -378,32 +401,32 @@ const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
                     {/* Badge LIVE */}
                     <View style={{ position: 'absolute', top: 6, left: 6, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.liveTag, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
                       <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#fff' }} />
-                      <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>LIVE</Text>
+                      <Text style={{ color: '#fff', fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold }}>LIVE</Text>
                     </View>
 
                     {/* Badge privé */}
                     {live.is_private && (
-                      <View style={{ position: 'absolute', top: 22, left: 6, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: colors.primary + 'D9', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
+                      <View style={{ position: 'absolute', top: 22, left: 6, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.65)', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
                         <MCIcon name="lock" size={8} color="#fff" />
-                        <Text style={{ color: '#fff', fontSize: 8, fontWeight: '700' }}>Abonnés</Text>
+                        <Text style={{ color: '#fff', fontSize: 8, fontWeight: FontWeight.bold }}>Abonnés</Text>
                       </View>
                     )}
 
                     {/* Viewers */}
                     <View style={{ position: 'absolute', top: 6, right: 6, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
                       <Icon name="eye" size={9} color="#fff" />
-                      <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>{live.current_viewers ?? 0}</Text>
+                      <Text style={{ color: '#fff', fontSize: FontSize['2xs'], fontWeight: FontWeight.bold }}>{live.current_viewers ?? 0}</Text>
                     </View>
 
                     {/* Avatar centré */}
                     {live.user?.avatar_url
                       ? <CachedImage uri={live.user.avatar_url} style={{ position: 'absolute', bottom: 22, alignSelf: 'center', width: 34, height: 34, borderRadius: 17, borderWidth: 2, borderColor: '#fff' }} />
                       : <View style={{ position: 'absolute', bottom: 22, alignSelf: 'center', width: 34, height: 34, borderRadius: 17, backgroundColor: colors.liveTag, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' }}>
-                          <Text style={{ color: '#fff', fontSize: 13, fontWeight: '800' }}>{liveInitial}</Text>
+                          <Text style={{ color: '#fff', fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold }}>{liveInitial}</Text>
                         </View>
                     }
                     <View style={{ position: 'absolute', bottom: 6, left: 4, right: 4, alignItems: 'center' }}>
-                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700', textAlign: 'center' }} numberOfLines={1}>{liveName}</Text>
+                      <Text style={{ color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.bold, textAlign: 'center' }} numberOfLines={1}>{liveName}</Text>
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -429,7 +452,9 @@ const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
             {nearbyEvents.map(ev => {
               const dist = (ev as any).distance_km as number | null | undefined;
               const distLabel = dist != null ? (dist < 1 ? `${Math.round(dist * 1000)} m` : `${dist.toFixed(1)} km`) : null;
-              const typeColor = colors.primary;
+              // Neutre — la couleur de marque n'a pas besoin d'habiller chaque
+              // carte type, elle reste réservée aux signaux (LIVE, badges…).
+              const typeColor = colors.textSecondary;
               const typeIcon  = EVENT_ICONS[ev.event_type ?? 'other'] ?? 'calendar';
               const NCARD_W   = Dimensions.get('window').width * 0.45;
               const NCOVER_H  = NCARD_W * 0.5;
@@ -446,7 +471,7 @@ const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
                     {distLabel && (
                       <View style={{ position: 'absolute', top: 8, right: 8, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 }}>
                         <Icon name="map-pin" size={9} color="#fff" />
-                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#fff' }}>{distLabel}</Text>
+                        <Text style={{ fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: '#fff' }}>{distLabel}</Text>
                       </View>
                     )}
                   </TouchableOpacity>
@@ -540,17 +565,17 @@ const CommunitiesInlineCard: React.FC<{
                 }}>
                   {c.avatar_url
                     ? <CachedImage uri={c.avatar_url} style={{ width: '100%', height: '100%' }} />
-                    : <Text style={{ color: '#fff', fontWeight: '800', fontSize: COMM_AVATAR_SZ * 0.4 }}>{initial}</Text>
+                    : <Text style={{ color: '#fff', fontWeight: FontWeight.extraBold, fontSize: COMM_AVATAR_SZ * 0.4 }}>{initial}</Text>
                   }
                 </View>
               </View>
 
               {/* Infos */}
               <View style={{ alignItems: 'center', paddingHorizontal: 12, paddingBottom: 14, paddingTop: 8, gap: 4 }}>
-                <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' }}>
+                <Text numberOfLines={1} style={{ fontSize: FontSize.base, fontWeight: FontWeight.bold, color: colors.textPrimary, textAlign: 'center' }}>
                   {c.name}
                 </Text>
-                <Text style={{ fontSize: 11, color: colors.textTertiary }}>
+                <Text style={{ fontSize: FontSize.xsPlus, color: colors.textTertiary }}>
                   {(c.members_count ?? 0).toLocaleString()} membres
                 </Text>
 
@@ -564,7 +589,7 @@ const CommunitiesInlineCard: React.FC<{
                     borderWidth: isJoined ? 1.5 : 0, borderColor: colors.border,
                   }}>
                   <Icon name={isJoined ? 'check' : 'plus'} size={14} color={isJoined ? colors.textSecondary : '#fff'} />
-                  <Text style={{ fontSize: 13.5, fontWeight: '700', color: isJoined ? colors.textSecondary : '#fff' }}>
+                  <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, color: isJoined ? colors.textSecondary : '#fff' }}>
                     {isJoined ? 'Membre ✓' : 'Rejoindre'}
                   </Text>
                 </TouchableOpacity>
@@ -629,14 +654,14 @@ const ReelRowInlineCard: React.FC<{
                 style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '38%', justifyContent: 'flex-end', padding: 10, gap: 3 }}
               >
                 {authorName ? (
-                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#fff' }} numberOfLines={1}>
+                  <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: '#fff' }} numberOfLines={1}>
                     {authorName}
                   </Text>
                 ) : null}
                 {(r.view_count ?? 0) > 0 && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <Icon name="eye" size={11} color="rgba(255,255,255,0.85)" />
-                    <Text style={{ fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.85)' }}>
+                    <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold, color: 'rgba(255,255,255,0.85)' }}>
                       {(r.view_count ?? 0) >= 1000 ? `${((r.view_count ?? 0) / 1000).toFixed(1)}k` : r.view_count}
                     </Text>
                   </View>
@@ -868,6 +893,57 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   // Vrai tant que le doigt de l'utilisateur tient la liste (entre begin/end drag)
   // ou que la liste décélère après un fling — la restauration d'offset s'abstient.
   const userDraggingRef = useRef(false);
+  // Bouton flottant "remonter + rafraîchir" — apparaît dès le tout début du
+  // scroll (seuil bas, juste assez pour ignorer le léger rebond élastique en
+  // haut de liste sur iOS) et reste affiché fixe tant qu'on n'est pas
+  // remonté tout en haut, juste au-dessus de la tab bar (jamais dessus/
+  // dessous). Au clic : remonte en haut de la liste ET relance un chargement
+  // silencieux (load(filter, true, true), même pattern que le refresh au
+  // retour de focus) pour repartir sur du contenu frais.
+  const SCROLL_TOP_THRESHOLD = 40;
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const scrollTopAnim = useSharedValue(0);
+  // Déclaré ici, au niveau racine du composant (jamais dans le JSX conditionnel
+  // {showScrollTop && (...)}) — useAnimatedStyle est un hook, l'appeler dans une
+  // branche qui ne s'exécute que parfois casse la règle des hooks ("Rendered
+  // more hooks than during the previous render") dès que showScrollTop change.
+  const scrollTopStyle = useAnimatedStyle(() => ({
+    opacity: scrollTopAnim.value,
+    transform: [{ scale: interpolate(scrollTopAnim.value, [0, 1], [0.6, 1]) }],
+  }));
+  // Icône qui "s'envole" vers le haut en boucle — part d'en bas (translateY
+  // positif, légèrement transparente), remonte franchement jusqu'en haut en
+  // s'estompant, puis revient instantanément à sa position de départ pour
+  // relancer le cycle. Contrairement à un simple va-et-vient symétrique, ce
+  // sens unique (bas → haut, jamais l'inverse visible) rend la direction du
+  // geste "remonter" immédiatement lisible.
+  const scrollTopIconBounce = useSharedValue(0);
+  useEffect(() => {
+    scrollTopIconBounce.value = withRepeat(
+      withSequence(
+        withTiming(0, { duration: 0 }),
+        withTiming(1, { duration: 650 }),
+      ),
+      -1,
+      false,
+    );
+  }, [scrollTopIconBounce]);
+  const scrollTopIconStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollTopIconBounce.value, [0, 0.7, 1], [1, 1, 0]),
+    // Amplitude réduite et centrée sur 0 (±4px) — l'icône reste visuellement
+    // au milieu du cercle du bouton tout au long de l'animation, au lieu de
+    // sortir de son centre (l'ancien -10 à +4 n'était pas symétrique).
+    transform: [{ translateY: interpolate(scrollTopIconBounce.value, [0, 1], [4, -4]) }],
+  }));
+
+  const setScrollTopVisible = useCallback((visible: boolean) => {
+    setShowScrollTop(prev => {
+      if (prev === visible) return prev;
+      scrollTopAnim.value = withTiming(visible ? 1 : 0, { duration: 200 });
+      return visible;
+    });
+  }, [scrollTopAnim]);
+
   const handleFeedScroll = (e: any) => {
     const offsetY = e.nativeEvent?.contentOffset?.y ?? 0;
     lastScrollYRef.current = offsetY;
@@ -876,6 +952,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
       feedAtTopRef.current = atTop;
       setFeedAtTop(atTop);
     }
+    setScrollTopVisible(offsetY > SCROLL_TOP_THRESHOLD);
     const approxIndex = Math.floor(offsetY / AVG_ITEM_HEIGHT);
     if (approxIndex > lastScrollPrefetchIndexRef.current) {
       lastScrollPrefetchIndexRef.current = approxIndex;
@@ -1193,8 +1270,21 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   // ref est lue/écrite de façon synchrone, donc fiable comme garde immédiate.
   const loadingInitialRef = useRef(false);
 
+  // Anti race-condition (2026-09) : plusieurs pull-to-refresh rapprochés lancent
+  // chacun leur propre appel réseau (aucun AbortController/annulation ici), et
+  // rien ne garantissait que les réponses reviennent dans l'ordre d'envoi — un
+  // appel PLUS ANCIEN pouvait répondre APRÈS un appel plus récent et écraser son
+  // résultat avec des données obsolètes. Symptôme remonté : "je dois tirer 3 fois
+  // pour voir un changement" (le contenu affiché correspondait en fait à un
+  // rafraîchissement précédent, pas au dernier déclenché). Chaque appel de
+  // load('all', ...) prend un numéro de séquence ; seul le résultat du DERNIER
+  // appel lancé est autorisé à écrire dans le state, les réponses en retard
+  // d'un appel dépassé sont silencieusement ignorées.
+  const loadRequestIdRef = useRef(0);
+
   const load = useCallback(async (f: FeedFilter, silent = false, forceRefresh = false) => {
     if (f === 'all') loadingInitialRef.current = true;
+    const requestId = f === 'all' ? ++loadRequestIdRef.current : loadRequestIdRef.current;
     try {
       if (f === 'all') {
         // Reset pagination — uniquement pour un vrai rechargement (1er montage, pull-to-
@@ -1226,6 +1316,12 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           concertService.getLive().catch(() => [] as Concert[]),
           liveService.getLives().catch(() => [] as LiveStream[]),
         ]);
+        // Un appel load('all', ...) plus RÉCENT a été lancé pendant cette requête
+        // réseau (ex: 2e/3e pull-to-refresh avant que le 1er n'ait répondu) — cette
+        // réponse est désormais obsolète, on l'ignore sans toucher au state (cf.
+        // commentaire de loadRequestIdRef plus haut). Le `finally` plus bas gère
+        // encore loading/refreshing pour CET appel, mais n'écrase plus le contenu.
+        if (requestId !== loadRequestIdRef.current) return;
         feedHasMoreRef.current = (feedResult.items ?? []).length >= FEED_PAGE_SIZE;
         // Header "En direct" : ne le laisser changer de hauteur (donc pousser tout
         // le feed) QUE si l'utilisateur est au sommet, ou lors d'un vrai
@@ -1344,9 +1440,17 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     } catch (err) {
       if (__DEV__) { console.warn('[FeedScreen] load error:', err); }
     } finally {
-      loadingInitialRef.current = false;
-      setLoading(false);
-      setRefreshing(false);
+      // Ne couper loading/refreshing que pour le DERNIER appel lancé (f==='all') —
+      // sinon un appel obsolète qui répond après un appel plus récent (toujours en
+      // vol) éteindrait prématurément le spinner de pull-to-refresh alors que le
+      // vrai résultat attendu n'est pas encore arrivé. Les filtres autres que
+      // 'all' ne partagent pas ce compteur de séquence (requestId figé à sa
+      // valeur courante pour eux, cf. plus haut), donc ce garde ne les affecte pas.
+      if (f !== 'all' || requestId === loadRequestIdRef.current) {
+        loadingInitialRef.current = false;
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, []);
 
@@ -1378,6 +1482,11 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     if (itemsRef.current.length === 0) setLoading(true);
     load(filter);
   }, [filter]);
+
+  const handleScrollTopPress = useCallback(() => {
+    try { feedListRef.current?.scrollToOffset({ offset: 0, animated: true }); } catch {}
+    load(filter, true, true);
+  }, [load, filter]);
 
   // Scroll infini — page suivante de posts + reels + événements/concerts (recherche),
   // fusionnés et dédupliqués contre tout ce qui a déjà été chargé, ajoutés à la suite.
@@ -1546,6 +1655,24 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     return () => removeListener(handler);
   }, [filter, load, addListener, removeListener]);
 
+  // Restauration explicite de la status bar à chaque prise de focus — le
+  // composant <StatusBar> déclaratif plus bas ne suffit pas seul : un écran
+  // visité entre-temps (masquant la status bar via son propre <StatusBar
+  // hidden />) peut, selon le timing de démontage de React Navigation, laisser
+  // la barre système masquée/opaque au retour sur le Feed. On la reforce donc
+  // explicitement ici, à chaque fois que cet écran redevient actif. translucent
+  // obligatoire — le header gère lui-même l'espace de la status bar via
+  // paddingTop: insets.top ; sans ça la barre devient une bande opaque qui
+  // recouvre les icônes système au lieu de laisser le fond du header dessous.
+  useFocusEffect(useCallback(() => {
+    StatusBar.setHidden(false, 'none');
+    StatusBar.setBarStyle(theme.isDark ? 'light-content' : 'dark-content', true);
+    if (Platform.OS === 'android') {
+      StatusBar.setTranslucent(true);
+      StatusBar.setBackgroundColor('transparent', true);
+    }
+  }, [theme.isDark]));
+
   // Focus : reprise vidéo + rechargement silencieux au retour (stale-while-revalidate)
   const didMountRef = useRef(false);
   useFocusEffect(useCallback(() => {
@@ -1697,8 +1824,17 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     setFrozenHeaderData({ liveConcerts, spontLives, nearbyEvents });
   }, [feedAtTop, liveConcerts, spontLives, nearbyEvents]);
 
+  const goToCommunities = useCallback(() => {
+    (nav as any).navigate('Communities');
+  }, [nav]);
+
   const feedListHeader = useMemo(() => (
     <>
+      {/* Bannière promo communautés — une seule fois par installation, pour
+          orienter les nouveaux utilisateurs vers l'onglet Découvrir dès leur
+          première arrivée sur le feed. */}
+      <CommunityPromoHint onPress={goToCommunities} />
+
       {/* Stories scrollent avec le feed — style Instagram/WhatsApp */}
       <StoryBar
         currentUser={currentUser}
@@ -1726,7 +1862,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     </>
   ), [frozenHeaderData, colors, theme.isDark,
       currentUser, currentUser?.id, filter,
-      onNavMyStories, onNavChat,
+      onNavMyStories, onNavChat, goToCommunities,
       onNavLiveList, onNavSpontList, onNavNearby, onNavLiveStream, onNavLiveViewer,
       onNavSpontStream, onNavSpontViewer, onNavEvent]);
 
@@ -1844,10 +1980,15 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
+      {/* translucent: obligatoire ici — le header gère lui-même l'espace de la
+          status bar via paddingTop: insets.top (juste en-dessous). Sans
+          translucent, la barre système devient une bande opaque séparée qui
+          recouvre les icônes système (heure/batterie/réseau) au lieu de les
+          laisser fusionnées avec le fond du header. */}
       <StatusBar
         barStyle={theme.isDark ? 'light-content' : 'dark-content'}
         translucent
-        backgroundColor={theme.isDark ? 'transparent' : colors.surface}
+        backgroundColor="transparent"
       />
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
@@ -1881,7 +2022,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                       l'est par définition quand il consulte son feed). */}
                   <View style={{
                     position: 'absolute', right: -1, bottom: -1,
-                    width: 8, height: 8, borderRadius: 4,
+                    width: 9, height: 9, borderRadius: 5,
                     backgroundColor: '#22C55E',
                     borderWidth: 1.5, borderColor: colors.surface,
                   }} />
@@ -1890,7 +2031,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                     profil / multi-comptes). */}
                 <Icon
                   name={showProfilePanel ? 'chevron-up' : 'chevron-down'}
-                  size={10}
+                  size={12}
                   color={colors.textSecondary}
                 />
               </TouchableOpacity>
@@ -1916,23 +2057,23 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                     <CachedImage uri={currentUser.avatar_url} style={{ width: 44, height: 44, borderRadius: 22 }} />
                   ) : (
                     <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary + '22', alignItems: 'center', justifyContent: 'center' }}>
-                      <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 15 }}>{initials}</Text>
+                      <Text style={{ color: colors.primary, fontWeight: FontWeight.bold, fontSize: FontSize.basePlus }}>{initials}</Text>
                     </View>
                   )}
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <Text style={{ fontSize: 15, fontWeight: '800', color: colors.textPrimary, flexShrink: 1 }} numberOfLines={1}>
+                      <Text style={{ fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold, color: colors.textPrimary, flexShrink: 1 }} numberOfLines={1}>
                         {currentUser.display_name ?? currentUser.first_name ?? currentUser.username}
                       </Text>
                       {currentUser.is_verified && <Icon name="check-circle" size={14} color={colors.primary} />}
                     </View>
                     {currentUser.username && (
-                      <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 1 }} numberOfLines={1}>@{currentUser.username}</Text>
+                      <Text style={{ fontSize: FontSize.sm, color: colors.textTertiary, marginTop: 1 }} numberOfLines={1}>@{currentUser.username}</Text>
                     )}
                   </View>
                 </View>
                 {currentUser.bio && (
-                  <Text style={{ fontSize: 12.5, color: colors.textSecondary, marginTop: 10, lineHeight: 17 }} numberOfLines={3}>
+                  <Text style={{ fontSize: FontSize.sm, color: colors.textSecondary, marginTop: 10, lineHeight: 17 }} numberOfLines={3}>
                     {currentUser.bio}
                   </Text>
                 )}
@@ -1941,14 +2082,14 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                   activeOpacity={0.85}
                   style={{ marginTop: 12, borderRadius: 10, paddingVertical: 9, alignItems: 'center', backgroundColor: colors.primary + '18' }}
                 >
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>Voir le profil</Text>
+                  <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, color: colors.primary }}>Voir le profil</Text>
                 </TouchableOpacity>
 
                 {/* Multi-compte — bascule rapide, sans repasser par les Paramètres */}
                 {accounts.length > 1 && (
                   <>
                     <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.divider, marginVertical: 12 }} />
-                    <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 0.6, color: colors.textTertiary, marginBottom: 8 }}>
+                    <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, letterSpacing: 0.6, color: colors.textTertiary, marginBottom: 8 }}>
                       MES COMPTES
                     </Text>
                     {accounts.map(account => {
@@ -1977,10 +2118,10 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                             <CachedImage uri={account.avatar_url} style={{ width: 32, height: 32, borderRadius: 16 }} />
                           ) : (
                             <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary + '22', alignItems: 'center', justifyContent: 'center' }}>
-                              <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 13 }}>{initial}</Text>
+                              <Text style={{ color: colors.primary, fontWeight: FontWeight.extraBold, fontSize: FontSize.smPlus }}>{initial}</Text>
                             </View>
                           )}
-                          <Text style={{ flex: 1, fontSize: 13, fontWeight: '600', color: colors.textPrimary }} numberOfLines={1}>
+                          <Text style={{ flex: 1, fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold, color: colors.textPrimary }} numberOfLines={1}>
                             {account.display_name || account.username}
                           </Text>
                           {isSwitching ? (
@@ -1999,7 +2140,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: accounts.length > 1 ? 10 : 12, paddingTop: accounts.length > 1 ? 4 : 0 }}
                 >
                   <Icon name="plus-circle" size={15} color={colors.textSecondary} />
-                  <Text style={{ fontSize: 12.5, fontWeight: '600', color: colors.textSecondary }}>Gérer les comptes</Text>
+                  <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, color: colors.textSecondary }}>Gérer les comptes</Text>
                 </TouchableOpacity>
               </View>
             </>
@@ -2012,15 +2153,15 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
               activeOpacity={0.7}
               onPress={openSearch}
               style={{
-                flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6,
-                height: 27, borderRadius: 14, paddingHorizontal: 10,
-                marginHorizontal: 6,
+                flex: 1, flexDirection: 'row', alignItems: 'center', gap: 7,
+                height: 32, borderRadius: 17, paddingHorizontal: 12,
+                marginHorizontal: 7,
                 backgroundColor: colors.backgroundSecondary,
                 borderWidth: 1, borderColor: colors.divider,
               }}
             >
-              <Icon name="search" size={11} color={colors.textTertiary} />
-              <Text style={{ flex: 1, fontSize: 10, color: colors.textTertiary }} numberOfLines={1}>
+              <Icon name="search" size={14} color={colors.textTertiary} />
+              <Text style={{ flex: 1, fontSize: FontSize.sm, color: colors.textTertiary }} numberOfLines={1}>
                 Rechercher une publication, un ami…
               </Text>
             </TouchableOpacity>
@@ -2030,18 +2171,18 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           {searchOpen && (
             <Animated.View style={[animatedSearchBar, {
               flexDirection: 'row', alignItems: 'center',
-              paddingHorizontal: 8, height: 27,
-              borderRadius: 14, borderWidth: 1,
+              paddingHorizontal: 10, height: 32,
+              borderRadius: 17, borderWidth: 1,
               borderColor: colors.primary + '55',
               backgroundColor: colors.backgroundSecondary,
-              gap: 6, flex: 1, marginRight: 6,
+              gap: 7, flex: 1, marginRight: 7,
             }]}>
-              <Icon name="search" size={11} color={colors.primary} />
+              <Icon name="search" size={14} color={colors.primary} />
               <TextInput
                 ref={searchInputRef}
                 placeholder="Rechercher..."
                 placeholderTextColor={colors.textDisabled}
-                style={{ flex: 1, fontSize: 14, color: colors.textPrimary, padding: 0 }}
+                style={{ flex: 1, fontSize: FontSize.base, color: colors.textPrimary, padding: 0 }}
                 returnKeyType="search"
                 value={searchQuery}
                 onChangeText={(text) => { setSearchQuery(text); liveSearch(text, searchFilter); }}
@@ -2054,7 +2195,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
               {searching && <ActivityIndicator size="small" color={colors.primary} />}
               {searchQuery.length > 0 && !searching && (
                 <TouchableOpacity onPress={() => { setSearchQuery(''); setSearchResults(null); }}>
-                  <Icon name="x-circle" size={11} color={colors.textTertiary} />
+                  <Icon name="x-circle" size={14} color={colors.textTertiary} />
                 </TouchableOpacity>
               )}
             </Animated.View>
@@ -2071,7 +2212,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                 onPress={closeSearch}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Icon name="x" size={15} color={colors.primary} />
+                <Icon name="x" size={19} color={colors.primary} />
               </TouchableOpacity>
             ) : (
               <>
@@ -2081,7 +2222,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                   <View style={{ position: 'relative' }}>
-                    <Icon name="bell" size={15} color={colors.textPrimary} />
+                    <Icon name="bell" size={19} color={colors.textPrimary} />
                     {headerNotifCount > 0 && (
                       <View style={[badgeS.badge, { borderColor: colors.surface, backgroundColor: colors.primary }]}>
                         <Text style={badgeS.badgeText}>{headerNotifCount > 99 ? '99+' : headerNotifCount}</Text>
@@ -2095,7 +2236,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                   <View style={{ position: 'relative' }}>
-                    <Icon name="message-circle" size={15} color={colors.textPrimary} />
+                    <Icon name="message-circle" size={19} color={colors.textPrimary} />
                     {unreadMessages > 0 && (
                       <View style={[badgeS.badge, { borderColor: colors.surface }]}>
                         <Text style={badgeS.badgeText}>{unreadMessages > 99 ? '99+' : unreadMessages}</Text>
@@ -2108,7 +2249,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                   onPress={openMenu}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <MCIcon name="view-grid-outline" size={15} color={colors.textPrimary} />
+                  <MCIcon name="view-grid-outline" size={19} color={colors.textPrimary} />
                 </TouchableOpacity>
               </>
             )}
@@ -2132,7 +2273,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
             >
               <Icon
                 name="users"
-                size={11}
+                size={14}
                 color={filter === 'following' ? colors.primary : colors.textSecondary}
               />
               <Text style={[
@@ -2151,10 +2292,10 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
               style={[s.headerPillNav, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
             >
               <View style={s.headerPillNavInner}>
-                <Icon name="heart" size={11} color={colors.textSecondary} />
+                <Icon name="heart" size={14} color={colors.textSecondary} />
                 <Text style={[s.headerPillText, { color: colors.textSecondary }]}>Favoris</Text>
               </View>
-              <Icon name="chevron-right" size={11} color={colors.textTertiary} />
+              <Icon name="chevron-right" size={13} color={colors.textTertiary} />
             </TouchableOpacity>
 
             {/* Direct — même fonction que l'ancien bouton "En direct" : ouvre
@@ -2166,17 +2307,17 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
             >
               <View style={s.headerPillNavInner}>
                 <View style={{ position: 'relative' }}>
-                  <Icon name="send" size={11} color={colors.textSecondary} />
+                  <Icon name="send" size={14} color={colors.textSecondary} />
                   <View style={{
                     position: 'absolute', top: -1, right: -3,
-                    width: 5, height: 5, borderRadius: 3,
+                    width: 6, height: 6, borderRadius: 3,
                     backgroundColor: colors.liveTag,
                     borderWidth: 1, borderColor: colors.backgroundSecondary,
                   }} />
                 </View>
                 <Text style={[s.headerPillText, { color: colors.textSecondary }]}>Direct</Text>
               </View>
-              <Icon name="chevron-right" size={11} color={colors.textTertiary} />
+              <Icon name="chevron-right" size={13} color={colors.textTertiary} />
             </TouchableOpacity>
           </View>
         )}
@@ -2226,9 +2367,9 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                 <LinearGradient colors={[accent, accent + 'AA']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}>
                   <Icon name={icon} size={13} color="#fff" />
                 </LinearGradient>
-                <Text style={{ flex: 1, fontSize: 13, fontWeight: '800', color: colors.textPrimary, letterSpacing: 0.2, textTransform: 'uppercase' }}>{label}</Text>
+                <Text style={{ flex: 1, fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold, color: colors.textPrimary, letterSpacing: 0.2, textTransform: 'uppercase' }}>{label}</Text>
                 <View style={{ backgroundColor: accent + '18', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '800', color: accent }}>{count}</Text>
+                  <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, color: accent }}>{count}</Text>
                 </View>
               </View>
             );
@@ -2250,8 +2391,8 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                     colors={['transparent', 'rgba(0,0,0,0.85)']}
                     style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '45%', justifyContent: 'flex-end', padding: 8 }}
                   >
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#fff' }} numberOfLines={2}>{title}</Text>
-                    {sub && <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', marginTop: 2 }} numberOfLines={1}>{sub}</Text>}
+                    <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.extraBold, color: '#fff' }} numberOfLines={2}>{title}</Text>
+                    {sub && <Text style={{ fontSize: FontSize.xs, color: 'rgba(255,255,255,0.75)', marginTop: 2 }} numberOfLines={1}>{sub}</Text>}
                   </LinearGradient>
                   <View style={{ position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' }}>
                     <Icon name={icon} size={11} color="#fff" />
@@ -2287,12 +2428,12 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                 {searchHistory.length > 0 && (
                   <View style={{ paddingTop: 20, paddingBottom: 4 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 10 }}>
-                      <Text style={{ fontSize: 11, fontWeight: '800', color: colors.textTertiary, letterSpacing: 1, textTransform: 'uppercase' }}>Recherches récentes</Text>
+                      <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, color: colors.textTertiary, letterSpacing: 1, textTransform: 'uppercase' }}>Recherches récentes</Text>
                       <TouchableOpacity
                         onPress={() => { searchHistoryService.clear(); setSearchHistory([]); }}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       >
-                        <Text style={{ fontSize: 12, fontWeight: '600', color: colors.primary }}>Tout effacer</Text>
+                        <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, color: colors.primary }}>Tout effacer</Text>
                       </TouchableOpacity>
                     </View>
                     {searchHistory.map((h, i) => (
@@ -2318,7 +2459,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                           <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
                             <Icon name="clock" size={14} color={colors.textTertiary} />
                           </View>
-                          <Text style={{ fontSize: 14, fontWeight: '500', color: colors.textPrimary, flex: 1 }} numberOfLines={1}>{h.query}</Text>
+                          <Text style={{ fontSize: FontSize.base, fontWeight: FontWeight.medium, color: colors.textPrimary, flex: 1 }} numberOfLines={1}>{h.query}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                           onPress={() => { searchHistoryService.remove(h.query); setSearchHistory(searchHistoryService.getAll()); }}
@@ -2333,7 +2474,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
 
                 {/* Catégories rapides */}
                 <View style={{ paddingHorizontal: 16, paddingTop: searchHistory.length > 0 ? 20 : 24, paddingBottom: 8 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '800', color: colors.textTertiary, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 14 }}>Explorer</Text>
+                  <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, color: colors.textTertiary, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 14 }}>Explorer</Text>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
                     {[
                       { icon: 'calendar', label: 'Événements', accent: '#0EA5E9', nav: 'Events' },
@@ -2366,7 +2507,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                         <View style={{ width: 30, height: 30, borderRadius: 8, backgroundColor: accent + '18', alignItems: 'center', justifyContent: 'center' }}>
                           <Icon name={icon} size={14} color={accent} />
                         </View>
-                        <Text style={{ fontSize: 13, fontWeight: '600', color: colors.textPrimary }}>{label}</Text>
+                        <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold, color: colors.textPrimary }}>{label}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -2377,7 +2518,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                   <View style={{ paddingTop: 24, paddingBottom: 4 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, marginBottom: 12 }}>
                       <Icon name="trending-up" size={12} color={colors.textTertiary} />
-                      <Text style={{ fontSize: 11, fontWeight: '800', color: colors.textTertiary, letterSpacing: 1, textTransform: 'uppercase' }}>
+                      <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, color: colors.textTertiary, letterSpacing: 1, textTransform: 'uppercase' }}>
                         Meilleures suggestions
                       </Text>
                     </View>
@@ -2420,24 +2561,24 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                                   </View>
                                 )}
                                 <View style={{ position: 'absolute', top: 6, left: 6, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
-                                  <Text style={{ fontSize: 9, fontWeight: '700', color: '#fff' }}>{isEvent ? 'Événement' : 'Populaire'}</Text>
+                                  <Text style={{ fontSize: FontSize['2xs'], fontWeight: FontWeight.bold, color: '#fff' }}>{isEvent ? 'Événement' : 'Populaire'}</Text>
                                 </View>
                               </View>
-                              <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textPrimary, marginTop: 6 }} numberOfLines={1}>
+                              <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, color: colors.textPrimary, marginTop: 6 }} numberOfLines={1}>
                                 {item.title ?? 'Sans titre'}
                               </Text>
                               {isEvent ? (
                                 !!item.starts_at && (
                                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
                                     <Icon name="calendar" size={10} color={colors.textTertiary} />
-                                    <Text style={{ fontSize: 11, color: colors.textTertiary }}>{fmtDate(item.starts_at)}</Text>
+                                    <Text style={{ fontSize: FontSize.xsPlus, color: colors.textTertiary }}>{fmtDate(item.starts_at)}</Text>
                                   </View>
                                 )
                               ) : (
                                 !!item.view_count && (
                                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
                                     <Icon name="eye" size={10} color={colors.textTertiary} />
-                                    <Text style={{ fontSize: 11, color: colors.textTertiary }}>{fmtV(item.view_count)}</Text>
+                                    <Text style={{ fontSize: FontSize.xsPlus, color: colors.textTertiary }}>{fmtV(item.view_count)}</Text>
                                   </View>
                                 )
                               )}
@@ -2455,8 +2596,8 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                     <Icon name="zap" size={18} color={colors.primary} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>Recherche instantanée</Text>
-                    <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }}>Tape un nom, un lieu ou un titre</Text>
+                    <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, color: colors.textPrimary }}>Recherche instantanée</Text>
+                    <Text style={{ fontSize: FontSize.sm, color: colors.textTertiary, marginTop: 2 }}>Tape un nom, un lieu ou un titre</Text>
                   </View>
                 </View>
               </ScrollView>
@@ -2482,7 +2623,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                 )}
                 {historySuggestions.length > 0 && (
                   <View style={{ paddingTop: 8, paddingBottom: 4 }}>
-                    <Text style={{ fontSize: 11, fontWeight: '800', color: colors.textTertiary, letterSpacing: 1, textTransform: 'uppercase', paddingHorizontal: 16, marginBottom: 6 }}>Suggestions</Text>
+                    <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, color: colors.textTertiary, letterSpacing: 1, textTransform: 'uppercase', paddingHorizontal: 16, marginBottom: 6 }}>Suggestions</Text>
                     {historySuggestions.map((h) => (
                       <TouchableOpacity
                         key={h.query}
@@ -2493,7 +2634,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                         <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center' }}>
                           <Icon name="clock" size={14} color={colors.primary} />
                         </View>
-                        <Text style={{ flex: 1, fontSize: 14, fontWeight: '500', color: colors.textPrimary }} numberOfLines={1}>{h.query}</Text>
+                        <Text style={{ flex: 1, fontSize: FontSize.base, fontWeight: FontWeight.medium, color: colors.textPrimary }} numberOfLines={1}>{h.query}</Text>
                         <Icon name="arrow-up-left" size={14} color={colors.textTertiary} />
                       </TouchableOpacity>
                     ))}
@@ -2501,7 +2642,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                 )}
                 <View style={{ alignItems: 'center', paddingTop: historySuggestions.length > 0 ? 24 : 80, gap: 12 }}>
                   <GofolyxLoader color={colors.primary} />
-                  <Text style={{ fontSize: 14, color: colors.textTertiary }}>Recherche en cours...</Text>
+                  <Text style={{ fontSize: FontSize.base, color: colors.textTertiary }}>Recherche en cours...</Text>
                 </View>
               </ScrollView>
             );
@@ -2521,8 +2662,8 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                 <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
                   <Icon name="search" size={30} color={colors.textTertiary} />
                 </View>
-                <Text style={{ fontSize: 18, fontWeight: '800', color: colors.textPrimary, textAlign: 'center' }}>Aucun résultat</Text>
-                <Text style={{ fontSize: 14, color: colors.textTertiary, textAlign: 'center', lineHeight: 20 }}>Rien trouvé pour "{searchQuery}". Essaie un autre mot-clé.</Text>
+                <Text style={{ fontSize: FontSize.lg, fontWeight: FontWeight.extraBold, color: colors.textPrimary, textAlign: 'center' }}>Aucun résultat</Text>
+                <Text style={{ fontSize: FontSize.base, color: colors.textTertiary, textAlign: 'center', lineHeight: 20 }}>Rien trouvé pour "{searchQuery}". Essaie un autre mot-clé.</Text>
               </View>
             );
 
@@ -2551,7 +2692,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                         <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center' }}>
                           <Icon name="clock" size={13} color={colors.primary} />
                         </View>
-                        <Text style={{ flex: 1, fontSize: 14, fontWeight: '500', color: colors.textPrimary }} numberOfLines={1}>{h.query}</Text>
+                        <Text style={{ flex: 1, fontSize: FontSize.base, fontWeight: FontWeight.medium, color: colors.textPrimary }} numberOfLines={1}>{h.query}</Text>
                         <Icon name="arrow-up-left" size={13} color={colors.textTertiary} />
                       </TouchableOpacity>
                     ))}
@@ -2581,10 +2722,10 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                         }}
                       >
                         <Icon name={cat.icon} size={13} color={active ? '#fff' : colors.textSecondary} />
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: active ? '#fff' : colors.textSecondary }}>{cat.label}</Text>
+                        <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, color: active ? '#fff' : colors.textSecondary }}>{cat.label}</Text>
                         {totalCounts[cat.key] > 0 && (
                           <View style={{ backgroundColor: active ? 'rgba(255,255,255,0.25)' : cat.accent + '22', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1 }}>
-                            <Text style={{ fontSize: 10, fontWeight: '800', color: active ? '#fff' : cat.accent }}>{totalCounts[cat.key]}</Text>
+                            <Text style={{ fontSize: FontSize.xs, fontWeight: FontWeight.extraBold, color: active ? '#fff' : cat.accent }}>{totalCounts[cat.key]}</Text>
                           </View>
                         )}
                       </TouchableOpacity>
@@ -2632,8 +2773,8 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                             isLive={u.is_live}
                           />
                           <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary }} numberOfLines={1}>{u.display_name ?? u.username}</Text>
-                            <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }}>@{u.username}</Text>
+                            <Text style={{ fontSize: FontSize.basePlus, fontWeight: FontWeight.bold, color: colors.textPrimary }} numberOfLines={1}>{u.display_name ?? u.username}</Text>
+                            <Text style={{ fontSize: FontSize.sm, color: colors.textTertiary, marginTop: 2 }}>@{u.username}</Text>
                           </View>
                           <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
                             <Icon name="chevron-right" size={14} color={colors.textDisabled} />
@@ -2786,17 +2927,17 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                 <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: colors.primary + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
                   <Icon name="users" size={32} color={colors.primary} />
                 </View>
-                <Text style={[s.emptyText, { color: colors.textPrimary, fontWeight: '800', fontSize: 17 }]}>
+                <Text style={[s.emptyText, { color: colors.textPrimary, fontWeight: FontWeight.extraBold, fontSize: FontSize.mdPlus }]}>
                   Aucun post de tes suivis
                 </Text>
-                <Text style={{ color: colors.textTertiary, fontSize: 14, textAlign: 'center', lineHeight: 20, paddingHorizontal: 32, marginTop: 6 }}>
+                <Text style={{ color: colors.textTertiary, fontSize: FontSize.base, textAlign: 'center', lineHeight: 20, paddingHorizontal: 32, marginTop: 6 }}>
                   Les personnes que tu suis n'ont pas encore publié de post. Suis plus de gens ou reviens plus tard.
                 </Text>
                 <TouchableOpacity
                   onPress={handleToggleFriends}
                   style={{ marginTop: 20, paddingHorizontal: 24, paddingVertical: 12, backgroundColor: colors.primary, borderRadius: 24 }}
                 >
-                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Découvrir du contenu</Text>
+                  <Text style={{ color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.base }}>Découvrir du contenu</Text>
                 </TouchableOpacity>
               </View>
             ) : (
@@ -2820,6 +2961,35 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           initialNumToRender={5}
         />
       )}
+
+      {/* Bouton flottant "remonter + rafraîchir" — juste au-dessus de la tab
+          bar (jamais dessus ni caché dessous), apparaît après un scroll
+          significatif. Au clic : remonte en haut de la liste ET relance un
+          chargement silencieux pour du contenu frais.
+          Toujours monté (jamais démonté/remonté conditionnellement dans le
+          JSX) — un montage/démontage en plein milieu d'un geste de scroll actif
+          sur la FlatList perturbait la réconciliation native de l'arbre de
+          vues, provoquant des saccades et des taps qui atterrissaient sur le
+          mauvais élément. Seuls opacity/pointerEvents changent, jamais la
+          présence du composant. */}
+      <Animated.View
+        pointerEvents={showScrollTop ? 'box-none' : 'none'}
+        style={[
+          fst.scrollTopWrap,
+          { bottom: TAB_BAR_HEIGHT + insets.bottom - 46 },
+          scrollTopStyle,
+        ]}
+      >
+        <TouchableOpacity
+          onPress={handleScrollTopPress}
+          activeOpacity={0.6}
+          style={fst.scrollTopBtn}
+        >
+          <Animated.View style={[{ alignItems: 'center', justifyContent: 'center' }, scrollTopIconStyle]}>
+            <Icon name="chevrons-up" size={18} color="#fff" style={{ textAlign: 'center' }} />
+          </Animated.View>
+        </TouchableOpacity>
+      </Animated.View>
 
       {/* ── Sheet commentaires ──────────────────────────────────────────── */}
       <CommentsBottomSheet
@@ -2939,7 +3109,7 @@ const ReelFeedCard: React.FC<{
             const ls = JSON.parse(reel.text_layers);
             return ls.slice(0, 3).map((l: any) => (
               <View key={l.id} pointerEvents="none" style={{ position: 'absolute', left: `${(l.x / 390) * 100}%` as any, top: `${(l.y / 844) * 100}%` as any, zIndex: 2 }}>
-                <Text style={{ color: l.color, fontSize: Math.max(8, Math.round(l.fontSize * 0.35)), fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }} numberOfLines={1}>{l.text}</Text>
+                <Text style={{ color: l.color, fontSize: Math.max(8, Math.round(l.fontSize * 0.35)), fontWeight: FontWeight.bold, textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }} numberOfLines={1}>{l.text}</Text>
               </View>
             ));
           } catch { return null; }
@@ -2958,7 +3128,7 @@ const ReelFeedCard: React.FC<{
             <CachedImage uri={author.avatar_url} style={rs.avatarSm} />
           ) : (
             <View style={[rs.avatarSm, { backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }]}>
-              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>{initials}</Text>
+              <Text style={{ color: '#fff', fontWeight: FontWeight.extraBold, fontSize: FontSize.sm }}>{initials}</Text>
             </View>
           )}
           <View style={{ flex: 1 }}>
@@ -3022,27 +3192,27 @@ const rs = StyleSheet.create({
 
   // Badge REEL
   reelBadge:     { position: 'absolute', top: 12, left: 12, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
-  reelBadgeText: { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  reelBadgeText: { color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.extraBold, letterSpacing: 0.5 },
 
   // Auteur en overlay haut
   authorOverlay:     { position: 'absolute', top: 40, left: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
   avatarSm:          { width: 32, height: 32, borderRadius: 16, overflow: 'hidden', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)' },
-  authorOverlayName: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  authorOverlayTime: { color: 'rgba(255,255,255,0.65)', fontSize: 11, marginTop: 1 },
+  authorOverlayName: { color: '#fff', fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
+  authorOverlayTime: { color: 'rgba(255,255,255,0.65)', fontSize: FontSize.xsPlus, marginTop: 1 },
   muteBtnOverlay:    { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' },
 
   // Bas overlay
   bottomOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 14, gap: 6 },
   hookWrap:  { alignSelf: 'flex-start', backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
-  hookText:  { color: '#fff', fontSize: 13, fontWeight: '700' },
-  captionOverlay: { color: 'rgba(255,255,255,0.9)', fontSize: 13, lineHeight: 18 },
+  hookText:  { color: '#fff', fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
+  captionOverlay: { color: 'rgba(255,255,255,0.9)', fontSize: FontSize.smPlus, lineHeight: 18 },
 
   // Stats + CTA
   statsRow:  { flexDirection: 'row', alignItems: 'center', gap: 12 },
   statItem:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  statTxt:   { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '600' },
+  statTxt:   { color: 'rgba(255,255,255,0.85)', fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
   ctaBtn:    { marginLeft: 'auto' as any, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' },
-  ctaTxt:    { color: '#fff', fontSize: 12, fontWeight: '700' },
+  ctaTxt:    { color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.bold },
 
   // Bouton play animé
   playCenter:  { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
@@ -3052,8 +3222,8 @@ const rs = StyleSheet.create({
 
 const hk = StyleSheet.create({
   wrap: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 14, marginBottom: 10, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10, borderLeftWidth: 3 },
-  icon: { fontSize: 16 },
-  text: { flex: 1, fontSize: 13, fontWeight: '700', lineHeight: 18 },
+  icon: { fontSize: FontSize.md },
+  text: { flex: 1, fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, lineHeight: 18 },
 });
 
 // ── FeedCard ──────────────────────────────────────────────────────────────────
@@ -3233,15 +3403,15 @@ const cm = StyleSheet.create({
   sheet:      { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 10, paddingHorizontal: 12, gap: 8 },
   handle:     { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 4 },
   titleRow:   { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center', paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, marginBottom: 4 },
-  sheetTitle: { fontSize: 12, fontWeight: '600' },
+  sheetTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
   group:      { borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
   action:     { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 13 },
   iconWrap:   { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  actionText: { fontSize: 15, fontWeight: '500' },
+  actionText: { fontSize: FontSize.basePlus, fontWeight: FontWeight.medium },
   divider:    { height: StyleSheet.hairlineWidth },
   cancelBtn:  { borderRadius: 16, paddingVertical: 16, alignItems: 'center', borderWidth: StyleSheet.hairlineWidth, marginTop: 4 },
-  cancelText: { fontSize: 16, fontWeight: '600' },
-  actionSub:  { fontSize: 12, marginTop: 1 },
+  cancelText: { fontSize: FontSize.md, fontWeight: FontWeight.semiBold },
+  actionSub:  { fontSize: FontSize.sm, marginTop: 1 },
 });
 
 const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUserId, isFollowing, onToggleFollow, onComment, onPress, onAuthorPress, onHide }) => {
@@ -3268,7 +3438,9 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
   const price  = isEvent ? event?.ticket_price : concert?.ticket_price;
   const commentsDisabled = isEvent ? (event?.comments_disabled ?? false) : (concert?.comments_disabled ?? false);
 
-  const accent   = colors.primary;
+  // Neutre plutôt que le violet de marque — la couleur reste réservée aux
+  // vrais signaux de statut (LIVE, GRATUIT), pas à la décoration générique.
+  const accent   = colors.textSecondary;
   const cardIcon = isEvent ? (EVENT_ICONS[event.event_type]  ?? 'calendar') : 'music';
   const typeLabel = isEvent ? event.event_type?.toUpperCase() : 'CONCERT';
 
@@ -3422,7 +3594,7 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
                 })}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 }}>
                 <ActivityIndicator size="small" color={colors.textTertiary} />
-                <Text style={{ color: colors.textTertiary, fontSize: 10, fontWeight: '600' }}>Vérification en cours…</Text>
+                <Text style={{ color: colors.textTertiary, fontSize: FontSize.xs, fontWeight: FontWeight.semiBold }}>Vérification en cours…</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -3430,8 +3602,8 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
 
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           {showFollowBtn && !isFollowing && (
-            <TouchableOpacity style={[fc.followChip, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '40' }]} onPress={onToggleFollow} activeOpacity={0.7}>
-              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Suivre</Text>
+            <TouchableOpacity style={[fc.followChip, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]} onPress={onToggleFollow} activeOpacity={0.7}>
+              <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, color: colors.textPrimary }}>Suivre</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity onPress={() => setCardMenuOpen(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -3440,43 +3612,37 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
         </View>
       </View>
 
-      {/* ── Titre + date/lieu — sorti de l'image, façon Facebook ─────────── */}
+      {/* ── Titre + ligne info compacte — design allégé : type/date/lieu tenus
+          sur une seule ligne (plus de badge de type séparé), le statut
+          (LIVE/GRATUIT/prix) aligné à droite au lieu d'empiler un 3e bloc
+          de badges en dessous. Minimum affiché, mieux réparti. ─────────── */}
       <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={fc.titleWrap}>
         <Text style={[fc.heroTitle, { color: colors.textPrimary }]} numberOfLines={2}>{title}</Text>
-        <View style={fc.heroMeta}>
-          <Icon name="calendar" size={9} color={colors.textTertiary} />
-          <Text style={[fc.heroMetaText, { color: colors.textSecondary }]}>{formatDate(date)}</Text>
-          {city ? (
-            <>
-              <Text style={[fc.heroMetaDot, { color: colors.textTertiary }]}>·</Text>
-              <Icon name="map-pin" size={9} color={colors.textTertiary} />
-              <Text style={[fc.heroMetaText, { color: colors.textSecondary }]} numberOfLines={1}>{city}</Text>
-            </>
-          ) : null}
-        </View>
-        {/* Badges — type, gratuit/prix — petits, sous le titre plutôt que sur l'image */}
-        <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
-          <View style={[fc.chipBadge, { backgroundColor: accent + '15' }]}>
-            <Icon name={cardIcon} size={7} color={accent} />
-            <Text style={[fc.typeBadgeText, { color: accent }]}>{typeLabel}</Text>
+        <View style={fc.heroInfoRow}>
+          <View style={fc.heroMeta}>
+            <Icon name={cardIcon} size={10} color={colors.textTertiary} />
+            <Text style={[fc.heroMetaText, { color: colors.textSecondary }]} numberOfLines={1}>{typeLabel}</Text>
+            <Text style={[fc.heroMetaDot, { color: colors.textTertiary }]}>·</Text>
+            <Text style={[fc.heroMetaText, { color: colors.textSecondary }]}>{formatDate(date)}</Text>
+            {city ? (
+              <>
+                <Text style={[fc.heroMetaDot, { color: colors.textTertiary }]}>·</Text>
+                <Text style={[fc.heroMetaText, { color: colors.textSecondary }]} numberOfLines={1}>{city}</Text>
+              </>
+            ) : null}
           </View>
-          {isLive && (
-            <View style={[fc.chipBadge, { backgroundColor: colors.liveTag + '22' }]}>
+          {isLive ? (
+            <View style={fc.heroStatus}>
               <View style={[fc.liveDot, { backgroundColor: colors.liveTag }]} />
-              <Text style={[fc.chipBadgeText, { color: colors.liveTag }]}>LIVE</Text>
+              <Text style={[fc.heroStatusText, { color: colors.liveTag }]}>LIVE</Text>
             </View>
-          )}
-          {isFree && (
-            <View style={[fc.chipBadge, { backgroundColor: colors.success + '22' }]}>
-              <Text style={[fc.chipBadgeText, { color: colors.success }]}>GRATUIT</Text>
-            </View>
-          )}
-          {!isFree && price != null && price > 0 && (
-            <View style={[fc.chipBadge, { backgroundColor: colors.backgroundSecondary }]}>
-              <Icon name="tag" size={7} color={colors.textSecondary} />
-              <Text style={[fc.chipBadgeText, { color: colors.textSecondary }]}>dès <PriceWithLocal amountEur={price!} style={[fc.chipBadgeText, { color: colors.textSecondary }]} localStyle={{ color: colors.textTertiary }} /></Text>
-            </View>
-          )}
+          ) : isFree ? (
+            <Text style={[fc.heroStatusText, { color: colors.success }]}>Gratuit</Text>
+          ) : price != null && price > 0 ? (
+            <Text style={[fc.heroStatusText, { color: colors.textSecondary }]}>
+              dès <PriceWithLocal amountEur={price!} style={[fc.heroStatusText, { color: colors.textSecondary }]} localStyle={{ color: colors.textTertiary }} />
+            </Text>
+          ) : null}
         </View>
       </TouchableOpacity>
 
@@ -3534,7 +3700,7 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
           ) : <View style={{ flex: 1, minWidth: 0 }} />}
           {!commentsDisabled && commentCount > 0 && (
             <TouchableOpacity onPress={() => onComment((d: number) => setCommentCount((v: number) => v + d), (n: number) => setCommentCount((v: number) => Math.max(v, n)))} style={fc.countChip}>
-              <View style={[fc.commentIcon, { backgroundColor: colors.primary }]}><MCIcon name="comment-outline" size={9} color="#fff" /></View>
+              <View style={[fc.commentIcon, { backgroundColor: colors.textTertiary }]}><MCIcon name="comment-outline" size={9} color="#fff" /></View>
               <Text style={[fc.countText, { color: colors.textTertiary }]}>{fmtN(commentCount)}</Text>
             </TouchableOpacity>
           )}
@@ -3568,7 +3734,7 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
 
         <TouchableOpacity style={[fc.actionBtn, fc.actionBtnSave]} onPress={handleSave} activeOpacity={0.7} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
           <Animated.View style={saveStyle}>
-            <MCIcon name={saved ? 'bookmark' : 'bookmark-outline'} size={FeedActionIcon.size} color={saved ? colors.primary : colors.textSecondary} />
+            <MCIcon name={saved ? 'bookmark' : 'bookmark-outline'} size={FeedActionIcon.size} color={saved ? colors.textPrimary : colors.textSecondary} />
           </Animated.View>
         </TouchableOpacity>
       </View>
@@ -3609,33 +3775,33 @@ const FCPAD = FeedCardLayout.padH; // 12
 
 const fc = StyleSheet.create({
   // Hero
-  liveBadge:      { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EF4444', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   liveDot:        { width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#fff' },
-  liveBadgeText:  { fontSize: 9, fontWeight: '900', color: '#fff', letterSpacing: 0.8 },
-  chipBadge:      { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: FeedRadius.chip },
-  chipBadgeText:  { fontSize: 9, fontWeight: '800' },
-  typeBadgeText:  { fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
   titleWrap:      { paddingHorizontal: FCPAD, paddingTop: 2, paddingBottom: 8 },
-  heroTitle:      { fontSize: 16, fontWeight: '800', letterSpacing: -0.2, lineHeight: 21, marginBottom: 4 },
-  heroMeta:       { flexDirection: 'row', alignItems: 'center', gap: 5, flexWrap: 'wrap' },
-  heroMetaText:   { fontSize: 12, fontWeight: '500' },
-  heroMetaDot:    { fontSize: 11 },
+  heroTitle:      { fontSize: FontSize.md, fontWeight: FontWeight.extraBold, letterSpacing: -0.2, lineHeight: 21, marginBottom: 4 },
+  // Ligne unique : infos (type · date · lieu) à gauche, statut à droite —
+  // remplace l'ancien empilement titre / date-lieu / badges (3 blocs).
+  heroInfoRow:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  heroMeta:       { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 5, minWidth: 0 },
+  heroMetaText:   { fontSize: FontSize.sm, fontWeight: FontWeight.medium, flexShrink: 1 },
+  heroMetaDot:    { fontSize: FontSize.xsPlus },
+  heroStatus:     { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 0 },
+  heroStatusText: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, flexShrink: 0 },
   // Header auteur
   header:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: FCPAD, paddingTop: FCPAD, paddingBottom: 8, gap: 8 },
   headerLeft:     { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 },
-  authorName:     { fontSize: 13, fontWeight: '700', letterSpacing: -0.1 },
-  timeAgo:        { fontSize: 11, fontWeight: '500', marginTop: 1 },
+  authorName:     { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, letterSpacing: -0.1 },
+  timeAgo:        { fontSize: FontSize.xsPlus, fontWeight: FontWeight.medium, marginTop: 1 },
   followChip:     { paddingHorizontal: 10, paddingVertical: 4, borderRadius: FeedRadius.chip, borderWidth: 1 },
   // Description
   descWrap:       { paddingHorizontal: FCPAD, paddingBottom: 8 },
-  desc:           { fontSize: 14, lineHeight: 21 },
+  desc:           { fontSize: FontSize.base, lineHeight: 21 },
   // Media — encadré, coins arrondis
   mediaWrap:      { paddingHorizontal: FCPAD, paddingBottom: 10 },
   mediaClip:      { borderRadius: FeedRadius.media, overflow: 'hidden', backgroundColor: '#0d0d1a' },
   // Compteurs
   countsRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: FCPAD, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth },
   countChip:    { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  countText:    { fontSize: 12, fontWeight: '500' },
+  countText:    { fontSize: FontSize.sm, fontWeight: FontWeight.medium },
   commentIcon:  { width: 18, height: 18, borderRadius: FeedRadius.full, alignItems: 'center', justifyContent: 'center' },
   // Actions — icônes seules, cible 44px
   actionBar:      { flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: FCPAD - 4, paddingVertical: 2 },
@@ -3655,16 +3821,40 @@ const nbS = StyleSheet.create({
     overflow:         'hidden',
   },
   header:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 12 },
-  title:    { fontSize: 16, fontWeight: '800' },
-  subtitle: { fontSize: 11, marginTop: 2 },
-  seeAll:   { fontSize: 13, fontWeight: '700' },
+  title:    { fontSize: FontSize.md, fontWeight: FontWeight.extraBold },
+  subtitle: { fontSize: FontSize.xsPlus, marginTop: 2 },
+  seeAll:   { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
   list:     { paddingHorizontal: 16, gap: 10, paddingBottom: 4 },
   card:     { borderRadius: FeedRadius.media, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
   iconWrap: { width: 36, height: 36, borderRadius: FeedRadius.full, borderWidth: 3, alignItems: 'center', justifyContent: 'center', alignSelf: 'center' },
   cardBody: { alignItems: 'center', paddingHorizontal: 12, paddingBottom: 14, gap: 3 },
-  name:     { fontSize: 13, fontWeight: '700', textAlign: 'center' },
-  handle:   { fontSize: 10, textAlign: 'center' },
+  name:     { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, textAlign: 'center' },
+  handle:   { fontSize: FontSize.xs, textAlign: 'center' },
   goBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8, borderRadius: FeedRadius.chip, paddingVertical: 9, width: '100%' },
-  goBtnText:{ fontSize: 13, fontWeight: '700', color: '#fff' },
+  goBtnText:{ fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, color: '#fff' },
+});
+
+// ── Bouton flottant "remonter + rafraîchir" ───────────────────────────────────
+const fst = StyleSheet.create({
+  scrollTopWrap: {
+    position: 'absolute',
+    right: 18,
+    // Taille bornée exactement à celle du bouton — jamais de zone de hit-test
+    // floue qui pourrait intercepter des touches ailleurs sur la liste en dessous.
+    width: 34,
+    height: 34,
+  },
+  scrollTopBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Fond overlay — sans lui, l'icône seule se perdait visuellement selon le
+    // contenu qui défile derrière (photo claire, fond blanc...). Semi-transparent
+    // sombre pour rester lisible quel que soit le fond, cohérent avec les autres
+    // boutons flottants par-dessus du contenu variable dans l'app (Reels...).
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
 });
 

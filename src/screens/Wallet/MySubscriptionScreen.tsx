@@ -8,6 +8,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { subscriptionService } from '../../services/subscriptionService';
 import { toastService, showConfirm } from '../../services';
@@ -272,48 +273,48 @@ export default function MySubscriptionScreen() {
 const s = StyleSheet.create({
   header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   backBtn:      { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
-  headerTitle:  { fontSize: 17, fontWeight: '700' },
+  headerTitle:  { fontSize: FontSize.mdPlus, fontWeight: FontWeight.bold },
   scroll:       { padding: 16 },
 
   currentCard:   { borderRadius: 20, padding: 22, marginBottom: 16, gap: 16 },
   currentTop:    { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  currentPlan:   { color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: '600' },
-  currentPrice:  { color: '#fff', fontSize: 28, fontWeight: '900', marginTop: 2 },
+  currentPlan:   { color: 'rgba(255,255,255,0.8)', fontSize: FontSize.base, fontWeight: FontWeight.semiBold },
+  currentPrice:  { color: '#fff', fontSize: FontSize['3xl'], fontWeight: FontWeight.black, marginTop: 2 },
   statusPill:    { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
-  statusPillText:{ color: '#fff', fontSize: 12, fontWeight: '700' },
+  statusPillText:{ color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.bold },
   currentDates:  { flexDirection: 'row', gap: 12 },
   dateItem:      { flex: 1 },
-  dateLabel:     { color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '600', marginBottom: 3 },
-  dateVal:       { color: '#fff', fontSize: 13, fontWeight: '600' },
+  dateLabel:     { color: 'rgba(255,255,255,0.6)', fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold, marginBottom: 3 },
+  dateVal:       { color: '#fff', fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
   dateDivider:   { width: 1, backgroundColor: 'rgba(255,255,255,0.2)' },
   downloadsRow:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  downloadsText: { color: 'rgba(255,255,255,0.8)', fontSize: 12 },
+  downloadsText: { color: 'rgba(255,255,255,0.8)', fontSize: FontSize.sm },
 
   specsCard:   { borderRadius: 16, padding: 16, marginBottom: 14, gap: 12 },
-  specsTitle:  { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginBottom: 4 },
+  specsTitle:  { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, letterSpacing: 0.8, marginBottom: 4 },
   specRow:     { flexDirection: 'row', alignItems: 'center', gap: 12 },
   specIcon:    { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  specLabel:   { fontSize: 14, fontWeight: '500' },
+  specLabel:   { fontSize: FontSize.base, fontWeight: FontWeight.medium },
 
   actionBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 15, borderRadius: 14, marginBottom: 10 },
-  actionBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  actionBtnText: { color: '#fff', fontSize: FontSize.basePlus, fontWeight: FontWeight.bold },
   cancelBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, marginBottom: 10 },
-  cancelBtnText: { color: '#EF4444', fontSize: 15, fontWeight: '600' },
+  cancelBtnText: { color: '#EF4444', fontSize: FontSize.basePlus, fontWeight: FontWeight.semiBold },
   cancelledNote: { flexDirection: 'row', gap: 8, padding: 12, borderRadius: 12, alignItems: 'flex-start' },
-  cancelledNoteText: { flex: 1, fontSize: 12, lineHeight: 17 },
+  cancelledNoteText: { flex: 1, fontSize: FontSize.sm, lineHeight: 17 },
 
   emptyWrap:   { alignItems: 'center', gap: 12, paddingVertical: 60, paddingHorizontal: 32 },
   emptyIcon:   { width: 90, height: 90, borderRadius: 45, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  emptyTitle:  { fontSize: 20, fontWeight: '800', textAlign: 'center' },
-  emptySub:    { fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  emptyTitle:  { fontSize: FontSize.xl, fontWeight: FontWeight.extraBold, textAlign: 'center' },
+  emptySub:    { fontSize: FontSize.base, textAlign: 'center', lineHeight: 20 },
 
   histSection: { marginTop: 12 },
-  histTitle:   { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginBottom: 10 },
+  histTitle:   { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, letterSpacing: 0.8, marginBottom: 10 },
   histCard:    { borderRadius: 14, overflow: 'hidden' },
   histRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
   histDot:     { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  histPlan:    { fontSize: 14, fontWeight: '600' },
-  histDate:    { fontSize: 11, marginTop: 2 },
+  histPlan:    { fontSize: FontSize.base, fontWeight: FontWeight.semiBold },
+  histDate:    { fontSize: FontSize.xsPlus, marginTop: 2 },
   histBadge:   { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
-  histBadgeText: { fontSize: 11, fontWeight: '700' },
+  histBadgeText: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold },
 });

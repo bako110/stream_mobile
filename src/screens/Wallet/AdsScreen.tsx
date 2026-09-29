@@ -12,6 +12,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { BackButton, GofolyxLoader, PriceWithLocal } from '../../components/common';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { adService, type Ad } from '../../services/adService';
 import { toastService, showConfirm } from '../../services';
@@ -25,13 +26,13 @@ const coins2eur = (GoGold: number) => (GoGold / EUR_TO_COINS).toFixed(2);
 const HowItWorks: React.FC<{ colors: any }> = ({ colors }) => (
   <View style={{ marginBottom: 20 }}>
     <LinearGradient
-      colors={['#7B3FF2', '#E0389A']}
+      colors={[colors.gradientStart, colors.gradientEnd]}
       start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
       style={{ borderRadius: 18, padding: 18, marginBottom: 12 }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
         <MaterialCommunityIcons name="bullhorn" size={20} color="#fff" />
-        <Text style={{ color: '#fff', fontSize: 16, fontWeight: '900' }}>Comment ça marche ?</Text>
+        <Text style={{ color: '#fff', fontSize: FontSize.md, fontWeight: FontWeight.black }}>Comment ça marche ?</Text>
       </View>
       {[
         { icon: 'zap',        text: 'Tu paies en GoGold — 100 GoGold = 1 €' },
@@ -43,22 +44,22 @@ const HowItWorks: React.FC<{ colors: any }> = ({ colors }) => (
           <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
             <Icon name={r.icon} size={12} color="#fff" />
           </View>
-          <Text style={{ color: 'rgba(255,255,255,0.92)', fontSize: 13, flex: 1, lineHeight: 18 }}>{r.text}</Text>
+          <Text style={{ color: 'rgba(255,255,255,0.92)', fontSize: FontSize.smPlus, flex: 1, lineHeight: 18 }}>{r.text}</Text>
         </View>
       ))}
     </LinearGradient>
 
     {/* Tableau CPM */}
     <View style={[{ borderRadius: 16, borderWidth: 1, borderColor: colors.divider, backgroundColor: colors.surface, overflow: 'hidden' }]}>
-      <View style={{ backgroundColor: '#7B3FF210', padding: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <Icon name="info" size={13} color="#7B3FF2" />
-        <Text style={{ color: '#7B3FF2', fontSize: 12, fontWeight: '800' }}>Tarifs — Coût pour 1 000 impressions (CPM)</Text>
+      <View style={{ backgroundColor: colors.primary + '10', padding: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <Icon name="info" size={13} color={colors.primary} />
+        <Text style={{ color: colors.primary, fontSize: FontSize.sm, fontWeight: FontWeight.extraBold }}>Tarifs — Coût pour 1 000 impressions (CPM)</Text>
       </View>
       {[
-        { cpm: 1,  GoGold: 100,  label: 'Économique', reach: '~1 000',  color: '#10B981' },
-        { cpm: 2,  GoGold: 200,  label: 'Standard',   reach: '~500',    color: '#3B82F6' },
-        { cpm: 5,  GoGold: 500,  label: 'Premium',    reach: '~200',    color: '#F59E0B' },
-        { cpm: 10, GoGold: 1000, label: 'Top',        reach: '~100',    color: '#E0389A' },
+        { cpm: 1,  GoGold: 100,  label: 'Économique', reach: '~1 000',  color: colors.primary },
+        { cpm: 2,  GoGold: 200,  label: 'Standard',   reach: '~500',    color: colors.primary },
+        { cpm: 5,  GoGold: 500,  label: 'Premium',    reach: '~200',    color: colors.primary },
+        { cpm: 10, GoGold: 1000, label: 'Top',        reach: '~100',    color: colors.primary },
       ].map((row, i, arr) => (
         <View key={row.cpm} style={{
           flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 11,
@@ -66,13 +67,13 @@ const HowItWorks: React.FC<{ colors: any }> = ({ colors }) => (
           borderBottomColor: colors.divider,
         }}>
           <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: row.color, marginRight: 10 }} />
-          <Text style={{ color: colors.textPrimary, fontWeight: '700', fontSize: 13, width: 70 }}>{row.label}</Text>
+          <Text style={{ color: colors.textPrimary, fontWeight: FontWeight.bold, fontSize: FontSize.smPlus, width: 70 }}>{row.label}</Text>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
-              <PriceWithLocal amountEur={row.cpm} style={{ color: colors.textSecondary, fontSize: 12 }} /> · <Text style={{ color: row.color, fontWeight: '700' }}>{row.GoGold} GoGold</Text> / 1 000 imp.
+            <Text style={{ color: colors.textSecondary, fontSize: FontSize.sm }}>
+              <PriceWithLocal amountEur={row.cpm} style={{ color: colors.textSecondary, fontSize: FontSize.sm }} /> · <Text style={{ color: row.color, fontWeight: FontWeight.bold }}>{row.GoGold} GoGold</Text> / 1 000 imp.
             </Text>
           </View>
-          <Text style={{ color: colors.textTertiary, fontSize: 11 }}>{row.reach} imp/€</Text>
+          <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus }}>{row.reach} imp/€</Text>
         </View>
       ))}
     </View>
@@ -109,10 +110,10 @@ const AdCard: React.FC<{
           <Text style={[s.adTitle, { color: colors.textPrimary }]} numberOfLines={1}>{item.title}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
             <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: statusColor }} />
-            <Text style={{ color: statusColor, fontSize: 11, fontWeight: '700' }}>
+            <Text style={{ color: statusColor, fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold }}>
               {adService.statusLabel(item.status)}
             </Text>
-            <Text style={{ color: colors.textTertiary, fontSize: 11 }}>
+            <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus }}>
               · {PLACEMENT_LABELS[item.placement] ?? item.placement}
             </Text>
           </View>
@@ -132,32 +133,32 @@ const AdCard: React.FC<{
       </View>
 
       {/* Budget en GoGold + euros */}
-      <View style={[s.coinBox, { backgroundColor: '#7B3FF210', borderColor: '#7B3FF225' }]}>
+      <View style={[s.coinBox, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '25' }]}>
         <View style={{ flex: 1 }}>
-          <Text style={{ color: '#7B3FF2', fontSize: 11, fontWeight: '700', marginBottom: 2 }}>BUDGET</Text>
-          <Text style={{ color: '#7B3FF2', fontSize: 18, fontWeight: '900' }}>
-            {goGoldLeft.toLocaleString('fr-FR')} <Text style={{ fontSize: 12 }}>GoGold restants</Text>
+          <Text style={{ color: colors.primary, fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, marginBottom: 2 }}>BUDGET</Text>
+          <Text style={{ color: colors.primary, fontSize: FontSize.lg, fontWeight: FontWeight.black }}>
+            {goGoldLeft.toLocaleString('fr-FR')} <Text style={{ fontSize: FontSize.sm }}>GoGold restants</Text>
           </Text>
-          <Text style={{ color: colors.textTertiary, fontSize: 11, marginTop: 1 }}>
+          <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus, marginTop: 1 }}>
             {goGoldSpent.toLocaleString('fr-FR')} dépensés · {goGoldTotal.toLocaleString('fr-FR')} total
           </Text>
-          <Text style={{ color: colors.textTertiary, fontSize: 11 }}>
-            = <PriceWithLocal amountEur={item.spent_eur} style={{ color: colors.textTertiary, fontSize: 11 }} /> / <PriceWithLocal amountEur={item.budget_eur} style={{ color: colors.textTertiary, fontSize: 11 }} />
+          <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus }}>
+            = <PriceWithLocal amountEur={item.spent_eur} style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus }} /> / <PriceWithLocal amountEur={item.budget_eur} style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus }} />
           </Text>
         </View>
         <View style={{ alignItems: 'flex-end', gap: 4 }}>
-          <View style={{ backgroundColor: '#7B3FF222', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, alignItems: 'center' }}>
-            <Text style={{ color: '#7B3FF2', fontSize: 9, fontWeight: '700', letterSpacing: 0.3 }}>CPM</Text>
-            <Text style={{ color: '#7B3FF2', fontSize: 10, fontWeight: '800' }}>
+          <View style={{ backgroundColor: colors.primary + '22', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, alignItems: 'center' }}>
+            <Text style={{ color: colors.primary, fontSize: FontSize['2xs'], fontWeight: FontWeight.bold, letterSpacing: 0.3 }}>CPM</Text>
+            <Text style={{ color: colors.primary, fontSize: FontSize.xs, fontWeight: FontWeight.extraBold }}>
               1 000 imp = {cpmGoGold} GoGold
             </Text>
-            <Text style={{ color: colors.textTertiary, fontSize: 9 }}>= <PriceWithLocal amountEur={item.cpm_eur ?? 2} style={{ color: colors.textTertiary, fontSize: 9 }} /></Text>
+            <Text style={{ color: colors.textTertiary, fontSize: FontSize['2xs'] }}>= <PriceWithLocal amountEur={item.cpm_eur ?? 2} style={{ color: colors.textTertiary, fontSize: FontSize['2xs'] }} /></Text>
           </View>
         </View>
       </View>
       {/* gogold_debited — affiché si disponible */}
       {item.gogold_debited != null && (
-        <Text style={{ color: colors.textTertiary, fontSize: 11, marginTop: -4 }}>
+        <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus, marginTop: -4 }}>
           Débité à la création : {item.gogold_debited.toLocaleString('fr-FR')} GoGold
         </Text>
       )}
@@ -167,10 +168,10 @@ const AdCard: React.FC<{
         <View style={[s.budgetTrack, { backgroundColor: colors.backgroundSecondary }]}>
           <View style={[s.budgetFill, {
             width: `${Math.min(100, pct * 100)}%` as any,
-            backgroundColor: pct > 0.9 ? '#EF4444' : pct > 0.7 ? '#F59E0B' : '#7B3FF2',
+            backgroundColor: pct > 0.9 ? '#EF4444' : pct > 0.7 ? '#F59E0B' : colors.primary,
           }]} />
         </View>
-        <Text style={{ color: colors.textTertiary, fontSize: 10, marginTop: 3 }}>
+        <Text style={{ color: colors.textTertiary, fontSize: FontSize.xs, marginTop: 3 }}>
           {Math.round(pct * 100)}% du budget consommé
         </Text>
       </View>
@@ -178,10 +179,10 @@ const AdCard: React.FC<{
       {/* Stats */}
       <View style={[s.statsRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider, paddingTop: 10 }]}>
         {[
-          { icon: 'eye',        val: item.impressions.toLocaleString('fr-FR'), lbl: 'Impressions', color: '#3B82F6' },
-          { icon: 'mouse-pointer', val: item.clicks.toLocaleString('fr-FR'),  lbl: 'Clics',       color: '#10B981' },
-          { icon: 'percent',    val: `${item.ctr_pct}%`,                      lbl: 'CTR',         color: '#F59E0B' },
-          { icon: 'zap',        val: goGoldLeft.toLocaleString('fr-FR'),        lbl: 'GoGold rest.', color: '#E0389A' },
+          { icon: 'eye',        val: item.impressions.toLocaleString('fr-FR'), lbl: 'Impressions', color: colors.primary },
+          { icon: 'mouse-pointer', val: item.clicks.toLocaleString('fr-FR'),  lbl: 'Clics',       color: colors.primary },
+          { icon: 'percent',    val: `${item.ctr_pct}%`,                      lbl: 'CTR',         color: colors.primary },
+          { icon: 'zap',        val: goGoldLeft.toLocaleString('fr-FR'),        lbl: 'GoGold rest.', color: colors.primary },
         ].map(st => (
           <View key={st.lbl} style={s.stat}>
             <Icon name={st.icon} size={13} color={st.color} style={{ marginBottom: 3 }} />
@@ -197,6 +198,7 @@ const AdCard: React.FC<{
 // ── Screen ─────────────────────────────────────────────────────────────────────
 export const AdsScreen: React.FC = () => {
   const { theme: { colors } } = useTheme();
+  const ACCENT = colors.primary;
   const nav = useNavigation<any>();
   const insets = useSafeAreaInsets();
 
@@ -283,29 +285,29 @@ export const AdsScreen: React.FC = () => {
   const GlobalStats = ads.length > 0 ? (
     <View style={[s.globalStats, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
       <Text style={[s.globalTitle, { color: colors.textPrimary }]}>
-        Vue d'ensemble · <Text style={{ color: '#10B981' }}>{activeCount} active{activeCount !== 1 ? 's' : ''}</Text>
+        Vue d'ensemble · <Text style={{ color: colors.primary }}>{activeCount} active{activeCount !== 1 ? 's' : ''}</Text>
       </Text>
       {/* Ligne 1 : Budget total + Dépensé + Impressions + CTR */}
       <View style={{ flexDirection: 'row', gap: 8 }}>
         {[
-          { lbl: 'Budget total',  val: `${totalBudgetGoGold.toLocaleString('fr-FR')} c`,      sub: <PriceWithLocal amountEur={totalBudget} style={{ fontSize: 9, color: '#7B3FF2AA', fontWeight: '600' }} />,  color: '#7B3FF2' },
-          { lbl: 'Dépensé',       val: `${eur2coins(totalSpent).toLocaleString('fr-FR')} c`, sub: <PriceWithLocal amountEur={totalSpent} style={{ fontSize: 9, color: '#E0389AAA', fontWeight: '600' }} />,   color: '#E0389A' },
-          { lbl: 'Impressions',   val: totalImpressions.toLocaleString('fr-FR'),              sub: 'vues réelles' as React.ReactNode,                color: '#3B82F6' },
-          { lbl: 'CTR moyen',     val: `${globalCtr}%`,                                       sub: 'taux clic' as React.ReactNode,                   color: '#F59E0B' },
+          { lbl: 'Budget total',  val: `${totalBudgetGoGold.toLocaleString('fr-FR')} c`,      sub: <PriceWithLocal amountEur={totalBudget} style={{ fontSize: FontSize['2xs'], color: colors.primary + 'AA', fontWeight: FontWeight.semiBold }} /> },
+          { lbl: 'Dépensé',       val: `${eur2coins(totalSpent).toLocaleString('fr-FR')} c`, sub: <PriceWithLocal amountEur={totalSpent} style={{ fontSize: FontSize['2xs'], color: colors.primary + 'AA', fontWeight: FontWeight.semiBold }} /> },
+          { lbl: 'Impressions',   val: totalImpressions.toLocaleString('fr-FR'),              sub: 'vues réelles' as React.ReactNode },
+          { lbl: 'CTR moyen',     val: `${globalCtr}%`,                                       sub: 'taux clic' as React.ReactNode },
         ].map(g => (
-          <View key={g.lbl} style={[s.gStat, { backgroundColor: g.color + '12', borderRadius: 12, padding: 10 }]}>
-            <Text style={[s.gVal, { color: g.color }]}>{g.val}</Text>
-            <Text style={[{ fontSize: 9, color: g.color + 'AA', fontWeight: '600' }]}>{g.sub}</Text>
+          <View key={g.lbl} style={[s.gStat, { backgroundColor: colors.primary + '12', borderRadius: 12, padding: 10 }]}>
+            <Text style={[s.gVal, { color: colors.primary }]}>{g.val}</Text>
+            <Text style={[{ fontSize: FontSize['2xs'], color: colors.primary + 'AA', fontWeight: FontWeight.semiBold }]}>{g.sub}</Text>
             <Text style={[s.gLbl, { color: colors.textTertiary }]}>{g.lbl}</Text>
           </View>
         ))}
       </View>
       {/* Ligne 2 : Impressions restantes estimées (campagnes actives/pause) */}
       {estimatedRemainingImpressions > 0 && (
-        <View style={[s.gStat, { backgroundColor: '#10B98112', borderRadius: 12, padding: 10, width: '100%', alignItems: 'flex-start' }]}>
+        <View style={[s.gStat, { backgroundColor: colors.primary + '12', borderRadius: 12, padding: 10, width: '100%', alignItems: 'flex-start' }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Icon name="eye" size={13} color="#10B981" />
-            <Text style={[s.gVal, { color: '#10B981', fontSize: 13 }]}>
+            <Icon name="eye" size={13} color={colors.primary} />
+            <Text style={[s.gVal, { color: colors.primary, fontSize: FontSize.smPlus }]}>
               ~{estimatedRemainingImpressions.toLocaleString('fr-FR')} imp. restantes estimées
             </Text>
           </View>
@@ -328,11 +330,11 @@ export const AdsScreen: React.FC = () => {
         <BackButton onPress={() => nav.goBack()} />
         <View style={{ flex: 1 }}>
           <Text style={[s.title, { color: colors.textPrimary }]}>Mes publicités</Text>
-          <Text style={{ color: colors.textTertiary, fontSize: 11, marginTop: 1 }}>100 GoGold = 1 € de budget pub</Text>
+          <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus, marginTop: 1 }}>100 GoGold = 1 € de budget pub</Text>
         </View>
         <TouchableOpacity
           onPress={() => nav.navigate('CreateAd', { ad: null })}
-          style={[s.createBtn, { backgroundColor: '#7B3FF2' }]}
+          style={[s.createBtn, { backgroundColor: colors.primary }]}
         >
           <Icon name="plus" size={15} color="#fff" />
           <Text style={s.createTxt}>Créer</Text>
@@ -374,7 +376,7 @@ export const AdsScreen: React.FC = () => {
           contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: insets.bottom + 24 }}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }}
-              colors={['#7B3FF2']} tintColor="#7B3FF2" />
+              colors={[colors.primary]} tintColor={colors.primary} />
           }
           ListHeaderComponent={
             <View>
@@ -384,23 +386,20 @@ export const AdsScreen: React.FC = () => {
           }
           ListEmptyComponent={
             <View style={s.empty}>
-              <LinearGradient colors={['#7B3FF222', '#E0389A11']} style={{ width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
-                <MaterialCommunityIcons name="bullhorn-outline" size={38} color="#7B3FF2" />
-              </LinearGradient>
+              <View style={{ width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center', marginBottom: 8, backgroundColor: colors.primary + '18' }}>
+                <MaterialCommunityIcons name="bullhorn-outline" size={38} color={colors.primary} />
+              </View>
               <Text style={[s.emptyTitle, { color: colors.textPrimary }]}>Lance ta première campagne</Text>
               <Text style={[s.emptyDesc, { color: colors.textSecondary }]}>
                 Touche des milliers d'utilisateurs dès 100 GoGold (1€).{'\n'}
                 Tu contrôles ton budget, tu pauses quand tu veux.
               </Text>
               <TouchableOpacity
-                style={{ overflow: 'hidden', borderRadius: 24, marginTop: 8 }}
+                style={{ borderRadius: 24, marginTop: 8, paddingHorizontal: 28, paddingVertical: 13, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.primary }}
                 onPress={() => nav.navigate('CreateAd', { ad: null })}
               >
-                <LinearGradient colors={['#7B3FF2', '#E0389A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  style={{ paddingHorizontal: 28, paddingVertical: 13, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Icon name="zap" size={15} color="#fff" />
-                  <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>Créer une campagne</Text>
-                </LinearGradient>
+                <Icon name="zap" size={15} color="#fff" />
+                <Text style={{ color: '#fff', fontWeight: FontWeight.extraBold, fontSize: FontSize.basePlus }}>Créer une campagne</Text>
               </TouchableOpacity>
             </View>
           }
@@ -411,31 +410,31 @@ export const AdsScreen: React.FC = () => {
 };
 
 const s = StyleSheet.create({
-  title:        { fontSize: 17, fontWeight: '800' },
+  title:        { fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold },
   createBtn:    { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20 },
-  createTxt:    { color: '#fff', fontWeight: '700', fontSize: 13 },
+  createTxt:    { color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.smPlus },
   sectionHdr:   { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6,
                   paddingLeft: 10, borderLeftWidth: 3, borderRadius: 2, marginBottom: -2 },
   sectionDot:   { width: 6, height: 6, borderRadius: 3 },
-  sectionLabel: { fontSize: 12, fontWeight: '800', letterSpacing: 0.5, flex: 1 },
+  sectionLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.extraBold, letterSpacing: 0.5, flex: 1 },
   sectionBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
-  sectionCount: { fontSize: 11, fontWeight: '800' },
+  sectionCount: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold },
   card:        { borderRadius: 18, padding: 16, borderWidth: 1, gap: 12 },
-  adTitle:     { fontSize: 15, fontWeight: '800' },
+  adTitle:     { fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold },
   iconBtn:     { padding: 7, borderRadius: 8 },
   coinBox:     { borderRadius: 12, borderWidth: 1, padding: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   statsRow:    { flexDirection: 'row', gap: 0 },
   stat:        { flex: 1, alignItems: 'center', paddingVertical: 4 },
-  statVal:     { fontSize: 14, fontWeight: '800' },
-  statLbl:     { fontSize: 9, marginTop: 1 },
+  statVal:     { fontSize: FontSize.base, fontWeight: FontWeight.extraBold },
+  statLbl:     { fontSize: FontSize['2xs'], marginTop: 1 },
   budgetTrack: { height: 5, borderRadius: 3, overflow: 'hidden' },
   budgetFill:  { height: 5, borderRadius: 3 },
   globalStats: { borderRadius: 16, padding: 14, borderWidth: 1, marginBottom: 12, gap: 10 },
-  globalTitle: { fontSize: 14, fontWeight: '700' },
+  globalTitle: { fontSize: FontSize.base, fontWeight: FontWeight.bold },
   gStat:       { flex: 1, alignItems: 'center' },
-  gVal:        { fontSize: 14, fontWeight: '900' },
-  gLbl:        { fontSize: 9, marginTop: 2, textAlign: 'center' },
+  gVal:        { fontSize: FontSize.base, fontWeight: FontWeight.black },
+  gLbl:        { fontSize: FontSize['2xs'], marginTop: 2, textAlign: 'center' },
   empty:       { alignItems: 'center', paddingTop: 20, gap: 10, paddingHorizontal: 28 },
-  emptyTitle:  { fontSize: 18, fontWeight: '900', textAlign: 'center' },
-  emptyDesc:   { fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  emptyTitle:  { fontSize: FontSize.lg, fontWeight: FontWeight.black, textAlign: 'center' },
+  emptyDesc:   { fontSize: FontSize.smPlus, textAlign: 'center', lineHeight: 20 },
 });

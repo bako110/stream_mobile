@@ -95,12 +95,9 @@ export const ChangePasswordScreen: React.FC<Props> = ({ navigation }) => {
       {/* Indicateur d'étapes */}
       <View style={styles.stepsRow}>
         <View style={styles.stepItem}>
-          <LinearGradient
-            colors={['#7B3FF2', '#E0389A']}
-            style={[styles.stepDot, styles.stepDotActive]}
-          >
+          <View style={[styles.stepDot, styles.stepDotActive, { backgroundColor: colors.primary }]}>
             <Icon name="check" size={12} color="#fff" />
-          </LinearGradient>
+          </View>
           <Text style={[styles.stepLabel, { color: step === 1 ? colors.primary : colors.textTertiary }]}>
             Vérification
           </Text>
@@ -168,7 +165,7 @@ export const ChangePasswordScreen: React.FC<Props> = ({ navigation }) => {
                 disabled={current.length === 0 || verifying}
                 activeOpacity={0.8}
               >
-                <LinearGradient colors={['#7B3FF2', '#E0389A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.primary }]} />
                 {verifying
                   ? <ActivityIndicator color="#fff" size="small" />
                   : <Text style={styles.btnText}>Continuer</Text>
@@ -177,8 +174,8 @@ export const ChangePasswordScreen: React.FC<Props> = ({ navigation }) => {
             </>
           ) : (
             <>
-              <View style={[styles.iconBanner, { backgroundColor: '#10B981' + '15' }]}>
-                <Icon name="lock" size={32} color="#10B981" />
+              <View style={[styles.iconBanner, { backgroundColor: colors.primary + '15' }]}>
+                <Icon name="lock" size={32} color={colors.primary} />
               </View>
               <Text style={[styles.stepTitle, { color: colors.textPrimary }]}>
                 Nouveau mot de passe
@@ -257,7 +254,7 @@ export const ChangePasswordScreen: React.FC<Props> = ({ navigation }) => {
                 disabled={!canSave || saving}
                 activeOpacity={0.8}
               >
-                <LinearGradient colors={['#10B981', '#36D9A0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.primary }]} />
                 {saving
                   ? <ActivityIndicator color="#fff" size="small" />
                   : <Text style={styles.btnText}>Enregistrer</Text>

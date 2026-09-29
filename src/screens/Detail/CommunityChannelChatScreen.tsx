@@ -14,6 +14,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { useActiveVoice } from '../../context/ActiveVoiceContext';
 import { communityService } from '../../services/communityService';
@@ -581,7 +582,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
             </View>
             {dur != null && (
               <View style={{ position: 'absolute', bottom: 8, right: 10 }}>
-                <Text style={{ color: '#fff', fontSize: 11, fontWeight: '600', textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 3 }}>
+                <Text style={{ color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold, textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 3 }}>
                   {fmtDuration(dur)}
                 </Text>
               </View>
@@ -612,7 +613,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
                 <Text style={[C.msgText, { color: textColor }]}>{msg.content}</Text>
               </View>
             ) : null}
-            <Text style={{ fontSize: 10, color: colors.textTertiary, textAlign: isMe ? 'right' : 'left', marginTop: 2 }}>
+            <Text style={{ fontSize: FontSize.xs, color: colors.textTertiary, textAlign: isMe ? 'right' : 'left', marginTop: 2 }}>
               {fmtTime(msg.created_at)}
             </Text>
           </View>
@@ -728,12 +729,12 @@ export const CommunityChannelChatScreen: React.FC = () => {
           {msg.is_pinned && (
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
               <Icon name="bookmark" size={10} color={isMe ? 'rgba(255,255,255,0.7)' : '#F59E0B'} />
-              <Text style={{ color: isMe ? 'rgba(255,255,255,0.7)' : '#F59E0B', fontSize: 9, fontWeight: '700', marginLeft: 3 }}>Épinglé</Text>
+              <Text style={{ color: isMe ? 'rgba(255,255,255,0.7)' : '#F59E0B', fontSize: FontSize['2xs'], fontWeight: FontWeight.bold, marginLeft: 3 }}>Épinglé</Text>
             </View>
           )}
           <Text style={[C.msgText, { color: textColor }]}>{msg.content}</Text>
           <View style={C.msgMeta}>
-            {msg.edited_at && <Text style={[{ fontSize: 10, fontStyle: 'italic', color: timeColor }]}>modifié · </Text>}
+            {msg.edited_at && <Text style={[{ fontSize: FontSize.xs, fontStyle: 'italic', color: timeColor }]}>modifié · </Text>}
             <Text style={[C.msgTime, { color: timeColor }]}>{fmtTime(msg.created_at)}</Text>
           </View>
         </View>
@@ -845,7 +846,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
                 <Icon name="corner-up-left" size={14} color={colors.primary} />
                 <View style={{ flex: 1 }}>
                   <Text style={[C.replyBannerName, { color: colors.primary }]}>{replyingTo.sender_display_name || replyingTo.sender_username}</Text>
-                  <Text style={[{ fontSize: 12, color: colors.textSecondary }]} numberOfLines={1}>
+                  <Text style={[{ fontSize: FontSize.sm, color: colors.textSecondary }]} numberOfLines={1}>
                     {replyingTo.content || '📎 Pièce jointe'}
                   </Text>
                 </View>
@@ -861,7 +862,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
                 <Icon name="edit-2" size={14} color={colors.primary} />
                 <View style={{ flex: 1 }}>
                   <Text style={[C.replyBannerName, { color: colors.primary }]}>Modification</Text>
-                  <Text style={[{ fontSize: 12, color: colors.textSecondary }]} numberOfLines={1}>{editingMsg.content}</Text>
+                  <Text style={[{ fontSize: FontSize.sm, color: colors.textSecondary }]} numberOfLines={1}>{editingMsg.content}</Text>
                 </View>
                 <TouchableOpacity onPress={() => { setEditingMsg(null); setText(''); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   <Icon name="x" size={18} color={colors.textTertiary} />
@@ -975,7 +976,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
             >
               <Icon name="x" size={22} color="#fff" />
             </TouchableOpacity>
-            <Text style={{ flex: 1, color: '#fff', fontSize: 16, fontWeight: '700', textAlign: 'center', marginHorizontal: 8 }} numberOfLines={1}>
+            <Text style={{ flex: 1, color: '#fff', fontSize: FontSize.md, fontWeight: FontWeight.bold, textAlign: 'center', marginHorizontal: 8 }} numberOfLines={1}>
               {filePreview?.name ?? 'Fichier'}
             </Text>
             <View style={{ width: 36 }} />
@@ -985,11 +986,11 @@ export const CommunityChannelChatScreen: React.FC = () => {
             <View style={{ width: 96, height: 96, borderRadius: 20, backgroundColor: '#2a2a2a', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
               <Icon name="file-text" size={44} color="#7B3FF2" />
             </View>
-            <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700', textAlign: 'center', marginBottom: 6 }} numberOfLines={2}>
+            <Text style={{ color: '#fff', fontSize: FontSize.mdPlus, fontWeight: FontWeight.bold, textAlign: 'center', marginBottom: 6 }} numberOfLines={2}>
               {filePreview?.name}
             </Text>
             {filePreview?.size != null && (
-              <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13 }}>
+              <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: FontSize.smPlus }}>
                 {filePreview.size < 1024 ? `${filePreview.size} o`
                   : filePreview.size < 1048576 ? `${(filePreview.size / 1024).toFixed(1)} Ko`
                   : `${(filePreview.size / 1048576).toFixed(1)} Mo`}
@@ -1002,7 +1003,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
               <Icon name="edit-3" size={16} color="rgba(255,255,255,0.4)" />
               <TextInput
                 ref={fileCaptionRef}
-                style={{ flex: 1, color: '#fff', fontSize: 15, maxHeight: 100 }}
+                style={{ flex: 1, color: '#fff', fontSize: FontSize.basePlus, maxHeight: 100 }}
                 placeholder="Ajouter un commentaire…"
                 placeholderTextColor="rgba(255,255,255,0.35)"
                 value={fileCaption}
@@ -1062,16 +1063,16 @@ export const CommunityChannelChatScreen: React.FC = () => {
               <View style={[C.emojiRow, { borderBottomColor: colors.divider }]}>
                 {QUICK_EMOJIS.map(e => (
                   <TouchableOpacity key={e} onPress={() => setMenuMsg(null)} style={C.emojiBtn}>
-                    <Text style={{ fontSize: 24 }}>{e}</Text>
+                    <Text style={{ fontSize: FontSize['2xl'] }}>{e}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
             )}
             <View style={[C.menuPreview, { borderBottomColor: colors.divider }]}>
-              <Text style={[{ fontSize: 12, fontWeight: '700', color: colors.primary, marginBottom: 3 }]}>
+              <Text style={[{ fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: colors.primary, marginBottom: 3 }]}>
                 {menuMsg?.sender_display_name || menuMsg?.sender_username}
               </Text>
-              <Text style={{ color: colors.textPrimary, fontSize: 13 }} numberOfLines={2}>
+              <Text style={{ color: colors.textPrimary, fontSize: FontSize.smPlus }} numberOfLines={2}>
                 {menuMsg?.content || '📎 Pièce jointe'}
               </Text>
             </View>
@@ -1161,49 +1162,49 @@ const C = StyleSheet.create({
   root:   { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth, gap: 10 },
   channelIconBox: { width: 32, height: 32 },
-  headerTitle: { fontSize: 15, fontWeight: '800' },
-  headerSub:   { fontSize: 11, marginTop: 1 },
+  headerTitle: { fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold },
+  headerSub:   { fontSize: FontSize.xsPlus, marginTop: 1 },
   onlineDot: { width: 8, height: 8, borderRadius: 4 },
 
   dateSepRow:  { flexDirection: 'row', alignItems: 'center', marginVertical: 16, paddingHorizontal: 16 },
   dateSepLine: { flex: 1, height: StyleSheet.hairlineWidth },
   dateSepPill: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, marginHorizontal: 10 },
-  dateSepText: { fontSize: 11, fontWeight: '700' },
+  dateSepText: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold },
 
   msgRow:      { flexDirection: 'row', alignItems: 'flex-end' },
   msgRowMe:    { justifyContent: 'flex-end' },
   msgRowOther: { justifyContent: 'flex-start' },
   avatar:            { width: 32, height: 32, borderRadius: 16 },
   avatarPlaceholder: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  avatarLetter:      { fontWeight: '800', fontSize: 13 },
-  senderName: { fontSize: 12, fontWeight: '700', marginLeft: 2, marginBottom: 3 },
+  avatarLetter:      { fontWeight: FontWeight.extraBold, fontSize: FontSize.smPlus },
+  senderName: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, marginLeft: 2, marginBottom: 3 },
 
   bubble:   { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, maxWidth: '100%' },
-  msgText:  { fontSize: 15, lineHeight: 22 },
+  msgText:  { fontSize: FontSize.basePlus, lineHeight: 22 },
   msgMeta:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 5, gap: 3 },
-  msgTime:  { fontSize: 10 },
+  msgTime:  { fontSize: FontSize.xs },
 
   replyBox:  { borderLeftWidth: 3, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, marginBottom: 3 },
-  replyName: { fontSize: 11, fontWeight: '700', marginBottom: 1 },
-  replyText: { fontSize: 11 },
+  replyName: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, marginBottom: 1 },
+  replyText: { fontSize: FontSize.xsPlus },
 
   // Audio bubble
   audioBubble:     { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, minWidth: 200 },
   audioIconBox:    { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  audioName:       { fontSize: 13, fontWeight: '600' },
-  audioMeta:       { fontSize: 11, marginTop: 2 },
+  audioName:       { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
+  audioMeta:       { fontSize: FontSize.xsPlus, marginTop: 2 },
   recordingBar:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 10, borderTopWidth: StyleSheet.hairlineWidth },
   recordingDot:    { width: 10, height: 10, borderRadius: 5, backgroundColor: '#FF4444' },
-  recordingTime:   { fontSize: 16, fontWeight: '600', minWidth: 44 },
+  recordingTime:   { fontSize: FontSize.md, fontWeight: FontWeight.semiBold, minWidth: 44 },
   recordCancelBtn: { padding: 8 },
   recordSendBtn:   { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
 
   // File bubble
   fileBubble: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
   fileIconBox: { width: 44, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  fileExt:  { fontSize: 11, fontWeight: '900' },
-  fileName: { fontSize: 13, fontWeight: '600' },
-  fileMeta: { fontSize: 11, marginTop: 2 },
+  fileExt:  { fontSize: FontSize.xsPlus, fontWeight: FontWeight.black },
+  fileName: { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
+  fileMeta: { fontSize: FontSize.xsPlus, marginTop: 2 },
 
   // Location bubble
   locationCard:        { borderRadius: 12, overflow: 'hidden', width: 240 },
@@ -1217,36 +1218,36 @@ const C = StyleSheet.create({
   locationFooter:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8 },
   locationFooterMe:    { backgroundColor: '#054d43' },
   locationFooterOther: { backgroundColor: '#f5f5f5' },
-  locationLabel:       { fontSize: 13, fontWeight: '700' },
-  locationCoords:      { fontSize: 11, marginTop: 1 },
+  locationLabel:       { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
+  locationCoords:      { fontSize: FontSize.xsPlus, marginTop: 1 },
 
   announceBubble: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 8 },
   announceTop:    { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 10 },
   announceIconBox: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  announceLabel:   { fontSize: 13, fontWeight: '800' },
-  announceMeta:    { fontSize: 11, marginTop: 1 },
-  announceText:    { fontSize: 15, lineHeight: 22 },
+  announceLabel:   { fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold },
+  announceMeta:    { fontSize: FontSize.xsPlus, marginTop: 1 },
+  announceText:    { fontSize: FontSize.basePlus, lineHeight: 22 },
 
   empty:      { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', marginTop: 16, marginBottom: 8 },
-  emptySub:   { fontSize: 13, textAlign: 'center', lineHeight: 19 },
+  emptyTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, marginTop: 16, marginBottom: 8 },
+  emptySub:   { fontSize: FontSize.smPlus, textAlign: 'center', lineHeight: 19 },
 
   readonlyBar:  { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 14, borderTopWidth: StyleSheet.hairlineWidth },
-  readonlyText: { flex: 1, fontSize: 12, lineHeight: 17 },
+  readonlyText: { flex: 1, fontSize: FontSize.sm, lineHeight: 17 },
 
   replyBanner:     { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 9, borderTopWidth: StyleSheet.hairlineWidth, borderLeftWidth: 3 },
-  replyBannerName: { fontSize: 12, fontWeight: '700', marginBottom: 1 },
+  replyBannerName: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, marginBottom: 1 },
   editBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 9, borderTopWidth: 2 },
 
   partnerStatusBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 6, borderTopWidth: StyleSheet.hairlineWidth, gap: 8 },
   typingDotsRow:    { flexDirection: 'row', gap: 3, alignItems: 'center' },
   typingDot:        { width: 5, height: 5, borderRadius: 3 },
-  partnerStatusText: { fontSize: 12, fontStyle: 'italic' },
+  partnerStatusText: { fontSize: FontSize.sm, fontStyle: 'italic' },
 
   inputBar:    { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 10, paddingVertical: 10, gap: 8, borderTopWidth: StyleSheet.hairlineWidth },
   inputRow:    { flex: 1, flexDirection: 'row', alignItems: 'flex-end', borderRadius: 24, borderWidth: 1, paddingVertical: 4, paddingHorizontal: 12 },
   inputIconBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17 },
-  input:       { flex: 1, paddingVertical: 8, fontSize: 15, maxHeight: 120 },
+  input:       { flex: 1, paddingVertical: 8, fontSize: FontSize.basePlus, maxHeight: 120 },
   sendBtn:     { width: 44, height: 44, borderRadius: 22, overflow: 'hidden' },
 
   overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
@@ -1256,23 +1257,23 @@ const C = StyleSheet.create({
   menuPreview:    { paddingHorizontal: 18, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
   menuItem:       { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 14 },
   menuItemIcon:   { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  menuItemText:   { fontSize: 15, fontWeight: '500' },
+  menuItemText:   { fontSize: FontSize.basePlus, fontWeight: FontWeight.medium },
 
   attachSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12, paddingHorizontal: 16 },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
-  attachTitle: { fontSize: 16, fontWeight: '800', marginBottom: 16, textAlign: 'center' },
+  attachTitle: { fontSize: FontSize.md, fontWeight: FontWeight.extraBold, marginBottom: 16, textAlign: 'center' },
   attachGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center', marginBottom: 8 },
   attachItem:  { alignItems: 'center', gap: 8, width: 72 },
   attachIconBox: { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  attachLabel: { fontSize: 12, fontWeight: '600', textAlign: 'center' },
+  attachLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, textAlign: 'center' },
 });
 
 const MP = StyleSheet.create({
   header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 12 },
   closeBtn:   { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  title:      { color: '#fff', fontSize: 15, fontWeight: '700' },
+  title:      { color: '#fff', fontSize: FontSize.basePlus, fontWeight: FontWeight.bold },
   bottomBar:  { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingTop: 10, backgroundColor: 'rgba(0,0,0,0.6)', gap: 10 },
   captionRow: { flex: 1, flexDirection: 'row', alignItems: 'flex-end', backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 24, paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
-  captionInput: { flex: 1, color: '#fff', fontSize: 15, maxHeight: 100, paddingVertical: 0 },
+  captionInput: { flex: 1, color: '#fff', fontSize: FontSize.basePlus, maxHeight: 100, paddingVertical: 0 },
   sendBtn:    { width: 48, height: 48, borderRadius: 24, backgroundColor: '#25D366', alignItems: 'center', justifyContent: 'center' },
 });

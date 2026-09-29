@@ -17,6 +17,7 @@ import { BackButton } from '../../components/common';
 import { tournamentService } from '../../services/tournamentService';
 import type { TournamentFinanceReport, TournamentFinanceParticipant, TournamentRound } from '../../services/tournamentService';
 import { toastService } from '../../services';
+import { FontSize, FontWeight } from '../../theme';
 
 interface RouteParams { tournamentId: string; }
 
@@ -148,9 +149,11 @@ export const TournamentFinanceScreen: React.FC = () => {
         </View>
       </ScrollView>
 
-      <Modal visible={!!rewardTarget} transparent animationType="fade" onRequestClose={() => setRewardTarget(null)}>
+      <Modal visible={!!rewardTarget} transparent animationType="slide" onRequestClose={() => setRewardTarget(null)} statusBarTranslucent>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={st.modalOverlay}>
-          <View style={st.modalCard}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setRewardTarget(null)} />
+          <View style={[st.modalCard, { paddingBottom: 20 + insets.bottom }]}>
+            <View style={st.modalHandle} />
             <Text style={st.modalTitle}>Récompenser {rewardTarget?.display_name ?? 'ce participant'}</Text>
             <Text style={st.modalSub}>Montant en GoGold, débité de ton wallet</Text>
             <TextInput
@@ -187,27 +190,27 @@ const st = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: 'rgba(245,158,11,0.25)',
     backgroundColor: 'rgba(42,31,10,0.55)',
   },
-  headerTitle: { fontSize: 16, fontWeight: '800', color: '#F0EFF8' },
+  headerTitle: { fontSize: FontSize.md, fontWeight: FontWeight.extraBold, color: '#F0EFF8' },
 
   totalCard: { borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,215,0,0.35)', padding: 20, alignItems: 'center', gap: 6 },
-  totalLabel: { color: '#F0EFF8', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  totalValue: { color: '#FFD700', fontSize: 30, fontWeight: '900' },
+  totalLabel: { color: '#F0EFF8', fontSize: FontSize.sm, fontWeight: FontWeight.bold, textTransform: 'uppercase', letterSpacing: 0.5 },
+  totalValue: { color: '#FFD700', fontSize: 30, fontWeight: FontWeight.black },
   totalBreakdownRow: { flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 10 },
   totalBreakdownItem: { alignItems: 'center' },
-  totalBreakdownLabel: { color: '#9390AB', fontSize: 11, fontWeight: '600' },
-  totalBreakdownValue: { color: '#F0EFF8', fontSize: 15, fontWeight: '800', marginTop: 2 },
+  totalBreakdownLabel: { color: '#9390AB', fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold },
+  totalBreakdownValue: { color: '#F0EFF8', fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold, marginTop: 2 },
   totalBreakdownDivider: { width: 1, height: 28, backgroundColor: 'rgba(255,255,255,0.12)' },
 
   section: { marginTop: 20 },
-  sectionTitle: { color: '#F0EFF8', fontSize: 14, fontWeight: '800', marginBottom: 10 },
+  sectionTitle: { color: '#F0EFF8', fontSize: FontSize.base, fontWeight: FontWeight.extraBold, marginBottom: 10 },
 
   roundRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12, marginBottom: 6,
     backgroundColor: 'rgba(255,255,255,0.04)',
   },
-  roundLabel: { color: '#F0EFF8', fontSize: 13, fontWeight: '700' },
-  roundValue: { color: '#FFD700', fontSize: 13, fontWeight: '800' },
+  roundLabel: { color: '#F0EFF8', fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
+  roundValue: { color: '#FFD700', fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold },
 
   participantRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 14, marginBottom: 8,
@@ -215,23 +218,28 @@ const st = StyleSheet.create({
   },
   participantAvatar: { width: 36, height: 36, borderRadius: 18 },
   participantAvatarFallback: { backgroundColor: 'rgba(120,120,120,0.2)', alignItems: 'center', justifyContent: 'center' },
-  participantName: { color: '#F0EFF8', fontSize: 13, fontWeight: '700' },
-  participantSub: { color: '#9390AB', fontSize: 11, fontWeight: '600', marginTop: 2 },
-  participantAmount: { color: '#FFD700', fontSize: 14, fontWeight: '800' },
+  participantName: { color: '#F0EFF8', fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
+  participantSub: { color: '#9390AB', fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold, marginTop: 2 },
+  participantAmount: { color: '#FFD700', fontSize: FontSize.base, fontWeight: FontWeight.extraBold },
 
-  emptyText: { color: '#9390AB', fontSize: 13, textAlign: 'center', paddingVertical: 20 },
+  emptyText: { color: '#9390AB', fontSize: FontSize.smPlus, textAlign: 'center', paddingVertical: 20 },
 
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 24 },
-  modalCard: { width: '100%', backgroundColor: '#1C1033', borderRadius: 20, padding: 20, gap: 12, borderWidth: 1, borderColor: 'rgba(255,215,0,0.25)' },
-  modalTitle: { color: '#F0EFF8', fontSize: 16, fontWeight: '800' },
-  modalSub: { color: '#9390AB', fontSize: 12, fontWeight: '600' },
+  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' },
+  modalCard: {
+    backgroundColor: '#1C1033', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: 20, paddingTop: 10, gap: 12,
+    borderWidth: 1, borderColor: 'rgba(255,215,0,0.25)', borderBottomWidth: 0,
+  },
+  modalHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 14, backgroundColor: 'rgba(255,255,255,0.25)' },
+  modalTitle: { color: '#F0EFF8', fontSize: FontSize.md, fontWeight: FontWeight.extraBold },
+  modalSub: { color: '#9390AB', fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
   modalInput: {
     backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
-    color: '#F0EFF8', fontSize: 16, fontWeight: '700', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    color: '#F0EFF8', fontSize: FontSize.md, fontWeight: FontWeight.bold, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 4 },
   modalCancelBtn: { paddingVertical: 12, paddingHorizontal: 16, justifyContent: 'center' },
-  modalCancelText: { color: '#9390AB', fontSize: 14, fontWeight: '700' },
+  modalCancelText: { color: '#9390AB', fontSize: FontSize.base, fontWeight: FontWeight.bold },
   modalSendBtn: { borderRadius: 12, paddingVertical: 12, paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center' },
-  modalSendText: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  modalSendText: { color: '#fff', fontSize: FontSize.base, fontWeight: FontWeight.extraBold },
 });

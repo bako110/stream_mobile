@@ -12,6 +12,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { VideoView, useVideoPlayer } from 'react-native-video';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { SkeletonDetail, CommentsBottomSheet, ExpandableText, BackButton, GofolyxLoader, FriendsWhoLiked, PriceWithLocal } from '../../components/common';
 import { TicketPaymentSheet } from '../../components/wallet/TicketPaymentSheet';
@@ -108,19 +109,19 @@ const HeroConcert: React.FC<{
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
           backgroundColor: '#EF4444', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 }}>
           <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' }} />
-          <Text style={{ fontSize: 10, fontWeight: '900', color: '#fff', letterSpacing: 0.8 }}>EN DIRECT</Text>
+          <Text style={{ fontSize: FontSize.xs, fontWeight: FontWeight.black, color: '#fff', letterSpacing: 0.8 }}>EN DIRECT</Text>
         </View>
       )}
       {isFree && (
         <View style={{ backgroundColor: '#36D9A0EE', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 }}>
-          <Text style={{ fontSize: 10, fontWeight: '800', color: '#fff', letterSpacing: 0.6 }}>GRATUIT</Text>
+          <Text style={{ fontSize: FontSize.xs, fontWeight: FontWeight.extraBold, color: '#fff', letterSpacing: 0.6 }}>GRATUIT</Text>
         </View>
       )}
       {isLive && viewers > 0 && (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4,
           backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 }}>
           <Icon name="eye" size={11} color="#fff" />
-          <Text style={{ fontSize: 11, fontWeight: '700', color: '#fff' }}>{viewers.toLocaleString('fr')}</Text>
+          <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, color: '#fff' }}>{viewers.toLocaleString('fr')}</Text>
         </View>
       )}
     </View>
@@ -132,24 +133,24 @@ const HeroConcert: React.FC<{
           flexDirection: 'row', alignItems: 'center', gap: 5,
           backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20 }}>
         <Icon name="play-circle" size={14} color="#fff" />
-        <Text style={{ fontSize: 11, fontWeight: '800', color: '#fff' }}>Vidéo</Text>
+        <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, color: '#fff' }}>Vidéo</Text>
       </TouchableOpacity>
     )}
 
     {/* Titre + artiste en bas */}
     <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 16, paddingBottom: 20, gap: 8 }}>
-      <Text style={{ fontSize: 26, fontWeight: '900', color: '#fff', lineHeight: 32, letterSpacing: -0.3 }} numberOfLines={2}>
+      <Text style={{ fontSize: FontSize['2xl'], fontWeight: FontWeight.black, color: '#fff', lineHeight: 32, letterSpacing: -0.3 }} numberOfLines={2}>
         {title}
       </Text>
       {artistName && (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <LinearGradient colors={['#7B3FF2', '#E0389A']}
             style={{ width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ fontSize: 10, fontWeight: '900', color: '#fff' }}>{getInitials(artistName)}</Text>
+            <Text style={{ fontSize: FontSize.xs, fontWeight: FontWeight.black, color: '#fff' }}>{getInitials(artistName)}</Text>
           </LinearGradient>
           <View>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.9)' }}>{artistName}</Text>
-            {genre && <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', fontWeight: '500' }}>{genre}</Text>}
+            <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, color: 'rgba(255,255,255,0.9)' }}>{artistName}</Text>
+            {genre && <Text style={{ fontSize: FontSize.xs, color: 'rgba(255,255,255,0.55)', fontWeight: FontWeight.medium }}>{genre}</Text>}
           </View>
         </View>
       )}
@@ -158,7 +159,7 @@ const HeroConcert: React.FC<{
       {showAiPending && (
         <TouchableOpacity activeOpacity={0.7} onPress={onAiPendingPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
           <ActivityIndicator size="small" color="rgba(255,255,255,0.85)" />
-          <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 10, fontWeight: '600' }}>Vérification en cours…</Text>
+          <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: FontSize.xs, fontWeight: FontWeight.semiBold }}>Vérification en cours…</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -168,7 +169,7 @@ const HeroConcert: React.FC<{
 // ── SectionHeader ─────────────────────────────────────────────────────────────
 
 const SectionHeader: React.FC<{ label: string; colors: AppColors }> = ({ label, colors }) => (
-  <Text style={{ fontSize: 11, fontWeight: '800', letterSpacing: 1.2, color: colors.textTertiary, marginBottom: 10, textTransform: 'uppercase' }}>
+  <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, letterSpacing: 1.2, color: colors.textTertiary, marginBottom: 10, textTransform: 'uppercase' }}>
     {label}
   </Text>
 );
@@ -189,8 +190,8 @@ const InfoRow: React.FC<InfoRowProps> = ({ icon, label, value, color, colors, di
         <Icon name={icon} size={17} color={color} />
       </View>
       <View style={{ flex: 1, gap: 2 }}>
-        <Text style={{ fontSize: 11, color: colors.textTertiary, fontWeight: '500' }}>{label}</Text>
-        <Text style={{ fontSize: 14, fontWeight: '700', color: onPress ? color : colors.textPrimary, lineHeight: 18 }}>{value}</Text>
+        <Text style={{ fontSize: FontSize.xsPlus, color: colors.textTertiary, fontWeight: FontWeight.medium }}>{label}</Text>
+        <Text style={{ fontSize: FontSize.base, fontWeight: FontWeight.bold, color: onPress ? color : colors.textPrimary, lineHeight: 18 }}>{value}</Text>
       </View>
       {onPress && <Icon name="chevron-right" size={15} color={color} />}
     </View>
@@ -242,20 +243,20 @@ const TierCard: React.FC<{
         <Icon name={tier.icon} size={19} color={tier.color} />
       </View>
       <View style={{ flex: 1, gap: 2 }}>
-        <Text style={{ fontSize: 13, fontWeight: '900', color: active ? tier.color : colors.textPrimary, letterSpacing: 0.2 }}>
+        <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.black, color: active ? tier.color : colors.textPrimary, letterSpacing: 0.2 }}>
           {tier.label.toUpperCase()}
         </Text>
         {tier.sub && (
-          <Text style={{ fontSize: 11, color: colors.textTertiary, fontWeight: '500' }}>{tier.sub}</Text>
+          <Text style={{ fontSize: FontSize.xsPlus, color: colors.textTertiary, fontWeight: FontWeight.medium }}>{tier.sub}</Text>
         )}
       </View>
       <View style={{ alignItems: 'flex-end', gap: 2 }}>
         <PriceWithLocal
           amountEur={tier.price}
-          style={{ fontSize: 17, fontWeight: '900', color: active ? tier.color : colors.textPrimary }}
+          style={{ fontSize: FontSize.mdPlus, fontWeight: FontWeight.black, color: active ? tier.color : colors.textPrimary }}
           localStyle={{ color: colors.textTertiary }}
         />
-        <Text style={{ fontSize: 10, color: colors.textTertiary, fontWeight: '500' }}>
+        <Text style={{ fontSize: FontSize.xs, color: colors.textTertiary, fontWeight: FontWeight.medium }}>
           + {fees.toLocaleString('fr')} frais
         </Text>
       </View>
@@ -438,7 +439,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
   if (!concert) return (
     <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
       <Icon name="alert-circle" size={48} color={colors.textTertiary} />
-      <Text style={{ color: colors.textTertiary, fontSize: 15 }}>Concert introuvable</Text>
+      <Text style={{ color: colors.textTertiary, fontSize: FontSize.basePlus }}>Concert introuvable</Text>
     </View>
   );
 
@@ -525,7 +526,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
                   <Icon name="radio" size={20} color="#fff" />
                   <Text style={ds.ctaText}>Regarder en direct</Text>
                   <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, marginLeft: 'auto' as any }}>
-                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#fff' }}>LIVE</Text>
+                    <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, color: '#fff' }}>LIVE</Text>
                   </View>
                 </LinearGradient>
               </TouchableOpacity>
@@ -534,8 +535,8 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
               <View style={[ds.infoBanner, { borderColor: colors.primary + '55', backgroundColor: colors.primary + '10' }]}>
                 <Icon name="clock" size={20} color={colors.primary} />
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '800', color: colors.primary }}>Live programmé</Text>
-                  {scheduledIn && <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>Démarre {scheduledIn} · {formatTime(concert.scheduled_at)}</Text>}
+                  <Text style={{ fontSize: FontSize.base, fontWeight: FontWeight.extraBold, color: colors.primary }}>Live programmé</Text>
+                  {scheduledIn && <Text style={{ fontSize: FontSize.sm, color: colors.textSecondary, marginTop: 2 }}>Démarre {scheduledIn} · {formatTime(concert.scheduled_at)}</Text>}
                 </View>
               </View>
             )}
@@ -551,7 +552,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
             {isEnded && !hasReplay && concert.live_id && (
               <View style={[ds.infoBanner, { borderColor: colors.border, backgroundColor: colors.backgroundSecondary }]}>
                 <Icon name="film" size={18} color={colors.textTertiary} />
-                <Text style={{ fontSize: 14, color: colors.textTertiary }}>Replay non disponible</Text>
+                <Text style={{ fontSize: FontSize.base, color: colors.textTertiary }}>Replay non disponible</Text>
               </View>
             )}
           </View>
@@ -562,10 +563,10 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
           <View style={[ds.datePill, { backgroundColor: colors.primary + '12', borderColor: colors.primary + '30' }]}>
             <Icon name="calendar" size={13} color={colors.primary} />
             <View>
-              <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primary }}>
+              <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.extraBold, color: colors.primary }}>
                 {formatDate(concert.scheduled_at)}
               </Text>
-              <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 1 }}>
+              <Text style={{ fontSize: FontSize.xsPlus, color: colors.textTertiary, marginTop: 1 }}>
                 {formatTime(concert.scheduled_at)}
               </Text>
             </View>
@@ -573,7 +574,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
           {concert.venue_city && (
             <View style={[ds.locationPill, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
               <Icon name="map-pin" size={13} color={colors.accentOrange} />
-              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textPrimary }} numberOfLines={1}>
+              <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: colors.textPrimary }} numberOfLines={1}>
                 {concert.venue_city}
               </Text>
             </View>
@@ -627,7 +628,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
           <View style={ds.section}>
             <SectionHeader label="À propos" colors={colors} />
             <ExpandableText text={concert.description} maxLines={4}
-              textStyle={{ fontSize: 14, lineHeight: 22, color: colors.textSecondary }}
+              textStyle={{ fontSize: FontSize.base, lineHeight: 22, color: colors.textSecondary }}
               primaryColor={colors.primary} />
           </View>
         ) : null}
@@ -692,7 +693,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
               <TouchableOpacity onPress={() => nav.navigate('LiveStream' as any, { concertId })}
                 style={[ds.ctaSecondary, { flex: 1, backgroundColor: '#EF444414' }]}>
                 <Icon name="radio" size={16} color="#EF4444" />
-                <Text style={{ fontSize: 14, fontWeight: '700', color: '#EF4444' }}>
+                <Text style={{ fontSize: FontSize.base, fontWeight: FontWeight.bold, color: '#EF4444' }}>
                   {concert.status === 'live' ? 'Rejoindre' : 'Go Live'}
                 </Text>
               </TouchableOpacity>
@@ -700,7 +701,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
             <TouchableOpacity onPress={handleEdit}
               style={[ds.ctaSecondary, { flex: 1, backgroundColor: colors.primary + '14' }]}>
               <Icon name="edit-2" size={16} color={colors.primary} />
-              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.primary }}>Modifier</Text>
+              <Text style={{ fontSize: FontSize.base, fontWeight: FontWeight.bold, color: colors.primary }}>Modifier</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setShowOwnerMenu(true)}
               style={[ds.ctaSecondary, { paddingHorizontal: 18, backgroundColor: colors.surface }]}>
@@ -728,10 +729,10 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
                 <View style={{ marginLeft: 'auto' as any, alignItems: 'flex-end', gap: 1 }}>
                   <PriceWithLocal
                     amountEur={activeTier.price + Math.round(activeTier.price * FEES_RATE)}
-                    style={{ fontSize: 14, fontWeight: '900', color: '#fff' }}
+                    style={{ fontSize: FontSize.base, fontWeight: FontWeight.black, color: '#fff' }}
                     localStyle={{ color: 'rgba(255,255,255,0.65)' }}
                   />
-                  <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.65)', fontWeight: '600' }}>frais inclus</Text>
+                  <Text style={{ fontSize: FontSize['2xs'], color: 'rgba(255,255,255,0.65)', fontWeight: FontWeight.semiBold }}>frais inclus</Text>
                 </View>
               )}
             </LinearGradient>
@@ -765,7 +766,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
                 ? <ActivityIndicator size="small" color={colors.primary} />
                 : <MCIcon name={concert?.comments_disabled ? 'comment-check-outline' : 'comment-off-outline'} size={22} color={colors.primary} />
               }
-              <Text style={{ fontSize: 15, fontWeight: '600', color: colors.textPrimary }}>
+              <Text style={{ fontSize: FontSize.basePlus, fontWeight: FontWeight.semiBold, color: colors.textPrimary }}>
                 {concert?.comments_disabled ? 'Activer les commentaires' : 'Desactiver les commentaires'}
               </Text>
             </TouchableOpacity>
@@ -796,7 +797,7 @@ const ds = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 10,
     paddingVertical: 16, paddingHorizontal: 20, borderRadius: 16,
   },
-  ctaText: { fontSize: 16, fontWeight: '800', color: '#fff' },
+  ctaText: { fontSize: FontSize.md, fontWeight: FontWeight.extraBold, color: '#fff' },
   ctaSecondary: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 6, paddingVertical: 14, borderRadius: 14,
@@ -811,7 +812,7 @@ const ds = StyleSheet.create({
     flex: 1, flexDirection: 'row', alignItems: 'center',
     justifyContent: 'center', gap: 6, paddingVertical: 13,
   },
-  socialBtnText: { fontSize: 13, fontWeight: '600' },
+  socialBtnText: { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
   socialSep: { width: StyleSheet.hairlineWidth, height: 22 },
   section: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 4 },
   infoCard: { borderRadius: 16, overflow: 'hidden' },

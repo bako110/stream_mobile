@@ -10,12 +10,14 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, StatusBar,
   RefreshControl, ActivityIndicator, Modal, TextInput, Animated, Image,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { tournamentService } from '../../services/tournamentService';
@@ -307,9 +309,14 @@ export const TournamentListScreen: React.FC = () => {
         />
       )}
 
-      <Modal visible={showCreate} transparent animationType="fade" onRequestClose={() => setShowCreate(false)}>
-        <View style={styles.modalBackdrop}>
-          <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+      <Modal visible={showCreate} transparent animationType="slide" onRequestClose={() => setShowCreate(false)} statusBarTranslucent>
+        <KeyboardAvoidingView
+          style={styles.modalBackdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setShowCreate(false)} />
+          <View style={[styles.modalCard, { backgroundColor: colors.surface, paddingBottom: 20 + insets.bottom }]}>
+            <View style={[styles.modalHandle, { backgroundColor: colors.divider }]} />
             <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Créer un tournoi</Text>
             <Text style={[styles.modalSub, { color: colors.textTertiary }]}>
               Choisis un nom et le nombre de participants.
@@ -338,7 +345,7 @@ export const TournamentListScreen: React.FC = () => {
                       { borderColor: active ? colors.primary : colors.border, backgroundColor: active ? colors.primary + '18' : colors.backgroundSecondary },
                     ]}
                   >
-                    <Text style={{ color: active ? colors.primary : colors.textSecondary, fontWeight: '800', fontSize: 15 }}>{f}</Text>
+                    <Text style={{ color: active ? colors.primary : colors.textSecondary, fontWeight: FontWeight.extraBold, fontSize: FontSize.basePlus }}>{f}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -346,7 +353,7 @@ export const TournamentListScreen: React.FC = () => {
 
             <View style={styles.modalActions}>
               <TouchableOpacity style={[styles.modalBtn, { borderWidth: 1, borderColor: colors.border }]} onPress={() => setShowCreate(false)}>
-                <Text style={{ color: colors.textSecondary, fontWeight: '700', fontSize: 15 }}>Annuler</Text>
+                <Text style={{ color: colors.textSecondary, fontWeight: FontWeight.bold, fontSize: FontSize.basePlus }}>Annuler</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalBtn, { backgroundColor: colors.primary }, !name.trim() && { opacity: 0.5 }]}
@@ -355,12 +362,12 @@ export const TournamentListScreen: React.FC = () => {
               >
                 {creating
                   ? <ActivityIndicator size="small" color="#fff" />
-                  : <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>Créer</Text>
+                  : <Text style={{ color: '#fff', fontWeight: FontWeight.extraBold, fontSize: FontSize.basePlus }}>Créer</Text>
                 }
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -368,7 +375,7 @@ export const TournamentListScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
-  headerTitle: { fontSize: 17, fontWeight: '800', letterSpacing: -0.2 },
+  headerTitle: { fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold, letterSpacing: -0.2 },
   createBtn: { width: 40, height: 40, borderRadius: RR.pill, alignItems: 'center', justifyContent: 'center' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingTop: 60 },
   list: { padding: 16, gap: 14 },
@@ -378,44 +385,45 @@ const styles = StyleSheet.create({
   cover: { height: 128, justifyContent: 'space-between', padding: 12 },
   coverTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   formatPill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.4)', paddingHorizontal: 9, paddingVertical: 5, borderRadius: RR.chip },
-  formatPillText: { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 0.3 },
+  formatPillText: { color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.extraBold, letterSpacing: 0.3 },
   statusPill: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: RR.chip },
-  statusPillText: { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 0.3 },
-  coverTitle: { color: '#fff', fontSize: 17, fontWeight: '800', letterSpacing: -0.3, textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 4 },
+  statusPillText: { color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.extraBold, letterSpacing: 0.3 },
+  coverTitle: { color: '#fff', fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold, letterSpacing: -0.3, textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 4 },
 
   body: { padding: 14, gap: 12 },
   rewardRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  rewardEmoji: { fontSize: 16 },
-  rewardText: { flex: 1, fontSize: 14, fontWeight: '700' },
+  rewardEmoji: { fontSize: FontSize.md },
+  rewardText: { flex: 1, fontSize: FontSize.base, fontWeight: FontWeight.bold },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -4 },
-  metaText: { fontSize: 12, fontWeight: '500' },
+  metaText: { fontSize: FontSize.sm, fontWeight: FontWeight.medium },
 
   fillBlock: { gap: 6 },
   fillLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  fillLabel: { fontSize: 12, fontWeight: '600' },
-  fillCount: { fontSize: 13, fontWeight: '800' },
+  fillLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
+  fillCount: { fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold },
   fillTrack: { height: 8, borderRadius: RR.pill, overflow: 'hidden' },
   fillBar: { height: '100%', borderRadius: RR.pill },
 
   ctaWrap: { marginTop: 2 },
   cta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 46, borderRadius: RR.media },
-  ctaText: { fontSize: 14.5, fontWeight: '800' },
+  ctaText: { fontSize: FontSize.base, fontWeight: FontWeight.extraBold },
 
   // ── Empty ─────────────────────────────────────────────────────────────────
   empty: { alignItems: 'center', paddingTop: 64, paddingHorizontal: 40, gap: 8 },
   emptyIconWrap: { width: 64, height: 64, borderRadius: RR.pill, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-  emptyTitle: { fontSize: 17, fontWeight: '800', letterSpacing: -0.2, textAlign: 'center' },
-  emptySub: { fontSize: 13, fontWeight: '400', lineHeight: 19, textAlign: 'center', marginBottom: 8 },
+  emptyTitle: { fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold, letterSpacing: -0.2, textAlign: 'center' },
+  emptySub: { fontSize: FontSize.smPlus, fontWeight: FontWeight.regular, lineHeight: 19, textAlign: 'center', marginBottom: 8 },
   emptyCta: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: RR.pill, paddingHorizontal: 20, paddingVertical: 12 },
-  emptyCtaText: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  emptyCtaText: { color: '#fff', fontSize: FontSize.base, fontWeight: FontWeight.extraBold },
 
-  // ── Modale creation ───────────────────────────────────────────────────────
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 24 },
-  modalCard: { width: '100%', maxWidth: 360, borderRadius: RR.card, padding: 20, gap: 12 },
-  modalTitle: { fontSize: 18, fontWeight: '800', letterSpacing: -0.2 },
-  modalSub: { fontSize: 13, fontWeight: '400', marginTop: -6, marginBottom: 4 },
-  input: { borderWidth: 1, borderRadius: RR.media, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15 },
-  fieldLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, marginTop: 4 },
+  // ── Modale creation (bottom sheet) ───────────────────────────────────────
+  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' },
+  modalCard: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 10, gap: 12 },
+  modalHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 14 },
+  modalTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.extraBold, letterSpacing: -0.2 },
+  modalSub: { fontSize: FontSize.smPlus, fontWeight: FontWeight.regular, marginTop: -6, marginBottom: 4 },
+  input: { borderWidth: 1, borderRadius: RR.media, paddingHorizontal: 14, paddingVertical: 12, fontSize: FontSize.basePlus },
+  fieldLabel: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, letterSpacing: 0.6, marginTop: 4 },
   formatRow: { flexDirection: 'row', gap: 8 },
   formatChip: { flex: 1, borderWidth: 1.5, borderRadius: RR.media, paddingVertical: 12, alignItems: 'center' },
   modalActions: { flexDirection: 'row', gap: 10, marginTop: 8 },

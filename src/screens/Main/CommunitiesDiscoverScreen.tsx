@@ -5,10 +5,11 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
-import { BackButton, CONTENT_CATEGORIES } from '../../components/common';
+import { BackButton, CONTENT_CATEGORIES, CategoryIcon } from '../../components/common';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { communityService } from '../../services/communityService';
 import type { CommunityData } from '../../services/communityService';
@@ -171,7 +172,7 @@ export const CommunitiesDiscoverScreen: React.FC = () => {
               borderColor: !activeCategory ? colors.primary : colors.divider,
             }]}
           >
-            <Text style={{ color: !activeCategory ? '#fff' : colors.textSecondary, fontWeight: '700', fontSize: 12 }}>Toutes</Text>
+            <Text style={{ color: !activeCategory ? '#fff' : colors.textSecondary, fontWeight: FontWeight.bold, fontSize: FontSize.sm }}>Toutes</Text>
           </TouchableOpacity>
           {CONTENT_CATEGORIES.filter(c => c.value !== 'autre').map(cat => {
             const active = activeCategory === cat.value;
@@ -184,8 +185,8 @@ export const CommunitiesDiscoverScreen: React.FC = () => {
                   borderColor: active ? colors.primary : colors.divider,
                 }]}
               >
-                <Text style={{ fontSize: 12 }}>{cat.emoji}</Text>
-                <Text style={{ color: active ? '#fff' : colors.textSecondary, fontWeight: '700', fontSize: 12 }}>{cat.label}</Text>
+                <CategoryIcon value={cat.value} size={13} color={active ? '#fff' : colors.textSecondary} />
+                <Text style={{ color: active ? '#fff' : colors.textSecondary, fontWeight: FontWeight.bold, fontSize: FontSize.sm }}>{cat.label}</Text>
               </TouchableOpacity>
             );
           })}
@@ -230,9 +231,9 @@ export const CommunitiesDiscoverScreen: React.FC = () => {
           )}
           ListEmptyComponent={
             <View style={{ alignItems: 'center', gap: 16 }}>
-              <LinearGradient colors={['#7B3FF230', '#E0389A20']} style={S.emptyIcon}>
-                <Icon name="users" size={36} color="#7B3FF2" />
-              </LinearGradient>
+              <View style={[S.emptyIcon, { backgroundColor: colors.primary + '20' }]}>
+                <Icon name="users" size={36} color={colors.primary} />
+              </View>
               <Text style={[S.emptyTitle, { color: colors.textPrimary }]}>
                 {query ? 'Aucun résultat' : 'Aucune communauté'}
               </Text>
@@ -254,7 +255,7 @@ const S = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 18, paddingBottom: 14,
   },
-  headerTitle: { fontSize: 18, fontWeight: '800' },
+  headerTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.extraBold },
 
   searchWrap: {
     flexDirection: 'row', alignItems: 'center', gap: 9,
@@ -262,7 +263,7 @@ const S = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 11,
     borderRadius: 16, borderWidth: StyleSheet.hairlineWidth,
   },
-  searchInput: { flex: 1, fontSize: 14, padding: 0 },
+  searchInput: { flex: 1, fontSize: FontSize.base, padding: 0 },
 
   chipsScroll: { height: 46 },
   chipsRow: { paddingHorizontal: 16, paddingBottom: 14, gap: 8, alignItems: 'center' },
@@ -274,6 +275,6 @@ const S = StyleSheet.create({
 
   emptyContainer: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 36, paddingTop: 60 },
   emptyIcon: { width: 90, height: 90, borderRadius: 45, alignItems: 'center', justifyContent: 'center' },
-  emptyTitle: { fontSize: 18, fontWeight: '800', textAlign: 'center' },
-  emptySub: { fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  emptyTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.extraBold, textAlign: 'center' },
+  emptySub: { fontSize: FontSize.smPlus, textAlign: 'center', lineHeight: 20 },
 });

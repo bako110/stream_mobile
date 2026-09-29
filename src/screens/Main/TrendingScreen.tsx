@@ -228,7 +228,7 @@ export const TrendingScreen: React.FC = () => {
           contentContainerStyle={{ padding: 16, gap: 12 }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.primary} />}
-          ListHeaderComponent={<HeroBanner count={trending.length} label="contenus" />}
+          ListHeaderComponent={<HeroBanner count={trending.length} label="contenus" accent={colors.primary} />}
           ListEmptyComponent={<EmptyState colors={colors} />}
           renderItem={({ item, index }: any) => {
             if (item.__ad) {
@@ -244,12 +244,6 @@ export const TrendingScreen: React.FC = () => {
             const realIdx = trending.indexOf(item);
             const rank = realIdx >= 0 ? realIdx : index;
             // Dans ce mode 1 colonne on affiche les cartes en ligne complete
-            const GRADS: [string, string][] = [
-              ['#7B3FF2', '#E0389A'], ['#0EA5E9', '#6366F1'],
-              ['#10B981', '#0EA5E9'], ['#F59E0B', '#EF4444'],
-              ['#EC4899', '#8B5CF6'], ['#14B8A6', '#3B82F6'],
-            ];
-            const grad = GRADS[rank % GRADS.length];
             const fmtV = (n: number) => n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n ?? 0);
             return (
               <TouchableOpacity
@@ -257,21 +251,18 @@ export const TrendingScreen: React.FC = () => {
                 onPress={() => handleContentPress(item)}
                 activeOpacity={0.85}
               >
-                <View style={[s.rankBadge, { backgroundColor: rank < 3 ? '#F59E0B' : colors.primary }]}>
+                <View style={[s.rankBadge, { backgroundColor: colors.primary }]}>
                   <Text style={s.rankText}>#{rank + 1}</Text>
                 </View>
                 <View style={s.contentThumb}>
                   {item.thumbnail_url ? (
                     <Image source={{ uri: item.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
                   ) : (
-                    <LinearGradient
-                      colors={grad}
-                      style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                    >
+                    <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.primary }]}>
                       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
                         <Icon name="film" size={30} color="rgba(255,255,255,0.7)" />
                       </View>
-                    </LinearGradient>
+                    </View>
                   )}
                   <LinearGradient colors={['transparent', 'rgba(0,0,0,0.65)']} style={s.contentThumbGrad} />
                 </View>
@@ -298,7 +289,7 @@ export const TrendingScreen: React.FC = () => {
           contentContainerStyle={{ padding: 16, gap: 12 }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.primary} />}
-          ListHeaderComponent={<HeroBanner count={reels.length} label="reels" />}
+          ListHeaderComponent={<HeroBanner count={reels.length} label="reels" accent={colors.primary} />}
           ListEmptyComponent={<EmptyState colors={colors} />}
           renderItem={({ item, index }: any) => {
             if (item.__ad) {
@@ -323,15 +314,15 @@ export const TrendingScreen: React.FC = () => {
 
 // ── Hero banner ───────────────────────────────────────────────────────────────
 
-const HeroBanner: React.FC<{ count: number; label: string }> = ({ count, label }) => (
+const HeroBanner: React.FC<{ count: number; label: string; accent: string }> = ({ count, label, accent }) => (
   <View style={[s.heroBanner]}>
-    <LinearGradient colors={['#7B3FF2', '#E0389A']} style={s.heroBannerGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+    <View style={[s.heroBannerGrad, { backgroundColor: accent }]}>
       <Icon name="trending-up" size={28} color="#fff" />
       <View style={{ marginLeft: 12 }}>
         <Text style={s.heroTitle}>Top tendances</Text>
         <Text style={s.heroSub}>{count} {label} populaires</Text>
       </View>
-    </LinearGradient>
+    </View>
   </View>
 );
 
@@ -349,19 +340,13 @@ const EmptyState: React.FC<{ colors: any }> = ({ colors }) => (
 // ── Content card (grille 2 colonnes) ─────────────────────────────────────────
 
 const ContentCard: React.FC<{ item: any; index: number; colors: any; onPress: () => void }> = ({ item, index, colors, onPress }) => {
-  const GRADS: [string, string][] = [
-    ['#7B3FF2', '#E0389A'], ['#0EA5E9', '#6366F1'],
-    ['#10B981', '#0EA5E9'], ['#F59E0B', '#EF4444'],
-    ['#EC4899', '#8B5CF6'], ['#14B8A6', '#3B82F6'],
-  ];
-  const grad = GRADS[index % GRADS.length];
   const fmtViews = (n: number) => n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n ?? 0);
 
   return (
     <View style={{ width: CARD_W }}>
       <TouchableOpacity style={[s.contentCard, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={onPress} activeOpacity={0.85}>
         {/* Rank badge */}
-        <View style={[s.rankBadge, { backgroundColor: index < 3 ? '#F59E0B' : colors.primary }]}>
+        <View style={[s.rankBadge, { backgroundColor: colors.primary }]}>
           <Text style={s.rankText}>#{index + 1}</Text>
         </View>
 
@@ -370,11 +355,11 @@ const ContentCard: React.FC<{ item: any; index: number; colors: any; onPress: ()
           {item.thumbnail_url ? (
             <Image source={{ uri: item.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
           ) : (
-            <LinearGradient colors={grad} style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.primary }]}>
               <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
                 <Icon name="film" size={30} color="rgba(255,255,255,0.7)" />
               </View>
-            </LinearGradient>
+            </View>
           )}
           <LinearGradient colors={['transparent', 'rgba(0,0,0,0.65)']} style={s.contentThumbGrad} />
         </View>
@@ -405,8 +390,8 @@ const ReelRow: React.FC<{ item: any; index: number; colors: any; onPress: () => 
     <View>
       <TouchableOpacity onPress={onPress} activeOpacity={0.82} style={[s.reelRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         {/* Rank */}
-        <View style={[s.reelRank, { backgroundColor: index < 3 ? '#F59E0B18' : colors.backgroundSecondary }]}>
-          <Text style={[s.reelRankText, { color: index < 3 ? '#F59E0B' : colors.textTertiary }]}>#{index + 1}</Text>
+        <View style={[s.reelRank, { backgroundColor: colors.primary + '18' }]}>
+          <Text style={[s.reelRankText, { color: colors.primary }]}>#{index + 1}</Text>
         </View>
 
         {/* Thumbnail */}
@@ -414,9 +399,9 @@ const ReelRow: React.FC<{ item: any; index: number; colors: any; onPress: () => 
           {item.thumbnail_url ? (
             <Image source={{ uri: item.thumbnail_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
           ) : (
-            <LinearGradient colors={['#7B3FF2', '#E0389A']} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }}>
               <Icon name="video" size={20} color="rgba(255,255,255,0.8)" />
-            </LinearGradient>
+            </View>
           )}
           <LinearGradient
             colors={['transparent', 'rgba(0,0,0,0.5)']}

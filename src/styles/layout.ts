@@ -6,7 +6,7 @@ import { StyleSheet, Platform, StatusBar } from 'react-native';
 
 export const STATUS_BAR_HEIGHT = Platform.OS === 'ios' ? 44 : (StatusBar.currentHeight ?? 24);
 export const HEADER_HEIGHT     = Platform.OS === 'ios' ? 88 : 70;
-export const TAB_BAR_HEIGHT    = Platform.OS === 'ios' ? 82 : 64;
+export const TAB_BAR_HEIGHT    = Platform.OS === 'ios' ? 60 : 46;
 
 export const layout = StyleSheet.create({
   // Conteneurs

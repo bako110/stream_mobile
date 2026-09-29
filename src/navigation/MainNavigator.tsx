@@ -1,6 +1,7 @@
 import React, { useEffect, useCallback, useRef } from 'react';
 import { decodeId } from '../utils/slugId';
-import { Platform, BackHandler, ToastAndroid } from 'react-native';
+import { Platform, BackHandler, ToastAndroid, View, Dimensions } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { toastService } from '../services/toastService';
 import { createBottomTabNavigator }   from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -13,6 +14,7 @@ import { ExplorerMenuScreen } from '../screens/Main/ExplorerMenuScreen';
 import { CommunitiesScreen as CommunitiesTabScreen } from '../screens/Main/CommunitiesScreen';
 import { ReelsScreen }              from '../screens/Main/ReelsScreen';
 import { UserPostsScreen }          from '../screens/Main/UserPostsScreen';
+import { SearchScreen }             from '../screens/Main/SearchScreen';
 import { UserGalleryScreen }        from '../screens/Main/UserGalleryScreen';
 import { ProfileScreen }            from '../screens/Main/ProfileScreen';
 import { PlanningScreen }           from '../screens/Main/PlanningScreen';
@@ -101,6 +103,7 @@ import { LiveMatchesHubScreen }    from '../screens/Live/LiveMatchesHubScreen';
 import { LiveOneVsOneScreen }      from '../screens/Live/LiveOneVsOneScreen';
 import { LiveTournamentsScreen }   from '../screens/Live/LiveTournamentsScreen';
 import WalletScreen                from '../screens/Wallet/WalletScreen';
+import WalletTransactionsScreen     from '../screens/Wallet/WalletTransactionsScreen';
 import BuyGoGoldScreen              from '../screens/Wallet/BuyGoGoldScreen';
 import { MonetisationScreen }       from '../screens/Wallet/MonetisationScreen';
 import { CreatorAnalyticsScreen }   from '../screens/Wallet/CreatorAnalyticsScreen';
@@ -170,6 +173,7 @@ export type MainStackParamList = {
   Attendees:       { eventId: string; eventTitle: string };
   TicketScanner:   { eventId: string; eventTitle: string };
   UserProfile:     { userId:    string };
+  Search:          { query?: string } | undefined;
   EditProfile:     undefined;
   Messages:        undefined;
   Films:           undefined;
@@ -241,6 +245,7 @@ export type MainStackParamList = {
   ImageViewer:     { url: string; label?: string };
   CreatePost:      undefined;
   Wallet:          undefined;
+  WalletTransactions: undefined;
   BuyGoGold:        { reason?: string; missingGoGold?: number; returnTo?: keyof MainStackParamList } | undefined;
   CreatorAnalytics: undefined;
   ContentAnalyticsDetail: { contentType: 'reel' | 'post' | 'event' | 'concert' | 'live'; contentId: string };
@@ -248,7 +253,9 @@ export type MainStackParamList = {
   RevenueDetail:       undefined;
   RevenueContentList:  { period?: 'all' | 'month' | 'year' } | undefined;
   RevenueTransactions: undefined;
-  Monetisation:     undefined;
+  // preloadedStatus — évite un second appel réseau + un second spinner quand on
+  // arrive ici juste après SettingsMonetisationScreen (statut déjà connu 'approved').
+  Monetisation:     { preloadedStatus?: 'approved' } | undefined;
   Transfer:        { recipientId?: string; recipientName?: string; recipientAvatar?: string } | undefined;
   WalletPin:       undefined;
   Boost:                    undefined;
@@ -351,18 +358,79 @@ const ProfileTab: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 
+// Ordre de navigation par swipe horizontal — distinct de l'ordre d'affichage
+// des icônes dans AppTabBar (identique ici, mais gardé séparé pour clarté).
+const SWIPE_TAB_ORDER = ['Home', 'Communities', 'Reels', 'Profile'] as const;
+const SCREEN_W = Dimensions.get('window').width;
+// Largeur de la zone sensible au bord de l'écran (comme le retour iOS) — le
+// geste ne se déclenche QUE s'il démarre dans cette bande, jamais au centre
+// de l'écran. Chaque écran (Accueil, Communautés, Profil) a des carrousels
+// horizontaux internes (concerts live, catégories...) qui doivent rester
+// totalement libres — un geste global sur tout l'écran les bloquerait.
+const SWIPE_EDGE_ZONE = 24;
+// Distance de swipe pour valider le changement d'onglet une fois démarré
+// depuis le bord.
+const SWIPE_TAB_THRESHOLD = SCREEN_W * 0.18;
+
+/**
+ * Enveloppe un écran d'onglet avec un geste de swipe horizontal DEPUIS LE
+ * BORD gauche/droit pour naviguer vers l'onglet voisin — comme Instagram,
+ * mais limité aux bords pour ne jamais interférer avec les ScrollView
+ * horizontaux internes (carrousels) qui vivent au centre de l'écran.
+ * Désactivé sur Reels (son propre geste horizontal sert à avancer/reculer
+ * la vidéo, cf. ReelsScreen.tsx).
+ */
+const SwipeTabScreen: React.FC<{ tabName: typeof SWIPE_TAB_ORDER[number]; children: React.ReactNode }> = ({ tabName, children }) => {
+  const navigation = useNavigation<any>();
+
+  if (tabName === 'Reels') return <>{children}</>;
+
+  const index = SWIPE_TAB_ORDER.indexOf(tabName);
+  const prevTab = index > 0 ? SWIPE_TAB_ORDER[index - 1] : null;
+  const nextTab = index < SWIPE_TAB_ORDER.length - 1 ? SWIPE_TAB_ORDER[index + 1] : null;
+
+  const edgeSwipeGesture = Gesture.Pan()
+    .runOnJS(true)
+    .activeOffsetX([-15, 15])
+    .failOffsetY([-15, 15])
+    .onEnd((e) => {
+      if (e.translationX <= -SWIPE_TAB_THRESHOLD && nextTab) {
+        navigation.navigate(nextTab);
+      } else if (e.translationX >= SWIPE_TAB_THRESHOLD && prevTab) {
+        navigation.navigate(prevTab);
+      }
+    });
+
+  return (
+    <View style={{ flex: 1 }}>
+      {children}
+      {/* Bandes invisibles superposées aux bords — seules zones où le pan
+          horizontal est intercepté, le reste de l'écran (carrousels compris)
+          n'est jamais touché par ce geste. */}
+      <GestureDetector gesture={edgeSwipeGesture}>
+        <View pointerEvents="box-only" style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: SWIPE_EDGE_ZONE }} />
+      </GestureDetector>
+      <GestureDetector gesture={edgeSwipeGesture}>
+        <View pointerEvents="box-only" style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: SWIPE_EDGE_ZONE }} />
+      </GestureDetector>
+    </View>
+  );
+};
+
 const Tabs: React.FC<{ onLogout: () => void; onSwitchAccount: (userId: string) => Promise<void> }> = ({ onLogout, onSwitchAccount }) => (
   <Tab.Navigator
     tabBar={props => <AppTabBar {...props} />}
     screenOptions={{ headerShown: false }}
   >
     <Tab.Screen name="Home">
-      {() => <HomeScreen onLogout={onLogout} onSwitchAccount={onSwitchAccount} />}
+      {() => <SwipeTabScreen tabName="Home"><HomeScreen onLogout={onLogout} onSwitchAccount={onSwitchAccount} /></SwipeTabScreen>}
     </Tab.Screen>
-    <Tab.Screen name="Communities" component={CommunitiesTabScreen} />
-    <Tab.Screen name="Reels"       component={ReelsScreen} options={{ tabBarStyle: { display: 'none' } }} />
+    <Tab.Screen name="Communities">
+      {() => <SwipeTabScreen tabName="Communities"><CommunitiesTabScreen /></SwipeTabScreen>}
+    </Tab.Screen>
+    <Tab.Screen name="Reels"       component={ReelsScreen} />
     <Tab.Screen name="Profile">
-      {() => <ProfileTab onLogout={onLogout} />}
+      {() => <SwipeTabScreen tabName="Profile"><ProfileTab onLogout={onLogout} /></SwipeTabScreen>}
     </Tab.Screen>
   </Tab.Navigator>
 );
@@ -511,6 +579,7 @@ const SettingsWrapper = useCallback(
         <Stack.Screen name="LiveViewer"     component={LiveViewerWrapper}     options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="UserReels"      component={ReelsScreen}           options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="UserPosts"      component={UserPostsScreen}       options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="Search"         component={SearchScreen}          options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="UserGallery"    component={UserGalleryScreen}     options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="ReelPlayer"    component={ReelPlayerScreen}      options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="SearchReelViewer" component={SearchReelViewerScreen} options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
@@ -529,6 +598,7 @@ const SettingsWrapper = useCallback(
         <Stack.Screen name="Attendees"      component={AttendeesWrapper}      options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="TicketScanner"  component={TicketScannerWrapper}  options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Wallet"         component={WalletScreen}          options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="WalletTransactions" component={WalletTransactionsScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Ads"            component={AdsScreen}             options={{ animation: 'slide_from_right', headerShown: false }} />
         <Stack.Screen name="CreateAd"       component={CreateAdScreen}        options={{ animation: 'slide_from_right', headerShown: false }} />
         <Stack.Screen name="BuyGoGold"       component={BuyGoGoldScreen}        options={{ animation: 'slide_from_right' }} />

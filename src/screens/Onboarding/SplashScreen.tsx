@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, StatusBar, Dimensions, Image, Platform } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, StyleSheet, StatusBar, Dimensions, Image } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -21,26 +21,20 @@ import { getLogo } from '../../assets';
 const { width: W, height: H } = Dimensions.get('window');
 
 const LOGO_SIZE = Math.min(W * 0.42, 190);
-const WORD_SIZE = W * 0.115;
 
 interface Props { onFinish: () => void; }
 
 // ── Chronologie (ms) ─────────────────────────────────────────────────────────
-// Pensée comme une "signature de marque" : le logo se pose avec du poids
-// (ressort), un reflet le traverse, le mot se dévoile derrière un masque, une
-// ligne d'accent s'ouvre, puis sortie en léger zoom. ~2.6s au total, calée
-// pile sur onFinish (aucun setTimeout suspendu au-delà).
+// Signature de marque réduite au logo seul : il se pose avec du poids
+// (ressort), un reflet le traverse, puis sortie en léger zoom. ~1.7s au
+// total, calée pile sur onFinish (aucun setTimeout suspendu au-delà).
 const T = {
   logoIn:     260,   // le logo commence à apparaître
   haloPulse:  620,   // le halo pulse une fois derrière le logo
   shine:      900,   // le reflet diagonal traverse le logo
-  wordReveal: 1120,  // le wordmark se dévoile
-  accentLine: 1360,  // la ligne d'accent s'ouvre
-  exit:       2320,  // début du fondu de sortie (après ~0.9s de lecture)
-  exitDur:    380,   // durée du fondu → onFinish à ~2.7s
+  exit:       1560,  // début du fondu de sortie (après ~0.6s de lecture)
+  exitDur:    380,   // durée du fondu → onFinish à ~1.9s
 };
-
-const WORD = 'Gofolyx';
 
 export const SplashScreen: React.FC<Props> = ({ onFinish }) => {
   const { isDark } = useTheme();
@@ -50,7 +44,6 @@ export const SplashScreen: React.FC<Props> = ({ onFinish }) => {
   const BRAND_B = '#E0389A';
   const bg        = isDark ? '#08071A' : '#FFFFFF';
   const bgDeep    = isDark ? '#0E0A2C' : '#F4F1FF';
-  const textColor = isDark ? '#FFFFFF' : '#0D0B2A';
 
   // ── Valeurs animées ────────────────────────────────────────────────────────
   const rootOpacity = useSharedValue(1);
@@ -65,18 +58,6 @@ export const SplashScreen: React.FC<Props> = ({ onFinish }) => {
   const haloOpacity = useSharedValue(0);
 
   const shineX      = useSharedValue(-1);   // -1 → 1 : position du reflet
-
-  // Largeur du wordmark : estimée d'abord (pour que le masque ne soit jamais
-  // bloqué à 0 si onLayout tarde sur un appareil lent), puis remplacée par la
-  // mesure réelle dès qu'elle arrive.
-  const WORD_W_EST = WORD.length * WORD_SIZE * 0.62;
-  const [wordW, setWordW] = useState(WORD_W_EST);
-  const wordReveal  = useSharedValue(0);    // 0 → 1 : fraction révélée du masque
-  const wordLift    = useSharedValue(10);
-  const wordOpacity = useSharedValue(0);
-
-  const accentW     = useSharedValue(0);    // 0 → 1 : largeur de la ligne
-  const accentOp    = useSharedValue(0);
 
   // Dérive lente et continue des halos de fond (ambiance, non bloquant).
   const drift       = useSharedValue(0);
@@ -104,16 +85,7 @@ export const SplashScreen: React.FC<Props> = ({ onFinish }) => {
     // 3. Reflet diagonal qui traverse le logo.
     shineX.value = withDelay(T.shine, withTiming(1, { duration: 640, easing: Easing.inOut(Easing.cubic) }));
 
-    // 4. Le wordmark se dévoile derrière un masque gauche → droite.
-    wordOpacity.value = withDelay(T.wordReveal, withTiming(1, { duration: 120 }));
-    wordReveal.value  = withDelay(T.wordReveal, withTiming(1, { duration: 520, easing: Easing.out(Easing.cubic) }));
-    wordLift.value    = withDelay(T.wordReveal, withSpring(0, { damping: 16, stiffness: 150 }));
-
-    // 5. Ligne d'accent qui s'ouvre du centre.
-    accentOp.value = withDelay(T.accentLine, withTiming(1, { duration: 160 }));
-    accentW.value  = withDelay(T.accentLine, withTiming(1, { duration: 460, easing: Easing.out(Easing.cubic) }));
-
-    // 6. Sortie : léger zoom + fondu, puis onFinish (une seule fois).
+    // 4. Sortie : léger zoom + fondu, puis onFinish (une seule fois).
     rootScale.value   = withDelay(T.exit, withTiming(1.045, { duration: T.exitDur, easing: Easing.in(Easing.quad) }));
     rootOpacity.value = withDelay(T.exit, withTiming(0, { duration: T.exitDur, easing: Easing.in(Easing.quad) }, (finished) => {
       if (finished) runOnJS(onFinish)();
@@ -165,23 +137,6 @@ export const SplashScreen: React.FC<Props> = ({ onFinish }) => {
     const op = interpolate(shineX.value, [-1, -0.5, 0, 0.5, 1], [0, 0.85, 1, 0.85, 0], Extrapolation.CLAMP);
     return { opacity: op, transform: [{ translateX: x }, { rotate: '18deg' }] };
   });
-
-  // Masque en pixels (pas en %) : anime la largeur d'un calque overflow-hidden
-  // au-dessus du wordmark → révélation gauche → droite sans layout par frame.
-  // +6px : marge pour que le "x" incliné (letterSpacing négatif) ne soit pas
-  // rogné d'un ou deux pixels par le bord du masque une fois pleinement révélé.
-  const wordMaskStyle = useAnimatedStyle(() => ({
-    opacity: wordOpacity.value,
-    width: wordReveal.value * (wordW + 6),
-  }));
-  const wordShiftStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: wordLift.value }],
-  }));
-
-  const accentStyle = useAnimatedStyle(() => ({
-    opacity: accentOp.value,
-    transform: [{ scaleX: accentW.value }],
-  }));
 
   const logoSource = getLogo(isDark);
 
@@ -243,42 +198,6 @@ export const SplashScreen: React.FC<Props> = ({ onFinish }) => {
           </Animated.View>
         </View>
 
-        {/* Wordmark révélé par masque gauche → droite */}
-        <Animated.View style={[s.wordShift, wordShiftStyle]}>
-          <View style={s.wordTrack}>
-            {/* Calque "fantôme" : réserve la place + mesure la largeur réelle */}
-            <Text
-              style={[s.word, { color: textColor, opacity: 0 }]}
-              onLayout={e => setWordW(e.nativeEvent.layout.width)}
-            >
-              {WORD}
-            </Text>
-            {/* Calque révélé — largeur pilotée par le masque animé. Le Text
-                garde sa largeur pleine (wordW) pour ne pas se re-wrapper quand
-                le conteneur rétrécit ; c'est le parent overflow-hidden qui coupe. */}
-            <Animated.View style={[s.wordMask, wordMaskStyle]}>
-              <Text
-                style={[s.word, { color: textColor, width: wordW || undefined }]}
-                numberOfLines={1}
-              >
-                {WORD.slice(0, -1)}
-                <Text style={[s.word, s.wordAccent, { color: BRAND_B }]}>{WORD.slice(-1)}</Text>
-              </Text>
-            </Animated.View>
-          </View>
-        </Animated.View>
-
-        {/* Ligne d'accent qui s'ouvre du centre */}
-        <View style={s.accentTrack}>
-          <Animated.View style={[s.accentFill, accentStyle]}>
-            <LinearGradient
-              colors={[BRAND_A, BRAND_B]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={StyleSheet.absoluteFill}
-            />
-          </Animated.View>
-        </View>
-
       </View>
     </Animated.View>
   );
@@ -337,45 +256,5 @@ const s = StyleSheet.create({
     left: LOGO_SIZE * 0.5 - LOGO_SIZE * 0.16,
     width: LOGO_SIZE * 0.32,
     height: LOGO_SIZE * 1.6,
-  },
-
-  // ── Wordmark ────────────────────────────────────────────────────────────
-  wordShift: { alignItems: 'center' },
-  wordTrack: {
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-  },
-  wordMask: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    overflow: 'hidden',
-    justifyContent: 'center',
-  },
-  word: {
-    fontSize: WORD_SIZE,
-    fontWeight: '800',
-    letterSpacing: -1.5,
-    includeFontPadding: false,
-    ...Platform.select({ android: { fontFamily: 'sans-serif-medium' } }),
-  },
-  wordAccent: {
-    fontWeight: '900',
-  },
-
-  // ── Ligne d'accent ──────────────────────────────────────────────────────
-  accentTrack: {
-    width: W * 0.46,
-    height: 3,
-    borderRadius: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  accentFill: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 2,
-    overflow: 'hidden',
   },
 });

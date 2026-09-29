@@ -6,6 +6,7 @@ import {
 import { Camera, CameraType } from 'react-native-camera-kit';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { BackButton, PriceWithLocal, GofolyxLoader } from '../../components/common';
 import { eventService } from '../../services/eventService';
@@ -308,8 +309,8 @@ const InfoRow: React.FC<{
 const CORNER = 24;
 const st = StyleSheet.create({
   header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 16 },
-  headerTitle:  { fontSize: 16, fontWeight: '800', color: '#fff' },
-  headerSub:    { fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
+  headerTitle:  { fontSize: FontSize.md, fontWeight: FontWeight.extraBold, color: '#fff' },
+  headerSub:    { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
 
   overlay:      { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   viewfinder:   { width: 240, height: 240, position: 'relative' },
@@ -318,39 +319,39 @@ const st = StyleSheet.create({
   tr:           { top: 0, right: 0, borderLeftWidth: 0, borderBottomWidth: 0, borderTopRightRadius: 4 },
   bl:           { bottom: 0, left: 0, borderRightWidth: 0, borderTopWidth: 0, borderBottomLeftRadius: 4 },
   br:           { bottom: 0, right: 0, borderLeftWidth: 0, borderTopWidth: 0, borderBottomRightRadius: 4 },
-  hint:         { color: '#fff', fontSize: 13, textAlign: 'center', marginTop: 24, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
+  hint:         { color: '#fff', fontSize: FontSize.smPlus, textAlign: 'center', marginTop: 24, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
 
   center:       { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
-  loadingTxt:   { fontSize: 15, fontWeight: '600' },
+  loadingTxt:   { fontSize: FontSize.basePlus, fontWeight: FontWeight.semiBold },
 
   statusBadge:  { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16, borderRadius: 14, borderWidth: 1.5, marginBottom: 16 },
-  statusTxt:    { fontSize: 15, fontWeight: '700', flex: 1 },
+  statusTxt:    { fontSize: FontSize.basePlus, fontWeight: FontWeight.bold, flex: 1 },
 
   card:         { borderRadius: 14, padding: 16, marginBottom: 12, gap: 12 },
-  sectionLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
+  sectionLabel: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
 
   userRow:      { flexDirection: 'row', alignItems: 'center' },
   avatar:       { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   avatarImg:    { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   nameRow:      { flexDirection: 'row', alignItems: 'center' },
-  displayName:  { fontSize: 17, fontWeight: '700' },
-  username:     { fontSize: 13, marginTop: 2 },
+  displayName:  { fontSize: FontSize.mdPlus, fontWeight: FontWeight.bold },
+  username:     { fontSize: FontSize.smPlus, marginTop: 2 },
 
   infoRow:      { flexDirection: 'row', alignItems: 'flex-start' },
-  infoLabel:    { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
-  infoValue:    { fontSize: 14, fontWeight: '600', marginTop: 2 },
+  infoLabel:    { fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold, textTransform: 'uppercase', letterSpacing: 0.5 },
+  infoValue:    { fontSize: FontSize.base, fontWeight: FontWeight.semiBold, marginTop: 2 },
 
   validateBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 16, borderRadius: 14, marginBottom: 12 },
-  validateTxt:  { color: '#fff', fontSize: 15, fontWeight: '800' },
+  validateTxt:  { color: '#fff', fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold },
 
   scanAgainBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, borderRadius: 14, borderWidth: 1.5 },
-  scanAgainTxt: { fontSize: 14, fontWeight: '700' },
+  scanAgainTxt: { fontSize: FontSize.base, fontWeight: FontWeight.bold },
 
   alreadyUsedBanner:  { backgroundColor: '#EF4444', borderRadius: 16, padding: 24, alignItems: 'center', marginBottom: 16, gap: 8 },
   alreadyUsedIconWrap:{ width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(0,0,0,0.2)', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
-  alreadyUsedTitle:   { fontSize: 22, fontWeight: '900', color: '#fff', letterSpacing: 1 },
-  alreadyUsedSub:     { fontSize: 13, color: 'rgba(255,255,255,0.85)', textAlign: 'center' },
+  alreadyUsedTitle:   { fontSize: FontSize['2xl'], fontWeight: FontWeight.black, color: '#fff', letterSpacing: 1 },
+  alreadyUsedSub:     { fontSize: FontSize.smPlus, color: 'rgba(255,255,255,0.85)', textAlign: 'center' },
   alreadyUsedDateRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
-  alreadyUsedDate:    { fontSize: 12, color: 'rgba(255,255,255,0.7)' },
-  alreadyUsedRefuse:  { fontSize: 11, fontWeight: '800', color: 'rgba(255,255,255,0.6)', letterSpacing: 2, marginTop: 4 },
+  alreadyUsedDate:    { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.7)' },
+  alreadyUsedRefuse:  { fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, color: 'rgba(255,255,255,0.6)', letterSpacing: 2, marginTop: 4 },
 });

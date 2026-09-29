@@ -326,15 +326,10 @@ const NearbyCard: React.FC<NearbyCardProps> = ({ concert, colors, onPress }) => 
 
         {/* Badge distance */}
         {distLabel ? (
-          <LinearGradient
-            colors={['#7B3FF2', '#E0389A']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={s.nearbyDistBadge}
-          >
+          <View style={[s.nearbyDistBadge, { backgroundColor: colors.primary }]}>
             <Icon name="map-pin" size={9} color="#fff" />
             <Text style={s.nearbyDistText}>{distLabel}</Text>
-          </LinearGradient>
+          </View>
         ) : null}
       </View>
 

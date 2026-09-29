@@ -31,13 +31,6 @@ function getInitials(name: string): string {
   return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
 }
 
-const ACCENT_COLORS = ['#7B3FF2','#FF7A2F','#E0389A','#36D9A0','#3B82F6','#9B65F5','#EF4444','#F59E0B'];
-function accentFor(id: string): string {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) & 0xffff;
-  return ACCENT_COLORS[h % ACCENT_COLORS.length]!;
-}
-
 export const NewConversationScreen: React.FC = () => {
   const insets            = useSafeAreaInsets();
   const STATUS_H          = insets.top;
@@ -171,7 +164,7 @@ export const NewConversationScreen: React.FC = () => {
 
 const UserRow: React.FC<{ user: UserResult; colors: any; onPress: () => void }> = ({ user, colors, onPress }) => {
   const name   = user.display ?? user.full_name ?? user.username;
-  const accent = accentFor(user.id);
+  const accent = colors.primary;
   return (
     <TouchableOpacity
       style={[styles.row, { borderBottomColor: colors.divider }]}

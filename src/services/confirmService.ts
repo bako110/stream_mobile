@@ -15,6 +15,8 @@ export interface ConfirmButton {
   text: string;
   style?: ConfirmButtonStyle;
   onPress?: () => void | Promise<void>;
+  /** Nom d'icône Feather — affiché uniquement dans le rendu "menu d'options" (3+ boutons). */
+  icon?: string;
 }
 
 export interface ConfirmState {

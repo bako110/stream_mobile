@@ -12,6 +12,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { AppHeader, ImagePickerSection, VideoPickerField, PriceWithLocal, GofolyxLoader } from '../../components/common';
 import { eventService, toastService, showConfirm } from '../../services';
@@ -428,10 +429,10 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
                 }}>
                   {done
                     ? <Icon name="check" size={14} color="#fff" />
-                    : <Text style={{ fontSize: 11, fontWeight: '800', color: active ? colors.primary : colors.textDisabled }}>{i + 1}</Text>
+                    : <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, color: active ? colors.primary : colors.textDisabled }}>{i + 1}</Text>
                   }
                 </View>
-                <Text style={{ fontSize: 9, fontWeight: '700', color: active ? colors.primary : done ? colors.primary : colors.textDisabled }}>
+                <Text style={{ fontSize: FontSize['2xs'], fontWeight: FontWeight.bold, color: active ? colors.primary : done ? colors.primary : colors.textDisabled }}>
                   {label}
                 </Text>
               </TouchableOpacity>
@@ -516,7 +517,7 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
               {accessType === 'ticket' && (
                 <Animated.View entering={FadeInDown.springify()} style={s.section}>
                   <Text style={[s.sectionTitle, { color: colors.textTertiary }]}>PRIX PAR CATÉGORIE</Text>
-                  <Text style={{ fontSize: 12, color: colors.textTertiary, marginBottom: 16, lineHeight: 18 }}>
+                  <Text style={{ fontSize: FontSize.sm, color: colors.textTertiary, marginBottom: 16, lineHeight: 18 }}>
                     Laisse vide les catégories que tu ne souhaites pas proposer.
                   </Text>
                   {TICKET_TIERS.map(tier => {
@@ -529,30 +530,30 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
                             <Icon name={tier.icon} size={15} color={tier.color} />
                           </View>
                           <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 14, fontWeight: '800', color: tier.color }}>{tier.label}</Text>
-                            <Text style={{ fontSize: 11, color: colors.textTertiary }}>{tier.sub}</Text>
+                            <Text style={{ fontSize: FontSize.base, fontWeight: FontWeight.extraBold, color: tier.color }}>{tier.label}</Text>
+                            <Text style={{ fontSize: FontSize.xsPlus, color: colors.textTertiary }}>{tier.sub}</Text>
                           </View>
                           {valMap[tier.key] ? (
                             <View style={{ backgroundColor: tier.color + '22', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 }}>
                               <PriceWithLocal
                                 amountEur={parseFloat(valMap[tier.key]) || 0}
-                                style={{ fontSize: 13, fontWeight: '800', color: tier.color }}
+                                style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold, color: tier.color }}
                                 localStyle={{ color: tier.color, opacity: 0.7 }}
                               />
                             </View>
                           ) : (
-                            <Text style={{ fontSize: 11, color: colors.textDisabled }}>Non proposé</Text>
+                            <Text style={{ fontSize: FontSize.xsPlus, color: colors.textDisabled }}>Non proposé</Text>
                           )}
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 14, marginBottom: 12, borderRadius: 10, borderWidth: 1, borderColor: colors.inputBorder, backgroundColor: colors.inputBg }}>
-                          <Text style={{ paddingHorizontal: 12, fontSize: 15, fontWeight: '700', color: tier.color }}>€</Text>
+                          <Text style={{ paddingHorizontal: 12, fontSize: FontSize.basePlus, fontWeight: FontWeight.bold, color: tier.color }}>€</Text>
                           <TextInput
                             value={valMap[tier.key]}
                             onChangeText={setMap[tier.key]}
                             placeholder="0.00"
                             placeholderTextColor={colors.textDisabled}
                             keyboardType="decimal-pad"
-                            style={{ flex: 1, paddingVertical: 10, paddingRight: 12, fontSize: 15, color: colors.textPrimary }}
+                            style={{ flex: 1, paddingVertical: 10, paddingRight: 12, fontSize: FontSize.basePlus, color: colors.textPrimary }}
                           />
                         </View>
                       </View>
@@ -566,8 +567,8 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
                   <View style={{ backgroundColor: colors.backgroundSecondary, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: colors.border, flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
                     <Icon name="lock" size={20} color={colors.primary} />
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 14, fontWeight: '700', color: colors.textPrimary }}>Événement sur invitation</Text>
-                      <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 4, lineHeight: 18 }}>Seules les personnes que tu invites pourront participer. Tu pourras gérer la liste depuis la page de l'événement.</Text>
+                      <Text style={{ fontSize: FontSize.base, fontWeight: FontWeight.bold, color: colors.textPrimary }}>Événement sur invitation</Text>
+                      <Text style={{ fontSize: FontSize.sm, color: colors.textTertiary, marginTop: 4, lineHeight: 18 }}>Seules les personnes que tu invites pourront participer. Tu pourras gérer la liste depuis la page de l'événement.</Text>
                     </View>
                   </View>
                 </View>
@@ -603,10 +604,10 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
                   }}>
                     <Icon name="video" size={18} color={colors.primary} style={{ marginTop: 1 }} />
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 13, fontWeight: '800', color: colors.primary, marginBottom: 3 }}>
+                      <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold, color: colors.primary, marginBottom: 3 }}>
                         Live automatique
                       </Text>
-                      <Text style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 18 }}>
+                      <Text style={{ fontSize: FontSize.sm, color: colors.textSecondary, lineHeight: 18 }}>
                         Un live sera programmé à la date de début de l'événement.
                         Il démarrera automatiquement et le replay sera disponible après.
                       </Text>
@@ -623,7 +624,7 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
                       style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, backgroundColor: colors.primary + '18', borderWidth: 1.5, borderColor: colors.primary + '55', marginBottom: 12 }}
                     >
                       {locating ? <ActivityIndicator size="small" color={colors.primary} /> : <Icon name="map-pin" size={16} color={colors.primary} />}
-                      <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>{locating ? 'Localisation en cours...' : 'Utiliser ma position GPS'}</Text>
+                      <Text style={{ color: colors.primary, fontWeight: FontWeight.semiBold, fontSize: FontSize.base }}>{locating ? 'Localisation en cours...' : 'Utiliser ma position GPS'}</Text>
                     </TouchableOpacity>
 
                     {/* Champs adresse — onBlur déclenche le forward geocoding */}
@@ -636,7 +637,7 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
                     {geocoding && (
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderRadius: 10, backgroundColor: colors.backgroundSecondary, marginTop: 4 }}>
                         <ActivityIndicator size="small" color={colors.primary} />
-                        <Text style={{ fontSize: 12, color: colors.textTertiary }}>Recherche de la position...</Text>
+                        <Text style={{ fontSize: FontSize.sm, color: colors.textTertiary }}>Recherche de la position...</Text>
                       </View>
                     )}
                     {!geocoding && geoCoords && (
@@ -646,11 +647,11 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
                             <Icon name="check-circle" size={16} color="#10B981" />
                           </View>
                           <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 12, fontWeight: '800', color: '#10B981', marginBottom: 2 }}>Position trouvée</Text>
-                            <Text style={{ fontSize: 11, color: colors.textSecondary, lineHeight: 16 }} numberOfLines={2}>
+                            <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.extraBold, color: '#10B981', marginBottom: 2 }}>Position trouvée</Text>
+                            <Text style={{ fontSize: FontSize.xsPlus, color: colors.textSecondary, lineHeight: 16 }} numberOfLines={2}>
                               {geoCoords.label}
                             </Text>
-                            <Text style={{ fontSize: 10, color: colors.textTertiary, marginTop: 3 }}>
+                            <Text style={{ fontSize: FontSize.xs, color: colors.textTertiary, marginTop: 3 }}>
                               {geoCoords.lat.toFixed(5)}, {geoCoords.lon.toFixed(5)}
                             </Text>
                           </View>
@@ -661,7 +662,7 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
                             }}
                             style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: '#10B98122', borderWidth: 1, borderColor: '#10B98155' }}
                           >
-                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#10B981' }}>Voir</Text>
+                            <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, color: '#10B981' }}>Voir</Text>
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -669,7 +670,7 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
                     {!geocoding && !geoCoords && (venueCity.trim() || venueAddr.trim()) && (
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderRadius: 10, backgroundColor: colors.backgroundSecondary, marginTop: 4, borderWidth: 1, borderColor: colors.border }}>
                         <Icon name="alert-circle" size={14} color={colors.textTertiary} />
-                        <Text style={{ fontSize: 11, color: colors.textTertiary, flex: 1 }}>
+                        <Text style={{ fontSize: FontSize.xsPlus, color: colors.textTertiary, flex: 1 }}>
                           Position non confirmée — quitte un champ pour vérifier l'adresse.
                         </Text>
                       </View>
@@ -726,10 +727,10 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
                           <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: tier.color + '22', alignItems: 'center', justifyContent: 'center' }}>
                             <Icon name={tier.icon} size={13} color={tier.color} />
                           </View>
-                          <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>{tier.label}</Text>
+                          <Text style={{ flex: 1, fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, color: colors.textPrimary }}>{tier.label}</Text>
                           <PriceWithLocal
                             amountEur={parseFloat(valMap[tier.key]) || 0}
-                            style={{ fontSize: 14, fontWeight: '800', color: tier.color }}
+                            style={{ fontSize: FontSize.base, fontWeight: FontWeight.extraBold, color: tier.color }}
                             localStyle={{ color: colors.textTertiary }}
                           />
                         </View>
@@ -827,7 +828,7 @@ interface ReviewRowProps { icon: string; label: string; value: string; colors: a
 const ReviewRow: React.FC<ReviewRowProps> = ({ icon, label, value, colors }) => (
   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.divider }}>
     <Icon name={icon} size={16} color={colors.textTertiary} />
-    <Text style={{ width: 80, fontSize: 12, color: colors.textTertiary, fontWeight: '600' }}>{label}</Text>
-    <Text style={{ flex: 1, fontSize: 13, color: colors.textPrimary, fontWeight: '600' }} numberOfLines={1}>{value || '—'}</Text>
+    <Text style={{ width: 80, fontSize: FontSize.sm, color: colors.textTertiary, fontWeight: FontWeight.semiBold }}>{label}</Text>
+    <Text style={{ flex: 1, fontSize: FontSize.smPlus, color: colors.textPrimary, fontWeight: FontWeight.semiBold }} numberOfLines={1}>{value || '—'}</Text>
   </View>
 );

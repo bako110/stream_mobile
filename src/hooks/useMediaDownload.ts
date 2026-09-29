@@ -18,19 +18,6 @@ export type DlState = {
   downloading: boolean;
 };
 
-function mimeForExt(ext: string, isVideo: boolean): string {
-  const imgMap: Record<string, string> = {
-    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
-    gif: 'image/gif', webp: 'image/webp', heic: 'image/heic',
-  };
-  const vidMap: Record<string, string> = {
-    mp4: 'video/mp4', mov: 'video/quicktime', avi: 'video/x-msvideo',
-    mkv: 'video/x-matroska', webm: 'video/webm',
-  };
-  if (isVideo) return vidMap[ext] ?? 'video/mp4';
-  return imgMap[ext] ?? 'image/jpeg';
-}
-
 function fmtSize(bytes?: number): string {
   if (!bytes) return '';
   if (bytes < 1024) return `${bytes} o`;
@@ -82,7 +69,6 @@ export function useMediaDownload() {
     }
 
     const ext = isHls ? 'mp4' : (url.split('.').pop()?.split('?')[0]?.toLowerCase() ?? (isVideo ? 'mp4' : 'jpg'));
-    const mime = mimeForExt(ext, isVideo);
     // Nom lisible pour l'utilisateur — l'id technique (UUID/hash) ne doit jamais apparaître
     // dans le fichier téléchargé, seulement servir de clé interne pour suivre la progression.
     const filename = `Gofolyx_${isVideo ? 'video' : 'image'}_${Date.now()}.${ext}`;
@@ -94,23 +80,19 @@ export function useMediaDownload() {
     downloadToastService.start(id);
 
     try {
+      // addAndroidDownloads (même avec notification:false) fait toujours
+      // apparaître la notification système Android "Downloading…" pendant le
+      // transfert — ce bloc n'est là que pour enregistrer le fichier auprès du
+      // DownloadManager afin qu'il apparaisse dans l'app "Fichiers" système,
+      // mais il embarque de fait la notification native, hors de notre
+      // contrôle. On s'en passe entièrement : RNBlobUtil.config({path}) seul
+      // écrit directement au bon endroit sans jamais toucher au DownloadManager
+      // ni à son système de notification — seul le toast interne reste visible.
       await RNBlobUtil.config({
         path: destPath,
         // Reconstruction HLS→MP4 : peut prendre plusieurs secondes (téléchargement des
         // segments + remux côté serveur) avant que le premier octet de réponse arrive.
         timeout: isHls ? 120_000 : 60_000,
-        // useDownloadManager délègue la requête au DownloadManager natif Android, qui ne
-        // gère pas fiablement le header Authorization custom ni une réponse chunked sans
-        // Content-Length connu à l'avance (cas de l'endpoint HLS→MP4, streamée dynamiquement
-        // côté serveur) — la requête échouait silencieusement, restant bloquée à 0% avant de
-        // finir en erreur. RNBlobUtil gère lui-même le fetch + la notification à la place.
-        addAndroidDownloads: {
-          useDownloadManager: false,
-          notification: true,
-          title: filename,
-          description: 'Téléchargement en cours…',
-          mime,
-        },
       })
         .fetch('GET', fetchUrl, token ? { Authorization: `Bearer ${token}` } : undefined)
         .progress((received: number, total: number) => {

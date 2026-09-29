@@ -4,6 +4,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, StatusBar, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -29,6 +30,7 @@ export const RevenueTransactionsScreen: React.FC = () => {
   const { theme } = useTheme();
   const { colors } = theme;
   const nav = useNavigation<Nav>();
+  const insets = useSafeAreaInsets();
 
   const [source, setSource] = useState<string | undefined>(undefined);
   const [items, setItems] = useState<RevenueTransaction[]>([]);
@@ -62,9 +64,13 @@ export const RevenueTransactionsScreen: React.FC = () => {
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
+      <StatusBar
+        barStyle={theme.isDark ? 'light-content' : 'dark-content'}
+        translucent
+        backgroundColor="transparent"
+      />
 
-      <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+      <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 12 }]}>
         <BackButton onPress={() => nav.goBack()} />
         <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Historique des revenus</Text>
         <View style={{ width: 38 }} />
@@ -125,10 +131,15 @@ const s = StyleSheet.create({
   header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 14, paddingTop: 12, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   headerTitle: { fontSize: 18, fontWeight: '800' },
 
-  filterRow:        { flexGrow: 0, marginTop: 12 },
-  filterRowContent: { gap: 8, paddingHorizontal: 16 },
-  filterPill:       { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
-  filterText:       { fontSize: 12, fontWeight: '700' },
+  // Hauteur explicite — sans elle, le conteneur se cale sur le plus haut de
+  // ses enfants au premier rendu (avant stabilisation des polices), ce qui
+  // pouvait rogner "Toutes"/"Cadeaux" verticalement selon le device.
+  filterRow:        { flexGrow: 0, height: 40, marginTop: 12 },
+  // paddingRight plus large que paddingLeft — le dernier filtre ("Vues") ne
+  // doit jamais se retrouver coupé/masqué contre le bord droit de l'écran.
+  filterRowContent: { gap: 8, paddingLeft: 16, paddingRight: 32, alignItems: 'center' },
+  filterPill:       { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, justifyContent: 'center' },
+  filterText:       { fontSize: 12, fontWeight: '700', lineHeight: 16 },
 
   row:      { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderTopWidth: 0, borderBottomWidth: 0 },
   rowFirst: { borderTopWidth: 1, borderTopLeftRadius: 16, borderTopRightRadius: 16, marginTop: 8 },

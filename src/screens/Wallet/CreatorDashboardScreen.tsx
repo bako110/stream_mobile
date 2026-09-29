@@ -27,6 +27,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { BackButton, GofolyxLoader, PriceWithLocal } from '../../components/common';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
@@ -125,18 +126,18 @@ const statStyles = (colors: any) => StyleSheet.create({
     marginBottom: 6,
   },
   value: {
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: FontSize.xl,
+    fontWeight: FontWeight.extraBold,
     color: '#F0EFF8',
   },
   sub: {
-    fontSize: 11,
+    fontSize: FontSize.xsPlus,
     color: '#A09DC0',
   },
   label: {
-    fontSize: 11,
+    fontSize: FontSize.xsPlus,
     color: '#6B698A',
-    fontWeight: '500',
+    fontWeight: FontWeight.medium,
     marginTop: 2,
   },
 });
@@ -450,7 +451,7 @@ const CreatorDashboardScreen: React.FC = () => {
         <Text style={s.sectionTitle}>Cadeaux reçus récemment</Text>
         {recentGifts.length === 0 ? (
           <View style={s.emptyBox}>
-            <Text style={{ fontSize: 32 }}>🎁</Text>
+            <Text style={{ fontSize: FontSize['4xl'] }}>🎁</Text>
             <Text style={s.emptyText}>Aucun cadeau reçu pour l'instant</Text>
           </View>
         ) : (
@@ -497,8 +498,8 @@ const styles = (colors: any) => StyleSheet.create({
   headerTitle: {
     flex: 1,
     textAlign: 'center',
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: FontSize.xl,
+    fontWeight: FontWeight.bold,
     color: colors.textPrimary,
   },
   scroll: {
@@ -507,8 +508,8 @@ const styles = (colors: any) => StyleSheet.create({
     gap: 12,
   },
   sectionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: FontSize.basePlus,
+    fontWeight: FontWeight.bold,
     color: colors.textPrimary,
     marginTop: 8,
   },
@@ -523,12 +524,12 @@ const styles = (colors: any) => StyleSheet.create({
     gap: 12,
   },
   cardTitle: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: FontSize.basePlus,
+    fontWeight: FontWeight.bold,
     color: colors.textPrimary,
   },
   cardSubtitle: {
-    fontSize: 12,
+    fontSize: FontSize.sm,
     color: colors.textSecondary,
     marginTop: 2,
   },
@@ -566,8 +567,8 @@ const styles = (colors: any) => StyleSheet.create({
     borderRadius: 10,
   },
   reelCaption: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: FontSize.smPlus,
+    fontWeight: FontWeight.semiBold,
     color: colors.textPrimary,
   },
   reelStat: {
@@ -576,16 +577,16 @@ const styles = (colors: any) => StyleSheet.create({
     gap: 3,
   },
   reelStatText: {
-    fontSize: 11,
+    fontSize: FontSize.xsPlus,
     color: colors.textSecondary,
   },
   reelGoGold: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: FontSize.basePlus,
+    fontWeight: FontWeight.bold,
     color: colors.primary,
   },
   reelCoinsLabel: {
-    fontSize: 10,
+    fontSize: FontSize.xs,
     color: colors.textSecondary,
   },
   priceInputRow: {
@@ -607,14 +608,14 @@ const styles = (colors: any) => StyleSheet.create({
     gap: 4,
   },
   eurSymbol: {
-    fontSize: 16,
+    fontSize: FontSize.md,
     color: colors.textSecondary,
-    fontWeight: '600',
+    fontWeight: FontWeight.semiBold,
   },
   priceInputText: {
     flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.semiBold,
   },
   savePriceBtn: {
     backgroundColor: colors.primary,
@@ -626,8 +627,8 @@ const styles = (colors: any) => StyleSheet.create({
   },
   savePriceBtnText: {
     color: '#FFF',
-    fontWeight: '700',
-    fontSize: 13,
+    fontWeight: FontWeight.bold,
+    fontSize: FontSize.smPlus,
   },
   withdrawCard: {
     backgroundColor: colors.surface,
@@ -644,17 +645,17 @@ const styles = (colors: any) => StyleSheet.create({
   },
   withdrawGoGold: {
     fontSize: 36,
-    fontWeight: '800',
+    fontWeight: FontWeight.extraBold,
     color: colors.textPrimary,
   },
   withdrawCoinsLabel: {
-    fontSize: 13,
+    fontSize: FontSize.smPlus,
     color: colors.textSecondary,
   },
   withdrawEur: {
-    fontSize: 14,
+    fontSize: FontSize.base,
     color: colors.primary,
-    fontWeight: '600',
+    fontWeight: FontWeight.semiBold,
   },
   withdrawBtn: {
     flexDirection: 'row',
@@ -665,11 +666,11 @@ const styles = (colors: any) => StyleSheet.create({
     borderRadius: 14,
   },
   withdrawBtnText: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: FontSize.basePlus,
+    fontWeight: FontWeight.bold,
   },
   withdrawMin: {
-    fontSize: 11,
+    fontSize: FontSize.xsPlus,
     color: colors.textSecondary,
     textAlign: 'center',
   },
@@ -689,8 +690,8 @@ const styles = (colors: any) => StyleSheet.create({
     position: 'relative',
   },
   payoutLabel: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: FontSize.smPlus,
+    fontWeight: FontWeight.semiBold,
     color: colors.textSecondary,
     textAlign: 'center',
   },
@@ -714,22 +715,22 @@ const styles = (colors: any) => StyleSheet.create({
     borderBottomColor: colors.divider,
   },
   giftEmoji: {
-    fontSize: 28,
+    fontSize: FontSize['3xl'],
     width: 36,
     textAlign: 'center',
   },
   giftSender: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: FontSize.smPlus,
+    fontWeight: FontWeight.semiBold,
     color: colors.textPrimary,
   },
   giftName: {
-    fontSize: 11,
+    fontSize: FontSize.xsPlus,
     color: colors.textSecondary,
   },
   giftGoGold: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: FontSize.basePlus,
+    fontWeight: FontWeight.bold,
     color: colors.success,
   },
   emptyBox: {
@@ -742,7 +743,7 @@ const styles = (colors: any) => StyleSheet.create({
     borderColor: colors.border,
   },
   emptyText: {
-    fontSize: 13,
+    fontSize: FontSize.smPlus,
     color: colors.textSecondary,
   },
 });

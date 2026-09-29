@@ -22,8 +22,9 @@ import { pick, types, isErrorWithCode, errorCodes } from '@react-native-document
 import Geolocation from '@react-native-community/geolocation';
 import Slider from '@react-native-community/slider';
 import { useTheme } from '../../hooks/useTheme';
-import { Spacing } from '../../theme';
+import { Spacing, FontSize, FontWeight } from '../../theme';
 import { messageService } from '../../services/messageService';
+import { userService } from '../../services/userService';
 import { authService } from '../../services/authService';
 import { uploadAudioFile, uploadMessageImage, uploadFileFromUri } from '../../services/uploadService';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
@@ -107,7 +108,13 @@ export const ChatScreen: React.FC = () => {
   const { colors }        = theme;
   const nav               = useNavigation<any>();
   const route             = useRoute();
-  const { partnerId, partnerName, avatarUrl: partnerAvatarUrl, lastSeen: initialLastSeen, isOnline: initialIsOnline } = route.params as RouteParams;
+  const { partnerId, partnerName, avatarUrl: routeAvatarUrl, lastSeen: initialLastSeen, isOnline: initialIsOnline } = route.params as RouteParams;
+  // Récupéré en fallback via l'API si absent des params — arriver ici depuis
+  // une notification (contrairement à la liste des conversations, où c'est
+  // déjà en mémoire) ne transmettait jamais l'avatar, laissant le header du
+  // chat sans photo tant qu'on ne repassait pas par la liste.
+  const [fetchedAvatarUrl, setFetchedAvatarUrl] = useState<string | undefined>(undefined);
+  const partnerAvatarUrl = routeAvatarUrl ?? fetchedAvatarUrl;
 
   const { get: getDl, download: startDl } = useMediaDownload();
   const { visibleJobs } = useBackgroundUpload();
@@ -361,6 +368,16 @@ export const ChatScreen: React.FC = () => {
     loadMessages(1);
     messageService.markRead(partnerId).catch(() => {});
   }, []);
+
+  // Fallback avatar — si absent des params de route (ex: arrivée depuis une
+  // notification push, qui ne le transmettait pas), on va le chercher via
+  // l'API pour que le header du chat ne reste jamais sans photo.
+  useEffect(() => {
+    if (routeAvatarUrl || !partnerId) return;
+    userService.getPublicProfile(partnerId)
+      .then(p => setFetchedAvatarUrl(p.avatar_url ?? undefined))
+      .catch(() => {});
+  }, [routeAvatarUrl, partnerId]);
 
 
   const loadMore = () => {
@@ -1583,7 +1600,7 @@ export const ChatScreen: React.FC = () => {
       {editingMsg && (
         <View style={[styles.editBanner, { backgroundColor: colors.primary + '15', borderTopColor: colors.divider }]}>
           <Icon name="edit-2" size={16} color={colors.primary} />
-          <Text style={{ color: colors.primary, flex: 1, marginLeft: 8, fontSize: 13 }} numberOfLines={1}>
+          <Text style={{ color: colors.primary, flex: 1, marginLeft: 8, fontSize: FontSize.smPlus }} numberOfLines={1}>
             Modification : {editingMsg.content}
           </Text>
           <TouchableOpacity onPress={cancelEdit} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -1672,7 +1689,7 @@ export const ChatScreen: React.FC = () => {
               onPress={() => { setShowStickerPicker(false); setShowEmojiPicker(p => !p); }}
               style={styles.inputSideBtn}
             >
-              <Text style={{ fontSize: 22 }}>😊</Text>
+              <Text style={{ fontSize: FontSize['2xl'] }}>😊</Text>
             </TouchableOpacity>
 
             {/* Zone texte */}
@@ -1789,7 +1806,7 @@ export const ChatScreen: React.FC = () => {
             {/* Épingler */}
             {selectedMsg && !selectedMsg.deleted && (
               <TouchableOpacity style={styles.actionItem} onPress={() => handlePinToggle(selectedMsg)}>
-                <Icon name="bookmark" size={20} color={selectedMsg?.pinned ? '#F59E0B' : colors.textPrimary} />
+                <Icon name="bookmark" size={20} color={selectedMsg?.pinned ? colors.primary : colors.textPrimary} />
                 <Text style={[styles.actionText, { color: colors.textPrimary }]}>{selectedMsg?.pinned ? 'Désépingler' : 'Épingler'}</Text>
               </TouchableOpacity>
             )}
@@ -1884,13 +1901,13 @@ export const ChatScreen: React.FC = () => {
           {/* Aperçu fichier centré */}
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
             <View style={{ width: 96, height: 96, borderRadius: 20, backgroundColor: '#2a2a2a', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
-              <Icon name="file-text" size={44} color="#7B3FF2" />
+              <Icon name="file-text" size={44} color={colors.primary} />
             </View>
-            <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700', textAlign: 'center', marginBottom: 6 }} numberOfLines={2}>
+            <Text style={{ color: '#fff', fontSize: FontSize.mdPlus, fontWeight: FontWeight.bold, textAlign: 'center', marginBottom: 6 }} numberOfLines={2}>
               {filePreview?.name}
             </Text>
             {filePreview?.size != null && (
-              <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13 }}>
+              <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: FontSize.smPlus }}>
                 {filePreview.size < 1024 ? `${filePreview.size} o`
                   : filePreview.size < 1048576 ? `${(filePreview.size / 1024).toFixed(1)} Ko`
                   : `${(filePreview.size / 1048576).toFixed(1)} Mo`}
@@ -2028,12 +2045,12 @@ export const ChatScreen: React.FC = () => {
                       if (idx !== -1) listRef.current?.scrollToIndex({ index: idx, animated: true });
                     }}
                   >
-                    <Icon name="bookmark" size={16} color="#F59E0B" />
+                    <Icon name="bookmark" size={16} color={colors.primary} />
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.actionText, { color: colors.textPrimary, fontSize: 13 }]} numberOfLines={2}>
+                      <Text style={[styles.actionText, { color: colors.textPrimary, fontSize: FontSize.smPlus }]} numberOfLines={2}>
                         {item.message_type !== 'text' ? `📎 ${item.message_type}` : item.content}
                       </Text>
-                      <Text style={{ color: colors.textTertiary, fontSize: 11, marginTop: 2 }}>
+                      <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus, marginTop: 2 }}>
                         {item.sender_id === myId ? 'Vous' : partnerName}
                       </Text>
                     </View>
@@ -2064,7 +2081,7 @@ export const ChatScreen: React.FC = () => {
                 </Text>
               </View>
 
-              <Text style={{ color: colors.textSecondary, fontSize: 13.5, lineHeight: 20, marginBottom: 16 }}>
+              <Text style={{ color: colors.textSecondary, fontSize: FontSize.smPlus, lineHeight: 20, marginBottom: 16 }}>
                 Les messages texte échangés avec {partnerName} sont protégés par un chiffrement
                 de bout en bout : ils sont chiffrés sur votre appareil avant l'envoi, et seul
                 l'appareil du destinataire peut les déchiffrer. Personne d'autre ne peut les
@@ -2101,10 +2118,10 @@ export const ChatScreen: React.FC = () => {
                     <Icon name={item.icon} size={16} color={colors.textSecondary} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: colors.textPrimary, fontSize: 13.5, fontWeight: '700', marginBottom: 3 }}>
+                    <Text style={{ color: colors.textPrimary, fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, marginBottom: 3 }}>
                       {item.title}
                     </Text>
-                    <Text style={{ color: colors.textTertiary, fontSize: 12.5, lineHeight: 18 }}>
+                    <Text style={{ color: colors.textTertiary, fontSize: FontSize.sm, lineHeight: 18 }}>
                       {item.text}
                     </Text>
                   </View>
@@ -2119,7 +2136,7 @@ export const ChatScreen: React.FC = () => {
                 }}
                 onPress={() => { setShowE2EEInfo(false); nav.navigate('PolitiqueConfidentialite'); }}
               >
-                <Text style={{ color: colors.primary, fontSize: 13.5, fontWeight: '700' }}>
+                <Text style={{ color: colors.primary, fontSize: FontSize.smPlus, fontWeight: FontWeight.bold }}>
                   En savoir plus sur la confidentialité
                 </Text>
                 <Icon name="external-link" size={13} color={colors.primary} />
@@ -2149,7 +2166,7 @@ export const ChatScreen: React.FC = () => {
                       onPress={() => doForward(item.partner_id, name)}
                     >
                       <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary + '22', alignItems: 'center', justifyContent: 'center' }}>
-                        <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 14 }}>{name[0]?.toUpperCase()}</Text>
+                        <Text style={{ color: colors.primary, fontWeight: FontWeight.extraBold, fontSize: FontSize.base }}>{name[0]?.toUpperCase()}</Text>
                       </View>
                       <Text style={[styles.actionText, { color: colors.textPrimary }]}>{name}</Text>
                     </TouchableOpacity>
@@ -2203,7 +2220,7 @@ const styles = StyleSheet.create({
   },
   e2eeBannerText: {
     flex:     1,
-    fontSize: 11,
+    fontSize: FontSize.xsPlus,
     lineHeight: 15,
   },
   header: {
@@ -2220,8 +2237,8 @@ const styles = StyleSheet.create({
   headerAvatar:     { width: 38, height: 38, borderRadius: 19, overflow: 'hidden' },
   headerAvatarDot:  { position: 'absolute', bottom: 0, right: 0, width: 11, height: 11, borderRadius: 5.5, backgroundColor: '#36D9A0', borderWidth: 2, borderColor: 'transparent' },
   headerInfo: { flex: 1 },
-  headerName: { fontSize: 16, fontWeight: '700' },
-  headerSub:  { fontSize: 12, marginTop: 1 },
+  headerName: { fontSize: FontSize.md, fontWeight: FontWeight.bold },
+  headerSub:  { fontSize: FontSize.sm, marginTop: 1 },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 60 },
 
@@ -2232,7 +2249,7 @@ const styles = StyleSheet.create({
   quickReplyChip: {
     paddingHorizontal: 14, paddingVertical: 9, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth,
   },
-  quickReplyText: { fontSize: 13, fontWeight: '500' },
+  quickReplyText: { fontSize: FontSize.smPlus, fontWeight: FontWeight.medium },
 
   uploadBar: {
     overflow: 'hidden',
@@ -2251,13 +2268,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   uploadBarText: {
-    fontSize: 13,
-    fontWeight: '500',
+    fontSize: FontSize.smPlus,
+    fontWeight: FontWeight.medium,
     flex: 1,
   },
   uploadBarPct: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.bold,
     marginLeft: 8,
   },
   uploadProgressTrack: {
@@ -2275,16 +2292,16 @@ const styles = StyleSheet.create({
   bubbleInner:  { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10, gap: 4 },
   bubbleInnerMine:   { borderBottomRightRadius: 4 },
   bubbleInnerTheirs: { borderBottomLeftRadius: 4 },
-  msgText:      { fontSize: 15, lineHeight: 22 },
-  msgTime:      { fontSize: 10, alignSelf: 'flex-end' },
+  msgText:      { fontSize: FontSize.basePlus, lineHeight: 22 },
+  msgTime:      { fontSize: FontSize.xs, alignSelf: 'flex-end' },
   bubbleFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 },
-  editedLabel:  { fontSize: 10, fontStyle: 'italic' },
+  editedLabel:  { fontSize: FontSize.xs, fontStyle: 'italic' },
 
   // Voice
   voiceBubble: { flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 180 },
   playBtn:     { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   voiceInfo:   { flex: 1, gap: 2 },
-  voiceDuration: { fontSize: 11 },
+  voiceDuration: { fontSize: FontSize.xsPlus },
   waveform:    { flexDirection: 'row', alignItems: 'center', height: 20, borderRadius: 4, gap: 1.5, paddingHorizontal: 4 },
   waveBar:     { width: 2.5, borderRadius: 2 },
 
@@ -2297,8 +2314,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.50)',
     alignItems: 'center', justifyContent: 'center',
   },
-  imgDlPct:  { color: '#fff', fontSize: 10, fontWeight: '700' },
-  imgDlSize: { color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '500' },
+  imgDlPct:  { color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+  imgDlSize: { color: 'rgba(255,255,255,0.85)', fontSize: FontSize.xsPlus, fontWeight: FontWeight.medium },
   imgProgressBar:  { position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, backgroundColor: 'rgba(255,255,255,0.25)' },
   imgProgressFill: { height: 3, backgroundColor: '#fff' },
   imgOverlayTime: {
@@ -2307,23 +2324,23 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.42)', borderRadius: 8,
     paddingHorizontal: 6, paddingVertical: 2, gap: 3,
   },
-  imgOverlayText: { color: '#fff', fontSize: 10, fontWeight: '500' },
+  imgOverlayText: { color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.medium },
 
   // Video
   videoBubble:       { width: SCREEN_W * 0.55, height: SCREEN_W * 0.4, borderRadius: 14, marginBottom: 4 },
   videoPlayOverlay:  { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 14 },
-  videoDurationLabel: { fontSize: 11, marginTop: -2 },
+  videoDurationLabel: { fontSize: FontSize.xsPlus, marginTop: -2 },
 
   // File
   fileBubble: { flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 180 },
   fileIcon:   { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   fileInfo:   { flex: 1 },
-  fileName:   { fontSize: 14, fontWeight: '600' },
-  fileSize:   { fontSize: 11, marginTop: 1 },
+  fileName:   { fontSize: FontSize.base, fontWeight: FontWeight.semiBold },
+  fileSize:   { fontSize: FontSize.xsPlus, marginTop: 1 },
 
   // Partner status (typing / recording)
   partnerStatusBar:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, gap: 8, borderTopWidth: StyleSheet.hairlineWidth },
-  partnerStatusText: { fontSize: 13, fontStyle: 'italic' },
+  partnerStatusText: { fontSize: FontSize.smPlus, fontStyle: 'italic' },
   typingDotsRow:     { flexDirection: 'row', gap: 3, alignItems: 'center' },
   typingDot:         { width: 5, height: 5, borderRadius: 3, opacity: 0.6 },
 
@@ -2336,7 +2353,7 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   recordingDot:  { width: 10, height: 10, borderRadius: 5, backgroundColor: '#FF4444' },
-  recordingTime: { fontSize: 16, fontWeight: '600', minWidth: 44 },
+  recordingTime: { fontSize: FontSize.md, fontWeight: FontWeight.semiBold, minWidth: 44 },
   recordCancelBtn: { padding: 8 },
   recordSendBtn:   { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
 
@@ -2367,7 +2384,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   input: {
-    fontSize: 15,
+    fontSize: FontSize.basePlus,
     maxHeight: 120,
     paddingTop: 2,
     paddingBottom: 2,
@@ -2387,11 +2404,11 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   attachHandle:  { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
-  attachTitle:   { fontSize: 18, fontWeight: '700', marginBottom: 20 },
+  attachTitle:   { fontSize: FontSize.lg, fontWeight: FontWeight.bold, marginBottom: 20 },
   attachGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 20 },
   attachItem:    { alignItems: 'center', width: 70, gap: 8 },
   attachIcon:    { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  attachLabel:   { fontSize: 12 },
+  attachLabel:   { fontSize: FontSize.sm },
 
   // Edit banner
   editBanner: {
@@ -2412,7 +2429,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  blockedText: { fontSize: 13, textAlign: 'center', flex: 1 },
+  blockedText: { fontSize: FontSize.smPlus, textAlign: 'center', flex: 1 },
 
   requestBanner: {
     paddingVertical: 14,
@@ -2425,7 +2442,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
   },
-  requestBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  requestBtnText: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: '#fff' },
 
   // Action sheet
   actionSheet: {
@@ -2442,13 +2459,13 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   actionText: {
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.medium,
   },
 
   // Emoji picker button inside input
   emojiBtn:     { paddingHorizontal: 6, justifyContent: 'center' },
-  emojiBtnText: { fontSize: 20 },
+  emojiBtnText: { fontSize: FontSize.xl },
 
   // Emoji picker panel
   emojiPanel: {
@@ -2460,12 +2477,12 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   emojiItem: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  emojiText: { fontSize: 26 },
+  emojiText: { fontSize: FontSize['2xl'] },
 
   // Quick reactions in action sheet
   reactionsRow: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 12 },
   reactionQuickBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  reactionQuickText: { fontSize: 28 },
+  reactionQuickText: { fontSize: FontSize['3xl'] },
 
   // Reaction badge under bubble
   reactionBadge: {
@@ -2478,10 +2495,10 @@ const styles = StyleSheet.create({
   },
   reactionMine:   { right: 8 },
   reactionTheirs: { left: 8 },
-  reactionEmoji:  { fontSize: 14 },
+  reactionEmoji:  { fontSize: FontSize.base },
   stickerBubble:  { alignItems: 'flex-start', paddingHorizontal: 4, paddingVertical: 2 },
   stickerText:    { fontSize: 72, lineHeight: 84 },
-  stickerTime:    { fontSize: 10, alignSelf: 'flex-end', marginTop: 2 },
+  stickerTime:    { fontSize: FontSize.xs, alignSelf: 'flex-end', marginTop: 2 },
 
   // Location card — style WhatsApp
   locationCard:        { borderRadius: 12, overflow: 'hidden', width: 240 },
@@ -2490,8 +2507,8 @@ const styles = StyleSheet.create({
   shareCard:      { borderRadius: 12, overflow: 'hidden', width: 200 },
   shareCardImg:   { width: '100%', height: 110 },
   shareCardBody:  { padding: 8, gap: 2 },
-  shareCardAuthor:{ fontSize: 10, fontWeight: '600' },
-  shareCardTitle: { fontSize: 12, fontWeight: '500', lineHeight: 16 },
+  shareCardAuthor:{ fontSize: FontSize.xs, fontWeight: FontWeight.semiBold },
+  shareCardTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.medium, lineHeight: 16 },
   locationCardOther:   { backgroundColor: '#fff', borderWidth: StyleSheet.hairlineWidth, borderColor: '#e0e0e0' },
   locationMapBox:      { width: '100%', height: 140, position: 'relative' },
   locationMapImg:      { width: '100%', height: 140 },
@@ -2501,38 +2518,38 @@ const styles = StyleSheet.create({
   locationFooter:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8 },
   locationFooterMe:    { backgroundColor: '#054d43' },
   locationFooterOther: { backgroundColor: '#f5f5f5' },
-  locationLabel:       { fontSize: 13, fontWeight: '700' },
-  locationCoords:      { fontSize: 11, marginTop: 1 },
+  locationLabel:       { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
+  locationCoords:      { fontSize: FontSize.xsPlus, marginTop: 1 },
 
   // Pinned banner
   pinnedBanner:     { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 14, paddingVertical: 7, borderBottomWidth: StyleSheet.hairlineWidth },
-  pinnedBannerText: { fontSize: 12, fontWeight: '700' },
-  pinnedBannerSub:  { fontSize: 12, flex: 1 },
+  pinnedBannerText: { fontSize: FontSize.sm, fontWeight: FontWeight.bold },
+  pinnedBannerSub:  { fontSize: FontSize.sm, flex: 1 },
 
   // Search bar in conversation
   chatSearchBar:   { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
-  chatSearchInput: { flex: 1, fontSize: 14, padding: 0 },
+  chatSearchInput: { flex: 1, fontSize: FontSize.base, padding: 0 },
 
   // Reply preview inside bubble
   replyPreview: { borderLeftWidth: 3, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 5, marginBottom: 6, gap: 2 },
-  replyName:    { fontSize: 12, fontWeight: '700' },
-  replyText:    { fontSize: 12 },
+  replyName:    { fontSize: FontSize.sm, fontWeight: FontWeight.bold },
+  replyText:    { fontSize: FontSize.sm },
 
   // Forwarded label
   forwardedLabel: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
-  forwardedText:  { fontSize: 11, fontStyle: 'italic' },
+  forwardedText:  { fontSize: FontSize.xsPlus, fontStyle: 'italic' },
 
   // Reply banner above input
   replyBanner:     { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth },
   replyBannerBar:  { width: 3, height: 36, borderRadius: 2 },
-  replyBannerName: { fontSize: 12, fontWeight: '700', marginBottom: 2 },
-  replyBannerText: { fontSize: 13 },
+  replyBannerName: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, marginBottom: 2 },
+  replyBannerText: { fontSize: FontSize.smPlus },
 
   // Date separator
   dateSepRow:  { alignItems: 'center', marginVertical: 14 },
   dateSepLine: { flex: 1, height: StyleSheet.hairlineWidth },
   dateSepPill: { paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20 },
-  dateSepText: { fontSize: 11, fontWeight: '600', letterSpacing: 0.5 },
+  dateSepText: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold, letterSpacing: 0.5 },
 });
 
 const CP = StyleSheet.create({
@@ -2541,7 +2558,7 @@ const CP = StyleSheet.create({
     paddingHorizontal: 16, paddingBottom: 12,
   },
   headerClose: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  headerTitle: { color: '#fff', fontSize: FontSize.basePlus, fontWeight: FontWeight.bold },
   bottomBar: {
     flexDirection: 'row', alignItems: 'flex-end',
     paddingHorizontal: 12, paddingTop: 10,
@@ -2553,7 +2570,7 @@ const CP = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 8, gap: 8,
   },
   captionInput: {
-    flex: 1, color: '#fff', fontSize: 15, maxHeight: 100, paddingVertical: 0,
+    flex: 1, color: '#fff', fontSize: FontSize.basePlus, maxHeight: 100, paddingVertical: 0,
   },
   sendBtn: {
     width: 48, height: 48, borderRadius: 24,

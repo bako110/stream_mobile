@@ -11,6 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { useUserLocation } from '../../hooks/useUserLocation';
 import { eventService } from '../../services';
@@ -182,7 +183,7 @@ const EventCard: React.FC<{ item: Event; index: number; colors: any; onPress: ()
                 {isFree ? (
                   <View style={[st.freeBadge, { borderColor: colors.success }]}>
                     <Icon name="gift" size={11} color={colors.success} />
-                    <Text style={{ fontSize: 11, fontWeight: '800', color: colors.success }}>Entrée gratuite</Text>
+                    <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, color: colors.success }}>Entrée gratuite</Text>
                   </View>
                 ) : minPrice != null ? (
                   <View>
@@ -288,9 +289,9 @@ export const NearbyEventsScreen: React.FC = () => {
       {/* ── Contenu ──────────────────────────────────────────────────── */}
       {noGeo ? (
         <View style={st.empty}>
-          <LinearGradient colors={['#7B3FF222', '#7B3FF208']} style={st.emptyIconWrap}>
-            <Icon name="map-pin" size={38} color="#7B3FF2" />
-          </LinearGradient>
+          <View style={[st.emptyIconWrap, { backgroundColor: colors.primary + '18' }]}>
+            <Icon name="map-pin" size={38} color={colors.primary} />
+          </View>
           <Text style={[st.emptyTitle, { color: colors.textPrimary }]}>Localisation désactivée</Text>
           <Text style={[st.emptySub, { color: colors.textTertiary }]}>
             Active ta localisation dans les réglages pour découvrir les événements autour de toi.
@@ -298,16 +299,16 @@ export const NearbyEventsScreen: React.FC = () => {
         </View>
       ) : loading ? (
         <View style={st.empty}>
-          <GofolyxLoader color="#7B3FF2" />
-          <Text style={{ color: colors.textTertiary, marginTop: 16, fontSize: 14 }}>
+          <GofolyxLoader color={colors.primary} />
+          <Text style={{ color: colors.textTertiary, marginTop: 16, fontSize: FontSize.base }}>
             Recherche d'événements à {radius} km...
           </Text>
         </View>
       ) : events.length === 0 ? (
         <View style={st.empty}>
-          <LinearGradient colors={['#7B3FF222', '#7B3FF208']} style={st.emptyIconWrap}>
-            <Icon name="calendar" size={38} color="#7B3FF2" />
-          </LinearGradient>
+          <View style={[st.emptyIconWrap, { backgroundColor: colors.primary + '18' }]}>
+            <Icon name="calendar" size={38} color={colors.primary} />
+          </View>
           <Text style={[st.emptyTitle, { color: colors.textPrimary }]}>Aucun événement</Text>
           <Text style={[st.emptySub, { color: colors.textTertiary }]}>
             Rien dans un rayon de {radius} km.{'\n'}Essaie d'augmenter le rayon.
@@ -316,10 +317,10 @@ export const NearbyEventsScreen: React.FC = () => {
             onPress={() => setRadius(RADII[Math.min(RADII.indexOf(radius) + 1, RADII.length - 1)])}
             style={st.enlargeBtn}
           >
-            <LinearGradient colors={['#7B3FF2', '#E0389A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.enlargeBtnInner}>
+            <View style={[st.enlargeBtnInner, { backgroundColor: colors.primary }]}>
               <Icon name="maximize-2" size={14} color="#fff" />
               <Text style={st.enlargeBtnText}>Élargir le rayon</Text>
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         </View>
       ) : (
@@ -349,49 +350,49 @@ const st = StyleSheet.create({
   header:        { paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   headerContent: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   backBtn:       { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  headerTitle:   { fontSize: 18, fontWeight: '900', letterSpacing: -0.3 },
-  headerSub:     { fontSize: 12, marginTop: 2 },
+  headerTitle:   { fontSize: FontSize.lg, fontWeight: FontWeight.black, letterSpacing: -0.3 },
+  headerSub:     { fontSize: FontSize.sm, marginTop: 2 },
   statPill:      { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 },
-  statPillText:  { fontSize: 13, fontWeight: '800' },
+  statPillText:  { fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold },
 
   // Radius
   radiusRow:      { flexDirection: 'row', alignItems: 'center', gap: 6, paddingBottom: 2 },
-  radiusLabelTxt: { fontSize: 12, fontWeight: '600', marginRight: 2 },
+  radiusLabelTxt: { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, marginRight: 2 },
   radiusChip:     { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
-  radiusChipText: { fontSize: 12, fontWeight: '700' },
+  radiusChipText: { fontSize: FontSize.sm, fontWeight: FontWeight.bold },
 
   // Card
   card:     { borderRadius: 20, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 12, elevation: 5 },
-  coverTitle: { fontSize: 17, fontWeight: '900', color: '#fff', lineHeight: 22 },
-  coverDate:  { fontSize: 11, color: 'rgba(255,255,255,0.72)' },
+  coverTitle: { fontSize: FontSize.mdPlus, fontWeight: FontWeight.black, color: '#fff', lineHeight: 22 },
+  coverDate:  { fontSize: FontSize.xsPlus, color: 'rgba(255,255,255,0.72)' },
   typePill:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  typePillText: { fontSize: 9, fontWeight: '900', color: '#fff', letterSpacing: 0.8 },
+  typePillText: { fontSize: FontSize['2xs'], fontWeight: FontWeight.black, color: '#fff', letterSpacing: 0.8 },
   distPill:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 12, overflow: 'hidden' },
-  distTxt:    { fontSize: 10, fontWeight: '800', color: '#fff', letterSpacing: 0.3 },
+  distTxt:    { fontSize: FontSize.xs, fontWeight: FontWeight.extraBold, color: '#fff', letterSpacing: 0.3 },
 
   // Body
   body:         { padding: 14, gap: 10 },
   bodyRow:      { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   bodyIconWrap: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
-  bodyMain:     { fontSize: 13, fontWeight: '700', lineHeight: 18 },
-  bodySub:      { fontSize: 11, marginTop: 1 },
+  bodyMain:     { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, lineHeight: 18 },
+  bodySub:      { fontSize: FontSize.xsPlus, marginTop: 1 },
   capTrack:     { height: 4, borderRadius: 2, marginTop: 6, overflow: 'hidden' },
   capFill:      { height: '100%', borderRadius: 2 },
 
   // Footer
   footer:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 12, marginTop: 2 },
   freeBadge:  { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1.5, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5 },
-  priceLabel: { fontSize: 10, fontWeight: '600' },
-  priceValue: { fontSize: 16, fontWeight: '900' },
+  priceLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.semiBold },
+  priceValue: { fontSize: FontSize.md, fontWeight: FontWeight.black },
   goBtn:      { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
-  goBtnText:  { fontSize: 13, fontWeight: '800', color: '#fff' },
+  goBtnText:  { fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold, color: '#fff' },
 
   // Empty
   empty:         { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 32 },
   emptyIconWrap: { width: 88, height: 88, borderRadius: 44, alignItems: 'center', justifyContent: 'center' },
-  emptyTitle:    { fontSize: 18, fontWeight: '800' },
-  emptySub:      { fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  emptyTitle:    { fontSize: FontSize.lg, fontWeight: FontWeight.extraBold },
+  emptySub:      { fontSize: FontSize.smPlus, textAlign: 'center', lineHeight: 20 },
   enlargeBtn:    { marginTop: 6, borderRadius: 14, overflow: 'hidden' },
   enlargeBtnInner: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingVertical: 13 },
-  enlargeBtnText:  { fontSize: 14, fontWeight: '800', color: '#fff' },
+  enlargeBtnText:  { fontSize: FontSize.base, fontWeight: FontWeight.extraBold, color: '#fff' },
 });

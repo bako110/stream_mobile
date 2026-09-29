@@ -12,6 +12,7 @@ import Animated, {
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { BackButton, PriceWithLocal } from '../../components/common';
 import { contentService, toastService, showConfirm } from '../../services';
@@ -69,8 +70,8 @@ const SeasonTab: React.FC<{
 const st = StyleSheet.create({
   tab:      { borderRadius: 10, overflow: 'hidden', marginRight: 8 },
   tabInner: { paddingHorizontal: 14, paddingVertical: 9, alignItems: 'center', minWidth: 52 },
-  tabNum:   { fontSize: 13, fontWeight: '800', letterSpacing: -0.2 },
-  tabTitle: { fontSize: 10, fontWeight: '600', marginTop: 1 },
+  tabNum:   { fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold, letterSpacing: -0.2 },
+  tabTitle: { fontSize: FontSize.xs, fontWeight: FontWeight.semiBold, marginTop: 1 },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -175,15 +176,15 @@ const ec = StyleSheet.create({
   overlay:      { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   actionCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
   epNumBadge:   { position: 'absolute', top: 8, left: 8, backgroundColor: 'rgba(0,0,0,0.65)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
-  epNumTxt:     { color: '#fff', fontSize: 11, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  epNumTxt:     { color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, fontVariant: ['tabular-nums'] },
   durBadge:     { position: 'absolute', bottom: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.65)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
-  durTxt:       { color: 'rgba(255,255,255,0.9)', fontSize: 10, fontWeight: '700' },
+  durTxt:       { color: 'rgba(255,255,255,0.9)', fontSize: FontSize.xs, fontWeight: FontWeight.bold },
   info:         { padding: 12, gap: 6 },
   infoTop:      { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  title:        { flex: 1, fontSize: 14, fontWeight: '800', lineHeight: 19 },
+  title:        { flex: 1, fontSize: FontSize.base, fontWeight: FontWeight.extraBold, lineHeight: 19 },
   accessBadge:  { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7, flexShrink: 0 },
-  accessTxt:    { fontSize: 10, fontWeight: '800' },
-  synopsis:     { fontSize: 12, lineHeight: 17, fontWeight: '400' },
+  accessTxt:    { fontSize: FontSize.xs, fontWeight: FontWeight.extraBold },
+  synopsis:     { fontSize: FontSize.sm, lineHeight: 17, fontWeight: FontWeight.regular },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -585,7 +586,7 @@ export const SerieEpisodesScreen: React.FC<Props> = ({ route, navigation }) => {
                   <Text style={[pw.cardLabel, { color: colors.textSecondary }]}>Votre solde</Text>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={[pw.cardValue, { color: canAfford ? '#10b981' : '#ef4444', fontWeight: '800' }]}>
+                  <Text style={[pw.cardValue, { color: canAfford ? '#10b981' : '#ef4444', fontWeight: FontWeight.extraBold }]}>
                     {walletGoGold} GoGold
                   </Text>
                   {!canAfford && (
@@ -654,41 +655,41 @@ export const SerieEpisodesScreen: React.FC<Props> = ({ route, navigation }) => {
 const fh = StyleSheet.create({
   backBtn:    { position: 'absolute', zIndex: 30, left: 16, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
   titleBar:   { position: 'absolute', zIndex: 25, left: 0, right: 0, height: 56, flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 60, paddingBottom: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(128,128,128,0.15)' },
-  titleTxt:   { fontSize: 16, fontWeight: '800', letterSpacing: -0.3 },
+  titleTxt:   { fontSize: FontSize.md, fontWeight: FontWeight.extraBold, letterSpacing: -0.3 },
   premBadge:  { position: 'absolute', right: 16, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
-  premTxt:    { fontSize: 10, fontWeight: '800', letterSpacing: 0.6 },
+  premTxt:    { fontSize: FontSize.xs, fontWeight: FontWeight.extraBold, letterSpacing: 0.6 },
   heroBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 18, paddingBottom: 20 },
   serieTag:   { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', backgroundColor: `${PURPLE}25`, borderWidth: 1, borderColor: `${PURPLE}70`, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 5, marginBottom: 8 },
-  serieTagTxt:{ color: PURPLE, fontSize: 9, fontWeight: '800', letterSpacing: 1 },
-  heroTitle:  { color: '#fff', fontSize: 24, fontWeight: '900', lineHeight: 29, letterSpacing: -0.5, marginBottom: 8, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+  serieTagTxt:{ color: PURPLE, fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold, letterSpacing: 1 },
+  heroTitle:  { color: '#fff', fontSize: FontSize['2xl'], fontWeight: FontWeight.black, lineHeight: 29, letterSpacing: -0.5, marginBottom: 8, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
   heroMeta:   { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   metaChip:   { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 5 },
-  metaChipTxt:{ fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.85)' },
-  metaDot:    { color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '600' },
+  metaChipTxt:{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, color: 'rgba(255,255,255,0.85)' },
+  metaDot:    { color: 'rgba(255,255,255,0.55)', fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold },
 });
 
 const pw2 = StyleSheet.create({
   banner:     { marginHorizontal: 16, marginTop: 14, borderRadius: 14, overflow: 'hidden' },
   bannerGrad: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 13 },
   bannerIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-  bannerTitle:{ flex: 1, color: '#fff', fontSize: 14, fontWeight: '800' },
-  bannerSub:  { color: 'rgba(255,255,255,0.75)', fontSize: 11, fontWeight: '600', marginTop: 1 },
+  bannerTitle:{ flex: 1, color: '#fff', fontSize: FontSize.base, fontWeight: FontWeight.extraBold },
+  bannerSub:  { color: 'rgba(255,255,255,0.75)', fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold, marginTop: 1 },
 });
 
 const sc = StyleSheet.create({
-  synopsis:      { fontSize: 14, lineHeight: 22, fontWeight: '400' },
-  synToggle:     { fontSize: 13, fontWeight: '700', marginTop: 2 },
+  synopsis:      { fontSize: FontSize.base, lineHeight: 22, fontWeight: FontWeight.regular },
+  synToggle:     { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, marginTop: 2 },
   seasonSection: { paddingTop: 20 },
-  sectionLabel:  { fontSize: 10, fontWeight: '800', letterSpacing: 1.2, paddingHorizontal: 16, marginBottom: 8 },
-  seasonTitle:   { fontSize: 16, fontWeight: '800', letterSpacing: -0.3 },
-  seasonYear:    { fontSize: 12, fontWeight: '500', marginTop: 2 },
+  sectionLabel:  { fontSize: FontSize.xs, fontWeight: FontWeight.extraBold, letterSpacing: 1.2, paddingHorizontal: 16, marginBottom: 8 },
+  seasonTitle:   { fontSize: FontSize.md, fontWeight: FontWeight.extraBold, letterSpacing: -0.3 },
+  seasonYear:    { fontSize: FontSize.sm, fontWeight: FontWeight.medium, marginTop: 2 },
   epHeader:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
-  epHeaderTitle: { fontSize: 15, fontWeight: '800', letterSpacing: -0.2 },
-  epCount:       { fontSize: 12, fontWeight: '600' },
+  epHeaderTitle: { fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold, letterSpacing: -0.2 },
+  epCount:       { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
   empty:         { alignItems: 'center', paddingTop: 50, gap: 12 },
   emptyIcon:     { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
-  emptyTitle:    { fontSize: 16, fontWeight: '800' },
-  emptySub:      { fontSize: 13, fontWeight: '500', textAlign: 'center' },
+  emptyTitle:    { fontSize: FontSize.md, fontWeight: FontWeight.extraBold },
+  emptySub:      { fontSize: FontSize.smPlus, fontWeight: FontWeight.medium, textAlign: 'center' },
 });
 
 const pw = StyleSheet.create({
@@ -698,21 +699,21 @@ const pw = StyleSheet.create({
   lockHero:    { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 16, position: 'relative' },
   lockCircle:  { width: 68, height: 68, borderRadius: 34, alignItems: 'center', justifyContent: 'center' },
   closeBtn:    { position: 'absolute', right: 0, width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  title:       { fontSize: 20, fontWeight: '900', textAlign: 'center', marginBottom: 6 },
-  subtitle:    { fontSize: 13, textAlign: 'center', lineHeight: 19, marginBottom: 18 },
+  title:       { fontSize: FontSize.xl, fontWeight: FontWeight.black, textAlign: 'center', marginBottom: 6 },
+  subtitle:    { fontSize: FontSize.smPlus, textAlign: 'center', lineHeight: 19, marginBottom: 18 },
   card:        { borderRadius: 16, overflow: 'hidden', marginBottom: 16 },
   cardRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14 },
   divider:     { height: StyleSheet.hairlineWidth, marginHorizontal: 14 },
   iconBox:     { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  cardLabel:   { fontSize: 13, fontWeight: '600' },
-  cardValue:   { fontSize: 15, fontWeight: '800' },
-  cardSub:     { fontSize: 11, fontWeight: '500', marginTop: 1 },
+  cardLabel:   { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
+  cardValue:   { fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold },
+  cardSub:     { fontSize: FontSize.xsPlus, fontWeight: FontWeight.medium, marginTop: 1 },
   benefits:    { gap: 8, marginBottom: 18 },
   benefit:     { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  benefitTxt:  { fontSize: 13, fontWeight: '500' },
+  benefitTxt:  { fontSize: FontSize.smPlus, fontWeight: FontWeight.medium },
   btnWrap:     { borderRadius: 14, overflow: 'hidden', marginBottom: 10 },
   btn:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 15 },
-  btnTxt:      { color: '#fff', fontSize: 15, fontWeight: '800' },
+  btnTxt:      { color: '#fff', fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold },
   cancelBtn:   { alignItems: 'center', paddingVertical: 10 },
-  cancelTxt:   { fontSize: 14, fontWeight: '600' },
+  cancelTxt:   { fontSize: FontSize.base, fontWeight: FontWeight.semiBold },
 });

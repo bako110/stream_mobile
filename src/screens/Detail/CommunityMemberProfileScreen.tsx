@@ -13,6 +13,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { GofolyxLoader, BackButton } from '../../components/common';
 import { showConfirm, toastService } from '../../services';
@@ -219,7 +220,7 @@ export function CommunityMemberProfileScreen({ route }: Props) {
       <View style={[styles.container, { backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }]}>
         <BackButton onPress={() => navigation.goBack()} />
         <Icon name="user-x" size={44} color={colors.textTertiary} />
-        <Text style={[{ color: colors.textTertiary, marginTop: 12, fontSize: 15 }]}>
+        <Text style={[{ color: colors.textTertiary, marginTop: 12, fontSize: FontSize.basePlus }]}>
           Profil introuvable
         </Text>
       </View>
@@ -434,7 +435,7 @@ export function CommunityMemberProfileScreen({ route }: Props) {
             activeOpacity={0.75}
           >
             <Icon name="bar-chart-2" size={16} color={colors.primary} />
-            <Text style={{ flex: 1, color: colors.textPrimary, fontWeight: '600', fontSize: 14 }}>Stats créateur</Text>
+            <Text style={{ flex: 1, color: colors.textPrimary, fontWeight: FontWeight.semiBold, fontSize: FontSize.base }}>Stats créateur</Text>
             <Icon name={showStats ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textTertiary} />
           </TouchableOpacity>
 
@@ -458,8 +459,8 @@ export function CommunityMemberProfileScreen({ route }: Props) {
                     <View style={[styles.historyIconWrap, { backgroundColor: row.color + '18' }]}>
                       <Icon name={row.icon} size={15} color={row.color} />
                     </View>
-                    <Text style={{ flex: 1, color: colors.textSecondary, fontSize: 13 }}>{row.label}</Text>
-                    <Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: '700' }}>{row.value}</Text>
+                    <Text style={{ flex: 1, color: colors.textSecondary, fontSize: FontSize.smPlus }}>{row.label}</Text>
+                    <Text style={{ color: colors.textPrimary, fontSize: FontSize.base, fontWeight: FontWeight.bold }}>{row.value}</Text>
                   </View>
                 ))}
               </View>
@@ -478,7 +479,7 @@ export function CommunityMemberProfileScreen({ route }: Props) {
                     style={[styles.roleChip, { backgroundColor: '#7B3FF215', borderColor: '#7B3FF240' }]}
                   >
                     <Icon name="shield" size={12} color="#7B3FF2" />
-                    <Text style={{ color: '#7B3FF2', fontSize: 12, fontWeight: '700' }}>Promouvoir Admin</Text>
+                    <Text style={{ color: '#7B3FF2', fontSize: FontSize.sm, fontWeight: FontWeight.bold }}>Promouvoir Admin</Text>
                   </TouchableOpacity>
                 )}
                 {member.role !== 'moderator' && (
@@ -488,7 +489,7 @@ export function CommunityMemberProfileScreen({ route }: Props) {
                     style={[styles.roleChip, { backgroundColor: '#3B82F615', borderColor: '#3B82F640' }]}
                   >
                     <Icon name="star" size={12} color="#3B82F6" />
-                    <Text style={{ color: '#3B82F6', fontSize: 12, fontWeight: '700' }}>Promouvoir Mod</Text>
+                    <Text style={{ color: '#3B82F6', fontSize: FontSize.sm, fontWeight: FontWeight.bold }}>Promouvoir Mod</Text>
                   </TouchableOpacity>
                 )}
                 {member.role !== 'member' && (
@@ -498,7 +499,7 @@ export function CommunityMemberProfileScreen({ route }: Props) {
                     style={[styles.roleChip, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
                   >
                     <Icon name="user" size={12} color={colors.textSecondary} />
-                    <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '700' }}>Rétrograder Membre</Text>
+                    <Text style={{ color: colors.textSecondary, fontSize: FontSize.sm, fontWeight: FontWeight.bold }}>Rétrograder Membre</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -511,7 +512,7 @@ export function CommunityMemberProfileScreen({ route }: Props) {
                   style={[styles.roleChip, { backgroundColor: '#EF444415', borderColor: '#EF444440' }]}
                 >
                   <Icon name="user-x" size={12} color="#EF4444" />
-                  <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '700' }}>Exclure</Text>
+                  <Text style={{ color: '#EF4444', fontSize: FontSize.sm, fontWeight: FontWeight.bold }}>Exclure</Text>
                 </TouchableOpacity>
                 {isAdmin && (
                   <TouchableOpacity
@@ -520,7 +521,7 @@ export function CommunityMemberProfileScreen({ route }: Props) {
                     style={[styles.roleChip, { backgroundColor: '#EF444410', borderColor: '#EF444430' }]}
                   >
                     <Icon name="slash" size={12} color="#EF4444" />
-                    <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '700' }}>Bloquer</Text>
+                    <Text style={{ color: '#EF4444', fontSize: FontSize.sm, fontWeight: FontWeight.bold }}>Bloquer</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -565,8 +566,8 @@ const styles = StyleSheet.create({
   },
   communityPillText: {
     color: 'rgba(255,255,255,0.9)',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semiBold,
   },
   avatarWrapper: {
     position: 'relative',
@@ -583,8 +584,8 @@ const styles = StyleSheet.create({
     borderRadius: 40,
   },
   avatarInitials: {
-    fontSize: 28,
-    fontWeight: '800',
+    fontSize: FontSize['3xl'],
+    fontWeight: FontWeight.extraBold,
     letterSpacing: 0.5,
   },
   onlineDot: {
@@ -600,14 +601,14 @@ const styles = StyleSheet.create({
   },
   heroName: {
     color: '#fff',
-    fontSize: 24,
-    fontWeight: '800',
+    fontSize: FontSize['2xl'],
+    fontWeight: FontWeight.extraBold,
     letterSpacing: 0.2,
     textAlign: 'center',
   },
   heroUsername: {
     color: 'rgba(255,255,255,0.65)',
-    fontSize: 14,
+    fontSize: FontSize.base,
     marginTop: 3,
     marginBottom: 12,
   },
@@ -619,8 +620,8 @@ const styles = StyleSheet.create({
   },
   roleBadgeText: {
     color: '#fff',
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.bold,
     letterSpacing: 0.3,
   },
 
@@ -635,9 +636,9 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   bioText: {
-    fontSize: 14,
+    fontSize: FontSize.base,
     lineHeight: 21,
-    fontWeight: '400',
+    fontWeight: FontWeight.regular,
   },
 
   statsRow: {
@@ -653,13 +654,13 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   statValue: {
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.extraBold,
     marginTop: 2,
   },
   statLabel: {
-    fontSize: 10,
-    fontWeight: '600',
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.semiBold,
     letterSpacing: 0.3,
   },
   statDivider: {
@@ -673,8 +674,8 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   sectionTitle: {
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.bold,
     letterSpacing: 0.9,
     marginBottom: 14,
   },
@@ -690,15 +691,15 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     gap: 4,
   },
-  badgeEmoji: { fontSize: 24, marginBottom: 2 },
-  badgeLabel: { fontSize: 12, fontWeight: '700', textAlign: 'center' },
-  badgeDesc: { fontSize: 10, textAlign: 'center', lineHeight: 13 },
+  badgeEmoji: { fontSize: FontSize['2xl'], marginBottom: 2 },
+  badgeLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, textAlign: 'center' },
+  badgeDesc: { fontSize: FontSize.xs, textAlign: 'center', lineHeight: 13 },
 
   historyRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 6 },
   historyIconWrap: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   historyContent: { flex: 1, gap: 2 },
-  historyLabel: { fontSize: 11, fontWeight: '500' },
-  historyValue: { fontSize: 14, fontWeight: '700' },
+  historyLabel: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.medium },
+  historyValue: { fontSize: FontSize.base, fontWeight: FontWeight.bold },
   historyDivider: { height: StyleSheet.hairlineWidth, marginVertical: 6 },
 
   actionsRow: { gap: 10, marginTop: 4 },
@@ -720,7 +721,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1.5,
   },
-  actionBtnOutlineText: { fontSize: 15, fontWeight: '700' },
+  actionBtnOutlineText: { fontSize: FontSize.basePlus, fontWeight: FontWeight.bold },
   actionBtnFill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -729,5 +730,5 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 14,
   },
-  actionBtnFillText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  actionBtnFillText: { color: '#fff', fontSize: FontSize.basePlus, fontWeight: FontWeight.bold },
 });

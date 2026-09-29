@@ -10,6 +10,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { launchImageLibrary } from 'react-native-image-picker';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { communityService } from '../../services/communityService';
 import { BackButton, GofolyxLoader } from '../../components/common';
@@ -250,7 +251,7 @@ export const CommunityChannelsScreen: React.FC = () => {
         ) : (
           <View style={[S.channelIcon, { backgroundColor: color + '18' }]}>
             {ch.emoji && isLegacyEmoji(ch.emoji)
-              ? <Text style={{ fontSize: 20 }}>{ch.emoji}</Text>
+              ? <Text style={{ fontSize: FontSize.xl }}>{ch.emoji}</Text>
               : <Icon
                   name={ch.emoji || (ch.type === 'announcement' ? 'bell' : ch.type === 'voice' ? 'mic' : DEFAULT_CHANNEL_ICON)}
                   size={20} color={color}
@@ -355,7 +356,7 @@ export const CommunityChannelsScreen: React.FC = () => {
               {canManage && (
                 <TouchableOpacity style={[S.emptyBtn, { backgroundColor: colors.primary }]} onPress={openCreate}>
                   <Icon name="plus" size={16} color="#fff" />
-                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Créer un canal</Text>
+                  <Text style={{ color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.base }}>Créer un canal</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -414,7 +415,7 @@ export const CommunityChannelsScreen: React.FC = () => {
                   </TouchableOpacity>
                   {formAvatar && (
                     <TouchableOpacity onPress={() => setFormAvatar(null)} style={{ marginTop: 6 }}>
-                      <Text style={{ color: '#EF4444', fontSize: 12 }}>Supprimer la photo</Text>
+                      <Text style={{ color: '#EF4444', fontSize: FontSize.sm }}>Supprimer la photo</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -493,8 +494,8 @@ export const CommunityChannelsScreen: React.FC = () => {
                     <Icon name="lock" size={16} color={formPrivate ? colors.primary : colors.textTertiary} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }]}>Canal privé</Text>
-                    <Text style={[{ fontSize: 12, color: colors.textTertiary, marginTop: 1 }]}>Visible uniquement sur invitation</Text>
+                    <Text style={[{ fontSize: FontSize.base, fontWeight: FontWeight.semiBold, color: colors.textPrimary }]}>Canal privé</Text>
+                    <Text style={[{ fontSize: FontSize.sm, color: colors.textTertiary, marginTop: 1 }]}>Visible uniquement sur invitation</Text>
                   </View>
                   <View style={[S.checkBox, { backgroundColor: formPrivate ? colors.primary : colors.backgroundSecondary, borderColor: formPrivate ? colors.primary : colors.divider }]}>
                     {formPrivate && <Icon name="check" size={12} color="#fff" />}
@@ -507,7 +508,7 @@ export const CommunityChannelsScreen: React.FC = () => {
                   <View style={{ gap: 8, marginBottom: 12 }}>
                     <View style={[S.passwordRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
                       <Icon name="key" size={16} color="#F59E0B" />
-                      <Text style={{ flex: 1, color: colors.textSecondary, fontSize: 13 }}>Mot de passe actif</Text>
+                      <Text style={{ flex: 1, color: colors.textSecondary, fontSize: FontSize.smPlus }}>Mot de passe actif</Text>
                     </View>
                     <TouchableOpacity
                       style={[S.toggleRow, { borderColor: '#EF444440' }]}
@@ -515,14 +516,14 @@ export const CommunityChannelsScreen: React.FC = () => {
                       activeOpacity={0.8}
                     >
                       <Icon name="trash-2" size={15} color="#EF4444" />
-                      <Text style={{ color: '#EF4444', fontSize: 13, fontWeight: '600', marginLeft: 8 }}>Supprimer le mot de passe</Text>
+                      <Text style={{ color: '#EF4444', fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold, marginLeft: 8 }}>Supprimer le mot de passe</Text>
                     </TouchableOpacity>
-                    <Text style={{ color: colors.textTertiary, fontSize: 12 }}>Ou définissez un nouveau :</Text>
+                    <Text style={{ color: colors.textTertiary, fontSize: FontSize.sm }}>Ou définissez un nouveau :</Text>
                   </View>
                 ) : removePassword ? (
                   <View style={[S.passwordRow, { backgroundColor: '#EF444415', borderColor: '#EF444440', marginBottom: 12 }]}>
                     <Icon name="trash-2" size={14} color="#EF4444" />
-                    <Text style={{ flex: 1, color: '#EF4444', fontSize: 13 }}>Mot de passe supprimé à la sauvegarde</Text>
+                    <Text style={{ flex: 1, color: '#EF4444', fontSize: FontSize.smPlus }}>Mot de passe supprimé à la sauvegarde</Text>
                     <TouchableOpacity onPress={() => setRemovePassword(false)}>
                       <Icon name="x" size={16} color="#EF4444" />
                     </TouchableOpacity>
@@ -531,7 +532,7 @@ export const CommunityChannelsScreen: React.FC = () => {
                 <View style={[S.passwordRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider, marginBottom: 16 }]}>
                   <Icon name="key" size={16} color={colors.textTertiary} />
                   <TextInput
-                    style={[{ flex: 1, color: colors.textPrimary, fontSize: 14, marginLeft: 8 }]}
+                    style={[{ flex: 1, color: colors.textPrimary, fontSize: FontSize.base, marginLeft: 8 }]}
                     value={formPassword}
                     onChangeText={setFormPassword}
                     placeholder={editChannel?.has_password ? 'Nouveau mot de passe…' : 'Définir un mot de passe…'}
@@ -564,49 +565,56 @@ export const CommunityChannelsScreen: React.FC = () => {
       </Modal>
 
       {/* ── Modal mot de passe pour rejoindre ── */}
-      <Modal visible={!!joinChannel} transparent animationType="fade" onRequestClose={() => setJoinChannel(null)}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 24 }}>
-          <View style={[S.joinSheet, { backgroundColor: colors.surface }]}>
-            <View style={[{ width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F59E0B20', marginBottom: 14, alignSelf: 'center' }]}>
-              <Icon name="key" size={24} color="#F59E0B" />
+      <Modal visible={!!joinChannel} transparent animationType="slide" onRequestClose={() => setJoinChannel(null)} statusBarTranslucent>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' }}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setJoinChannel(null)} />
+          <KeyboardAvoidingView
+            style={{ width: '100%' }}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
+            <View style={[S.joinSheet, { backgroundColor: colors.surface, paddingBottom: 24 + insets.bottom }]}>
+              <View style={[S.joinSheetHandle, { backgroundColor: colors.divider }]} />
+              <View style={[{ width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F59E0B20', marginBottom: 14, alignSelf: 'center' }]}>
+                <Icon name="key" size={24} color="#F59E0B" />
+              </View>
+              <Text style={[{ fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold, color: colors.textPrimary, textAlign: 'center', marginBottom: 6 }]}>
+                Canal protégé
+              </Text>
+              <Text style={[{ fontSize: FontSize.smPlus, color: colors.textTertiary, textAlign: 'center', marginBottom: 20 }]}>
+                Ce canal est protégé par un mot de passe.
+              </Text>
+              <View style={[S.passwordRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider, marginBottom: 16 }]}>
+                <Icon name="key" size={16} color={colors.textTertiary} />
+                <TextInput
+                  style={[{ flex: 1, color: colors.textPrimary, fontSize: FontSize.base, marginLeft: 8 }]}
+                  value={joinPassword}
+                  onChangeText={setJoinPassword}
+                  placeholder="Mot de passe…"
+                  placeholderTextColor={colors.textTertiary}
+                  secureTextEntry
+                  autoFocus
+                />
+              </View>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <TouchableOpacity
+                  style={[S.joinCancelBtn, { borderColor: colors.divider }]}
+                  onPress={() => setJoinChannel(null)}
+                >
+                  <Text style={{ color: colors.textSecondary, fontWeight: FontWeight.semiBold }}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[S.joinConfirmBtn, { opacity: joining ? 0.7 : 1 }]}
+                  onPress={handleJoinWithPassword}
+                  disabled={joining}
+                >
+                  {joining
+                    ? <ActivityIndicator color="#fff" size="small" />
+                    : <Text style={{ color: '#fff', fontWeight: FontWeight.bold }}>Entrer</Text>
+                  }
+                </TouchableOpacity>
+              </View>
             </View>
-            <Text style={[{ fontSize: 17, fontWeight: '800', color: colors.textPrimary, textAlign: 'center', marginBottom: 6 }]}>
-              Canal protégé
-            </Text>
-            <Text style={[{ fontSize: 13, color: colors.textTertiary, textAlign: 'center', marginBottom: 20 }]}>
-              Ce canal est protégé par un mot de passe.
-            </Text>
-            <View style={[S.passwordRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider, marginBottom: 16 }]}>
-              <Icon name="key" size={16} color={colors.textTertiary} />
-              <TextInput
-                style={[{ flex: 1, color: colors.textPrimary, fontSize: 14, marginLeft: 8 }]}
-                value={joinPassword}
-                onChangeText={setJoinPassword}
-                placeholder="Mot de passe…"
-                placeholderTextColor={colors.textTertiary}
-                secureTextEntry
-                autoFocus
-              />
-            </View>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <TouchableOpacity
-                style={[S.joinCancelBtn, { borderColor: colors.divider }]}
-                onPress={() => setJoinChannel(null)}
-              >
-                <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>Annuler</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[S.joinConfirmBtn, { opacity: joining ? 0.7 : 1 }]}
-                onPress={handleJoinWithPassword}
-                disabled={joining}
-              >
-                {joining
-                  ? <ActivityIndicator color="#fff" size="small" />
-                  : <Text style={{ color: '#fff', fontWeight: '700' }}>Entrer</Text>
-                }
-              </TouchableOpacity>
-            </View>
-          </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
 
@@ -617,26 +625,26 @@ export const CommunityChannelsScreen: React.FC = () => {
 const S = StyleSheet.create({
   root:   { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth, gap: 12 },
-  headerTitle: { fontSize: 17, fontWeight: '800' },
-  headerSub:   { fontSize: 12, marginTop: 1 },
+  headerTitle: { fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold },
+  headerSub:   { fontSize: FontSize.sm, marginTop: 1 },
   addBtn:      { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
 
   channelRow:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, gap: 12 },
   channelAvatar: { width: 46, height: 46, borderRadius: 14, borderWidth: 1 },
   channelIcon:  { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  channelName:  { fontSize: 15, fontWeight: '700' },
-  channelLast:  { fontSize: 12, marginTop: 2 },
-  channelTime:  { fontSize: 11 },
+  channelName:  { fontSize: FontSize.basePlus, fontWeight: FontWeight.bold },
+  channelLast:  { fontSize: FontSize.sm, marginTop: 2 },
+  channelTime:  { fontSize: FontSize.xsPlus },
   typeBadge:     { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 },
-  typeBadgeText: { fontSize: 10, fontWeight: '700' },
+  typeBadgeText: { fontSize: FontSize.xs, fontWeight: FontWeight.bold },
   unreadBadge:   { minWidth: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
-  unreadText:    { color: '#fff', fontSize: 11, fontWeight: '800' },
+  unreadText:    { color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold },
   actionBtn:     { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
 
   empty:      { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, marginTop: 60 },
   emptyIcon:  { width: 70, height: 70, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
-  emptySub:   { fontSize: 13, textAlign: 'center', lineHeight: 19, marginBottom: 24 },
+  emptyTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, marginBottom: 8 },
+  emptySub:   { fontSize: FontSize.smPlus, textAlign: 'center', lineHeight: 19, marginBottom: 24 },
   emptyBtn:   { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12 },
 
   overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)' },
@@ -644,21 +652,21 @@ const S = StyleSheet.create({
   sheetHandle:     { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 6 },
   sheetHeader:     { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   sheetHeaderIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  sheetTitle:      { flex: 1, fontSize: 16, fontWeight: '700' },
+  sheetTitle:      { flex: 1, fontSize: FontSize.md, fontWeight: FontWeight.bold },
 
-  label:    { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8, marginTop: 16 },
+  label:    { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8, marginTop: 16 },
   typeRow:  { flexDirection: 'row', gap: 8, marginBottom: 4 },
   typeCard: { flex: 1, borderRadius: 12, borderWidth: 1.5, padding: 10, alignItems: 'center', gap: 5 },
-  typeCardLabel: { fontSize: 12, fontWeight: '700' },
-  typeCardDesc:  { fontSize: 10, textAlign: 'center' },
+  typeCardLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.bold },
+  typeCardDesc:  { fontSize: FontSize.xs, textAlign: 'center' },
 
   nameRow:    { flexDirection: 'row', gap: 10, alignItems: 'center', marginBottom: 4 },
   emojiPicker: { width: 48, height: 48, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  nameInput:  { flex: 1, height: 48, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, fontSize: 15 },
+  nameInput:  { flex: 1, height: 48, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, fontSize: FontSize.basePlus },
   emojiGrid:  { flexDirection: 'row', flexWrap: 'wrap', borderRadius: 12, padding: 8, marginBottom: 4, gap: 4 },
   emojiGridBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
 
-  descInput:  { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, minHeight: 70, textAlignVertical: 'top', marginBottom: 4 },
+  descInput:  { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, fontSize: FontSize.base, minHeight: 70, textAlignVertical: 'top', marginBottom: 4 },
 
   toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 4 },
   toggleIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
@@ -671,9 +679,10 @@ const S = StyleSheet.create({
 
   saveBtn:     { marginTop: 8, borderRadius: 14, overflow: 'hidden', height: 52 },
   saveBtnGrad: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  saveBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  saveBtnText: { color: '#fff', fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold },
 
-  joinSheet:      { borderRadius: 20, padding: 24, width: '100%' },
+  joinSheet:      { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 24, paddingTop: 10 },
+  joinSheetHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 14 },
   joinCancelBtn:  { flex: 1, height: 46, borderRadius: 12, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   joinConfirmBtn: { flex: 1, height: 46, borderRadius: 12, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
 });

@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { contentService } from '../../services';
 import { apiClient } from '../../api/client';
@@ -247,26 +248,26 @@ const HeroSlide: React.FC<{ item: FilmItem; purchased: boolean; onPress: () => v
 const hs = StyleSheet.create({
   content:     { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 20, paddingBottom: 30 },
   serieTag:    { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', backgroundColor: `${PURPLE}25`, borderWidth: 1, borderColor: `${PURPLE}80`, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 6, marginBottom: 10 },
-  serieTagText: { color: PURPLE, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  serieTagText: { color: PURPLE, fontSize: FontSize.xs, fontWeight: FontWeight.extraBold, letterSpacing: 1 },
   badgeRow:    { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' },
   premiumBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#E8501A', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 6 },
-  premiumText: { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
+  premiumText: { color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.extraBold, letterSpacing: 0.8 },
   accessBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(16,185,129,0.15)', borderWidth: 1, borderColor: '#10b981', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 6 },
-  accessText:  { color: '#10b981', fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
+  accessText:  { color: '#10b981', fontSize: FontSize.xs, fontWeight: FontWeight.extraBold, letterSpacing: 0.8 },
   seasonTag:   { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: `${PURPLE}20`, borderWidth: 1, borderColor: `${PURPLE}60`, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 5 },
-  seasonTagText: { color: PURPLE, fontSize: 10, fontWeight: '700' },
-  yearTag:     { color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '600', backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 5 },
-  title:       { color: '#fff', fontSize: 27, fontWeight: '900', lineHeight: 32, letterSpacing: -0.7, marginBottom: 8, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 8 },
+  seasonTagText: { color: PURPLE, fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+  yearTag:     { color: 'rgba(255,255,255,0.55)', fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold, backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 5 },
+  title:       { color: '#fff', fontSize: 27, fontWeight: FontWeight.black, lineHeight: 32, letterSpacing: -0.7, marginBottom: 8, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 8 },
   ratingRow:   { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 8 },
-  ratingTxt:   { color: '#FFB800', fontSize: 12, fontWeight: '700', marginLeft: 4 },
-  synopsis:    { color: 'rgba(255,255,255,0.5)', fontSize: 13, lineHeight: 19, marginBottom: 18 },
+  ratingTxt:   { color: '#FFB800', fontSize: FontSize.sm, fontWeight: FontWeight.bold, marginLeft: 4 },
+  synopsis:    { color: 'rgba(255,255,255,0.5)', fontSize: FontSize.smPlus, lineHeight: 19, marginBottom: 18 },
   buttons:     { flexDirection: 'row', gap: 10 },
   btnWatch:    { flex: 1, borderRadius: 12, overflow: 'hidden' },
   btnGrad:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13 },
-  btnWatchText: { fontSize: 14, fontWeight: '800' },
+  btnWatchText: { fontSize: FontSize.base, fontWeight: FontWeight.extraBold },
   btnMore:     { overflow: 'hidden', borderRadius: 12 },
   btnMoreInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'rgba(255,255,255,0.1)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', paddingHorizontal: 22, paddingVertical: 13 },
-  btnMoreText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  btnMoreText: { color: '#fff', fontSize: FontSize.base, fontWeight: FontWeight.bold },
   dotsRow:     { position: 'absolute', bottom: 142, right: 20, flexDirection: 'row', gap: 5, alignItems: 'center' },
   dot:         { height: 3, borderRadius: 2 },
   dotActive:   { width: 20, backgroundColor: PURPLE },
@@ -334,15 +335,15 @@ const HorizontalRow: React.FC<{
 const rh = StyleSheet.create({
   header:      { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   accentLine:  { width: 3, height: 16, borderRadius: 2 },
-  title:       { fontSize: 16, fontWeight: '800', letterSpacing: -0.2 },
+  title:       { fontSize: FontSize.md, fontWeight: FontWeight.extraBold, letterSpacing: -0.2 },
   card:        { width: CARD_W_H, aspectRatio: 2 / 3, borderRadius: 10, overflow: 'hidden' },
   placeholder: { alignItems: 'center', justifyContent: 'center' },
   gradient:    { position: 'absolute', bottom: 0, left: 0, right: 0, height: '60%' },
   cornerBadge: { position: 'absolute', top: 7, right: 7, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   seasonBadge: { position: 'absolute', top: 7, left: 7, flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: `${PURPLE}30`, borderWidth: 1, borderColor: `${PURPLE}80`, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5 },
-  seasonBadgeTxt: { color: PURPLE, fontSize: 9, fontWeight: '800' },
+  seasonBadgeTxt: { color: PURPLE, fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold },
   overlay:     { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 8 },
-  overlayTitle: { color: '#fff', fontSize: 11, fontWeight: '800', lineHeight: 14 },
+  overlayTitle: { color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, lineHeight: 14 },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -417,12 +418,12 @@ const cd = StyleSheet.create({
   gradient:    { position: 'absolute', bottom: 0, left: 0, right: 0, height: '65%' },
   cornerBadge: { position: 'absolute', top: 8, right: 8, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   seasonBadge: { position: 'absolute', top: 8, left: 8, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: `${PURPLE}25`, borderWidth: 1, borderColor: `${PURPLE}70`, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6 },
-  seasonTxt:   { color: PURPLE, fontSize: 10, fontWeight: '800' },
+  seasonTxt:   { color: PURPLE, fontSize: FontSize.xs, fontWeight: FontWeight.extraBold },
   ratingBadge: { position: 'absolute', bottom: 40, left: 8, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.65)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6 },
-  ratingText:  { color: '#FFB800', fontSize: 10, fontWeight: '700' },
+  ratingText:  { color: '#FFB800', fontSize: FontSize.xs, fontWeight: FontWeight.bold },
   overlay:     { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 10 },
-  overlayTitle: { color: '#fff', fontSize: 12, fontWeight: '800', lineHeight: 16, marginBottom: 2 },
-  overlayMeta:  { color: 'rgba(255,255,255,0.55)', fontSize: 10, fontWeight: '500' },
+  overlayTitle: { color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.extraBold, lineHeight: 16, marginBottom: 2 },
+  overlayMeta:  { color: 'rgba(255,255,255,0.55)', fontSize: FontSize.xs, fontWeight: FontWeight.medium },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -830,7 +831,7 @@ export const SeriesScreen: React.FC = () => {
           {/* Suggestions pendant la frappe */}
           {search.trim() && historySuggestions.length > 0 && (
             <View style={{ backgroundColor: colors.background, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}>
-              <Text style={{ fontSize: 10, fontWeight: '800', color: colors.textTertiary, letterSpacing: 1, textTransform: 'uppercase', paddingHorizontal: H_PAD, paddingTop: 10, paddingBottom: 4 }}>Suggestions</Text>
+              <Text style={{ fontSize: FontSize.xs, fontWeight: FontWeight.extraBold, color: colors.textTertiary, letterSpacing: 1, textTransform: 'uppercase', paddingHorizontal: H_PAD, paddingTop: 10, paddingBottom: 4 }}>Suggestions</Text>
               {historySuggestions.map((h, i) => (
                 <TouchableOpacity
                   key={h.query}
@@ -841,7 +842,7 @@ export const SeriesScreen: React.FC = () => {
                   <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: PURPLE + '18', alignItems: 'center', justifyContent: 'center' }}>
                     <Icon name="clock" size={13} color={PURPLE} />
                   </View>
-                  <Text style={{ flex: 1, fontSize: 14, color: colors.textPrimary }} numberOfLines={1}>{h.query}</Text>
+                  <Text style={{ flex: 1, fontSize: FontSize.base, color: colors.textPrimary }} numberOfLines={1}>{h.query}</Text>
                   <Icon name="arrow-up-left" size={13} color={colors.textTertiary} />
                 </TouchableOpacity>
               ))}
@@ -852,9 +853,9 @@ export const SeriesScreen: React.FC = () => {
           {!search.trim() && searchHistory.length > 0 && (
             <View style={{ backgroundColor: colors.background, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: H_PAD, paddingTop: 12, paddingBottom: 8 }}>
-                <Text style={{ fontSize: 11, fontWeight: '800', color: colors.textTertiary, letterSpacing: 1, textTransform: 'uppercase' }}>Récents</Text>
+                <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, color: colors.textTertiary, letterSpacing: 1, textTransform: 'uppercase' }}>Récents</Text>
                 <TouchableOpacity onPress={() => { searchHistoryService.clear(); setSearchHistory([]); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: PURPLE }}>Effacer</Text>
+                  <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, color: PURPLE }}>Effacer</Text>
                 </TouchableOpacity>
               </View>
               {searchHistory.slice(0, 6).map((h, i) => (
@@ -867,7 +868,7 @@ export const SeriesScreen: React.FC = () => {
                   <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
                     <Icon name="clock" size={13} color={colors.textTertiary} />
                   </View>
-                  <Text style={{ flex: 1, fontSize: 14, color: colors.textPrimary }} numberOfLines={1}>{h.query}</Text>
+                  <Text style={{ flex: 1, fontSize: FontSize.base, color: colors.textPrimary }} numberOfLines={1}>{h.query}</Text>
                   <TouchableOpacity onPress={() => { searchHistoryService.remove(h.query); setSearchHistory(searchHistoryService.getAll()); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                     <Icon name="x" size={13} color={colors.textTertiary} />
                   </TouchableOpacity>
@@ -989,39 +990,39 @@ export const SeriesScreen: React.FC = () => {
 };
 
 const ms = StyleSheet.create({
-  pageTitle:   { fontSize: 26, fontWeight: '900', letterSpacing: -0.6 },
+  pageTitle:   { fontSize: FontSize['2xl'], fontWeight: FontWeight.black, letterSpacing: -0.6 },
   purplePill:  { backgroundColor: `${PURPLE}25`, borderWidth: 1, borderColor: `${PURPLE}70`, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  purplePillTxt: { color: PURPLE, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  pageSub:     { fontSize: 12, fontWeight: '500', marginTop: 3 },
-  gridTitle:   { fontSize: 15, fontWeight: '800', letterSpacing: -0.2 },
+  purplePillTxt: { color: PURPLE, fontSize: FontSize.xs, fontWeight: FontWeight.extraBold, letterSpacing: 1 },
+  pageSub:     { fontSize: FontSize.sm, fontWeight: FontWeight.medium, marginTop: 3 },
+  gridTitle:   { fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold, letterSpacing: -0.2 },
   empty:       { alignItems: 'center', paddingTop: 70, gap: 10 },
-  emptyTitle:  { fontSize: 17, fontWeight: '800' },
-  emptySub:    { fontSize: 13, fontWeight: '500' },
+  emptyTitle:  { fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold },
+  emptySub:    { fontSize: FontSize.smPlus, fontWeight: FontWeight.medium },
   loadMoreRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 24 },
   loadMoreDot: { width: 7, height: 7, borderRadius: 4 },
   endRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: H_PAD, paddingVertical: 24 },
   endLine:     { flex: 1, height: StyleSheet.hairlineWidth },
-  endTxt:      { fontSize: 11, fontWeight: '600' },
+  endTxt:      { fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold },
 });
 
 const hdr = StyleSheet.create({
   wrap:          { borderBottomWidth: StyleSheet.hairlineWidth, paddingBottom: 0 },
   row1:          { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: H_PAD, paddingBottom: 10 },
-  title:         { fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
+  title:         { fontSize: FontSize['2xl'], fontWeight: FontWeight.black, letterSpacing: -0.5 },
   tvPill:        { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
-  tvPillTxt:     { fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  sub:           { fontSize: 11, fontWeight: '500' },
+  tvPillTxt:     { fontSize: FontSize.xs, fontWeight: FontWeight.extraBold, letterSpacing: 1 },
+  sub:           { fontSize: FontSize.xsPlus, fontWeight: FontWeight.medium },
   searchWrap:    { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, marginHorizontal: H_PAD, marginBottom: 10 },
-  searchInput:   { flex: 1, fontSize: 14, padding: 0 },
+  searchInput:   { flex: 1, fontSize: FontSize.base, padding: 0 },
   clearBtn:      { width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(128,128,128,0.5)', alignItems: 'center', justifyContent: 'center' },
   chipActive:    { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 13, paddingVertical: 8, borderRadius: 20 },
-  chipActiveTxt:   { color: '#fff', fontSize: 12, fontWeight: '700' },
+  chipActiveTxt:   { color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.bold },
   chipInactive:    { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 13, paddingVertical: 8, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth },
-  chipInactiveTxt: { fontSize: 12, fontWeight: '600' },
+  chipInactiveTxt: { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
   filterBtn:     { width: 36, height: 36, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
   filterDot:     { position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
   activeChip:    { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },
-  activeChipTxt: { fontSize: 12, fontWeight: '600' },
+  activeChipTxt: { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
 });
 
 const fl = StyleSheet.create({
@@ -1029,12 +1030,12 @@ const fl = StyleSheet.create({
   sheet:        { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12, maxHeight: '80%' },
   handle:       { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
   sheetHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  sheetTitle:   { fontSize: 18, fontWeight: '800' },
-  resetTxt:     { fontSize: 13, fontWeight: '600' },
-  sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 1, marginBottom: 12, paddingHorizontal: 2 },
+  sheetTitle:   { fontSize: FontSize.lg, fontWeight: FontWeight.extraBold },
+  resetTxt:     { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
+  sectionTitle: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, letterSpacing: 1, marginBottom: 12, paddingHorizontal: 2 },
   tagsWrap:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tag:          { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth },
-  tagTxt:       { fontSize: 13, fontWeight: '600' },
+  tagTxt:       { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
   applyBtn:     { marginTop: 20, marginBottom: 8, paddingVertical: 15, borderRadius: 14, alignItems: 'center' },
-  applyTxt:     { color: '#fff', fontSize: 15, fontWeight: '800' },
+  applyTxt:     { color: '#fff', fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold },
 });

@@ -15,6 +15,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { GofolyxLoader, BackButton } from '../../components/common';
 import { communityService } from '../../services/communityService';
@@ -28,6 +29,7 @@ interface Props {
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BAR_MAX_HEIGHT = 120;
+const BAR_COL_WIDTH = 34;
 const COIN_COLOR = '#F59E0B';
 const GREEN = '#22D3A0';
 const BLUE = '#3B82F6';
@@ -65,8 +67,8 @@ export const CommunityStatsScreen: React.FC<Props> = ({ route }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Animated values — barres activité (max 7 jours)
-  const barAnims = useRef(Array.from({ length: 7 }, () => new Animated.Value(0))).current;
+  // Animated values — barres activité (jusqu'à 30 jours)
+  const barAnims = useRef(Array.from({ length: 30 }, () => new Animated.Value(0))).current;
 
   // Animated values — rôles
   const roleAdminAnim  = useRef(new Animated.Value(0)).current;
@@ -80,9 +82,17 @@ export const CommunityStatsScreen: React.FC<Props> = ({ route }) => {
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
+  // Incrémenté à chaque appel de load() — permet d'ignorer la réponse d'un
+  // appel obsolète (ex: changement rapide de période) qui reviendrait après
+  // un appel plus récent et écraserait les animations avec de mauvaises
+  // données ("graphique au hasard").
+  const requestIdRef = useRef(0);
+
   const load = useCallback(async (p: Period = period) => {
+    const requestId = ++requestIdRef.current;
     try {
       const data = await communityService.getStats(communityId, p);
+      if (requestId !== requestIdRef.current) return;
       setStats(data);
 
       // Reset animations
@@ -114,14 +124,17 @@ export const CommunityStatsScreen: React.FC<Props> = ({ route }) => {
         Animated.timing(retAnim30, { toValue: (data.retention?.d30 ?? 0) / 100, duration: 950, delay: 550, useNativeDriver: false }),
       ]).start();
     } catch {
+      if (requestId !== requestIdRef.current) return;
       setStats(null);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [communityId, period]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); }, [communityId]);
 
   const handlePeriodChange = (p: Period) => {
     setPeriod(p);
@@ -212,26 +225,35 @@ export const CommunityStatsScreen: React.FC<Props> = ({ route }) => {
           </Text>
         </View>
 
-        <View style={styles.barContainer}>
-          {activity.map((item, i) => {
-            const isMax = item.msgs === maxMsgs;
-            const targetH = (item.msgs / maxMsgs) * BAR_MAX_HEIGHT;
-            const heightAnim = barAnims[i]?.interpolate({ inputRange: [0, 1], outputRange: [0, targetH] }) ?? new Animated.Value(0);
-            return (
-              <View key={item.day + i} style={styles.barCol}>
-                <Animated.Text style={[styles.barValLabel, { color: isMax ? colors.primary : colors.textTertiary }]}>
-                  {item.msgs}
-                </Animated.Text>
-                <View style={[styles.barTrack, { height: BAR_MAX_HEIGHT }]}>
-                  <Animated.View style={[styles.barFill, { height: heightAnim, backgroundColor: isMax ? colors.primary : colors.primary + '44' }]} />
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          scrollEnabled={activity.length > 7}
+        >
+          <View style={[styles.barContainer, activity.length > 7 && { width: activity.length * BAR_COL_WIDTH }]}>
+            {activity.map((item, i) => {
+              const isMax = item.msgs === maxMsgs;
+              const targetH = (item.msgs / maxMsgs) * BAR_MAX_HEIGHT;
+              const heightAnim = barAnims[i]?.interpolate({ inputRange: [0, 1], outputRange: [0, targetH] }) ?? new Animated.Value(0);
+              return (
+                <View
+                  key={item.day + i}
+                  style={[styles.barCol, activity.length > 7 && { flex: undefined, width: BAR_COL_WIDTH }]}
+                >
+                  <Animated.Text style={[styles.barValLabel, { color: isMax ? colors.primary : colors.textTertiary }]}>
+                    {item.msgs}
+                  </Animated.Text>
+                  <View style={[styles.barTrack, { height: BAR_MAX_HEIGHT }]}>
+                    <Animated.View style={[styles.barFill, { height: heightAnim, backgroundColor: isMax ? colors.primary : colors.primary + '44' }]} />
+                  </View>
+                  <Text style={[styles.barDayLabel, { color: isMax ? colors.textPrimary : colors.textTertiary }]}>
+                    {item.day}
+                  </Text>
                 </View>
-                <Text style={[styles.barDayLabel, { color: isMax ? colors.textPrimary : colors.textTertiary }]}>
-                  {item.day}
-                </Text>
-              </View>
-            );
-          })}
-        </View>
+              );
+            })}
+          </View>
+        </ScrollView>
       </View>
     );
   };
@@ -440,17 +462,17 @@ export const CommunityStatsScreen: React.FC<Props> = ({ route }) => {
         {renderHeader()}
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 14 }}>
           <Icon name="bar-chart-2" size={44} color={colors.textTertiary} />
-          <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700', textAlign: 'center' }}>
+          <Text style={{ color: colors.textPrimary, fontSize: FontSize.md, fontWeight: FontWeight.bold, textAlign: 'center' }}>
             Statistiques indisponibles
           </Text>
-          <Text style={{ color: colors.textTertiary, fontSize: 13, textAlign: 'center', lineHeight: 20 }}>
+          <Text style={{ color: colors.textTertiary, fontSize: FontSize.smPlus, textAlign: 'center', lineHeight: 20 }}>
             Impossible de charger les données. Vérifiez votre connexion et réessayez.
           </Text>
           <TouchableOpacity
             onPress={() => { setLoading(true); load(); }}
             style={{ backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 11, borderRadius: 14 }}
           >
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Réessayer</Text>
+            <Text style={{ color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.base }}>Réessayer</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -513,12 +535,12 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 16, elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.28, shadowRadius: 8 },
   headerBtn: { width: 38, height: 38, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   headerCenter: { flex: 1, alignItems: 'center', paddingHorizontal: 8 },
-  headerTitle: { fontSize: 17, fontWeight: '700', letterSpacing: 0.2 },
-  headerSub: { fontSize: 12, marginTop: 2, maxWidth: 200 },
+  headerTitle: { fontSize: FontSize.mdPlus, fontWeight: FontWeight.bold, letterSpacing: 0.2 },
+  headerSub: { fontSize: FontSize.sm, marginTop: 2, maxWidth: 200 },
 
   periodWrap: { flexDirection: 'row', marginTop: 16, borderRadius: 14, padding: 4, borderWidth: 1 },
   periodPill: { flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  periodText: { fontSize: 13, fontWeight: '700', letterSpacing: 0.3 },
+  periodText: { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, letterSpacing: 0.3 },
 
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 16 },
@@ -527,22 +549,22 @@ const styles = StyleSheet.create({
   kpiCard: { width: (SCREEN_WIDTH - 42) / 2, borderRadius: 18, overflow: 'hidden', elevation: 4, shadowColor: '#7B3FF2', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.18, shadowRadius: 10 },
   kpiInner: { padding: 16, borderRadius: 18 },
   kpiIconCircle: { width: 36, height: 36, borderRadius: 11, justifyContent: 'center', alignItems: 'center', marginBottom: 12, alignSelf: 'flex-end' },
-  kpiValue: { fontSize: 24, fontWeight: '800', letterSpacing: -0.6 },
-  kpiLabel: { fontSize: 12, marginTop: 3, marginBottom: 10, fontWeight: '500' },
+  kpiValue: { fontSize: FontSize['2xl'], fontWeight: FontWeight.extraBold, letterSpacing: -0.6 },
+  kpiLabel: { fontSize: FontSize.sm, marginTop: 3, marginBottom: 10, fontWeight: FontWeight.medium },
   kpiBadge: { alignSelf: 'flex-start', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 20 },
-  kpiBadgeText: { fontSize: 10, fontWeight: '700' },
+  kpiBadgeText: { fontSize: FontSize.xs, fontWeight: FontWeight.bold },
 
   card: { borderRadius: 18, padding: 16, marginTop: 16, elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 8 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 18 },
   cardIconDot: { width: 30, height: 30, borderRadius: 9, justifyContent: 'center', alignItems: 'center' },
-  cardTitle: { fontSize: 15, fontWeight: '700', letterSpacing: 0.1 },
+  cardTitle: { fontSize: FontSize.basePlus, fontWeight: FontWeight.bold, letterSpacing: 0.1 },
 
   barContainer: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', height: BAR_MAX_HEIGHT + 46 },
   barCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
   barTrack: { width: '62%', justifyContent: 'flex-end', overflow: 'hidden' },
   barFill: { width: '100%', borderRadius: 5, borderTopLeftRadius: 5, borderTopRightRadius: 5 },
-  barValLabel: { fontSize: 9, fontWeight: '700', marginBottom: 3 },
-  barDayLabel: { fontSize: 11, fontWeight: '600', marginTop: 7 },
+  barValLabel: { fontSize: FontSize['2xs'], fontWeight: FontWeight.bold, marginBottom: 3 },
+  barDayLabel: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold, marginTop: 7 },
 
   retRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 14 },
   retCard: { alignItems: 'center', gap: 8 },
@@ -551,44 +573,44 @@ const styles = StyleSheet.create({
   retArcClip: { position: 'absolute', overflow: 'hidden', top: 0 },
   retArcHalf: { position: 'absolute', top: 0, left: 0 },
   retCenterLabel: { position: 'absolute', justifyContent: 'center', alignItems: 'center' },
-  retPct: { fontSize: 14, fontWeight: '800' },
-  retLabel: { fontSize: 13, fontWeight: '700' },
-  retSub: { fontSize: 10, fontWeight: '500', textAlign: 'center' },
-  retNote: { fontSize: 11, textAlign: 'center', fontStyle: 'italic', marginTop: 2 },
+  retPct: { fontSize: FontSize.base, fontWeight: FontWeight.extraBold },
+  retLabel: { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
+  retSub: { fontSize: FontSize.xs, fontWeight: FontWeight.medium, textAlign: 'center' },
+  retNote: { fontSize: FontSize.xsPlus, textAlign: 'center', fontStyle: 'italic', marginTop: 2 },
 
   roleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14, gap: 10 },
-  roleLabel: { width: 90, fontSize: 13, fontWeight: '500' },
+  roleLabel: { width: 90, fontSize: FontSize.smPlus, fontWeight: FontWeight.medium },
   roleBarFlex: { flex: 1 },
   roleBarBg: { height: 9, borderRadius: 5, overflow: 'hidden' },
   roleBarFill: { height: '100%', borderRadius: 5 },
   roleRight: { width: 68, alignItems: 'flex-end' },
-  roleCount: { fontSize: 13, fontWeight: '700' },
-  rolePct: { fontSize: 11, marginTop: 1 },
+  roleCount: { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
+  rolePct: { fontSize: FontSize.xsPlus, marginTop: 1 },
 
   contribRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 10 },
   rankCell: { width: 26, alignItems: 'center' },
-  medal: { fontSize: 17 },
-  rankText: { fontSize: 11, fontWeight: '700' },
+  medal: { fontSize: FontSize.mdPlus },
+  rankText: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold },
   avatar: { width: 42, height: 42, borderRadius: 21, borderWidth: 1.5, justifyContent: 'center', alignItems: 'center' },
-  avatarText: { fontSize: 14, fontWeight: '800' },
+  avatarText: { fontSize: FontSize.base, fontWeight: FontWeight.extraBold },
   contribInfo: { flex: 1 },
-  contribName: { fontSize: 14, fontWeight: '600' },
-  contribUsername: { fontSize: 12, marginTop: 1 },
+  contribName: { fontSize: FontSize.base, fontWeight: FontWeight.semiBold },
+  contribUsername: { fontSize: FontSize.sm, marginTop: 1 },
   contribRight: { alignItems: 'flex-end', gap: 3 },
   goGoldRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  lightningIcon: { fontSize: 12 },
-  goGoldValue: { fontSize: 13, fontWeight: '800', letterSpacing: -0.3 },
+  lightningIcon: { fontSize: FontSize.sm },
+  goGoldValue: { fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold, letterSpacing: -0.3 },
   postsRow: { flexDirection: 'row', alignItems: 'center' },
-  postsValue: { fontSize: 11 },
+  postsValue: { fontSize: FontSize.xsPlus },
   divider: { height: 1, marginHorizontal: 2, opacity: 0.6 },
 
   contentGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   contentCell: { width: (SCREEN_WIDTH - 68) / 2, borderRadius: 14, borderWidth: 1, padding: 14, alignItems: 'flex-start' },
   contentIconWrap: { width: 34, height: 34, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
-  contentValue: { fontSize: 22, fontWeight: '800', letterSpacing: -0.4 },
-  contentLabel: { fontSize: 11, marginTop: 4, fontWeight: '500' },
+  contentValue: { fontSize: FontSize['2xl'], fontWeight: FontWeight.extraBold, letterSpacing: -0.4 },
+  contentLabel: { fontSize: FontSize.xsPlus, marginTop: 4, fontWeight: FontWeight.medium },
 
   growthCell: { flex: 1, borderRadius: 14, borderWidth: 1, padding: 12, alignItems: 'center', gap: 4 },
-  growthValue: { fontSize: 18, fontWeight: '800', letterSpacing: -0.4 },
-  growthLabel: { fontSize: 10, fontWeight: '500', textAlign: 'center', lineHeight: 14 },
+  growthValue: { fontSize: FontSize.lg, fontWeight: FontWeight.extraBold, letterSpacing: -0.4 },
+  growthLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.medium, textAlign: 'center', lineHeight: 14 },
 });

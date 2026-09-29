@@ -95,15 +95,15 @@ export const AvatarWithBadge: React.FC<Props> = ({
         </View>
       )}
 
-      {/* Badge online — toujours visible : vert si en ligne, brun si hors ligne (masqué si live, redondant) */}
-      {!isLive && isOnline !== undefined && isOnline !== null && (
+      {/* Badge online — vert uniquement si en ligne ; rien si hors ligne (masqué si live, redondant) */}
+      {!isLive && isOnline && (
         <View style={[s.online, {
           width: onlineBadgeSize, height: onlineBadgeSize,
           borderRadius: onlineBadgeSize / 2,
           bottom: avatarEdgeInset - onlineBadgeSize * 0.3,
           left:  isVerified ? avatarEdgeInset - onlineBadgeSize * 0.3 : undefined,
           right: isVerified ? undefined : avatarEdgeInset - onlineBadgeSize * 0.3,
-          backgroundColor: isOnline ? '#22C55E' : '#92400E',
+          backgroundColor: '#22C55E',
         }]} />
       )}
     </View>

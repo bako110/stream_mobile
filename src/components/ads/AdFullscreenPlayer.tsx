@@ -4,22 +4,24 @@
  * le CTA ne s'ouvre jamais automatiquement.
  */
 import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
 import { VideoView, useVideoPlayer } from 'react-native-video';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { adIsPhone, type AdData } from './types';
+import { adIsPhone, adCtaLabel, type AdData } from './types';
 import { openPhoneMenu } from '../../utils/phoneMenu';
 import { Linking } from 'react-native';
+import { useTheme } from '../../hooks/useTheme';
 
 export const AdFullscreenPlayer: React.FC<{ ad: AdData; onClose: () => void; onClick?: (adId: string, url?: string) => void }> = ({ ad, onClose, onClick }) => {
   const insets = useSafeAreaInsets();
+  const { theme: { colors } } = useTheme();
   const creativeUri = ad.creative_url || ad.thumbnail_url || '';
   const player = useVideoPlayer({ uri: creativeUri }, p => { p.loop = true; p.muted = false; p.volume = 1; });
   useEffect(() => { try { player.play(); } catch {} }, [player]);
 
   const rawCta = (ad.cta_url ?? '').trim();
+  const { text: ctaText, icon: ctaIcon } = adCtaLabel(ad);
   const handleCta = () => {
     if (onClick) { onClick(ad.id, rawCta); return; }
     if (!rawCta) return;
@@ -29,6 +31,7 @@ export const AdFullscreenPlayer: React.FC<{ ad: AdData; onClose: () => void; onC
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="contain" controls={false} />
 
       <TouchableOpacity
@@ -43,12 +46,10 @@ export const AdFullscreenPlayer: React.FC<{ ad: AdData; onClose: () => void; onC
         <Text style={st.title} numberOfLines={1}>{ad.title}</Text>
         {ad.description ? <Text style={st.desc} numberOfLines={3}>{ad.description}</Text> : null}
         {rawCta ? (
-          <TouchableOpacity activeOpacity={0.88} onPress={handleCta} style={{ marginTop: 4 }}>
-            <LinearGradient colors={['#7B3FF2', '#C044E8', '#E0389A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.cta}>
-              <Icon name={adIsPhone(rawCta) ? 'phone' : 'globe'} size={15} color="#fff" />
-              <Text style={st.ctaTxt}>{ad.cta_text || (adIsPhone(rawCta) ? 'Contactez-nous' : 'En savoir plus')}</Text>
-              <Icon name="arrow-right" size={16} color="#fff" />
-            </LinearGradient>
+          <TouchableOpacity activeOpacity={0.88} onPress={handleCta} style={[st.cta, { marginTop: 4, backgroundColor: colors.primary }]}>
+            <Icon name={ctaIcon === 'phone' ? 'phone' : ctaIcon === 'download' ? 'download' : 'globe'} size={15} color="#fff" />
+            <Text style={st.ctaTxt}>{ctaText}</Text>
+            <Icon name="arrow-right" size={16} color="#fff" />
           </TouchableOpacity>
         ) : null}
       </View>

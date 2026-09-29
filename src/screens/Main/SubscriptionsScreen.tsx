@@ -3,9 +3,11 @@ import {
   View, Text, FlatList, TouchableOpacity, Modal,
   StyleSheet, RefreshControl, ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { AppHeader, SkeletonSubscriptions, PriceWithLocal } from '../../components/common';
 import { toastService, showConfirm } from '../../services';
@@ -161,13 +163,16 @@ const ConfirmModal: React.FC<{
 }> = ({ visible, plan, check, confirming, onConfirm, onRecharge, onClose }) => {
   const { theme } = useTheme();
   const { colors, fontSize } = theme;
+  const insets = useSafeAreaInsets();
   if (!plan || !check) return null;
   const grad = PLAN_COLORS[plan];
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={confirming ? undefined : onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={confirming ? undefined : onClose} statusBarTranslucent>
       <View style={s.modalOverlay}>
-        <View style={[s.modalCard, { backgroundColor: colors.surface }]}>
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={confirming ? undefined : onClose} />
+        <View style={[s.modalCard, { backgroundColor: colors.surface, paddingBottom: 20 + insets.bottom }]}>
+          <View style={[s.modalHandle, { backgroundColor: colors.divider }]} />
           {/* Header plan */}
           <LinearGradient colors={grad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.modalHeader}>
             <Text style={s.modalPlanName}>{PLAN_LABELS[plan]}</Text>
@@ -462,7 +467,7 @@ export const SubscriptionsScreen: React.FC = () => {
             <View style={[s.histRow, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
                 <View style={[s.histDot, { backgroundColor: col }]} />
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: colors.textPrimary, fontWeight: '600', fontSize: fontSize.sm }}>
+                  <Text style={{ color: colors.textPrimary, fontWeight: FontWeight.semiBold, fontSize: fontSize.sm }}>
                     {PLAN_LABELS[p] ?? p}
                   </Text>
                   <Text style={{ color: colors.textTertiary, fontSize: fontSize.xs, marginTop: 2 }}>
@@ -496,60 +501,61 @@ const s = StyleSheet.create({
   // Carte plan actif
   card:             { borderRadius: 18, padding: 20, gap: 0 },
   cardTop:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  cardLabel:        { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginBottom: 2 },
-  cardPlan:         { color: '#fff', fontSize: 24, fontWeight: '800' },
-  cardPrice:        { color: 'rgba(255,255,255,0.75)', fontSize: 13, marginTop: 2 },
+  cardLabel:        { color: 'rgba(255,255,255,0.7)', fontSize: FontSize.sm, marginBottom: 2 },
+  cardPlan:         { color: '#fff', fontSize: FontSize['2xl'], fontWeight: FontWeight.extraBold },
+  cardPrice:        { color: 'rgba(255,255,255,0.75)', fontSize: FontSize.smPlus, marginTop: 2 },
   statusBadge:      { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
-  statusBadgeText:  { color: '#fff', fontSize: 11, fontWeight: '700' },
+  statusBadgeText:  { color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold },
   featuresWrap:     { marginTop: 16, gap: 7 },
   featureRow:       { flexDirection: 'row', alignItems: 'flex-start', gap: 7 },
-  featureText:      { color: 'rgba(255,255,255,0.9)', fontSize: 13 },
+  featureText:      { color: 'rgba(255,255,255,0.9)', fontSize: FontSize.smPlus },
   datesRow:         { flexDirection: 'row', alignItems: 'center', marginTop: 18, backgroundColor: 'rgba(0,0,0,0.12)', borderRadius: 10, padding: 12 },
   dateItem:         { flex: 1, alignItems: 'center' },
-  dateLabel:        { color: 'rgba(255,255,255,0.6)', fontSize: 11, marginBottom: 3 },
-  dateValue:        { color: '#fff', fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  dateLabel:        { color: 'rgba(255,255,255,0.6)', fontSize: FontSize.xsPlus, marginBottom: 3 },
+  dateValue:        { color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.bold, textAlign: 'center' },
   dateSep:          { width: 1, height: 32, backgroundColor: 'rgba(255,255,255,0.2)' },
   dlRow:            { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 },
-  dlText:           { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
+  dlText:           { color: 'rgba(255,255,255,0.7)', fontSize: FontSize.sm },
   cancelBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 16, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 10, paddingVertical: 11 },
-  cancelBtnText:    { color: '#fff', fontWeight: '700', fontSize: 14 },
+  cancelBtnText:    { color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.base },
   cancelledNotice:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 14, backgroundColor: 'rgba(0,0,0,0.12)', borderRadius: 8, padding: 10 },
-  cancelledNoticeText: { color: 'rgba(255,255,255,0.8)', fontSize: 12, flex: 1 },
+  cancelledNoticeText: { color: 'rgba(255,255,255,0.8)', fontSize: FontSize.sm, flex: 1 },
 
   // Sélecteur plan
   noSubCard:        { borderRadius: 16, padding: 20, alignItems: 'center', borderWidth: 1, gap: 12 },
-  noSubTitle:       { fontSize: 20, fontWeight: '800', marginTop: 4 },
-  noSubSub:         { fontSize: 13, textAlign: 'center', lineHeight: 19 },
+  noSubTitle:       { fontSize: FontSize.xl, fontWeight: FontWeight.extraBold, marginTop: 4 },
+  noSubSub:         { fontSize: FontSize.smPlus, textAlign: 'center', lineHeight: 19 },
   planCard:         { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1.5, padding: 14, gap: 12 },
   planCardTop:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  planCardName:     { fontSize: 15, fontWeight: '800' },
-  planCardPrice:    { fontSize: 13, fontWeight: '700' },
-  planCardFeatures: { fontSize: 11, lineHeight: 16 },
+  planCardName:     { fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold },
+  planCardPrice:    { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
+  planCardFeatures: { fontSize: FontSize.xsPlus, lineHeight: 16 },
 
-  // Modal confirmation
-  modalOverlay:       { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  modalCard:          { width: '100%', borderRadius: 20, overflow: 'hidden' },
+  // Modal confirmation (bottom sheet)
+  modalOverlay:       { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' },
+  modalCard:          { borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
+  modalHandle:        { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 14 },
   modalHeader:        { padding: 20, alignItems: 'center', gap: 4 },
-  modalPlanName:      { color: '#fff', fontSize: 22, fontWeight: '800' },
-  modalPlanPrice:     { color: 'rgba(255,255,255,0.8)', fontSize: 14 },
+  modalPlanName:      { color: '#fff', fontSize: FontSize['2xl'], fontWeight: FontWeight.extraBold },
+  modalPlanPrice:     { color: 'rgba(255,255,255,0.8)', fontSize: FontSize.base },
   walletRow:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
   walletRowLeft:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  walletLabel:        { fontSize: 14 },
-  walletBalance:      { fontSize: 15, fontWeight: '700' },
-  walletCost:         { fontSize: 15, fontWeight: '700' },
+  walletLabel:        { fontSize: FontSize.base },
+  walletBalance:      { fontSize: FontSize.basePlus, fontWeight: FontWeight.bold },
+  walletCost:         { fontSize: FontSize.basePlus, fontWeight: FontWeight.bold },
   insufficientBox:    { flexDirection: 'row', alignItems: 'flex-start', gap: 8, margin: 16, padding: 12, borderRadius: 10, borderWidth: 1 },
-  insufficientText:   { flex: 1, fontSize: 13, color: '#EF4444', lineHeight: 18 },
+  insufficientText:   { flex: 1, fontSize: FontSize.smPlus, color: '#EF4444', lineHeight: 18 },
   confirmBtn:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, margin: 16, borderRadius: 12, paddingVertical: 14 },
-  confirmBtnText:     { color: '#fff', fontWeight: '700', fontSize: 15 },
+  confirmBtnText:     { color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.basePlus },
   cancelLink:         { alignItems: 'center', paddingVertical: 14 },
-  cancelLinkText:     { fontSize: 14 },
-  planCardGoGold:      { fontSize: 11 },
+  cancelLinkText:     { fontSize: FontSize.base },
+  planCardGoGold:      { fontSize: FontSize.xsPlus },
 
   // Historique
-  sectionTitle:     { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  sectionTitle:     { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
   histRow:          { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, padding: 14, gap: 10 },
   histDot:          { width: 8, height: 8, borderRadius: 4 },
   histBadge:        { borderRadius: 8, paddingHorizontal: 9, paddingVertical: 4 },
-  histBadgeText:    { fontSize: 11, fontWeight: '700' },
+  histBadgeText:    { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold },
   emptyHist:        { alignItems: 'center', borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', padding: 24, marginTop: 8 },
 });

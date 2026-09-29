@@ -11,6 +11,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { BackButton, GofolyxLoader, PriceWithLocal } from '../../components/common';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { adService, type Ad, type AdPlacement, type AdFormat } from '../../services/adService';
 import { apiClient } from '../../api/client';
@@ -298,19 +299,19 @@ export const CreateAdScreen: React.FC = () => {
         <View style={[s.estimateCard, { backgroundColor: '#7B3FF222', borderColor: '#7B3FF244' }]}>
           <Icon name="bar-chart-2" size={20} color="#7B3FF2" />
           <View style={{ flex: 1 }}>
-            <Text style={{ color: '#7B3FF2', fontWeight: '800', fontSize: 15 }}>
+            <Text style={{ color: '#7B3FF2', fontWeight: FontWeight.extraBold, fontSize: FontSize.basePlus }}>
               ~{estimatedImpressions.toLocaleString('fr-FR')} impressions estimées
             </Text>
-            <Text style={{ color: '#7B3FF2', fontSize: 12, opacity: 0.8 }}>
-              Coût : {(budget * 100).toLocaleString('fr-FR')} GoGold (<PriceWithLocal amountEur={budget} style={{ color: '#7B3FF2', fontSize: 12, opacity: 0.8 }} />)
+            <Text style={{ color: '#7B3FF2', fontSize: FontSize.sm, opacity: 0.8 }}>
+              Coût : {(budget * 100).toLocaleString('fr-FR')} GoGold (<PriceWithLocal amountEur={budget} style={{ color: '#7B3FF2', fontSize: FontSize.sm, opacity: 0.8 }} />)
             </Text>
-            <Text style={{ color: '#7B3FF2', fontSize: 11, opacity: 0.7, marginTop: 1 }}>
+            <Text style={{ color: '#7B3FF2', fontSize: FontSize.xsPlus, opacity: 0.7, marginTop: 1 }}>
               Coût : {(cpmEur / 1000 * 100).toFixed(3)} GoGold/impression
             </Text>
             {walletGoGold !== null && (
               <Text style={{
                 color: walletGoGold < budget * 100 ? '#EF4444' : '#10B981',
-                fontSize: 12, fontWeight: '700', marginTop: 2,
+                fontSize: FontSize.sm, fontWeight: FontWeight.bold, marginTop: 2,
               }}>
                 Solde : {walletGoGold.toLocaleString('fr-FR')} GoGold
                 {walletGoGold < budget * 100 ? ' — insuffisant' : ' ✓'}
@@ -373,7 +374,7 @@ export const CreateAdScreen: React.FC = () => {
                 {mediaType === 'video' ? (
                   <View style={[s.imagePreview, { backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }]}>
                     <Icon name="play-circle" size={48} color="rgba(255,255,255,0.8)" />
-                    <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 6 }}>
+                    <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: FontSize.sm, marginTop: 6 }}>
                       Vidéo HLS {creativeUrl ? '— prête' : '— en cours…'}
                     </Text>
                   </View>
@@ -382,7 +383,7 @@ export const CreateAdScreen: React.FC = () => {
                 )}
                 <View style={s.imageEditBadge}>
                   <Icon name={mediaType === 'video' ? 'video' : 'camera'} size={12} color="#fff" />
-                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>Changer</Text>
+                  <Text style={{ color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold }}>Changer</Text>
                 </View>
               </>
             ) : (
@@ -444,7 +445,7 @@ export const CreateAdScreen: React.FC = () => {
                 onPress={() => setPlacement(p.key)}
               >
                 <Icon name={p.icon} size={14} color={placement === p.key ? '#7B3FF2' : colors.textSecondary} />
-                <Text style={{ color: placement === p.key ? '#7B3FF2' : colors.textSecondary, fontWeight: '600', fontSize: 13 }}>
+                <Text style={{ color: placement === p.key ? '#7B3FF2' : colors.textSecondary, fontWeight: FontWeight.semiBold, fontSize: FontSize.smPlus }}>
                   {p.label}
                 </Text>
               </TouchableOpacity>
@@ -463,7 +464,7 @@ export const CreateAdScreen: React.FC = () => {
                 onPress={() => setFormat(f.key)}
               >
                 <Icon name={f.icon} size={14} color={format === f.key ? '#7B3FF2' : colors.textSecondary} />
-                <Text style={{ color: format === f.key ? '#7B3FF2' : colors.textSecondary, fontWeight: '600', fontSize: 13 }}>
+                <Text style={{ color: format === f.key ? '#7B3FF2' : colors.textSecondary, fontWeight: FontWeight.semiBold, fontSize: FontSize.smPlus }}>
                   {f.label}
                 </Text>
               </TouchableOpacity>
@@ -483,9 +484,9 @@ export const CreateAdScreen: React.FC = () => {
               >
                 <PriceWithLocal
                   amountEur={c.value}
-                  style={{ color: cpmEur === c.value ? '#7B3FF2' : colors.textPrimary, fontWeight: '800', fontSize: 13 }}
+                  style={{ color: cpmEur === c.value ? '#7B3FF2' : colors.textPrimary, fontWeight: FontWeight.extraBold, fontSize: FontSize.smPlus }}
                 />
-                <Text style={{ color: colors.textTertiary, fontSize: 10 }}>{c.desc}</Text>
+                <Text style={{ color: colors.textTertiary, fontSize: FontSize.xs }}>{c.desc}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -523,26 +524,26 @@ export const CreateAdScreen: React.FC = () => {
 
 const s = StyleSheet.create({
   header:       { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1 },
-  headerTitle:  { flex: 1, fontSize: 17, fontWeight: '800' },
+  headerTitle:  { flex: 1, fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold },
   saveBtn:      { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, minWidth: 70, alignItems: 'center' },
-  saveTxt:      { color: '#fff', fontWeight: '700', fontSize: 14 },
+  saveTxt:      { color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.base },
   scroll:       { padding: 16, gap: 16 },
   estimateCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderRadius: 14, borderWidth: 1 },
   field:        { gap: 6 },
-  fieldLabel:   { fontSize: 13, fontWeight: '600' },
-  input:        { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14 },
+  fieldLabel:   { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
+  input:        { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: FontSize.base },
   textarea:     { minHeight: 80, textAlignVertical: 'top' },
   row:          { flexDirection: 'row', gap: 10 },
   chips:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip:         { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5 },
-  hint:            { fontSize: 11, marginTop: 4 },
+  hint:            { fontSize: FontSize.xsPlus, marginTop: 4 },
   infoBox:         { flexDirection: 'row', gap: 8, padding: 12, borderRadius: 12, borderWidth: 1 },
-  infoTxt:         { flex: 1, fontSize: 12, lineHeight: 18 },
+  infoTxt:         { flex: 1, fontSize: FontSize.sm, lineHeight: 18 },
   imagePicker:     { borderWidth: 1.5, borderRadius: 14, overflow: 'hidden', minHeight: 140 },
   imagePickerInner:{ alignItems: 'center', justifyContent: 'center', padding: 24, gap: 8 },
   imagePickerIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  imagePickerTxt:  { fontSize: 14, fontWeight: '600' },
-  imagePickerHint: { fontSize: 11 },
+  imagePickerTxt:  { fontSize: FontSize.base, fontWeight: FontWeight.semiBold },
+  imagePickerHint: { fontSize: FontSize.xsPlus },
   imagePreview:    { width: '100%', height: 180 },
   imageEditBadge:  { position: 'absolute', bottom: 8, right: 8, flexDirection: 'row', alignItems: 'center', gap: 4,
                      backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },

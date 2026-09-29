@@ -8,6 +8,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { subscriptionService, type WalletCheck } from '../../services/subscriptionService';
 import { toastService } from '../../services/toastService';
@@ -145,10 +146,10 @@ export default function SubscriptionPaymentScreen() {
             <Text style={[s.recapVal, { color: colors.textPrimary }]}>Mensuelle</Text>
           </View>
           <View style={[s.recapRow, s.recapTotal]}>
-            <Text style={[s.recapLabel, { color: colors.textPrimary, fontWeight: '700' }]}>Total</Text>
+            <Text style={[s.recapLabel, { color: colors.textPrimary, fontWeight: FontWeight.bold }]}>Total</Text>
             <PriceWithLocal
               amountEur={cfg.price}
-              style={[s.recapVal, { color: colors.primary, fontWeight: '800', fontSize: 18 }]}
+              style={[s.recapVal, { color: colors.primary, fontWeight: FontWeight.extraBold, fontSize: FontSize.lg }]}
               localStyle={{ color: colors.textTertiary }}
             />
           </View>
@@ -191,40 +192,40 @@ export default function SubscriptionPaymentScreen() {
 const s = StyleSheet.create({
   header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   backBtn:      { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
-  headerTitle:  { fontSize: 17, fontWeight: '700' },
+  headerTitle:  { fontSize: FontSize.mdPlus, fontWeight: FontWeight.bold },
   scroll:       { padding: 16 },
 
   planCard:      { borderRadius: 20, padding: 24, marginBottom: 24, alignItems: 'center', gap: 6 },
-  planCardLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: '600' },
-  planCardPrice: { color: '#fff', fontSize: 32, fontWeight: '900' },
+  planCardLabel: { color: 'rgba(255,255,255,0.8)', fontSize: FontSize.base, fontWeight: FontWeight.semiBold },
+  planCardPrice: { color: '#fff', fontSize: FontSize['4xl'], fontWeight: FontWeight.black },
   planCardSpecs: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
-  planCardSpec:  { color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: '500' },
-  planCardDot:   { color: 'rgba(255,255,255,0.4)', fontSize: 13 },
+  planCardSpec:  { color: 'rgba(255,255,255,0.85)', fontSize: FontSize.smPlus, fontWeight: FontWeight.medium },
+  planCardDot:   { color: 'rgba(255,255,255,0.4)', fontSize: FontSize.smPlus },
 
-  sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginBottom: 12 },
+  sectionTitle: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, letterSpacing: 0.8, marginBottom: 12 },
 
   methodCard:  { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 14, borderWidth: 1.5, marginBottom: 10 },
   methodIcon:  { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  methodLabel: { fontSize: 15, fontWeight: '600' },
-  methodSub:   { fontSize: 12, marginTop: 2 },
+  methodLabel: { fontSize: FontSize.basePlus, fontWeight: FontWeight.semiBold },
+  methodSub:   { fontSize: FontSize.sm, marginTop: 2 },
   radio:       { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#6B7280', alignItems: 'center', justifyContent: 'center' },
   radioDot:    { width: 10, height: 10, borderRadius: 5 },
 
   rechargeBtn:     { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 14, borderRadius: 12, borderWidth: 1, marginBottom: 16 },
-  rechargeBtnText: { fontSize: 14, fontWeight: '600' },
+  rechargeBtnText: { fontSize: FontSize.base, fontWeight: FontWeight.semiBold },
 
   recap:      { borderRadius: 14, padding: 16, marginTop: 16, gap: 12 },
   recapRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   recapTotal: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.08)', paddingTop: 12, marginTop: 4 },
-  recapLabel: { fontSize: 14 },
-  recapVal:   { fontSize: 14, fontWeight: '600' },
+  recapLabel: { fontSize: FontSize.base },
+  recapVal:   { fontSize: FontSize.base, fontWeight: FontWeight.semiBold },
 
   confirmBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 16 },
-  confirmText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  confirmText: { color: '#fff', fontSize: FontSize.md, fontWeight: FontWeight.extraBold },
 
   successCircle: { width: 100, height: 100, borderRadius: 50, alignItems: 'center', justifyContent: 'center' },
-  successTitle:  { fontSize: 24, fontWeight: '800' },
-  successSub:    { fontSize: 15 },
+  successTitle:  { fontSize: FontSize['2xl'], fontWeight: FontWeight.extraBold },
+  successSub:    { fontSize: FontSize.basePlus },
 
-  disclaimer: { fontSize: 11, textAlign: 'center', marginTop: 14, lineHeight: 16, paddingHorizontal: 8 },
+  disclaimer: { fontSize: FontSize.xsPlus, textAlign: 'center', marginTop: 14, lineHeight: 16, paddingHorizontal: 8 },
 });

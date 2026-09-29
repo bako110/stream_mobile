@@ -17,15 +17,17 @@ import type { MainStackParamList } from '../../navigation/MainNavigator';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const EVENT_CONFIG: Record<EventType, { icon: string; label: string; color: string }> = {
-  concert:    { icon: 'music',       label: 'Concert',      color: '#7B3FF2' },
-  birthday:   { icon: 'gift',        label: 'Anniversaire', color: '#E0389A' },
-  festival:   { icon: 'star',        label: 'Festival',     color: '#FF7A2F' },
-  conference: { icon: 'mic',         label: 'Conférence',   color: '#36D9A0' },
-  sport:      { icon: 'activity',    label: 'Sport',        color: '#3B82F6' },
-  theater:    { icon: 'film',        label: 'Théâtre',      color: '#9B65F5' },
-  exhibition: { icon: 'image',       label: 'Exposition',   color: '#36D9A0' },
-  other:      { icon: 'calendar',    label: 'Autre',        color: '#9390AB' },
+// Icônes par type d'événement — une seule couleur d'accent partout (colors.primary,
+// voir EventCard), plus de couleur distincte par type.
+const EVENT_CONFIG: Record<EventType, { icon: string; label: string }> = {
+  concert:    { icon: 'music',       label: 'Concert' },
+  birthday:   { icon: 'gift',        label: 'Anniversaire' },
+  festival:   { icon: 'star',        label: 'Festival' },
+  conference: { icon: 'mic',         label: 'Conférence' },
+  sport:      { icon: 'activity',    label: 'Sport' },
+  theater:    { icon: 'film',        label: 'Théâtre' },
+  exhibition: { icon: 'image',       label: 'Exposition' },
+  other:      { icon: 'calendar',    label: 'Autre' },
 };
 
 export const EventsScreen: React.FC = () => {
@@ -171,7 +173,7 @@ interface EventCardProps { event: Event; colors: AppColors; onPress: () => void;
 
 const EventCard: React.FC<EventCardProps> = ({ event, colors, onPress, onDelete }) => {
   const cfg    = EVENT_CONFIG[event.event_type] ?? EVENT_CONFIG.other;
-  const accent = cfg.color;
+  const accent = colors.primary;
   const pct    = event.max_attendees
     ? Math.min(event.current_attendees / event.max_attendees, 1)
     : 0;

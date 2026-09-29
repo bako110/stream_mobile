@@ -46,6 +46,10 @@ export const AppTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, nav
   const focusedRoute = state.routes[state.index];
   const focusedOptions = descriptors[focusedRoute.key]?.options as any;
   const hideTabBar = focusedOptions?.tabBarStyle?.display === 'none' || focusedOptions?.tabBarVisible === false;
+  // Sur Reels, la vidéo occupe tout l'écran (plein écran réel, voir SCREEN_H
+  // dans ReelsScreen.tsx) — la tab bar flotte donc en overlay transparent
+  // par-dessus au lieu de réserver sa propre hauteur opaque en bas.
+  const isReelsScreen = focusedRoute.name === 'Reels';
 
   // Le menu "+" restait ouvert indéfiniment si on changeait d'onglet ou
   // qu'on naviguait ailleurs sans re-cliquer dessus pour le refermer
@@ -70,15 +74,38 @@ export const AppTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, nav
     <>
       <View style={[
         styles.container,
-        { backgroundColor: colors.surface, borderTopColor: colors.divider, height: barHeight, paddingBottom: bottomPad },
+        isReelsScreen
+          ? { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: 'transparent', borderTopWidth: 0, height: barHeight, paddingBottom: bottomPad }
+          : { backgroundColor: colors.surface, borderTopColor: colors.divider, height: barHeight, paddingBottom: bottomPad },
       ]}>
-        <LinearGradient
-          colors={[colors.primary + '30', colors.gradientEnd + '15', 'transparent']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.topLine}
-          pointerEvents="none"
-        />
+        {isReelsScreen ? (
+          <>
+            {/* Dégradé sombre (bas → haut) plutôt qu'un fond opaque — garantit
+                la lisibilité des icônes blanches quel que soit le contenu de
+                la vidéo derrière, sans jamais masquer complètement l'image.
+                Renforcé (0.75 au lieu de 0.7) pour que toute la zone du
+                footer se perçoive comme un espace distinct, pas juste les
+                icônes individuellement. */}
+            <LinearGradient
+              colors={['rgba(0,0,0,0.75)', 'rgba(0,0,0,0.0)']}
+              start={{ x: 0, y: 1 }}
+              end={{ x: 0, y: 0 }}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
+            {/* Fine ligne de séparation en haut de la zone — marque clairement
+                où commence le footer, sans être une bordure opaque. */}
+            <View pointerEvents="none" style={styles.reelsTopBorder} />
+          </>
+        ) : (
+          <LinearGradient
+            colors={[colors.primary + '30', colors.gradientEnd + '15', 'transparent']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.topLine}
+            pointerEvents="none"
+          />
+        )}
 
         {TABS.map((tab, index) => {
           const route     = state.routes.find(r => r.name === tab.name);
@@ -91,8 +118,8 @@ export const AppTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, nav
                 routeKey={route?.key}
                 isFocused={isFocused}
                 navigation={navigation}
-                activeColor={colors.primary}
-                inactiveColor={colors.textTertiary}
+                activeColor={isReelsScreen ? '#fff' : colors.primary}
+                inactiveColor={isReelsScreen ? 'rgba(255,255,255,0.6)' : colors.textTertiary}
                 showLabel={showLabels}
               />
               {/* Bouton Créer — entre Communautés (index 1) et Reels (index 2) */}
@@ -163,14 +190,16 @@ const CreateTabButton: React.FC<CreateTabButtonProps> = memo(({ open, onToggle, 
         style={styles.createBtnTouchable}
         activeOpacity={0.85}
       >
-        <View style={[
-          styles.createBtn,
-          { backgroundColor: colors.primary, borderColor: colors.surface },
-        ]}>
+        <LinearGradient
+          colors={[colors.gradientStart, colors.gradientEnd]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.createBtn, { borderColor: colors.surface }]}
+        >
           <Animated.View style={iconRotateStyle}>
-            <Icon name="plus" size={24} color="#fff" />
+            <Icon name="plus" size={16} color="#fff" />
           </Animated.View>
-        </View>
+        </LinearGradient>
       </TouchableOpacity>
     </View>
   );
@@ -201,13 +230,6 @@ const TabItem: React.FC<TabItemProps> = memo(({
     transform: [{ translateY: interpolate(progress.value, [0, 1], [0, -2]) }],
   }));
 
-  // Cercle de fond derrière l'icône active — même langage visuel que le bouton
-  // Créer (cercle avec fond + bordure), au lieu du simple trait dégradé d'avant.
-  const bubbleStyle = useAnimatedStyle(() => ({
-    opacity:   progress.value,
-    transform: [{ scale: interpolate(progress.value, [0, 1], [0.5, 1]) }],
-  }));
-
   const onPress = useCallback(() => {
     const event = navigation.emit({
       type: 'tabPress',
@@ -229,10 +251,8 @@ const TabItem: React.FC<TabItemProps> = memo(({
   return (
     <TouchableOpacity onPress={onPress} style={styles.tab} activeOpacity={0.75}>
       <View style={styles.iconSlot}>
-        <Animated.View style={[styles.iconBubble, { backgroundColor: activeColor + '18', borderColor: activeColor + '35' }, bubbleStyle]} />
-
         <Animated.View style={iconStyle}>
-          <Icon name={config.icon} size={20} color={isFocused ? activeColor : inactiveColor} />
+          <Icon name={config.icon} size={16} color={isFocused ? activeColor : inactiveColor} />
           {!!badge && badge > 0 && (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
@@ -267,28 +287,29 @@ const styles = StyleSheet.create({
     right:    0,
     height:   2,
   },
+  reelsTopBorder: {
+    position:        'absolute',
+    top:             0,
+    left:            0,
+    right:           0,
+    height:          StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
   tab: {
     flex:           1,
     alignItems:     'center',
     justifyContent: 'center',
-    gap:            4,
-    paddingTop:     6,
+    gap:            2,
+    paddingTop:     2,
   },
   iconSlot: {
-    width:          36,
-    height:         36,
+    width:          28,
+    height:         28,
     alignItems:     'center',
     justifyContent: 'center',
   },
-  iconBubble: {
-    position:     'absolute',
-    width:         36,
-    height:        36,
-    borderRadius:  18,
-    borderWidth:   1,
-  },
   label: {
-    fontSize:      10.5,
+    fontSize:      9.5,
     letterSpacing: 0.2,
   },
   badge: {
@@ -310,13 +331,13 @@ const styles = StyleSheet.create({
   createBtnTouchable: {
     alignItems:     'center',
     justifyContent: 'center',
-    marginTop:      -22, // le cercle bleu dépasse d'environ sa moitié au-dessus de la barre
+    marginTop:      -8, // le bouton dépasse légèrement au-dessus de la barre
   },
   createBtn: {
-    width:          52,
-    height:         52,
-    borderRadius:   26,
-    borderWidth:    3,      // liseré de la couleur de la barre → détache le cercle du fond
+    width:          32,
+    height:         32,
+    borderRadius:   10,
+    borderWidth:    3,      // liseré de la couleur de la barre → détache le bouton du fond
     alignItems:     'center',
     justifyContent: 'center',
     shadowColor:    '#000',

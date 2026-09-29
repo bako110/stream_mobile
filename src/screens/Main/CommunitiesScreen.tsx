@@ -6,8 +6,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
-import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { CategorySelector, CONTENT_CATEGORIES } from '../../components/common';
+import { CategorySelector, CONTENT_CATEGORIES, CategoryIcon } from '../../components/common';
 import { CommunityCard } from '../../components/communities/CommunityCard';
 import { CommunityGridCard } from '../../components/communities/CommunityGridCard';
 import { CommunitySkeletonCard } from '../../components/communities/CommunitySkeleton';
@@ -16,6 +15,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TAB_BAR_HEIGHT } from '../../styles/layout';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { communityService } from '../../services/communityService';
 import type { CommunityData, CreateCommunityPayload } from '../../services/communityService';
@@ -25,32 +25,8 @@ import type { MainStackParamList } from '../../navigation/MainNavigator';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
-// Icones Feather/MCIcon par template id — alignés sur CONTENT_CATEGORIES
-// (voir components/common/CategorySelector.tsx et backend content_category.py)
-const TEMPLATE_ICONS: Record<string, { lib: 'feather' | 'mc'; name: string }> = {
-  musique:      { lib: 'feather', name: 'music' },
-  sport:        { lib: 'mc',      name: 'soccer' },
-  gaming:       { lib: 'mc',      name: 'controller-classic-outline' },
-  humour:       { lib: 'mc',      name: 'emoticon-happy-outline' },
-  danse:        { lib: 'mc',      name: 'human' },
-  cuisine:      { lib: 'feather', name: 'coffee' },
-  mode:         { lib: 'mc',      name: 'tshirt-crew-outline' },
-  beaute:       { lib: 'mc',      name: 'lipstick' },
-  tech:         { lib: 'feather', name: 'cpu' },
-  education:    { lib: 'feather', name: 'book-open' },
-  lifestyle:    { lib: 'feather', name: 'star' },
-  art:          { lib: 'feather', name: 'image' },
-  voyage:       { lib: 'feather', name: 'send' },
-  business:     { lib: 'feather', name: 'briefcase' },
-  actualite:    { lib: 'feather', name: 'file-text' },
-  spiritualite: { lib: 'mc',      name: 'hands-pray' },
-  famille:      { lib: 'mc',      name: 'home-heart' },
-  sante:        { lib: 'feather', name: 'heart' },
-  free:         { lib: 'feather', name: 'star' },
-};
-
-function gradientFor(_name: string): [string, string] {
-  return ['#7B3FF2', '#9B65F5'];
+function gradientFor(_name: string, accent: string): [string, string] {
+  return [accent, accent];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -59,8 +35,8 @@ function gradientFor(_name: string): [string, string] {
 const CustomToggle: React.FC<{
   value: boolean;
   onChange: (v: boolean) => void;
-  color?: string;
-}> = ({ value, onChange, color = '#7B3FF2' }) => (
+  color: string;
+}> = ({ value, onChange, color }) => (
   <TouchableOpacity
     onPress={() => onChange(!value)}
     activeOpacity={0.8}
@@ -92,6 +68,33 @@ export const CommunitiesScreen: React.FC = () => {
   const nav = useNavigation<Nav>();
   const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
+
+  // ── Header dynamique — rétrécit progressivement avec le scroll (pas de
+  // saut binaire) jusqu'à un état compact où seule la ligne retour/titre/
+  // profil reste, collée en haut. HEADER_MIN = hauteur minimale nécessaire à
+  // cette ligne seule (insets.top + boutons 30px + marge) — jamais 0, sinon
+  // les boutons se feraient écraser.
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const HEADER_MIN = insets.top + 46;
+  const HEADER_MAX = HEADER_MIN + 62;
+  const headerScrollRange = HEADER_MAX - HEADER_MIN;
+  const animatedBannerHeight = scrollY.interpolate({
+    inputRange: [0, headerScrollRange],
+    outputRange: [HEADER_MAX, HEADER_MIN],
+    extrapolate: 'clamp',
+  });
+  // Actions (Créer / Code d'invitation) — seul bloc qui s'estompe et se
+  // replie avec le scroll, la ligne retour/titre/profil reste toujours visible.
+  const bannerContentOpacity = scrollY.interpolate({
+    inputRange: [0, headerScrollRange * 0.6],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+  const bannerContentTranslate = scrollY.interpolate({
+    inputRange: [0, headerScrollRange],
+    outputRange: [0, -24],
+    extrapolate: 'clamp',
+  });
 
   const [mine,           setMine]           = useState<CommunityData[]>([]);
   const [page,           setPage]           = useState(1);
@@ -322,43 +325,6 @@ export const CommunitiesScreen: React.FC = () => {
     } finally { setCreating(false); }
   };
 
-  // ── Hero banner ───────────────────────────────────────────────────────────
-  const renderHero = () => (
-    <LinearGradient
-      colors={[colors.gradientStart, colors.gradientEnd]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={S.hero}
-    >
-      <View style={S.heroCircle1} />
-      <View style={S.heroCircle2} />
-      <View style={S.heroContent}>
-        <Text style={S.heroTitle}>Rejoins ta communauté</Text>
-        <Text style={S.heroSub}>
-          Découvre des espaces qui te ressemblent — musique, sport, culture et plus encore.
-        </Text>
-        <View style={S.heroActions}>
-          <TouchableOpacity
-            onPress={() => { resetForm(); setCreateOpen(true); }}
-            style={S.heroBtnPrimary}
-            activeOpacity={0.85}
-          >
-            <Icon name="plus" size={14} color="#7B3FF2" />
-            <Text style={S.heroBtnPrimaryText}>Créer</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setJoinOpen(true)}
-            style={S.heroBtnSecondary}
-            activeOpacity={0.85}
-          >
-            <Icon name="key" size={14} color="#fff" />
-            <Text style={S.heroBtnSecondaryText}>Code d'invitation</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </LinearGradient>
-  );
-
   // ── Catégories populaires — toujours visible, navigue vers Découvrir ───────
   const renderCategories = () => (
     <View style={{ marginBottom: 8 }}>
@@ -370,29 +336,21 @@ export const CommunitiesScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={S.categoriesScroll} contentContainerStyle={S.categoriesRow}>
-        {CONTENT_CATEGORIES.filter(c => c.value !== 'autre').map(cat => {
-          // Vraie icône vectorielle (Feather/MaterialCommunityIcons), jamais
-          // d'emoji système — cohérent avec le reste du design de l'app.
-          const iconInfo = TEMPLATE_ICONS[cat.value] ?? { lib: 'feather' as const, name: 'grid' };
-          return (
-            <TouchableOpacity
-              key={cat.value}
-              onPress={() => handleCategoryPress(cat.value)}
-              activeOpacity={0.8}
-              style={S.categoryItem}
-            >
-              <View style={[S.categoryIconWrap, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
-                {iconInfo.lib === 'mc'
-                  ? <MCIcon name={iconInfo.name} size={20} color={colors.primary} />
-                  : <Icon name={iconInfo.name} size={18} color={colors.primary} />
-                }
-              </View>
-              <Text style={[S.categoryLabel, { color: colors.textSecondary }]} numberOfLines={1}>
-                {cat.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+        {CONTENT_CATEGORIES.filter(c => c.value !== 'autre').map(cat => (
+          <TouchableOpacity
+            key={cat.value}
+            onPress={() => handleCategoryPress(cat.value)}
+            activeOpacity={0.8}
+            style={S.categoryItem}
+          >
+            <View style={[S.categoryIconWrap, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
+              <CategoryIcon value={cat.value} size={19} color={colors.primary} />
+            </View>
+            <Text style={[S.categoryLabel, { color: colors.textSecondary }]} numberOfLines={1}>
+              {cat.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </ScrollView>
     </View>
   );
@@ -433,7 +391,7 @@ export const CommunitiesScreen: React.FC = () => {
               style={S.sortMenuItem}
               activeOpacity={0.8}
             >
-              <Text style={{ color: sortBy === opt ? colors.primary : colors.textSecondary, fontWeight: sortBy === opt ? '800' : '600', fontSize: 13 }}>
+              <Text style={{ color: sortBy === opt ? colors.primary : colors.textSecondary, fontWeight: sortBy === opt ? FontWeight.extraBold : FontWeight.semiBold, fontSize: FontSize.smPlus }}>
                 {SORT_LABELS[opt]}
               </Text>
               {sortBy === opt && <Icon name="check" size={14} color={colors.primary} />}
@@ -447,9 +405,9 @@ export const CommunitiesScreen: React.FC = () => {
   // ── Rendu empty state "Mes communautés" ─────────────────────────────────────
   const renderEmpty = () => (
     <View style={{ alignItems: 'center', gap: 16, paddingTop: 24 }}>
-      <LinearGradient colors={['#7B3FF230', '#E0389A20']} style={S.emptyIcon}>
-        <Icon name="users" size={36} color="#7B3FF2" />
-      </LinearGradient>
+      <View style={[S.emptyIcon, { backgroundColor: colors.primary + '20' }]}>
+        <Icon name="users" size={36} color={colors.primary} />
+      </View>
       <Text style={[S.emptyTitle, { color: colors.textPrimary }]}>
         {query ? 'Aucun résultat' : 'Aucune communauté'}
       </Text>
@@ -498,9 +456,9 @@ export const CommunitiesScreen: React.FC = () => {
     }
 
     return (
-      <ScrollView
+      <Animated.ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: TAB_BAR_HEIGHT + insets.bottom + 16 }}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: TAB_BAR_HEIGHT + insets.bottom + 16 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -508,17 +466,22 @@ export const CommunitiesScreen: React.FC = () => {
             tintColor={colors.primary}
           />
         }
-        onScroll={({ nativeEvent }) => {
-          // Pas de pagination pendant une recherche : query filtre côté client
-          // sur ce qui est déjà chargé, charger plus de pages n'aiderait pas.
-          if (query.trim()) return;
-          const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-          const distanceToEnd = contentSize.height - (layoutMeasurement.height + contentOffset.y);
-          if (distanceToEnd < 200) loadMore();
-        }}
-        scrollEventThrottle={200}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          {
+            useNativeDriver: false,
+            listener: ({ nativeEvent }: any) => {
+              // Pas de pagination pendant une recherche : query filtre côté client
+              // sur ce qui est déjà chargé, charger plus de pages n'aiderait pas.
+              if (query.trim()) return;
+              const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+              const distanceToEnd = contentSize.height - (layoutMeasurement.height + contentOffset.y);
+              if (distanceToEnd < 200) loadMore();
+            },
+          },
+        )}
+        scrollEventThrottle={16}
       >
-        {renderHero()}
         {renderCategories()}
         {renderSectionHeader()}
 
@@ -553,7 +516,7 @@ export const CommunitiesScreen: React.FC = () => {
         {loadingMore && (
           <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 16 }} />
         )}
-      </ScrollView>
+      </Animated.ScrollView>
     );
   };
 
@@ -565,14 +528,14 @@ export const CommunitiesScreen: React.FC = () => {
         {createBannerUri ? (
           <Image source={{ uri: createBannerUri }} style={S.bannerPickerImg} resizeMode="cover" />
         ) : (
-          <LinearGradient colors={['#7B3FF215', '#E0389A15']} style={S.bannerPickerImg}>
+          <View style={[S.bannerPickerImg, { backgroundColor: colors.primary + '15' }]}>
             <Icon name="image" size={26} color={colors.textTertiary} />
             <Text style={[S.bannerPlaceholderTxt, { color: colors.textTertiary }]}>
               Ajouter une bannière
             </Text>
-          </LinearGradient>
+          </View>
         )}
-        <View style={S.camBadge}>
+        <View style={[S.camBadge, { backgroundColor: colors.primary }]}>
           <Icon name="camera" size={13} color="#fff" />
         </View>
       </TouchableOpacity>
@@ -620,7 +583,6 @@ export const CommunitiesScreen: React.FC = () => {
             {templates.map(t => {
               const active = selectedTemplate?.id === t.id;
               const chipColor = t.color ?? colors.primary;
-              const iconInfo = TEMPLATE_ICONS[t.id as keyof typeof TEMPLATE_ICONS] ?? { lib: 'feather', name: 'users' };
               return (
                 <TouchableOpacity
                   key={t.id}
@@ -641,10 +603,7 @@ export const CommunitiesScreen: React.FC = () => {
                     borderColor: active ? chipColor : colors.border,
                   }]}
                 >
-                  {iconInfo.lib === 'mc'
-                    ? <MCIcon name={iconInfo.name} size={16} color={active ? chipColor : colors.textTertiary} />
-                    : <Icon name={iconInfo.name} size={15} color={active ? chipColor : colors.textTertiary} />
-                  }
+                  <CategoryIcon value={t.id} size={15} color={active ? chipColor : colors.textTertiary} />
                   <Text style={[S.typeChipLabel, { color: active ? chipColor : colors.textSecondary }]}>
                     {t.name}
                   </Text>
@@ -742,16 +701,16 @@ export const CommunitiesScreen: React.FC = () => {
         {createAvatarUri ? (
           <Image source={{ uri: createAvatarUri }} style={S.previewAvatar} />
         ) : (
-          <LinearGradient colors={gradientFor(createName)} style={S.previewAvatar}>
+          <LinearGradient colors={gradientFor(createName, colors.primary)} style={S.previewAvatar}>
             <Text style={S.previewLetter}>{(createName[0] ?? '?').toUpperCase()}</Text>
           </LinearGradient>
         )}
         <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary }}>
+          <Text style={{ fontSize: FontSize.basePlus, fontWeight: FontWeight.bold, color: colors.textPrimary }}>
             {createName}
           </Text>
           {createDesc ? (
-            <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }} numberOfLines={1}>
+            <Text style={{ fontSize: FontSize.sm, color: colors.textTertiary, marginTop: 2 }} numberOfLines={1}>
               {createDesc}
             </Text>
           ) : null}
@@ -805,12 +764,12 @@ export const CommunitiesScreen: React.FC = () => {
         onPress={() => setCreateInviteOnly(v => !v)}
         style={[S.optRow, {
           backgroundColor: colors.surface,
-          borderColor: createInviteOnly ? '#F59E0B80' : colors.border,
+          borderColor: createInviteOnly ? colors.primary + '80' : colors.border,
         }]}
         activeOpacity={0.8}
       >
-        <View style={[S.optIcon, { backgroundColor: '#F59E0B20' }]}>
-          <Icon name="user-check" size={18} color="#F59E0B" />
+        <View style={[S.optIcon, { backgroundColor: colors.primary + '20' }]}>
+          <Icon name="user-check" size={18} color={colors.primary} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[S.optLabel, { color: colors.textPrimary }]}>Approbation requise</Text>
@@ -821,7 +780,7 @@ export const CommunitiesScreen: React.FC = () => {
         <CustomToggle
           value={createInviteOnly}
           onChange={setCreateInviteOnly}
-          color="#F59E0B"
+          color={colors.primary}
         />
       </TouchableOpacity>
 
@@ -831,11 +790,11 @@ export const CommunitiesScreen: React.FC = () => {
       </Text>
       <View style={[S.optRow, {
         backgroundColor: colors.surface,
-        borderColor: (parseInt(createPriceGoGold, 10) || 0) > 0 ? '#F59E0B80' : colors.border,
+        borderColor: (parseInt(createPriceGoGold, 10) || 0) > 0 ? colors.primary + '80' : colors.border,
         alignItems: 'center',
       }]}>
-        <View style={[S.optIcon, { backgroundColor: '#F59E0B20' }]}>
-          <Icon name="zap" size={18} color="#F59E0B" />
+        <View style={[S.optIcon, { backgroundColor: colors.primary + '20' }]}>
+          <Icon name="zap" size={18} color={colors.primary} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[S.optLabel, { color: colors.textPrimary }]}>GoGold requis</Text>
@@ -861,11 +820,11 @@ export const CommunitiesScreen: React.FC = () => {
 
       <TouchableOpacity
         onPress={() => setCreateMembersHiddenPublic(v => !v)}
-        style={[S.optRow, { backgroundColor: colors.surface, borderColor: createMembersHiddenPublic ? '#7B3FF280' : colors.border }]}
+        style={[S.optRow, { backgroundColor: colors.surface, borderColor: createMembersHiddenPublic ? colors.primary + '80' : colors.border }]}
         activeOpacity={0.8}
       >
-        <View style={[S.optIcon, { backgroundColor: '#7B3FF220' }]}>
-          <Icon name="eye-off" size={18} color="#7B3FF2" />
+        <View style={[S.optIcon, { backgroundColor: colors.primary + '20' }]}>
+          <Icon name="eye-off" size={18} color={colors.primary} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[S.optLabel, { color: colors.textPrimary }]}>Masqué aux non-membres</Text>
@@ -873,16 +832,16 @@ export const CommunitiesScreen: React.FC = () => {
             Les personnes extérieures ne voient pas la liste des membres
           </Text>
         </View>
-        <CustomToggle value={createMembersHiddenPublic} onChange={setCreateMembersHiddenPublic} color="#7B3FF2" />
+        <CustomToggle value={createMembersHiddenPublic} onChange={setCreateMembersHiddenPublic} color={colors.primary} />
       </TouchableOpacity>
 
       <TouchableOpacity
         onPress={() => setCreateMembersHiddenAll(v => !v)}
-        style={[S.optRow, { backgroundColor: colors.surface, borderColor: createMembersHiddenAll ? '#E0389A80' : colors.border }]}
+        style={[S.optRow, { backgroundColor: colors.surface, borderColor: createMembersHiddenAll ? colors.primary + '80' : colors.border }]}
         activeOpacity={0.8}
       >
-        <View style={[S.optIcon, { backgroundColor: '#E0389A20' }]}>
-          <Icon name="users" size={18} color="#E0389A" />
+        <View style={[S.optIcon, { backgroundColor: colors.primary + '20' }]}>
+          <Icon name="users" size={18} color={colors.primary} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[S.optLabel, { color: colors.textPrimary }]}>Masqué aux membres</Text>
@@ -890,16 +849,16 @@ export const CommunitiesScreen: React.FC = () => {
             Même les membres ne voient pas les autres — seul l'admin voit tout
           </Text>
         </View>
-        <CustomToggle value={createMembersHiddenAll} onChange={setCreateMembersHiddenAll} color="#E0389A" />
+        <CustomToggle value={createMembersHiddenAll} onChange={setCreateMembersHiddenAll} color={colors.primary} />
       </TouchableOpacity>
 
       <TouchableOpacity
         onPress={() => setCreateInviteOnlyAdmin(v => !v)}
-        style={[S.optRow, { backgroundColor: colors.surface, borderColor: createInviteOnlyAdmin ? '#10B98180' : colors.border }]}
+        style={[S.optRow, { backgroundColor: colors.surface, borderColor: createInviteOnlyAdmin ? colors.primary + '80' : colors.border }]}
         activeOpacity={0.8}
       >
-        <View style={[S.optIcon, { backgroundColor: '#10B98120' }]}>
-          <Icon name="user-plus" size={18} color="#10B981" />
+        <View style={[S.optIcon, { backgroundColor: colors.primary + '20' }]}>
+          <Icon name="user-plus" size={18} color={colors.primary} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[S.optLabel, { color: colors.textPrimary }]}>Ajout par admin uniquement</Text>
@@ -907,7 +866,7 @@ export const CommunitiesScreen: React.FC = () => {
             Seul l'admin peut inviter de nouveaux membres
           </Text>
         </View>
-        <CustomToggle value={createInviteOnlyAdmin} onChange={setCreateInviteOnlyAdmin} color="#10B981" />
+        <CustomToggle value={createInviteOnlyAdmin} onChange={setCreateInviteOnlyAdmin} color={colors.primary} />
       </TouchableOpacity>
 
       {/* Footer étape 2 */}
@@ -950,59 +909,74 @@ export const CommunitiesScreen: React.FC = () => {
   // ── Rendu principal ──────────────────────────────────────────────────────────
   return (
     <View style={[S.root, { backgroundColor: colors.background }]}>
-      {/* Toujours light-content : la bannière dégradée est immersive (le fond
-          sous la status bar est coloré, pas colors.surface), quel que soit
-          le thème clair/sombre. */}
-      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
 
-      {/* ── Header ── */}
+      {/* ── Header dynamique — même système clair/sombre que le reste de
+          l'app (colors.surface, pas de dégradé de marque) : la bannière
+          rétrécit progressivement avec le scroll (interpolée sur scrollY,
+          pas de saut), jusqu'à un état compact où seuls le titre + la
+          recherche restent, collés en haut. ── */}
       <View style={[S.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-
-        {/* Bannière dégradée immersive — même identité que le reste de l'app
-            (colors.gradientStart → colors.gradientEnd), pas de couleurs en dur. */}
-        <LinearGradient
-          colors={[colors.gradientStart, colors.gradientEnd]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[S.banner, { paddingTop: insets.top + 6 }]}
-        >
-          {/* Seule la flèche retour occupe la barre du haut — le bouton de
-              création n'est PAS un bouton générique isolé à côté d'elle, il
-              fait partie du badge illustré ci-dessous (posé en superposition
-              dessus, comme sur la référence). Évite le "2 boutons ronds
-              identiques côte à côte" qui n'avait aucune hiérarchie claire. */}
-          <View style={S.bannerTopRow}>
-            <TouchableOpacity
-              onPress={() => nav.goBack()}
-              style={S.backBtn}
-              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-            >
-              <Icon name="arrow-left" size={16} color="#fff" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Corps centré (badge groupe → titre → sous-titre), fidèle à la
-              référence — hauteur ramenée à ~50% : badge réduit (30px) et
-              marges resserrées. Le bouton "+" (créer une communauté) est posé
-              en coin du badge, couleur pleine — se distingue clairement de la
-              flèche translucide. */}
-          <View style={S.bannerBody}>
-            <View style={S.bannerIconWrap}>
-              <Icon name="users" size={15} color="#fff" />
+        <Animated.View style={{ height: animatedBannerHeight, overflow: 'hidden', backgroundColor: colors.surface }}>
+          <View style={[S.banner]}>
+            {/* Une seule ligne : retour → titre + stats → badge groupe. */}
+            <View style={[S.bannerTopRow, { paddingTop: insets.top + 6 }]}>
               <TouchableOpacity
-                onPress={() => { resetForm(); setCreateOpen(true); }}
-                style={S.bannerCreateBtn}
+                onPress={() => nav.goBack()}
+                style={[S.backBtn, { backgroundColor: colors.backgroundSecondary }]}
                 hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               >
-                <Icon name="plus" size={9} color={colors.gradientStart ?? colors.primary} />
+                <Icon name="arrow-left" size={16} color={colors.textPrimary} />
               </TouchableOpacity>
-            </View>
-            <Text style={S.bannerTitle}>Communautés</Text>
-            <Text style={S.bannerSubtitle}>Connecte-toi, partage et grandis ensemble</Text>
-          </View>
-        </LinearGradient>
 
-        {/* Barre de recherche + filtre — remonte sur la bannière */}
+              <View style={S.bannerTextCol}>
+                <Text style={[S.bannerTitle, { color: colors.textPrimary }]} numberOfLines={1}>Communautés</Text>
+                {/* Sous-titre dynamique : vraies stats au lieu d'un texte
+                    marketing fixe — reflète ce que l'utilisateur a réellement. */}
+                <Text style={[S.bannerSubtitle, { color: colors.textTertiary }]} numberOfLines={1}>
+                  {mine.length > 0
+                    ? `${mine.length} communauté${mine.length > 1 ? 's' : ''} rejointe${mine.length > 1 ? 's' : ''}`
+                    : 'Rejoins ou crée ta première communauté'}
+                </Text>
+              </View>
+
+              <View style={[S.bannerIconWrap, { backgroundColor: colors.backgroundSecondary }]}>
+                <Icon name="users" size={15} color={colors.primary} />
+              </View>
+            </View>
+
+            {/* Actions — s'estompent et glissent vers le haut avec le scroll. */}
+            <Animated.View
+              style={[
+                S.bannerActionsWrap,
+                { opacity: bannerContentOpacity, transform: [{ translateY: bannerContentTranslate }] },
+              ]}
+              pointerEvents={query ? 'none' : 'auto'}
+            >
+              <View style={S.bannerActions}>
+                <TouchableOpacity
+                  onPress={() => { resetForm(); setCreateOpen(true); }}
+                  style={[S.bannerBtnPrimary, { backgroundColor: colors.primary }]}
+                  activeOpacity={0.85}
+                >
+                  <Icon name="plus" size={13} color="#fff" />
+                  <Text style={S.bannerBtnPrimaryText}>Créer</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setJoinOpen(true)}
+                  style={[S.bannerBtnSecondary, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
+                  activeOpacity={0.85}
+                >
+                  <Icon name="key" size={13} color={colors.textPrimary} />
+                  <Text style={[S.bannerBtnSecondaryText, { color: colors.textPrimary }]}>Code d'invitation</Text>
+                </TouchableOpacity>
+              </View>
+            </Animated.View>
+          </View>
+        </Animated.View>
+
+        {/* Barre de recherche + filtre — toujours visible, remonte sur la
+            bannière et reste stable pendant que celle-ci se replie. */}
         <View style={[S.searchWrap, {
           backgroundColor: colors.backgroundSecondary,
           borderColor: colors.divider,
@@ -1117,7 +1091,7 @@ export const CommunitiesScreen: React.FC = () => {
           <View style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 4 }}>
             <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.divider }} />
           </View>
-          <Text style={{ color: colors.textPrimary, fontSize: 17, fontWeight: '800', textAlign: 'center', paddingVertical: 14 }}>
+          <Text style={{ color: colors.textPrimary, fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold, textAlign: 'center', paddingVertical: 14 }}>
             Quel type de communauté ?
           </Text>
           <ScrollView contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 40 }}>
@@ -1128,11 +1102,11 @@ export const CommunitiesScreen: React.FC = () => {
                   borderWidth: 1.5, borderColor: colors.divider }}>
                 <View style={{ width: 48, height: 48, borderRadius: 24,
                   backgroundColor: t.color + '20', alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ fontSize: 22 }}>{t.icon}</Text>
+                  <Text style={{ fontSize: FontSize['2xl'] }}>{t.icon}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: colors.textPrimary, fontWeight: '700', fontSize: 15 }}>{t.name}</Text>
-                  <Text style={{ color: colors.textTertiary, fontSize: 12, marginTop: 2 }} numberOfLines={1}>
+                  <Text style={{ color: colors.textPrimary, fontWeight: FontWeight.bold, fontSize: FontSize.basePlus }}>{t.name}</Text>
+                  <Text style={{ color: colors.textTertiary, fontSize: FontSize.sm, marginTop: 2 }} numberOfLines={1}>
                     {t.description}
                   </Text>
                 </View>
@@ -1152,17 +1126,17 @@ export const CommunitiesScreen: React.FC = () => {
             <View style={{ alignItems: 'center', marginBottom: 4 }}>
               <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.divider }} />
             </View>
-            <Text style={{ color: colors.textPrimary, fontSize: 17, fontWeight: '800', textAlign: 'center' }}>
+            <Text style={{ color: colors.textPrimary, fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold, textAlign: 'center' }}>
               Rejoindre par code
             </Text>
-            <Text style={{ color: colors.textTertiary, fontSize: 13, textAlign: 'center' }}>
+            <Text style={{ color: colors.textTertiary, fontSize: FontSize.smPlus, textAlign: 'center' }}>
               Entre le code d'invitation que tu as reçu (ex: GOFOLIX-A3K9F)
             </Text>
             <TextInput
               style={{ backgroundColor: colors.backgroundSecondary, borderRadius: 14, borderWidth: 1,
                 borderColor: joinCode ? colors.primary : colors.divider,
                 paddingHorizontal: 16, paddingVertical: 14,
-                fontSize: 20, fontWeight: '800', textAlign: 'center', letterSpacing: 3,
+                fontSize: FontSize.xl, fontWeight: FontWeight.extraBold, textAlign: 'center', letterSpacing: 3,
                 color: colors.textPrimary }}
               value={joinCode}
               onChangeText={v => setJoinCode(v.toUpperCase())}
@@ -1179,12 +1153,12 @@ export const CommunitiesScreen: React.FC = () => {
                   gap: 8, paddingVertical: 14 }}>
                 {joining ? <ActivityIndicator color="#fff" size="small" /> : (
                   <><Icon name="log-in" size={18} color="#fff" />
-                  <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>Rejoindre</Text></>
+                  <Text style={{ color: '#fff', fontWeight: FontWeight.extraBold, fontSize: FontSize.basePlus }}>Rejoindre</Text></>
                 )}
               </LinearGradient>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => { setJoinOpen(false); setJoinCode(''); }} style={{ alignItems: 'center', paddingVertical: 8 }}>
-              <Text style={{ color: colors.textTertiary, fontSize: 14 }}>Annuler</Text>
+              <Text style={{ color: colors.textTertiary, fontSize: FontSize.base }}>Annuler</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -1202,50 +1176,52 @@ const S = StyleSheet.create({
   // Header
   header: { borderBottomWidth: StyleSheet.hairlineWidth },
 
-  // Bannière dégradée immersive (remplace l'ancien header plat) — layout
-  // centré (icône → titre → sous-titre) fidèle à la référence. Hauteur
-  // ramenée à ~50% de la version précédente : badge/texte/marges réduits
-  // proportionnellement, sous-titre sur une seule ligne.
+  // Bannière — même fond que le reste de l'app (colors.surface, passé en
+  // style inline), pas de dégradé de marque. La ligne retour/titre/badge
+  // reste fixe ; seules les actions Créer/Code s'estompent et se replient
+  // avec le scroll.
   banner: {
+    minHeight: 154,
     paddingHorizontal: 18,
     paddingBottom: 10,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    overflow: 'hidden',
   },
+  // Une seule ligne : retour ↔ titre+stats (flex:1) ↔ badge groupe.
   bannerTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
   },
-  bannerBody: { alignItems: 'center', marginTop: 2 },
   bannerIconWrap: {
-    width: 30, height: 30, borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    width: 32, height: 32, borderRadius: 11,
     alignItems: 'center', justifyContent: 'center',
-    marginBottom: 4,
   },
-  // Bouton "+" (créer) posé en coin du badge groupe — couleur pleine blanche,
-  // se distingue nettement de la flèche retour translucide.
-  bannerCreateBtn: {
-    position: 'absolute',
-    right: -4, bottom: -4,
-    width: 15, height: 15, borderRadius: 8,
-    backgroundColor: '#fff',
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.4)',
-  },
-  bannerTitle: { fontSize: 15, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
+  bannerTextCol: { flex: 1 },
+  bannerTitle: { fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold, letterSpacing: -0.3 },
   bannerSubtitle: {
-    fontSize: 10.5, fontWeight: '500', color: 'rgba(255,255,255,0.85)',
-    marginTop: 1, textAlign: 'center', paddingHorizontal: 24,
+    fontSize: FontSize.xsPlus, fontWeight: FontWeight.medium,
+    marginTop: 1,
   },
+  bannerActionsWrap: { marginTop: 12 },
+  bannerActions: { flexDirection: 'row', gap: 8 },
+  bannerBtnPrimary: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 13, paddingVertical: 6,
+    borderRadius: 9,
+  },
+  bannerBtnPrimaryText: { color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.sm },
+  bannerBtnSecondary: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 13, paddingVertical: 6,
+    borderRadius: 9,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  bannerBtnSecondaryText: { fontWeight: FontWeight.bold, fontSize: FontSize.sm },
   backBtn: {
     width: 30,
     height: 30,
     borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.16)',
   },
   // Search — chevauche le bas de la bannière (marge négative) comme sur la
   // référence, avec une ombre pour la détacher visuellement.
@@ -1266,7 +1242,7 @@ const S = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 4,
   },
-  searchInput: { flex: 1, fontSize: 14, padding: 0 },
+  searchInput: { flex: 1, fontSize: FontSize.base, padding: 0 },
   filterBtn: {
     width: 30,
     height: 30,
@@ -1280,9 +1256,9 @@ const S = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     marginHorizontal: 16, marginBottom: 10,
   },
-  categoriesTitle: { fontSize: 15, fontWeight: '800' },
+  categoriesTitle: { fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold },
   seeAllBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  seeAllText: { fontSize: 13, fontWeight: '700' },
+  seeAllText: { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
   categoriesScroll: { height: 88 },
   categoriesRow: { paddingHorizontal: 16, gap: 14 },
   categoryItem: { alignItems: 'center', width: 60, gap: 6 },
@@ -1291,59 +1267,20 @@ const S = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth,
   },
-  categoryLabel: { fontSize: 11, fontWeight: '700', textAlign: 'center' },
-
-  // Hero banner
-  hero: {
-    marginHorizontal: 16,
-    marginTop: 4,
-    marginBottom: 20,
-    borderRadius: 20,
-    overflow: 'hidden',
-    minHeight: 148,
-  },
-  heroCircle1: {
-    position: 'absolute', top: -30, right: -30,
-    width: 130, height: 130, borderRadius: 65,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  heroCircle2: {
-    position: 'absolute', bottom: -20, left: -20,
-    width: 100, height: 100, borderRadius: 50,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-  },
-  heroContent: { padding: 20, zIndex: 1 },
-  heroTitle: { color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: -0.4, marginBottom: 6 },
-  heroSub: { color: 'rgba(255,255,255,0.78)', fontSize: 13, lineHeight: 18, marginBottom: 16 },
-  heroActions: { flexDirection: 'row', gap: 10 },
-  heroBtnPrimary: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: '#fff',
-    paddingHorizontal: 16, paddingVertical: 9,
-    borderRadius: 11,
-  },
-  heroBtnPrimaryText: { color: '#7B3FF2', fontWeight: '700', fontSize: 13 },
-  heroBtnSecondary: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    paddingHorizontal: 16, paddingVertical: 9,
-    borderRadius: 11,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
-  },
-  heroBtnSecondaryText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  categoryLabel: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, textAlign: 'center' },
 
   // Section header — Mes communautés (tri + vue)
   sectionHeader: {
     paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12,
   },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  sectionTitle: { fontSize: 17, fontWeight: '800' },
+  sectionTitle: { fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold },
   sortBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 12, paddingVertical: 8,
     borderRadius: 12, borderWidth: StyleSheet.hairlineWidth,
   },
-  sortBtnText: { fontSize: 12, fontWeight: '700' },
+  sortBtnText: { fontSize: FontSize.sm, fontWeight: FontWeight.bold },
   viewBtn: {
     width: 32, height: 32, borderRadius: 10,
     alignItems: 'center', justifyContent: 'center',
@@ -1363,8 +1300,8 @@ const S = StyleSheet.create({
 
   // Empty
   emptyIcon: { width: 90, height: 90, borderRadius: 45, alignItems: 'center', justifyContent: 'center' },
-  emptyTitle: { fontSize: 18, fontWeight: '800', textAlign: 'center' },
-  emptySub: { fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  emptyTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.extraBold, textAlign: 'center' },
+  emptySub: { fontSize: FontSize.smPlus, textAlign: 'center', lineHeight: 20 },
   emptyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1372,8 +1309,8 @@ const S = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 14,
   },
-  emptyBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  emptyLinkText: { fontSize: 14, fontWeight: '700', marginTop: 4 },
+  emptyBtnText: { color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.base },
+  emptyLinkText: { fontSize: FontSize.base, fontWeight: FontWeight.bold, marginTop: 4 },
 
   // Modal
   overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.62)' },
@@ -1388,7 +1325,7 @@ const S = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   sheetNavBtn: { width: 72, justifyContent: 'center' },
-  sheetTitle: { fontSize: 16, fontWeight: '800' },
+  sheetTitle: { fontSize: FontSize.md, fontWeight: FontWeight.extraBold },
   stepDots: { flexDirection: 'row', gap: 5, marginTop: 5 },
   stepDot: { height: 4, borderRadius: 2 },
   sheetBody: { paddingHorizontal: 16, paddingTop: 18 },
@@ -1401,7 +1338,7 @@ const S = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  bannerPlaceholderTxt: { fontSize: 12, fontWeight: '500', marginTop: 6 },
+  bannerPlaceholderTxt: { fontSize: FontSize.sm, fontWeight: FontWeight.medium, marginTop: 6 },
   camBadge: {
     position: 'absolute',
     bottom: 10,
@@ -1428,7 +1365,7 @@ const S = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  avatarPickerLetter: { color: '#fff', fontWeight: '800', fontSize: 26 },
+  avatarPickerLetter: { color: '#fff', fontWeight: FontWeight.extraBold, fontSize: FontSize['2xl'] },
   avatarCam: {
     position: 'absolute',
     bottom: -2,
@@ -1436,7 +1373,6 @@ const S = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#7B3FF2',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
@@ -1449,13 +1385,13 @@ const S = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 10,
     borderRadius: 12, borderWidth: 1.5,
   },
-  typeChipLabel: { fontSize: 13, fontWeight: '700' },
+  typeChipLabel: { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
 
   // Form
-  fieldLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8, marginBottom: 7 },
+  fieldLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.extraBold, letterSpacing: 0.8, marginBottom: 7 },
   fieldBox: { borderRadius: 14, borderWidth: 1.5, paddingHorizontal: 14, paddingVertical: 12 },
-  fieldInput: { fontSize: 15, padding: 0 },
-  counter: { fontSize: 10, textAlign: 'right', marginTop: 4 },
+  fieldInput: { fontSize: FontSize.basePlus, padding: 0 },
+  counter: { fontSize: FontSize.xs, textAlign: 'right', marginTop: 4 },
 
   // Preview
   previewRow: {
@@ -1475,10 +1411,10 @@ const S = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  previewLetter: { color: '#fff', fontWeight: '800', fontSize: 18 },
+  previewLetter: { color: '#fff', fontWeight: FontWeight.extraBold, fontSize: FontSize.lg },
 
   // Section label
-  sectionLbl: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8, marginBottom: 10 },
+  sectionLbl: { fontSize: FontSize.xs, fontWeight: FontWeight.extraBold, letterSpacing: 0.8, marginBottom: 10 },
 
   // Options (modal)
   optRow: {
@@ -1491,15 +1427,15 @@ const S = StyleSheet.create({
     marginBottom: 10,
   },
   optIcon: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  optLabel: { fontSize: 14, fontWeight: '600' },
-  optSub: { fontSize: 11, marginTop: 2, lineHeight: 15 },
+  optLabel: { fontSize: FontSize.base, fontWeight: FontWeight.semiBold },
+  optSub: { fontSize: FontSize.xsPlus, marginTop: 2, lineHeight: 15 },
   radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   radioDot: { width: 10, height: 10, borderRadius: 5 },
   goGoldInput: {
     width: 64,
     textAlign: 'center',
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.extraBold,
     paddingVertical: 7,
     paddingHorizontal: 8,
     borderRadius: 10,
@@ -1522,7 +1458,7 @@ const S = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
   },
-  footerBtnSecondaryTxt: { fontWeight: '600', fontSize: 14 },
+  footerBtnSecondaryTxt: { fontWeight: FontWeight.semiBold, fontSize: FontSize.base },
   footerBtnPrimary: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1530,6 +1466,6 @@ const S = StyleSheet.create({
     gap: 8,
     paddingVertical: 14,
   },
-  footerBtnPrimaryTxt: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  footerBtnPrimaryTxt: { color: '#fff', fontWeight: FontWeight.extraBold, fontSize: FontSize.base },
 });
 

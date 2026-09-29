@@ -18,7 +18,7 @@ import { Endpoints } from '../../api/endpoints';
 import type { PlanningItem } from '../../services/planningService';
 import type { UserPublic } from '../../types/user';
 import type { AppColors } from '../../theme/colors';
-import { Spacing, BorderRadius } from '../../theme';
+import { Spacing, BorderRadius, FontSize, FontWeight } from '../../theme';
 import { useWs } from '../../context/WebSocketContext';
 
 // ── Types de statut temporel ──────────────────────────────────────────────────
@@ -182,7 +182,7 @@ const ContactPicker: React.FC<ContactPickerProps> = ({ visible, selected, onTogg
           <Image source={{ uri: u.avatar_url }} style={cp.avatar} />
         ) : (
           <View style={[cp.avatar, { backgroundColor: colors.primary + '30', alignItems: 'center', justifyContent: 'center' }]}>
-            <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 15 }}>{getInitial(u.display_name ?? u.username)}</Text>
+            <Text style={{ color: colors.primary, fontWeight: FontWeight.bold, fontSize: FontSize.basePlus }}>{getInitial(u.display_name ?? u.username)}</Text>
           </View>
         )}
         <View style={{ flex: 1 }}>
@@ -271,21 +271,21 @@ const cp = StyleSheet.create({
   sheet:        { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '75%' },
   handle:       { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(128,128,128,0.35)', alignSelf: 'center', marginTop: 10, marginBottom: 6 },
   header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12 },
-  title:        { fontSize: 17, fontWeight: '700' },
+  title:        { fontSize: FontSize.mdPlus, fontWeight: FontWeight.bold },
   doneBtn:      { paddingVertical: 6, paddingHorizontal: 4 },
-  doneTxt:      { fontSize: 15, fontWeight: '700' },
+  doneTxt:      { fontSize: FontSize.basePlus, fontWeight: FontWeight.bold },
   searchBox:    { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginBottom: 10, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, borderWidth: 1 },
-  searchInput:  { flex: 1, fontSize: 15 },
+  searchInput:  { flex: 1, fontSize: FontSize.basePlus },
   chips:        { paddingHorizontal: 16, marginBottom: 8, flexGrow: 0 },
   chip:         { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, marginRight: 8 },
-  chipText:     { fontSize: 13, fontWeight: '600' },
-  sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', paddingHorizontal: 16, marginBottom: 4 },
+  chipText:     { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
+  sectionLabel: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, letterSpacing: 0.5, textTransform: 'uppercase', paddingHorizontal: 16, marginBottom: 4 },
   list:         { flexGrow: 1, maxHeight: 320 },
-  empty:        { textAlign: 'center', marginTop: 30, fontSize: 14 },
+  empty:        { textAlign: 'center', marginTop: 30, fontSize: FontSize.base },
   row:          { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   avatar:       { width: 44, height: 44, borderRadius: 22 },
-  name:         { fontSize: 15, fontWeight: '600' },
-  cpHandle:     { fontSize: 12, marginTop: 1 },
+  name:         { fontSize: FontSize.basePlus, fontWeight: FontWeight.semiBold },
+  cpHandle:     { fontSize: FontSize.sm, marginTop: 1 },
   checkbox:     { width: 24, height: 24, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
 });
 
@@ -726,7 +726,7 @@ export const PlanningScreen: React.FC = () => {
                       {u.avatar_url
                         ? <Image source={{ uri: u.avatar_url }} style={s.contactChipAvatar} />
                         : <View style={[s.contactChipAvatar, { backgroundColor: colors.primary + '30', alignItems: 'center', justifyContent: 'center' }]}>
-                            <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '700' }}>{getInitial(u.display_name ?? u.username)}</Text>
+                            <Text style={{ color: colors.primary, fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold }}>{getInitial(u.display_name ?? u.username)}</Text>
                           </View>
                       }
                       <Text style={[s.contactChipName, { color: colors.textPrimary }]} numberOfLines={1}>
@@ -899,7 +899,7 @@ const PlanningCard: React.FC<PlanningCardProps> = ({
                   }]}>
                     {inv.invitee?.avatar_url
                       ? <Image source={{ uri: inv.invitee.avatar_url }} style={{ width: '100%', height: '100%', borderRadius: 8 }} />
-                      : <Text style={{ color: accent, fontSize: 8, fontWeight: '800' }}>{getInitial(inv.invitee?.display_name ?? inv.invitee?.username)}</Text>
+                      : <Text style={{ color: accent, fontSize: 8, fontWeight: FontWeight.extraBold }}>{getInitial(inv.invitee?.display_name ?? inv.invitee?.username)}</Text>
                     }
                   </View>
                 </TouchableOpacity>
@@ -942,25 +942,25 @@ const s = StyleSheet.create({
   root:  { flex: 1 },
   list:  { paddingHorizontal: Spacing[4], paddingTop: Spacing[2], paddingBottom: 100 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', marginTop: 16 },
-  emptyText:  { fontSize: 14, textAlign: 'center', marginTop: 8, lineHeight: 20 },
+  emptyTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, marginTop: 16 },
+  emptyText:  { fontSize: FontSize.base, textAlign: 'center', marginTop: 8, lineHeight: 20 },
   badge:      { minWidth: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
-  badgeText:  { color: '#fff', fontSize: 11, fontWeight: '800' },
+  badgeText:  { color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold },
 
   // ── Filtres ────────────────────────────────────────────────────────────────
   filterBar:     { flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth },
   filterContent: { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
   filterTab:     { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20 },
-  filterTabTxt:  { fontSize: 13, fontWeight: '600' },
+  filterTabTxt:  { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
   filterBadge:   { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  filterBadgeTxt: { fontSize: 10, fontWeight: '700' },
+  filterBadgeTxt: { fontSize: FontSize.xs, fontWeight: FontWeight.bold },
 
   // ── Section header ─────────────────────────────────────────────────────────
   sectionHeader:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 24, marginBottom: 10 },
   sectionDot:      { width: 8, height: 8, borderRadius: 4 },
-  sectionTitle:    { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, flex: 1 },
+  sectionTitle:    { fontSize: FontSize.sm, fontWeight: FontWeight.bold, textTransform: 'uppercase', letterSpacing: 0.8, flex: 1 },
   sectionCount:    { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10 },
-  sectionCountTxt: { fontSize: 10, fontWeight: '700' },
+  sectionCountTxt: { fontSize: FontSize.xs, fontWeight: FontWeight.bold },
 
   // ── Card ───────────────────────────────────────────────────────────────────
   card:        { flexDirection: 'row', alignItems: 'stretch', borderRadius: 14, overflow: 'hidden', marginBottom: 8 },
@@ -968,61 +968,61 @@ const s = StyleSheet.create({
   cardIcon:    { width: 40, alignItems: 'center', justifyContent: 'center' },
   cardContent: { flex: 1, paddingVertical: 10, paddingRight: 36 },
   cardRow:     { flexDirection: 'row', alignItems: 'center', gap: 5, flexWrap: 'wrap' },
-  cardTitle:   { fontSize: 14, fontWeight: '700', flexShrink: 1 },
+  cardTitle:   { fontSize: FontSize.base, fontWeight: FontWeight.bold, flexShrink: 1 },
 
   timeBadge:    { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 },
-  timeBadgeTxt: { fontSize: 9, fontWeight: '700' },
+  timeBadgeTxt: { fontSize: FontSize['2xs'], fontWeight: FontWeight.bold },
   ongoingDot:   { width: 5, height: 5, borderRadius: 3 },
 
   liveDot:   { paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 },
-  liveTxt:   { fontSize: 8, fontWeight: '900', color: '#fff', letterSpacing: 0.5 },
+  liveTxt:   { fontSize: 8, fontWeight: FontWeight.black, color: '#fff', letterSpacing: 0.5 },
   statusDot: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  statusTxt: { fontSize: 9, fontWeight: '700' },
+  statusTxt: { fontSize: FontSize['2xs'], fontWeight: FontWeight.bold },
 
   cardMeta:    { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3, flexWrap: 'wrap' },
-  cardMetaTxt: { fontSize: 11 },
-  cardMetaDot: { fontSize: 11, opacity: 0.4 },
-  cardMsg:     { fontSize: 11, fontStyle: 'italic', marginTop: 3 },
+  cardMetaTxt: { fontSize: FontSize.xsPlus },
+  cardMetaDot: { fontSize: FontSize.xsPlus, opacity: 0.4 },
+  cardMsg:     { fontSize: FontSize.xsPlus, fontStyle: 'italic', marginTop: 3 },
 
   avatarRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 6 },
   invAvatar: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, overflow: 'hidden' },
-  moreInv:   { fontSize: 9, fontWeight: '700' },
-  invCount:  { fontSize: 10, fontWeight: '600', marginLeft: 4 },
+  moreInv:   { fontSize: FontSize['2xs'], fontWeight: FontWeight.bold },
+  invCount:  { fontSize: FontSize.xs, fontWeight: FontWeight.semiBold, marginLeft: 4 },
 
   invActions:   { flexDirection: 'row', gap: 6, marginTop: 7 },
   btnAccept:    { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#36D9A0', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
-  btnAcceptTxt: { fontSize: 11, fontWeight: '700', color: '#fff' },
+  btnAcceptTxt: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, color: '#fff' },
   btnDecline:   { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1 },
-  btnDeclineTxt: { fontSize: 11, fontWeight: '600' },
+  btnDeclineTxt: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold },
 
   delBtn: { position: 'absolute', top: 10, right: 10 },
 
   fab:      { position: 'absolute', bottom: 24, right: 20, borderRadius: BorderRadius.full, overflow: 'hidden', elevation: 8, shadowColor: '#7B3FF2', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 10 },
   fabInner: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: Spacing[4], paddingVertical: 14 },
-  fabText:  { fontSize: 14, fontWeight: '800', color: '#fff' },
+  fabText:  { fontSize: FontSize.base, fontWeight: FontWeight.extraBold, color: '#fff' },
 
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
   modalSheet:   { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 34, maxHeight: '95%' },
   modalHandle:  { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(128,128,128,0.35)', alignSelf: 'center', marginTop: 10, marginBottom: 6 },
   modalHeader:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12 },
-  modalTitle:   { fontSize: 18, fontWeight: '700' },
+  modalTitle:   { fontSize: FontSize.lg, fontWeight: FontWeight.bold },
   modalBody:    { paddingHorizontal: 20, paddingBottom: 20 },
 
-  label:      { fontSize: 12, fontWeight: '600', marginTop: 16, marginBottom: 6 },
-  input:      { fontSize: 15, borderRadius: BorderRadius.md, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1 },
+  label:      { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, marginTop: 16, marginBottom: 6 },
+  input:      { fontSize: FontSize.basePlus, borderRadius: BorderRadius.md, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1 },
   inputMulti: { minHeight: 70, textAlignVertical: 'top' },
 
   dateRow:      { flexDirection: 'row', alignItems: 'center', gap: 10 },
   datePill:     { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, borderRadius: BorderRadius.md, borderWidth: 1 },
-  datePillText: { fontSize: 14 },
+  datePillText: { fontSize: FontSize.base },
 
   inviteBtn:     { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderRadius: BorderRadius.md, borderWidth: 1 },
-  inviteBtnText: { flex: 1, fontSize: 14 },
+  inviteBtnText: { flex: 1, fontSize: FontSize.base },
 
   contactsPreview:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
   contactChip:       { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: BorderRadius.full },
   contactChipAvatar: { width: 22, height: 22, borderRadius: 11 },
-  contactChipName:   { fontSize: 13, fontWeight: '500', maxWidth: 100 },
+  contactChipName:   { fontSize: FontSize.smPlus, fontWeight: FontWeight.medium, maxWidth: 100 },
 
   colorRow:      { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
   colorDot:      { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
@@ -1030,5 +1030,5 @@ const s = StyleSheet.create({
 
   submitBtn:      { marginTop: 24, borderRadius: BorderRadius.full, overflow: 'hidden' },
   submitBtnInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 15 },
-  submitBtnText:  { fontSize: 15, fontWeight: '800', color: '#fff' },
+  submitBtnText:  { fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold, color: '#fff' },
 });

@@ -2,7 +2,8 @@
  * AdvertiserRow — en-tête annonceur unifié pour tous les encarts.
  *
  *  variant="light" : sur carte claire (Feed, overlay recherche). Logo carré 30px,
- *                    nom + « Sponsorisé · domaine », bouton ⋯ optionnel.
+ *                    nom + « Sponsorisé » (jamais de domaine/numéro affiché —
+ *                    le CTA reste générique, voir AdCTA), bouton ⋯ optionnel.
  *  variant="dark"  : sur média sombre (Reels, Stories). Logo rond 32px, nom blanc,
  *                    cliquable → profil annonceur.
  */
@@ -11,7 +12,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { CachedImage } from '../common';
 import { useTheme } from '../../hooks/useTheme';
-import { adAdvertiserLabel, adDomain, adInitials, type AdData } from './types';
+import { adAdvertiserLabel, adInitials, type AdData } from './types';
 
 interface Props {
   ad: AdData;
@@ -26,23 +27,26 @@ export const AdvertiserRow: React.FC<Props> = ({
   const { theme } = useTheme();
   const { colors } = theme;
   const label = adAdvertiserLabel(ad);
-  const dom = adDomain(ad);
   const logo = ad.advertiser_logo;
   const initials = adInitials(ad);
   const dark = variant === 'dark';
 
   const nameColor = dark ? '#fff' : colors.textPrimary;
   const metaColor = dark ? 'rgba(255,255,255,0.7)' : colors.textTertiary;
+  // Fallback logo — lié au thème (ne doit jamais imposer une teinte sombre fixe
+  // en mode clair) ; en dark (Reels/Stories) reste sur média sombre, teinte
+  // légèrement translucide neutre plutôt qu'une couleur en dur.
+  const logoFallbackBg = dark ? 'rgba(255,255,255,0.14)' : colors.backgroundSecondary;
 
   const LogoInner = logo
     ? <CachedImage uri={logo} style={dark ? s.logoDark : s.logoLight} resizeMode="cover" />
     : (
       <View style={[
         dark ? s.logoDark : s.logoLight,
-        dark ? s.fbDark : { backgroundColor: '#1E1B2E' },
+        { backgroundColor: logoFallbackBg },
         { alignItems: 'center', justifyContent: 'center' },
       ]}>
-        <Text style={{ color: '#fff', fontWeight: '700', fontSize: dark ? 12 : 11, letterSpacing: -0.3 }}>
+        <Text style={{ color: dark ? '#fff' : colors.textSecondary, fontWeight: '700', fontSize: dark ? 12 : 11, letterSpacing: -0.3 }}>
           {initials}
         </Text>
       </View>
@@ -55,9 +59,14 @@ export const AdvertiserRow: React.FC<Props> = ({
         <Text style={[s.name, { color: nameColor }, dark && s.nameShadow]} numberOfLines={1}>
           {label}
         </Text>
-        <Text style={[s.meta, { color: metaColor }]} numberOfLines={1}>
-          {dom ? `Sponsorisé · ${dom}` : 'Sponsorisé'}
-        </Text>
+        {/* Badge "Sponsorisé" — pastille + texte, plus identifiable qu'un simple
+            texte gris (standard Instagram/LinkedIn Ads). */}
+        <View style={s.sponsoredRow}>
+          <View style={[s.sponsoredDot, { backgroundColor: metaColor }]} />
+          <Text style={[s.meta, { color: metaColor }]} numberOfLines={1}>
+            Sponsorisé
+          </Text>
+        </View>
       </View>
     </>
   );
@@ -80,7 +89,7 @@ export const AdvertiserRow: React.FC<Props> = ({
       {body}
       {onDismiss ? (
         <TouchableOpacity onPress={onDismiss} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Icon name="more-horizontal" size={16} color="#C9C7DC" />
+          <Icon name="more-horizontal" size={16} color={colors.textTertiary} />
         </TouchableOpacity>
       ) : null}
     </View>
@@ -92,8 +101,9 @@ const s = StyleSheet.create({
   rowDark:  { flexDirection: 'row', alignItems: 'center', gap: 9 },
   logoLight: { width: 30, height: 30, borderRadius: 8 },
   logoDark:  { width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)' },
-  fbDark:    { backgroundColor: '#211C33' },
   name:      { fontSize: 12.5, fontWeight: '600', letterSpacing: -0.1 },
   nameShadow:{ textShadowColor: 'rgba(0,0,0,0.85)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 8 },
-  meta:      { fontSize: 10.5, fontWeight: '500', marginTop: 1, letterSpacing: 0.1 },
+  sponsoredRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  sponsoredDot: { width: 3, height: 3, borderRadius: 1.5 },
+  meta:      { fontSize: 10.5, fontWeight: '500', letterSpacing: 0.1 },
 });

@@ -91,16 +91,16 @@ export const ExplorerMenuScreen: React.FC<Props> = ({ onLogout }) => {
 
         {/* Liste — Découvrir */}
         <Text style={[mnu.sectionTitle, { color: colors.textTertiary }]}>DÉCOUVRIR</Text>
-        {([
-          { icon: 'film',        label: 'Films',         sub: 'Regarder des films en streaming',           color: '#3B82F6', screen: 'Movies'         },
-          { icon: 'tv',          label: 'Séries',        sub: 'Suivre tes séries, épisode par épisode',    color: '#7B3FF2', screen: 'Series'         },
-          { icon: 'play-circle', label: 'Reels',         sub: 'Défiler des vidéos courtes à l\'infini',    color: '#FF7A2F', screen: 'Reels'          },
-          { icon: 'radio',       label: 'Lives',         sub: 'Voir les diffusions en direct du moment',   color: '#F0365A', screen: 'SimpleLiveList' },
-          { icon: 'zap',         label: 'Live Matchs',   sub: 'Suivre des battles et tournois en direct',  color: '#9B65F5', screen: 'LiveMatches'    },
-          { icon: 'music',       label: 'Concerts live', sub: 'Assister à des concerts en streaming',      color: '#E0389A', screen: 'LiveList'       },
-          { icon: 'calendar',    label: 'Événements',    sub: 'Trouver des sorties et réserver des billets', color: '#10B981', screen: 'Events'       },
-          { icon: 'trending-up', label: 'Tendances',     sub: 'Voir ce qui buzz en ce moment',             color: '#F59E0B', screen: 'Trending'       },
-        ] as const).map((item) => (
+        {[
+          { icon: 'film',        label: 'Films',         sub: 'Regarder des films en streaming',           screen: 'Movies'         },
+          { icon: 'tv',          label: 'Séries',        sub: 'Suivre tes séries, épisode par épisode',    screen: 'Series'         },
+          { icon: 'play-circle', label: 'Reels',         sub: 'Défiler des vidéos courtes à l\'infini',    screen: 'Reels'          },
+          { icon: 'radio',       label: 'Lives',         sub: 'Voir les diffusions en direct du moment',   screen: 'SimpleLiveList' },
+          { icon: 'zap',         label: 'Live Matchs',   sub: 'Suivre des battles et tournois en direct',  screen: 'LiveMatches'    },
+          { icon: 'music',       label: 'Concerts live', sub: 'Assister à des concerts en streaming',      screen: 'LiveList'       },
+          { icon: 'calendar',    label: 'Événements',    sub: 'Trouver des sorties et réserver des billets', screen: 'Events'       },
+          { icon: 'trending-up', label: 'Tendances',     sub: 'Voir ce qui buzz en ce moment',             screen: 'Trending'       },
+        ].map((item) => (
           <TouchableOpacity
             key={item.screen}
             style={[mnu.listItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
@@ -109,8 +109,8 @@ export const ExplorerMenuScreen: React.FC<Props> = ({ onLogout }) => {
               ? (nav as any).navigate('Tabs', { screen: 'Reels' })
               : (nav as any).navigate(item.screen)}
           >
-            <View style={[mnu.listIcon, { backgroundColor: item.color + '18' }]}>
-              <Icon name={item.icon} size={20} color={item.color} />
+            <View style={[mnu.listIcon, { backgroundColor: colors.primary + '18' }]}>
+              <Icon name={item.icon} size={20} color={colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[mnu.listLabel, { color: colors.textPrimary }]}>{item.label}</Text>
@@ -122,21 +122,21 @@ export const ExplorerMenuScreen: React.FC<Props> = ({ onLogout }) => {
 
         {/* Liste — Social */}
         <Text style={[mnu.sectionTitle, { color: colors.textTertiary }]}>SOCIAL</Text>
-        {([
-          { icon: 'users',          label: 'Communautés',   sub: 'Rejoindre des groupes qui te ressemblent',   color: '#36D9A0', screen: 'Communities'   },
-          { icon: 'user-plus',      label: 'Amis',          sub: 'Gérer tes abonnements et tes abonnés',       color: '#10B981', screen: 'Following'      },
-          { icon: 'activity',       label: 'Activité',      sub: 'Voir tes likes, commentaires et interactions', color: '#E0389A', screen: 'Activity'     },
-          { icon: 'clock',          label: 'Historique',    sub: 'Retrouver les vidéos déjà regardées',        color: '#6366F1', screen: 'WatchHistory'   },
-          { icon: 'star',           label: 'Favoris',       sub: 'Retrouver tes contenus sauvegardés',         color: '#EAB308', screen: 'Favorites'      },
-        ] as const).map((item) => (
+        {[
+          { icon: 'users',          label: 'Communautés',   sub: 'Rejoindre des groupes qui te ressemblent',   screen: 'Communities'   },
+          { icon: 'user-plus',      label: 'Amis',          sub: 'Gérer tes abonnements et tes abonnés',       screen: 'Following'      },
+          { icon: 'activity',       label: 'Activité',      sub: 'Voir tes likes, commentaires et interactions', screen: 'Activity'     },
+          { icon: 'clock',          label: 'Historique',    sub: 'Retrouver les vidéos déjà regardées',        screen: 'WatchHistory'   },
+          { icon: 'star',           label: 'Favoris',       sub: 'Retrouver tes contenus sauvegardés',         screen: 'Favorites'      },
+        ].map((item) => (
           <TouchableOpacity
             key={item.screen}
             style={[mnu.listItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
             activeOpacity={0.75}
             onPress={() => (nav as any).navigate(item.screen)}
           >
-            <View style={[mnu.listIcon, { backgroundColor: item.color + '18' }]}>
-              <Icon name={item.icon} size={20} color={item.color} />
+            <View style={[mnu.listIcon, { backgroundColor: colors.primary + '18' }]}>
+              <Icon name={item.icon} size={20} color={colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[mnu.listLabel, { color: colors.textPrimary }]}>{item.label}</Text>
@@ -148,24 +148,24 @@ export const ExplorerMenuScreen: React.FC<Props> = ({ onLogout }) => {
 
         {/* Liste — Espace personnel */}
         <Text style={[mnu.sectionTitle, { color: colors.textTertiary }]}>MON ESPACE</Text>
-        {([
-          { icon: 'calendar',     label: 'Planning',      sub: 'Voir tes événements et invitations à venir',    color: '#7B3FF2', screen: 'Planning'             },
-          { icon: 'credit-card',  label: 'Wallet',        sub: 'Consulter ton solde, acheter, transférer',      color: '#F59E0B', screen: 'Wallet'              },
-          { icon: 'gift',         label: 'Parrainage',    sub: 'Inviter des amis et gagner des GoGold',         color: '#10B981', screen: 'Referral'             },
-          { icon: 'bar-chart-2',  label: 'Monétisation',  sub: 'Activer et configurer tes revenus créateur',    color: '#7B3FF2', screen: 'SettingsMonetisation' },
-          { icon: 'trending-up',  label: 'Statistiques',  sub: 'Suivre tes vues, ton audience et leur évolution', color: '#3B82F6', screen: 'CreatorAnalytics'   },
-          { icon: 'shield',       label: 'Vérification',  sub: 'Demander le badge de compte certifié',          color: '#1D9BF0', screen: 'SettingsVerification' },
-          { icon: 'award',        label: 'Abonnement',    sub: 'Gérer ou changer ton abonnement premium',       color: '#14B8A6', screen: 'Subscriptions'        },
-          { icon: 'zap',          label: 'Pub',           sub: 'Créer et suivre tes campagnes publicitaires',   color: '#F97316', screen: 'Ads'                  },
-        ] as const).map((item) => (
+        {[
+          { icon: 'calendar',     label: 'Planning',      sub: 'Voir tes événements et invitations à venir',    screen: 'Planning'             },
+          { icon: 'credit-card',  label: 'Wallet',        sub: 'Consulter ton solde, acheter, transférer',      screen: 'Wallet'              },
+          { icon: 'gift',         label: 'Parrainage',    sub: 'Inviter des amis et gagner des GoGold',         screen: 'Referral'             },
+          { icon: 'bar-chart-2',  label: 'Monétisation',  sub: 'Activer et configurer tes revenus créateur',    screen: 'SettingsMonetisation' },
+          { icon: 'trending-up',  label: 'Statistiques',  sub: 'Suivre tes vues, ton audience et leur évolution', screen: 'CreatorAnalytics'   },
+          { icon: 'shield',       label: 'Vérification',  sub: 'Demander le badge de compte certifié',          screen: 'SettingsVerification' },
+          { icon: 'award',        label: 'Abonnement',    sub: 'Gérer ou changer ton abonnement premium',       screen: 'Subscriptions'        },
+          { icon: 'zap',          label: 'Pub',           sub: 'Créer et suivre tes campagnes publicitaires',   screen: 'Ads'                  },
+        ].map((item) => (
           <TouchableOpacity
             key={item.screen}
             style={[mnu.listItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
             activeOpacity={0.75}
             onPress={() => (nav as any).navigate(item.screen)}
           >
-            <View style={[mnu.listIcon, { backgroundColor: item.color + '18' }]}>
-              <Icon name={item.icon} size={20} color={item.color} />
+            <View style={[mnu.listIcon, { backgroundColor: colors.primary + '18' }]}>
+              <Icon name={item.icon} size={20} color={colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[mnu.listLabel, { color: colors.textPrimary }]}>{item.label}</Text>
@@ -177,17 +177,17 @@ export const ExplorerMenuScreen: React.FC<Props> = ({ onLogout }) => {
 
         {/* Réglages */}
         <Text style={[mnu.sectionTitle, { color: colors.textTertiary }]}>RÉGLAGES</Text>
-        {([
-          { icon: 'sliders',  label: 'Réglages',   sub: 'Apparence, notifications et gestion du compte', color: '#6B7280', screen: 'Settings' },
-        ] as const).map((item) => (
+        {[
+          { icon: 'sliders',  label: 'Réglages',   sub: 'Apparence, notifications et gestion du compte', screen: 'Settings' },
+        ].map((item) => (
           <TouchableOpacity
             key={item.screen}
             style={[mnu.listItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
             activeOpacity={0.75}
             onPress={() => (nav as any).navigate(item.screen)}
           >
-            <View style={[mnu.listIcon, { backgroundColor: item.color + '18' }]}>
-              <Icon name={item.icon} size={20} color={item.color} />
+            <View style={[mnu.listIcon, { backgroundColor: colors.primary + '18' }]}>
+              <Icon name={item.icon} size={20} color={colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[mnu.listLabel, { color: colors.textPrimary }]}>{item.label}</Text>
@@ -218,8 +218,8 @@ export const ExplorerMenuScreen: React.FC<Props> = ({ onLogout }) => {
           activeOpacity={0.75}
           onPress={() => (nav as any).navigate('Feedback')}
         >
-          <View style={[mnu.listIcon, { backgroundColor: '#7B3FF218' }]}>
-            <Icon name="edit-3" size={20} color="#7B3FF2" />
+          <View style={[mnu.listIcon, { backgroundColor: colors.primary + '18' }]}>
+            <Icon name="edit-3" size={20} color={colors.primary} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[mnu.listLabel, { color: colors.textPrimary }]}>Donner mon avis</Text>

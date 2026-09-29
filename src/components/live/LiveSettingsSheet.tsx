@@ -13,6 +13,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
@@ -465,7 +466,7 @@ export const LiveSettingsSheet: React.FC<Props> = ({
             handRequests.map(req => (
               <View key={req.identity} style={[s.handCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
                 <View style={s.handLeft}>
-                  <Text style={{ fontSize: 24 }}>✋</Text>
+                  <Text style={{ fontSize: FontSize['2xl'] }}>✋</Text>
                   <Text style={[s.handName, { color: colors.textPrimary }]} numberOfLines={1}>{req.name}</Text>
                 </View>
                 <View style={s.handActions}>
@@ -530,7 +531,7 @@ export const LiveSettingsSheet: React.FC<Props> = ({
                     ? <ActivityIndicator color="#F0365A" size="small" />
                     : <>
                         <Icon name="unlock" size={14} color="#F0365A" />
-                        <Text style={{ color: '#F0365A', fontSize: 13, fontWeight: '600' }}>Débannir</Text>
+                        <Text style={{ color: '#F0365A', fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold }}>Débannir</Text>
                       </>
                   }
                 </TouchableOpacity>
@@ -608,64 +609,64 @@ const s = StyleSheet.create({
   },
   handle:       { width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'center', marginBottom: 16 },
   sheetHeader:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
-  sheetTitle:   { fontSize: 18, fontWeight: '800' },
-  sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10, marginTop: 20 },
+  sheetTitle:   { fontSize: FontSize.lg, fontWeight: FontWeight.extraBold },
+  sectionLabel: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10, marginTop: 20 },
 
   monetSectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 20, marginBottom: 10 },
   monetSectionIcon:   { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  sectionLabelInline: { fontSize: 14, fontWeight: '800' },
-  sectionSub:         { fontSize: 11, marginTop: 1 },
+  sectionLabelInline: { fontSize: FontSize.base, fontWeight: FontWeight.extraBold },
+  sectionSub:         { fontSize: FontSize.xsPlus, marginTop: 1 },
 
   row:          { flexDirection: 'row', gap: 12 },
   flipCard:     { flexDirection: 'row', justifyContent: 'center', marginTop: 10, gap: 10, paddingVertical: 12 },
   toggleCard:   { flex: 1, borderRadius: 16, borderWidth: 1.5, padding: 14, alignItems: 'center', gap: 8 },
   toggleIcon:   { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  toggleLabel:  { fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  toggleLabel:  { fontSize: FontSize.sm, fontWeight: FontWeight.bold, textAlign: 'center' },
   dot:          { width: 8, height: 8, borderRadius: 4 },
 
   emptyCard:    { borderRadius: 14, padding: 16, alignItems: 'center' },
-  emptyText:    { fontSize: 13 },
+  emptyText:    { fontSize: FontSize.smPlus },
   handCard:     { borderRadius: 14, borderWidth: 1, padding: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   handLeft:     { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  handName:     { fontSize: 14, fontWeight: '600', flex: 1 },
+  handName:     { fontSize: FontSize.base, fontWeight: FontWeight.semiBold, flex: 1 },
   handActions:  { flexDirection: 'row', gap: 8, alignItems: 'center' },
   acceptBtn:    { borderRadius: 20, overflow: 'hidden' },
   acceptBtnGrad:{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8 },
-  acceptBtnText:{ color: '#fff', fontSize: 13, fontWeight: '700' },
+  acceptBtnText:{ color: '#fff', fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
   dismissBtn:   { width: 34, height: 34, borderRadius: 17, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   banAvatar:         { width: 32, height: 32, borderRadius: 16 },
   banAvatarFallback: { alignItems: 'center', justifyContent: 'center' },
 
   monetCard:        { borderRadius: 16, borderWidth: 1, padding: 16, gap: 12 },
   monetActive:      { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  monetActiveText:  { fontSize: 14, fontWeight: '600', flex: 1 },
+  monetActiveText:  { fontSize: FontSize.base, fontWeight: FontWeight.semiBold, flex: 1 },
   monetBtns:        { flexDirection: 'row', gap: 10 },
   monetEditBtn:     { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 7 },
-  monetEditBtnText: { fontSize: 13, fontWeight: '600' },
+  monetEditBtnText: { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
   monetStartBtn:    { borderRadius: 20, overflow: 'hidden' },
   monetStartGrad:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, height: 48 },
-  monetStartText:   { color: '#fff', fontSize: 15, fontWeight: '700' },
+  monetStartText:   { color: '#fff', fontSize: FontSize.basePlus, fontWeight: FontWeight.bold },
 
   monetForm:        { borderRadius: 16, borderWidth: 1, padding: 16, gap: 4 },
   monetFormBack:    { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 },
-  monetFormBackText:{ fontSize: 13 },
+  monetFormBackText:{ fontSize: FontSize.smPlus },
   typeRow:          { flexDirection: 'row', gap: 10 },
   typeCard:         { flex: 1, borderRadius: 14, borderWidth: 1.5, padding: 14, alignItems: 'center', gap: 6 },
   typeCardActive:   { backgroundColor: 'rgba(245,158,11,0.08)' },
-  typeEmoji:        { fontSize: 28 },
-  typeLabel:        { fontSize: 13, fontWeight: '600' },
+  typeEmoji:        { fontSize: FontSize['3xl'] },
+  typeLabel:        { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
   goGoldInputWrap:   { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12 },
-  goGoldInputEmoji:  { fontSize: 24 },
-  goGoldInput:       { flex: 1, height: 48, borderWidth: 1, borderRadius: 14, paddingHorizontal: 16, fontSize: 16, fontWeight: '700' },
+  goGoldInputEmoji:  { fontSize: FontSize['2xl'] },
+  goGoldInput:       { flex: 1, height: 48, borderWidth: 1, borderRadius: 14, paddingHorizontal: 16, fontSize: FontSize.md, fontWeight: FontWeight.bold },
   giftItem:         { flex: 1, alignItems: 'center', padding: 8, borderRadius: 12, borderWidth: 1.5, borderColor: 'transparent' },
   giftItemActive:   { borderColor: '#E85DAD', backgroundColor: 'rgba(232,93,173,0.1)' },
-  giftEmoji:        { fontSize: 26 },
-  giftName:         { fontSize: 9, marginTop: 3, textAlign: 'center' },
-  giftCost:         { fontSize: 10, color: '#F59E0B', fontWeight: '700' },
+  giftEmoji:        { fontSize: FontSize['2xl'] },
+  giftName:         { fontSize: FontSize['2xs'], marginTop: 3, textAlign: 'center' },
+  giftCost:         { fontSize: FontSize.xs, color: '#F59E0B', fontWeight: FontWeight.bold },
   saveBtn:          { borderRadius: 20, overflow: 'hidden', marginTop: 16 },
   saveBtnGrad:      { height: 50, alignItems: 'center', justifyContent: 'center' },
-  saveBtnText:      { color: '#fff', fontSize: 16, fontWeight: '800' },
+  saveBtnText:      { color: '#fff', fontSize: FontSize.md, fontWeight: FontWeight.extraBold },
 
   stopBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderWidth: 1.5, borderRadius: 16, paddingVertical: 14, marginTop: 4 },
-  stopBtnText: { color: '#F0365A', fontSize: 15, fontWeight: '700' },
+  stopBtnText: { color: '#F0365A', fontSize: FontSize.basePlus, fontWeight: FontWeight.bold },
 });

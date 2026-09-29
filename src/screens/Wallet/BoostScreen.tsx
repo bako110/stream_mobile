@@ -10,6 +10,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { apiClient } from '../../api/client';
@@ -340,7 +341,7 @@ const StatusBadge: React.FC<{ status: BoostRecord['status']; colors: any }> = ({
   const c = config[status] ?? { label: status, bg: colors.surface, text: colors.textSecondary };
   return (
     <View style={{ backgroundColor: c.bg, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 }}>
-      <Text style={{ fontSize: 10, fontWeight: '700', color: c.text }}>{c.label}</Text>
+      <Text style={{ fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: c.text }}>{c.label}</Text>
     </View>
   );
 };
@@ -417,15 +418,15 @@ const ActiveBoostCard: React.FC<{
               <Icon name={cat.icon as any} size={20} color="#fff" />
             </LinearGradient>
             <View style={{ flex: 1 }}>
-              <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '800' }} numberOfLines={1}>
+              <Text style={{ color: colors.textPrimary, fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold }} numberOfLines={1}>
                 {boost.tier_label}
               </Text>
               {boost.target_content_title ? (
-                <Text style={{ color: g1, fontSize: 12, fontWeight: '600', marginTop: 1 }} numberOfLines={1}>
+                <Text style={{ color: g1, fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, marginTop: 1 }} numberOfLines={1}>
                   {boost.target_content_title}
                 </Text>
               ) : (
-                <Text style={{ color: colors.textTertiary, fontSize: 12 }}>{cat.label}</Text>
+                <Text style={{ color: colors.textTertiary, fontSize: FontSize.sm }}>{cat.label}</Text>
               )}
             </View>
             <StatusBadge status={boost.status} colors={colors} />
@@ -434,10 +435,10 @@ const ActiveBoostCard: React.FC<{
           {/* Progression — grande barre + % central */}
           <View style={{ gap: 6 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '600' }}>
+              <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold }}>
                 PROGRESSION
               </Text>
-              <Text style={{ color: g1, fontSize: 16, fontWeight: '900' }}>{pctRounded}%</Text>
+              <Text style={{ color: g1, fontSize: FontSize.md, fontWeight: FontWeight.black }}>{pctRounded}%</Text>
             </View>
             {/* Barre haute + gradient */}
             <View style={{ height: 10, backgroundColor: colors.backgroundSecondary, borderRadius: 5, overflow: 'hidden' }}>
@@ -447,11 +448,11 @@ const ActiveBoostCard: React.FC<{
               </Animated.View>
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={{ color: colors.textTertiary, fontSize: 11 }}>
+              <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus }}>
                 {total > 0 ? `${fmtNum(delivered)} / ${fmtNum(total)} livrés` : 'En cours…'}
               </Text>
               {boost.status === 'active' && (
-                <Text style={{ color: colors.textTertiary, fontSize: 11 }}>
+                <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus }}>
                   {hoursLeft > 24 ? `${dl}j restants` : `${hoursLeft}h restantes`}
                 </Text>
               )}
@@ -473,8 +474,8 @@ const ActiveBoostCard: React.FC<{
               <View key={st.label} style={{ flex: 1, backgroundColor: st.color + '10',
                 borderRadius: 10, padding: 8, alignItems: 'center', gap: 3 }}>
                 <Icon name={st.icon} size={13} color={st.color} />
-                <Text style={{ color: st.color, fontSize: 13, fontWeight: '900' }}>{st.val}</Text>
-                <Text style={{ color: colors.textTertiary, fontSize: 9 }}>{st.label}</Text>
+                <Text style={{ color: st.color, fontSize: FontSize.smPlus, fontWeight: FontWeight.black }}>{st.val}</Text>
+                <Text style={{ color: colors.textTertiary, fontSize: FontSize['2xs'] }}>{st.label}</Text>
               </View>
             ))}
           </View>
@@ -487,8 +488,8 @@ const ActiveBoostCard: React.FC<{
                   gap: 6, paddingVertical: 10, borderRadius: 12,
                   backgroundColor: '#EF444412', borderWidth: 1, borderColor: '#EF444430' }}>
                 <Icon name="square" size={13} color="#EF4444" />
-                <Text style={{ color: '#EF4444', fontWeight: '700', fontSize: 13 }}>Arrêter le boost</Text>
-                <Text style={{ color: '#EF444480', fontSize: 11 }}>
+                <Text style={{ color: '#EF4444', fontWeight: FontWeight.bold, fontSize: FontSize.smPlus }}>Arrêter le boost</Text>
+                <Text style={{ color: '#EF444480', fontSize: FontSize.xsPlus }}>
                   (+{Math.round(boost.gogold_spent * 0.9).toLocaleString('fr-FR')} GoGold remboursés)
                 </Text>
               </TouchableOpacity>
@@ -497,7 +498,7 @@ const ActiveBoostCard: React.FC<{
                 gap: 6, paddingVertical: 10, borderRadius: 12,
                 backgroundColor: colors.backgroundSecondary, opacity: 0.5 }}>
                 <Icon name="lock" size={13} color={colors.textTertiary} />
-                <Text style={{ color: colors.textTertiary, fontSize: 12 }}>Annulation impossible après 30 min</Text>
+                <Text style={{ color: colors.textTertiary, fontSize: FontSize.sm }}>Annulation impossible après 30 min</Text>
               </View>
             )
           )}
@@ -586,7 +587,7 @@ const ContentPicker: React.FC<{
             <View style={{ flex: 1 }}>
               <Text style={[cp.triggerText, { color: g1 }]} numberOfLines={1}>{selected.title}</Text>
               {selected.subtitle ? (
-                <Text style={{ fontSize: 10, color: colors.textTertiary, marginTop: 1 }}>{selected.subtitle}</Text>
+                <Text style={{ fontSize: FontSize.xs, color: colors.textTertiary, marginTop: 1 }}>{selected.subtitle}</Text>
               ) : null}
             </View>
             <TouchableOpacity onPress={() => onSelect(null)} hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}>
@@ -650,7 +651,7 @@ const ContentPicker: React.FC<{
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={[cp.resultText, { color: colors.textPrimary }]} numberOfLines={2}>{item.title}</Text>
                     {item.subtitle ? (
-                      <Text style={{ fontSize: 10, color: colors.textTertiary, marginTop: 2 }}>{item.subtitle}</Text>
+                      <Text style={{ fontSize: FontSize.xs, color: colors.textTertiary, marginTop: 2 }}>{item.subtitle}</Text>
                     ) : null}
                   </View>
                   <Icon name="chevron-right" size={14} color={colors.textTertiary} />
@@ -658,7 +659,7 @@ const ContentPicker: React.FC<{
               )}
               ListEmptyComponent={
                 !loading ? (
-                  <Text style={{ textAlign: 'center', color: colors.textTertiary, marginTop: 40, fontSize: 14 }}>
+                  <Text style={{ textAlign: 'center', color: colors.textTertiary, marginTop: 40, fontSize: FontSize.base }}>
                     Aucun contenu trouve
                   </Text>
                 ) : null
@@ -1022,7 +1023,7 @@ export default function BoostScreen() {
                 Publie des reels ou des events pour obtenir des recommandations personnalisees.
               </Text>
               <TouchableOpacity onPress={() => setTab('new')} style={[s.emptyBtn, { backgroundColor: '#7B3FF2' }]}>
-                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>Explorer les boosts</Text>
+                <Text style={{ color: '#fff', fontWeight: FontWeight.extraBold, fontSize: FontSize.base }}>Explorer les boosts</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -1197,16 +1198,16 @@ export default function BoostScreen() {
 
               <View style={[s.customSummary, { backgroundColor: g1 + '10', borderColor: g1 + '20' }]}>
                 <View>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>
+                  <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, color: colors.textPrimary }}>
                     {fmtNum(customReach)} {customUnit} · {customDays}j
                   </Text>
-                  <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 2 }}>
+                  <Text style={{ fontSize: FontSize.xsPlus, color: colors.textTertiary, marginTop: 2 }}>
                     Solde apres : {Math.max(0, balance - customGoGold).toLocaleString('fr-FR')} GoGold
                   </Text>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={{ fontSize: 22, fontWeight: '900', color: g1 }}>{customGoGold.toLocaleString('fr-FR')}</Text>
-                  <Text style={{ fontSize: 10, color: colors.textTertiary }}>GoGold</Text>
+                  <Text style={{ fontSize: FontSize['2xl'], fontWeight: FontWeight.black, color: g1 }}>{customGoGold.toLocaleString('fr-FR')}</Text>
+                  <Text style={{ fontSize: FontSize.xs, color: colors.textTertiary }}>GoGold</Text>
                 </View>
               </View>
 
@@ -1267,7 +1268,7 @@ export default function BoostScreen() {
                 onPress={() => setTab('new')}
                 style={[s.emptyBtn, { backgroundColor: '#7B3FF2' }]}
               >
-                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>Creer un boost</Text>
+                <Text style={{ color: '#fff', fontWeight: FontWeight.extraBold, fontSize: FontSize.base }}>Creer un boost</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -1396,130 +1397,130 @@ const abc = StyleSheet.create({
   mainRow:      { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14 },
   iconBox:      { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   titleRow:     { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2, flexWrap: 'wrap' },
-  tierLabel:    { fontSize: 13, fontWeight: '700', flex: 1 },
-  contentTitle: { fontSize: 11, fontWeight: '600', marginBottom: 4 },
+  tierLabel:    { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, flex: 1 },
+  contentTitle: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold, marginBottom: 4 },
   statsBadge:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, borderWidth: 1, alignSelf: 'flex-start', marginBottom: 6 },
-  statsText:    { fontSize: 10, fontWeight: '700' },
+  statsText:    { fontSize: FontSize.xs, fontWeight: FontWeight.bold },
   progressBg:   { height: 4, borderRadius: 2, marginTop: 4 },
   progressFill: { height: 4, borderRadius: 2 },
   ring:         { width: 48, height: 48, borderRadius: 24, borderWidth: 3, alignItems: 'center', justifyContent: 'center' },
   ringFill:     { position: 'absolute', width: 48, height: 48, borderRadius: 24, borderWidth: 3 },
-  ringText:     { fontSize: 11, fontWeight: '800' },
-  daysLeft:     { fontSize: 9, fontWeight: '600' },
+  ringText:     { fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold },
+  daysLeft:     { fontSize: FontSize['2xs'], fontWeight: FontWeight.semiBold },
   details:      { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, paddingVertical: 12, gap: 8 },
   detailRow:    { flexDirection: 'row', justifyContent: 'space-between' },
-  detailLabel:  { fontSize: 12 },
-  detailValue:  { fontSize: 12, fontWeight: '600' },
+  detailLabel:  { fontSize: FontSize.sm },
+  detailValue:  { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
   stopBtn:      { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 10, padding: 10, marginTop: 4, justifyContent: 'center' },
-  stopText:     { color: '#EF4444', fontSize: 13, fontWeight: '700' },
+  stopText:     { color: '#EF4444', fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
 });
 
 const ms = StyleSheet.create({
   overlay:         { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   sheet:           { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, gap: 14 },
   handle:          { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 4 },
-  title:           { fontSize: 18, fontWeight: '800', textAlign: 'center' },
-  sub:             { fontSize: 13, lineHeight: 20, textAlign: 'center' },
+  title:           { fontSize: FontSize.lg, fontWeight: FontWeight.extraBold, textAlign: 'center' },
+  sub:             { fontSize: FontSize.smPlus, lineHeight: 20, textAlign: 'center' },
   refundBox:       { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1, padding: 14 },
-  refundText:      { fontSize: 14, fontWeight: '700', flex: 1 },
+  refundText:      { fontSize: FontSize.base, fontWeight: FontWeight.bold, flex: 1 },
   stopConfirm:     { borderRadius: 16, padding: 16, alignItems: 'center', backgroundColor: '#EF4444' },
-  stopConfirmText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  stopConfirmText: { color: '#fff', fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold },
   cancelBtn:       { alignItems: 'center', paddingVertical: 8 },
-  cancelText:      { fontSize: 14, fontWeight: '500' },
+  cancelText:      { fontSize: FontSize.base, fontWeight: FontWeight.medium },
 });
 
 const cp = StyleSheet.create({
   trigger:     { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, padding: 12 },
-  triggerText: { fontSize: 13, fontWeight: '600' },
+  triggerText: { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
   modal:       { flex: 1 },
   header:      { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16, borderBottomWidth: StyleSheet.hairlineWidth },
-  input:       { flex: 1, borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14 },
+  input:       { flex: 1, borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, fontSize: FontSize.base },
   resultRow:   { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 12, borderWidth: 1, padding: 12 },
   thumbWrap:   { position: 'relative', width: 44, height: 44 },
   thumb:       { width: 44, height: 44, borderRadius: 8 },
   playOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' },
-  resultText:  { fontSize: 13, fontWeight: '600' },
+  resultText:  { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
 });
 
 const s = StyleSheet.create({
   root:        { flex: 1 },
   header:      { flexDirection: 'row', alignItems: 'center', paddingBottom: 16, paddingHorizontal: 16, gap: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  headerTitle: { fontSize: 20, fontWeight: '800' },
-  headerSub:   { fontSize: 11, marginTop: 2 },
+  headerTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.extraBold },
+  headerSub:   { fontSize: FontSize.xsPlus, marginTop: 2 },
   balancePill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
-  balanceText: { color: '#FFD700', fontWeight: '700', fontSize: 13 },
+  balanceText: { color: '#FFD700', fontWeight: FontWeight.bold, fontSize: FontSize.smPlus },
 
   tabsBar:     { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth },
   tab:         { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, flexDirection: 'row', gap: 4 },
-  tabText:     { fontSize: 12, fontWeight: '700' },
+  tabText:     { fontSize: FontSize.sm, fontWeight: FontWeight.bold },
   tabBadge:    { backgroundColor: '#22C55E', borderRadius: 10, paddingHorizontal: 5, paddingVertical: 1 },
-  tabBadgeText:{ color: '#fff', fontSize: 9, fontWeight: '800' },
+  tabBadgeText:{ color: '#fff', fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold },
 
   scroll:       { paddingHorizontal: 16, paddingVertical: 16, paddingBottom: 60, gap: 14 },
-  sectionLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  warning:      { fontSize: 11, marginTop: 4 },
+  sectionLabel: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, textTransform: 'uppercase', letterSpacing: 0.5 },
+  warning:      { fontSize: FontSize.xsPlus, marginTop: 4 },
 
   catActive:      { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
-  catActiveText:  { color: '#fff', fontWeight: '700', fontSize: 12 },
+  catActiveText:  { color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.sm },
   catInactive:    { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
-  catInactiveText:{ fontWeight: '600', fontSize: 12 },
+  catInactiveText:{ fontWeight: FontWeight.semiBold, fontSize: FontSize.sm },
 
   descBox:      { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderRadius: 16, borderWidth: 1, padding: 14 },
   descIcon:     { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  descTitle:    { fontSize: 14, fontWeight: '800', marginBottom: 1 },
-  descSublabel: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 },
-  descText:     { fontSize: 12, lineHeight: 18 },
+  descTitle:    { fontSize: FontSize.base, fontWeight: FontWeight.extraBold, marginBottom: 1 },
+  descSublabel: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 },
+  descText:     { fontSize: FontSize.sm, lineHeight: 18 },
 
   modeSwitch:    { flexDirection: 'row', borderRadius: 16, padding: 4, gap: 4 },
   modeSwitchBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 9, borderRadius: 12 },
-  modeSwitchText:{ fontSize: 12, fontWeight: '700' },
+  modeSwitchText:{ fontSize: FontSize.sm, fontWeight: FontWeight.bold },
 
   tiersGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between' },
   tierCard:    { borderRadius: 16, padding: 14, alignItems: 'center', gap: 4, borderWidth: 1.5, minHeight: 130, justifyContent: 'center', position: 'relative' },
   tierSelected:{ borderColor: 'transparent', elevation: 8, shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
   popularBadge:{ position: 'absolute', top: -10, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, alignSelf: 'center' },
-  popularText: { fontSize: 9, fontWeight: '800', color: '#fff', letterSpacing: 0.6 },
-  tierLabel:   { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  tierQty:     { fontSize: 15, fontWeight: '800', textAlign: 'center' },
-  tierDur:     { fontSize: 11, marginTop: 2 },
-  tierGoGold:   { fontSize: 14, fontWeight: '800', marginTop: 6 },
+  popularText: { fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold, color: '#fff', letterSpacing: 0.6 },
+  tierLabel:   { fontSize: FontSize.xs, fontWeight: FontWeight.bold, textTransform: 'uppercase', letterSpacing: 0.5 },
+  tierQty:     { fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold, textAlign: 'center' },
+  tierDur:     { fontSize: FontSize.xsPlus, marginTop: 2 },
+  tierGoGold:   { fontSize: FontSize.base, fontWeight: FontWeight.extraBold, marginTop: 6 },
 
   customPanel:   { borderRadius: 18, borderWidth: 1, padding: 16, gap: 14 },
   customLabelRow:{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  customLabel:   { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  customValue:   { fontSize: 14, fontWeight: '800' },
+  customLabel:   { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, textTransform: 'uppercase', letterSpacing: 0.5 },
+  customValue:   { fontSize: FontSize.base, fontWeight: FontWeight.extraBold },
   preset:        { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
-  presetText:    { fontSize: 12, fontWeight: '700' },
+  presetText:    { fontSize: FontSize.sm, fontWeight: FontWeight.bold },
   customSummary: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: 14, borderWidth: 1, padding: 14 },
 
   buyInner:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 15 },
-  buyText:     { color: '#fff', fontSize: 16, fontWeight: '800' },
+  buyText:     { color: '#fff', fontSize: FontSize.md, fontWeight: FontWeight.extraBold },
 
   infoBox:     { flexDirection: 'row', gap: 8, borderRadius: 12, borderWidth: 1, padding: 12 },
-  infoText:    { flex: 1, fontSize: 11, lineHeight: 17 },
+  infoText:    { flex: 1, fontSize: FontSize.xsPlus, lineHeight: 17 },
 
   emptyState:  { alignItems: 'center', gap: 12, paddingVertical: 60 },
   emptyIcon:   { width: 70, height: 70, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  emptyTitle:  { fontSize: 16, fontWeight: '800' },
-  emptySub:    { fontSize: 13, textAlign: 'center', paddingHorizontal: 20 },
+  emptyTitle:  { fontSize: FontSize.md, fontWeight: FontWeight.extraBold },
+  emptySub:    { fontSize: FontSize.smPlus, textAlign: 'center', paddingHorizontal: 20 },
   emptyBtn:    { marginTop: 8, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 20 },
 
   modalPreview:       { borderRadius: 20, padding: 24, alignItems: 'center', gap: 4 },
-  modalPreviewQty:    { color: '#fff', fontSize: 24, fontWeight: '900', marginTop: 6 },
-  modalPreviewCat:    { color: 'rgba(255,255,255,0.8)', fontSize: 13 },
-  modalPreviewDur:    { color: 'rgba(255,255,255,0.65)', fontSize: 12 },
-  modalPreviewContent:{ color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '700', marginTop: 4 },
+  modalPreviewQty:    { color: '#fff', fontSize: FontSize['2xl'], fontWeight: FontWeight.black, marginTop: 6 },
+  modalPreviewCat:    { color: 'rgba(255,255,255,0.8)', fontSize: FontSize.smPlus },
+  modalPreviewDur:    { color: 'rgba(255,255,255,0.65)', fontSize: FontSize.sm },
+  modalPreviewContent:{ color: 'rgba(255,255,255,0.9)', fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, marginTop: 4 },
   modalSummary:       { borderRadius: 14, padding: 14, gap: 10 },
   modalRow:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  modalLabel:         { fontSize: 13 },
-  modalValue:         { fontSize: 13, fontWeight: '700' },
+  modalLabel:         { fontSize: FontSize.smPlus },
+  modalValue:         { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
   confirmInner:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 },
-  confirmText:        { color: '#fff', fontSize: 16, fontWeight: '800' },
+  confirmText:        { color: '#fff', fontSize: FontSize.md, fontWeight: FontWeight.extraBold },
 
   successBox:   { alignItems: 'center', gap: 16, padding: 32 },
   successRing:  { width: 100, height: 100, borderRadius: 50, alignItems: 'center', justifyContent: 'center' },
-  successTitle: { color: '#fff', fontSize: 26, fontWeight: '900' },
-  successSub:   { color: 'rgba(255,255,255,0.75)', fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  successTitle: { color: '#fff', fontSize: FontSize['2xl'], fontWeight: FontWeight.black },
+  successSub:   { color: 'rgba(255,255,255,0.75)', fontSize: FontSize.smPlus, textAlign: 'center', lineHeight: 20 },
 });
 
 const sc = StyleSheet.create({
@@ -1528,19 +1529,19 @@ const sc = StyleSheet.create({
   body:          { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14 },
   iconBox:       { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   topRow:        { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' },
-  impactLabel:   { fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.4, flex: 1 },
+  impactLabel:   { fontSize: FontSize.sm, fontWeight: FontWeight.extraBold, textTransform: 'uppercase', letterSpacing: 0.4, flex: 1 },
   priorityBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20 },
-  priorityText:  { fontSize: 10, fontWeight: '700' },
-  contentTitle:  { fontSize: 13, fontWeight: '700', marginBottom: 4 },
-  reason:        { fontSize: 12, lineHeight: 18 },
+  priorityText:  { fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+  contentTitle:  { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, marginBottom: 4 },
+  reason:        { fontSize: FontSize.sm, lineHeight: 18 },
   engBadge:      { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, borderWidth: 1, alignSelf: 'flex-start' },
-  engText:       { fontSize: 10, fontWeight: '700', color: '#22C55E' },
+  engText:       { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: '#22C55E' },
   footer:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth },
-  qty:           { fontSize: 13, fontWeight: '700' },
-  dur:           { fontSize: 11, marginTop: 1 },
+  qty:           { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
+  dur:           { fontSize: FontSize.xsPlus, marginTop: 1 },
   boostBtnWrap:  { borderRadius: 20, overflow: 'hidden' },
   boostBtn:      { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8 },
-  boostBtnText:  { color: '#fff', fontSize: 12, fontWeight: '800' },
+  boostBtnText:  { color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.extraBold },
   introBox:      { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderRadius: 14, borderWidth: 1, padding: 12 },
-  introText:     { flex: 1, fontSize: 12, lineHeight: 18 },
+  introText:     { flex: 1, fontSize: FontSize.sm, lineHeight: 18 },
 });

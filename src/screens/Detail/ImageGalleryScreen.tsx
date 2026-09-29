@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, FlatList, TouchableOpacity, Text,
   StatusBar, Platform, Dimensions, StyleSheet,
@@ -22,6 +22,15 @@ export const ImageGalleryScreen: React.FC<Props> = ({ urls, initialIndex = 0, on
   const [isZoomed,   setIsZoomed]   = useState(false);
   const flatRef = useRef<FlatList>(null);
 
+  // Restauration explicite au démontage — <StatusBar hidden /> en JSX seul ne
+  // suffit pas : sur un écran de stack natif (fullScreenModal), le timing de
+  // démontage vs. re-render de l'écran précédent peut se désynchroniser et
+  // laisser la status bar masquée/blanche au retour (cf. VideoPlayerScreen).
+  useEffect(() => {
+    StatusBar.setHidden(true, 'none');
+    return () => StatusBar.setHidden(false, 'none');
+  }, []);
+
   const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const idx = Math.round(e.nativeEvent.contentOffset.x / SW);
     setCurrentIdx(idx);
@@ -29,7 +38,6 @@ export const ImageGalleryScreen: React.FC<Props> = ({ urls, initialIndex = 0, on
 
   return (
     <View style={s.root}>
-      <StatusBar hidden />
 
       <FlatList
         ref={flatRef}
@@ -45,7 +53,6 @@ export const ImageGalleryScreen: React.FC<Props> = ({ urls, initialIndex = 0, on
         renderItem={({ item }) => (
           <ZoomableImage uri={item} width={SW} height={SH} onZoomChange={setIsZoomed} />
         )}
-        decelerationRate="fast"
       />
 
       {/* Bouton fermeture */}

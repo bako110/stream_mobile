@@ -9,6 +9,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { BackButton, GofolyxLoader } from '../../components/common';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
@@ -223,7 +224,7 @@ export const ReferralScreen: React.FC = () => {
                     <View style={{ flex: 1 }}>
                       <Text style={[s.userName, { color: colors.textPrimary }]}>{name}</Text>
                       {u.gofolyx_id ? (
-                        <Text style={[s.userDate, { color: colors.primary, fontWeight: '700', letterSpacing: 1 }]}>
+                        <Text style={[s.userDate, { color: colors.primary, fontWeight: FontWeight.bold, letterSpacing: 1 }]}>
                           {u.gofolyx_id}
                         </Text>
                       ) : null}
@@ -252,50 +253,50 @@ const s = StyleSheet.create({
   center:       { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, paddingHorizontal: 16 },
   backBtn:      { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle:  { fontSize: 18, fontWeight: '700' },
+  headerTitle:  { fontSize: FontSize.lg, fontWeight: FontWeight.bold },
   scroll:       { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 40, gap: 16 },
 
   heroCard:     { borderRadius: 16, padding: 20, borderWidth: 1 },
-  heroTitle:    { fontSize: 22, fontWeight: '800', marginBottom: 8 },
-  heroSub:      { fontSize: 14, lineHeight: 20, marginBottom: 16 },
+  heroTitle:    { fontSize: FontSize['2xl'], fontWeight: FontWeight.extraBold, marginBottom: 8 },
+  heroSub:      { fontSize: FontSize.base, lineHeight: 20, marginBottom: 16 },
   rewardsRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   rewardPill:   { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
-  rewardText:   { fontSize: 12, fontWeight: '600' },
+  rewardText:   { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
 
   codeCard:     { borderRadius: 16, padding: 20, borderWidth: 1 },
-  cardLabel:    { fontSize: 12, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 10 },
+  cardLabel:    { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 10 },
   codeRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  codeText:     { fontSize: 28, fontWeight: '900', letterSpacing: 4 },
+  codeText:     { fontSize: FontSize['3xl'], fontWeight: FontWeight.black, letterSpacing: 4 },
   copyBtn:      { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
-  copyLabel:    { fontSize: 13, fontWeight: '700' },
+  copyLabel:    { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
   shareBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 12 },
-  shareBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  shareBtnText: { color: '#fff', fontSize: FontSize.basePlus, fontWeight: FontWeight.bold },
 
   statsGrid:    { flexDirection: 'row', gap: 12 },
   statCard:     { flex: 1, borderRadius: 14, padding: 16, borderWidth: 1, alignItems: 'center', gap: 6 },
-  statValue:    { fontSize: 26, fontWeight: '800' },
-  statLabel:    { fontSize: 12, fontWeight: '500' },
+  statValue:    { fontSize: FontSize['2xl'], fontWeight: FontWeight.extraBold },
+  statLabel:    { fontSize: FontSize.sm, fontWeight: FontWeight.medium },
 
   capCard:      { borderRadius: 16, padding: 16, borderWidth: 1 },
   capHeader:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  capValue:     { fontSize: 14, fontWeight: '700' },
+  capValue:     { fontSize: FontSize.base, fontWeight: FontWeight.bold },
   capTrack:     { height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 8 },
   capFill:      { height: '100%', borderRadius: 4 },
-  capNote:      { fontSize: 11 },
+  capNote:      { fontSize: FontSize.xsPlus },
 
   howCard:      { borderRadius: 16, padding: 16, borderWidth: 1 },
-  howTitle:     { fontSize: 16, fontWeight: '700', marginBottom: 12 },
+  howTitle:     { fontSize: FontSize.md, fontWeight: FontWeight.bold, marginBottom: 12 },
   howRow:       { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 12 },
   howIcon:      { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  howText:      { flex: 1, fontSize: 13, lineHeight: 19 },
+  howText:      { flex: 1, fontSize: FontSize.smPlus, lineHeight: 19 },
 
   usersCard:    { borderRadius: 16, padding: 16, borderWidth: 1 },
   userRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
   userAvatar:   { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
-  userInitial:  { fontSize: 16, fontWeight: '800' },
-  userName:     { fontSize: 14, fontWeight: '600' },
-  userDate:     { fontSize: 11, marginTop: 2 },
+  userInitial:  { fontSize: FontSize.md, fontWeight: FontWeight.extraBold },
+  userName:     { fontSize: FontSize.base, fontWeight: FontWeight.semiBold },
+  userDate:     { fontSize: FontSize.xsPlus, marginTop: 2 },
   userGoGold:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
-  userCoinsText:  { color: '#FFD700', fontSize: 13, fontWeight: '800' },
-  userCoinsLabel: { color: '#FFD700', fontSize: 11, fontWeight: '500' },
+  userCoinsText:  { color: '#FFD700', fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold },
+  userCoinsLabel: { color: '#FFD700', fontSize: FontSize.xsPlus, fontWeight: FontWeight.medium },
 });

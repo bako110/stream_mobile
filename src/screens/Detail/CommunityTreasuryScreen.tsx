@@ -12,6 +12,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { BackButton, GofolyxLoader, PriceWithLocal } from '../../components/common';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
 
@@ -81,8 +82,8 @@ export const CommunityTreasuryScreen: React.FC = () => {
       <View style={[st.header, { paddingTop: insets.top + 8, borderBottomColor: colors.divider, backgroundColor: colors.surface }]}>
         <BackButton onPress={() => nav.goBack()} />
         <View style={{ flex: 1 }}>
-          <Text style={{ color: colors.textPrimary, fontSize: 17, fontWeight: '800' }}>Trésorerie</Text>
-          <Text style={{ color: colors.textTertiary, fontSize: 11 }}>{communityName}</Text>
+          <Text style={{ color: colors.textPrimary, fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold }}>Trésorerie</Text>
+          <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus }}>{communityName}</Text>
         </View>
         <TouchableOpacity
           onPress={() => nav.navigate('CommunityFund', { communityId, communityName, myRole: 'admin' })}
@@ -90,7 +91,7 @@ export const CommunityTreasuryScreen: React.FC = () => {
             backgroundColor: '#7B3FF215', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 }}
         >
           <Icon name="dollar-sign" size={13} color="#7B3FF2" />
-          <Text style={{ color: '#7B3FF2', fontWeight: '700', fontSize: 12 }}>Cotisations</Text>
+          <Text style={{ color: '#7B3FF2', fontWeight: FontWeight.bold, fontSize: FontSize.sm }}>Cotisations</Text>
         </TouchableOpacity>
       </View>
 
@@ -121,20 +122,20 @@ export const CommunityTreasuryScreen: React.FC = () => {
                     <Icon name="briefcase" size={20} color="#fff" />
                   </View>
                   <View>
-                    <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 11, fontWeight: '600' }}>
+                    <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold }}>
                       COMPTE COMMUNAUTAIRE
                     </Text>
-                    <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>{communityName}</Text>
+                    <Text style={{ color: '#fff', fontSize: FontSize.smPlus, fontWeight: FontWeight.bold }}>{communityName}</Text>
                   </View>
                 </View>
 
-                <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginBottom: 4 }}>Solde disponible</Text>
-                <Text style={{ color: '#fff', fontSize: 36, fontWeight: '900', letterSpacing: -1 }}>
+                <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: FontSize.sm, marginBottom: 4 }}>Solde disponible</Text>
+                <Text style={{ color: '#fff', fontSize: 36, fontWeight: FontWeight.black, letterSpacing: -1 }}>
                   {(wallet?.gogold_balance ?? 0).toLocaleString('fr-FR')}
-                  <Text style={{ fontSize: 16, fontWeight: '400' }}> GoGold</Text>
+                  <Text style={{ fontSize: FontSize.md, fontWeight: FontWeight.regular }}> GoGold</Text>
                 </Text>
-                <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, marginTop: 2 }}>
-                  ≈ <PriceWithLocal amountEur={wallet?.eur_balance ?? 0} style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14 }} localStyle={{ color: 'rgba(255,255,255,0.6)' }} />
+                <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: FontSize.base, marginTop: 2 }}>
+                  ≈ <PriceWithLocal amountEur={wallet?.eur_balance ?? 0} style={{ color: 'rgba(255,255,255,0.7)', fontSize: FontSize.base }} localStyle={{ color: 'rgba(255,255,255,0.6)' }} />
                 </Text>
 
                 {/* Stats bas */}
@@ -145,9 +146,9 @@ export const CommunityTreasuryScreen: React.FC = () => {
                   ].map(s => (
                     <View key={s.lbl} style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.12)',
                       borderRadius: 14, padding: 12 }}>
-                      <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 10, marginBottom: 4 }}>{s.lbl}</Text>
-                      <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800' }}>{s.val}</Text>
-                      <PriceWithLocal amountEur={s.subEur} style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }} localStyle={{ color: 'rgba(255,255,255,0.5)' }} />
+                      <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: FontSize.xs, marginBottom: 4 }}>{s.lbl}</Text>
+                      <Text style={{ color: '#fff', fontSize: FontSize.base, fontWeight: FontWeight.extraBold }}>{s.val}</Text>
+                      <PriceWithLocal amountEur={s.subEur} style={{ color: 'rgba(255,255,255,0.6)', fontSize: FontSize.xsPlus }} localStyle={{ color: 'rgba(255,255,255,0.5)' }} />
                     </View>
                   ))}
                 </View>
@@ -156,10 +157,10 @@ export const CommunityTreasuryScreen: React.FC = () => {
               {/* Titre historique */}
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
                 paddingHorizontal: 16, marginBottom: 10 }}>
-                <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '700' }}>
+                <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold }}>
                   HISTORIQUE DES MOUVEMENTS
                 </Text>
-                <Text style={{ color: colors.textTertiary, fontSize: 11 }}>{txs.length} opération{txs.length !== 1 ? 's' : ''}</Text>
+                <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus }}>{txs.length} opération{txs.length !== 1 ? 's' : ''}</Text>
               </View>
             </View>
           }
@@ -175,19 +176,19 @@ export const CommunityTreasuryScreen: React.FC = () => {
 
                 {/* Infos */}
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: colors.textPrimary, fontWeight: '700', fontSize: 14 }} numberOfLines={1}>
+                  <Text style={{ color: colors.textPrimary, fontWeight: FontWeight.bold, fontSize: FontSize.base }} numberOfLines={1}>
                     {item.label}
                   </Text>
-                  <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 1 }} numberOfLines={1}>
+                  <Text style={{ color: colors.textSecondary, fontSize: FontSize.sm, marginTop: 1 }} numberOfLines={1}>
                     {item.description}
                   </Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
                     {item.actor_name && (
-                      <Text style={{ color: colors.textTertiary, fontSize: 11 }}>
+                      <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus }}>
                         {item.actor_name} ·
                       </Text>
                     )}
-                    <Text style={{ color: colors.textTertiary, fontSize: 11 }}>
+                    <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus }}>
                       {fmtDate(item.created_at)}
                     </Text>
                   </View>
@@ -195,10 +196,10 @@ export const CommunityTreasuryScreen: React.FC = () => {
 
                 {/* Montant */}
                 <View style={{ alignItems: 'flex-end', gap: 2 }}>
-                  <Text style={{ color: isCredit ? '#10B981' : '#EF4444', fontWeight: '800', fontSize: 15 }}>
+                  <Text style={{ color: isCredit ? '#10B981' : '#EF4444', fontWeight: FontWeight.extraBold, fontSize: FontSize.basePlus }}>
                     {isCredit ? '+' : ''}{item.gogold_amount.toLocaleString('fr-FR')}
                   </Text>
-                  <Text style={{ color: colors.textTertiary, fontSize: 10 }}>
+                  <Text style={{ color: colors.textTertiary, fontSize: FontSize.xs }}>
                     Solde : {item.balance_after.toLocaleString('fr-FR')}
                   </Text>
                 </View>
@@ -208,8 +209,8 @@ export const CommunityTreasuryScreen: React.FC = () => {
           ListEmptyComponent={
             <View style={{ alignItems: 'center', paddingTop: 40, gap: 8 }}>
               <Icon name="inbox" size={36} color={colors.textTertiary} />
-              <Text style={{ color: colors.textTertiary, fontSize: 14 }}>Aucune transaction</Text>
-              <Text style={{ color: colors.textTertiary, fontSize: 12, textAlign: 'center' }}>
+              <Text style={{ color: colors.textTertiary, fontSize: FontSize.base }}>Aucune transaction</Text>
+              <Text style={{ color: colors.textTertiary, fontSize: FontSize.sm, textAlign: 'center' }}>
                 Les mouvements apparaîtront ici quand des cotisations seront lancées.
               </Text>
             </View>

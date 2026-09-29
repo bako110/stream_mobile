@@ -8,6 +8,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { GofolyxLoader, BackButton } from '../../components/common';
 import { communityService } from '../../services/communityService';
@@ -327,8 +328,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingBottom: 13, borderBottomWidth: StyleSheet.hairlineWidth,
   },
 headerCenter: { flex: 1, alignItems: 'center', gap: 2 },
-  headerTitle: { fontSize: 17, fontWeight: '800', letterSpacing: 0.2 },
-  headerSub: { fontSize: 11, fontWeight: '500' },
+  headerTitle: { fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold, letterSpacing: 0.2 },
+  headerSub: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.medium },
 
   scrollContent: { paddingTop: 0 },
 
@@ -336,19 +337,19 @@ headerCenter: { flex: 1, alignItems: 'center', gap: 2 },
     marginHorizontal: 16, marginTop: 16, borderRadius: 18,
     padding: 20, marginBottom: 8,
   },
-  heroName: { color: '#fff', fontSize: 20, fontWeight: '800', marginBottom: 2 },
-  heroCommunity: { color: 'rgba(255,255,255,0.65)', fontSize: 12, fontWeight: '500', marginBottom: 16 },
+  heroName: { color: '#fff', fontSize: FontSize.xl, fontWeight: FontWeight.extraBold, marginBottom: 2 },
+  heroCommunity: { color: 'rgba(255,255,255,0.65)', fontSize: FontSize.sm, fontWeight: FontWeight.medium, marginBottom: 16 },
   heroRow: { flexDirection: 'row', alignItems: 'center' },
   heroStat: { flex: 1, alignItems: 'center' },
-  heroStatValue: { color: '#fff', fontSize: 22, fontWeight: '900' },
-  heroStatLabel: { color: 'rgba(255,255,255,0.65)', fontSize: 11, fontWeight: '600', marginTop: 2 },
+  heroStatValue: { color: '#fff', fontSize: FontSize['2xl'], fontWeight: FontWeight.black },
+  heroStatLabel: { color: 'rgba(255,255,255,0.65)', fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold, marginTop: 2 },
   heroSep: { width: StyleSheet.hairlineWidth, height: 36, backgroundColor: 'rgba(255,255,255,0.25)' },
 
   card: { marginHorizontal: 16, marginTop: 12, borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 11 },
   cardHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   cardIconWrap: { width: 28, height: 28, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
-  cardTitle: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  cardTitle: { color: '#fff', fontSize: FontSize.base, fontWeight: FontWeight.bold },
   cardBody: { padding: 12 },
 
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -357,30 +358,30 @@ headerCenter: { flex: 1, alignItems: 'center', gap: 2 },
     alignItems: 'center', paddingVertical: 12, paddingHorizontal: 6, gap: 5,
   },
   statIconWrap: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  statValue: { fontSize: 18, fontWeight: '900' },
-  statLabel: { fontSize: 10, fontWeight: '600', letterSpacing: 0.4, textAlign: 'center' },
+  statValue: { fontSize: FontSize.lg, fontWeight: FontWeight.black },
+  statLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.semiBold, letterSpacing: 0.4, textAlign: 'center' },
 
   remuRow: { borderTopWidth: StyleSheet.hairlineWidth, marginTop: 12, paddingTop: 14, gap: 10 },
-  remuTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase' },
+  remuTitle: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, letterSpacing: 0.6, textTransform: 'uppercase' },
   remuBar: { flexDirection: 'row', height: 8, borderRadius: 4, overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.1)' },
   remuSegment: { height: '100%' },
   remuLegend: { flexDirection: 'row', gap: 14, flexWrap: 'wrap' },
   remuLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   remuDot: { width: 8, height: 8, borderRadius: 4 },
-  remuLegendText: { fontSize: 11, fontWeight: '500' },
+  remuLegendText: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.medium },
 
   engagementCard: {
     marginHorizontal: 16, marginTop: 12, borderRadius: 16, borderWidth: 1, padding: 14, gap: 0,
   },
-  engagementTitle: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 12 },
+  engagementTitle: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 12 },
   engRow: { paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth, gap: 6 },
-  engLabel: { fontSize: 12, fontWeight: '500' },
+  engLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.medium },
   engRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   engBar: { flex: 1, height: 6, borderRadius: 3, overflow: 'hidden' },
   engFill: { height: '100%', borderRadius: 3 },
-  engPct: { fontSize: 12, fontWeight: '800', minWidth: 40, textAlign: 'right' },
+  engPct: { fontSize: FontSize.sm, fontWeight: FontWeight.extraBold, minWidth: 40, textAlign: 'right' },
 
-  errorText: { fontSize: 15, fontWeight: '500' },
+  errorText: { fontSize: FontSize.basePlus, fontWeight: FontWeight.medium },
   retryBtn: { borderRadius: 12, paddingHorizontal: 24, paddingVertical: 11 },
-  retryText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  retryText: { color: '#fff', fontSize: FontSize.base, fontWeight: FontWeight.bold },
 });

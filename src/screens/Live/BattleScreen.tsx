@@ -29,6 +29,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { MatchResultModal } from '../../components/live/MatchResultModal';
 import { GofolyxLoader } from '../../components/common';
+import { FontSize, FontWeight } from '../../theme';
 import { battleService } from '../../services/battleService';
 import type { Battle, BattleGoal, BattleRanking } from '../../services/battleService';
 import { showConfirm } from '../../services';
@@ -1491,7 +1492,7 @@ const styles = StyleSheet.create({
     position: 'absolute', left: 0, right: 0, top: 0, bottom: 0,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
   },
-  headerTitleText: { color: '#fff', fontSize: 13, fontWeight: '900', letterSpacing: 0.5 },
+  headerTitleText: { color: '#fff', fontSize: FontSize.smPlus, fontWeight: FontWeight.black, letterSpacing: 0.5 },
   headerPulsingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#EF4444' },
   headerSpacer: { flex: 1 },
 
@@ -1525,7 +1526,7 @@ const styles = StyleSheet.create({
     borderWidth: 2, borderColor: '#fff',
     shadowColor: '#FFD700', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.7, shadowRadius: 8, elevation: 10,
   },
-  vsText: { color: '#1a1030', fontSize: 12, fontWeight: '900' },
+  vsText: { color: '#1a1030', fontSize: FontSize.sm, fontWeight: FontWeight.black },
 
   // Bandeau nom + avatar par camp — décalé sous le badge WIN (top: 6, hauteur
   // ~22px) pour ne jamais le chevaucher ; avant ce fix les deux badges étaient
@@ -1541,13 +1542,13 @@ const styles = StyleSheet.create({
   hostBadgeB: { right: 6 },
   hostBadgeAvatar: { width: 18, height: 18, borderRadius: 9 },
   hostBadgeAvatarFallback: { backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
-  hostBadgeName: { color: '#fff', fontSize: 11, fontWeight: '700', flexShrink: 1 },
-  hostBadgeCrown: { fontSize: 12 },
+  hostBadgeName: { color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, flexShrink: 1 },
+  hostBadgeCrown: { fontSize: FontSize.sm },
   crownPop: {
     position: 'absolute', top: -20, left: 0, right: 0, alignItems: 'center', zIndex: 20,
   },
   crownPopEmoji: {
-    fontSize: 22, textShadowColor: 'rgba(255,215,0,0.9)', textShadowRadius: 8, textShadowOffset: { width: 0, height: 0 },
+    fontSize: FontSize['2xl'], textShadowColor: 'rgba(255,215,0,0.9)', textShadowRadius: 8, textShadowOffset: { width: 0, height: 0 },
   },
 
   // Compteur de coeurs recus par camp — juste sous le bandeau nom/avatar
@@ -1563,8 +1564,8 @@ const styles = StyleSheet.create({
   },
   heartCounterA: { left: 6 },
   heartCounterB: { right: 6 },
-  heartCounterIcon: { fontSize: 11 },
-  heartCounterText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  heartCounterIcon: { fontSize: FontSize.xsPlus },
+  heartCounterText: { color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold },
 
   // Wrapper externe — porte l'ombre portée vers le haut (effet "feuille posée
   // par-dessus la vidéo"), séparé de bottomZone qui a overflow:hidden pour ses
@@ -1596,12 +1597,12 @@ const styles = StyleSheet.create({
   giftCardActive: { borderWidth: 2, opacity: 1 },
   giftCardAvatar: { width: 19, height: 19, borderRadius: 10 },
   giftCardAvatarFallback: { backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
-  giftCardName: { flex: 1, color: '#fff', fontSize: 11, fontWeight: '700' },
+  giftCardName: { flex: 1, color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold },
   giftCardIconWrap: {
     width: 20, height: 20, borderRadius: 10,
     backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center',
   },
-  giftCardIcon: { fontSize: 11 },
+  giftCardIcon: { fontSize: FontSize.xsPlus },
 
   // Barre de score pleine largeur, juste sous la rangée hosts — même fond et
   // même logique de dégradé dynamique que le web (BattlePage.tsx).
@@ -1610,10 +1611,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 8, overflow: 'hidden',
     backgroundColor: '#2A1D42',
   },
-  scoreText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  scoreText: { color: '#fff', fontSize: FontSize.md, fontWeight: FontWeight.extraBold },
   hypeText: {
     flex: 1, minWidth: 0, textAlign: 'center',
-    color: '#fff', fontSize: 11, fontWeight: '700',
+    color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold,
     textShadowColor: 'rgba(0,0,0,0.8)', textShadowRadius: 4, textShadowOffset: { width: 0, height: 1 },
   },
 
@@ -1623,7 +1624,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   centerCountdownText: {
-    color: '#fff', fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'],
+    color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.bold, fontVariant: ['tabular-nums'],
     textShadowColor: 'rgba(0,0,0,0.8)', textShadowRadius: 4, textShadowOffset: { width: 0, height: 1 },
   },
 
@@ -1633,8 +1634,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,215,0,0.12)', borderRadius: 20, padding: 10,
     borderWidth: 1, borderColor: 'rgba(255,215,0,0.35)',
   },
-  effectIcon: { fontSize: 20 },
-  effectText: { flex: 1, color: '#fff', fontSize: 12, fontWeight: '700' },
+  effectIcon: { fontSize: FontSize.xl },
+  effectText: { flex: 1, color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.bold },
 
   // Objectif communautaire — centré en bas de la zone vidéo (déplacé du header)
   goalBanner: {
@@ -1643,10 +1644,10 @@ const styles = StyleSheet.create({
     zIndex: 25,
   },
   goalBannerBoss: { borderWidth: 1.5, borderColor: '#EF4444' },
-  goalTitle: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  goalTitle: { color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.bold },
   goalBarTrack: { height: 7, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.2)', overflow: 'hidden' },
   goalBarFill: { height: '100%', backgroundColor: '#FFD700', borderRadius: 6 },
-  goalPct: { color: 'rgba(255,255,255,0.8)', fontSize: 10, fontWeight: '600', alignSelf: 'flex-end' },
+  goalPct: { color: 'rgba(255,255,255,0.8)', fontSize: FontSize.xs, fontWeight: FontWeight.semiBold, alignSelf: 'flex-end' },
 
   // Rangée hosts — sous le header, avatar+nom+vérifié+j'aime+Suivre par camp
   hostsRow: {
@@ -1662,8 +1663,8 @@ const styles = StyleSheet.create({
   hostsRowInfoRight: { alignItems: 'flex-end' },
   hostsRowNameLine: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   hostsRowNameLineRight: { flexDirection: 'row-reverse' },
-  hostsRowName: { color: '#fff', fontSize: 12, fontWeight: '700', maxWidth: 110 },
-  hostsRowLikes: { color: 'rgba(255,255,255,0.55)', fontSize: 10, marginTop: 1 },
+  hostsRowName: { color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.bold, maxWidth: 110 },
+  hostsRowLikes: { color: 'rgba(255,255,255,0.55)', fontSize: FontSize.xs, marginTop: 1 },
   verifiedCheck: {
     width: 13, height: 13, borderRadius: 7, backgroundColor: '#1D9BF0',
     alignItems: 'center', justifyContent: 'center',
@@ -1672,7 +1673,7 @@ const styles = StyleSheet.create({
   followBtnA: { backgroundColor: '#7B3FF2' },
   followBtnB: { backgroundColor: '#F0365A' },
   followBtnActive: { backgroundColor: 'rgba(255,255,255,0.14)' },
-  followBtnText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  followBtnText: { color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold },
 
   // Badge "WIN xN" — victoires historiques, coin haut de chaque moitié vidéo
   winBadge: {
@@ -1683,8 +1684,8 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,215,0,0.4)',
   },
   winBadgeRight: { left: undefined, right: 6 },
-  winBadgeLabel: { color: '#FFD700', fontSize: 9, fontWeight: '900', fontStyle: 'italic' },
-  winBadgeCount: { color: '#fff', fontSize: 9, fontWeight: '700' },
+  winBadgeLabel: { color: '#FFD700', fontSize: FontSize['2xs'], fontWeight: FontWeight.black, fontStyle: 'italic' },
+  winBadgeCount: { color: '#fff', fontSize: FontSize['2xs'], fontWeight: FontWeight.bold },
 
   // Cartes "top donateurs" — classement par camp, au-dessus des avatars MVP
   donorsCards: {
@@ -1698,10 +1699,10 @@ const styles = StyleSheet.create({
   donorCardAvatar: { width: 24, height: 24, borderRadius: 12 },
   donorCardAvatarFallback: { backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
   donorCardInfo: { flex: 1, minWidth: 0 },
-  donorCardName: { color: '#fff', fontSize: 10, fontWeight: '700' },
-  donorCardGift: { color: 'rgba(255,255,255,0.65)', fontSize: 9, marginTop: 1 },
-  donorCardEmoji: { fontSize: 16 },
-  donorCardCount: { color: '#FDE68A', fontSize: 11, fontWeight: '900' },
+  donorCardName: { color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+  donorCardGift: { color: 'rgba(255,255,255,0.65)', fontSize: FontSize['2xs'], marginTop: 1 },
+  donorCardEmoji: { fontSize: FontSize.md },
+  donorCardCount: { color: '#FDE68A', fontSize: FontSize.xsPlus, fontWeight: FontWeight.black },
 
   // Avatars top supporters en cascade + badge MVP — coin bas de chaque moitié
   mvpRow: {
@@ -1712,7 +1713,7 @@ const styles = StyleSheet.create({
   mvpAvatarFallbackA: { backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center' },
   mvpAvatarFallbackB: { backgroundColor: '#F0365A', alignItems: 'center', justifyContent: 'center' },
   mvpBadge: { marginLeft: 4, backgroundColor: '#FFD700', borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1.5 },
-  mvpBadgeText: { color: '#000', fontSize: 8, fontWeight: '900' },
+  mvpBadgeText: { color: '#000', fontSize: 8, fontWeight: FontWeight.black },
 
   topDonorBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
@@ -1721,7 +1722,7 @@ const styles = StyleSheet.create({
   },
   topDonorAvatar: { width: 18, height: 18, borderRadius: 9 },
   topDonorAvatarFallback: { backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
-  topDonorLabel: { color: '#FFD700', fontSize: 10, fontWeight: '700', flexShrink: 1 },
+  topDonorLabel: { color: '#FFD700', fontSize: FontSize.xs, fontWeight: FontWeight.bold, flexShrink: 1 },
 
   rankShortcut: {
     width: 36, height: 36, borderRadius: 18,
@@ -1731,19 +1732,19 @@ const styles = StyleSheet.create({
 
   floaterAnchorA: { position: 'absolute', bottom: '10%', left: '25%' },
   floaterAnchorB: { position: 'absolute', bottom: '10%', left: '60%' },
-  floater: { fontSize: 20 },
+  floater: { fontSize: FontSize.xl },
 
   // Cadeaux compacts par cote (retrecis pour tenir dans le split-screen)
   giftTick: { position: 'absolute', bottom: 4, left: 4, right: 4, zIndex: 30 },
   giftTickGrad: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 16, paddingHorizontal: 6, paddingVertical: 3, alignSelf: 'flex-start' },
-  giftTickEmoji: { fontSize: 11 },
-  giftTickText: { color: '#fff', fontSize: 9, flexShrink: 1 },
-  giftTickSender: { fontWeight: '800' },
+  giftTickEmoji: { fontSize: FontSize.xsPlus },
+  giftTickText: { color: '#fff', fontSize: FontSize['2xs'], flexShrink: 1 },
+  giftTickSender: { fontWeight: FontWeight.extraBold },
 
   reactBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.08)' },
   reactBtnA: { backgroundColor: '#7B3FF2CC' },
   reactBtnB: { backgroundColor: '#F0365ACC' },
-  giftBtnEmoji: { fontSize: 16 },
+  giftBtnEmoji: { fontSize: FontSize.md },
 
   closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
   participantsBtn: {
@@ -1751,7 +1752,7 @@ const styles = StyleSheet.create({
     height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.08)',
     paddingHorizontal: 10,
   },
-  participantsBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  participantsBtnText: { color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.bold },
   recordingBtnActive: { backgroundColor: 'rgba(240,54,90,0.25)', paddingHorizontal: 8 },
 
   // Chat fusionne
@@ -1760,28 +1761,28 @@ const styles = StyleSheet.create({
   chatSideDot: { width: 6, height: 6, borderRadius: 3, marginTop: 5 },
   chatSideDotA: { backgroundColor: '#7B3FF2' },
   chatSideDotB: { backgroundColor: '#F0365A' },
-  chatText: { flex: 1, color: '#fff', fontSize: 12, textShadowColor: 'rgba(0,0,0,0.8)', textShadowRadius: 3 },
-  chatUser: { fontWeight: '800' },
+  chatText: { flex: 1, color: '#fff', fontSize: FontSize.sm, textShadowColor: 'rgba(0,0,0,0.8)', textShadowRadius: 3 },
+  chatUser: { fontWeight: FontWeight.extraBold },
   chatUserA: { color: '#C4B5FD' },
   chatUserB: { color: '#FCA5C5' },
   chatInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingTop: 2 },
-  chatInput: { flex: 1, minWidth: 0, color: '#fff', fontSize: 13, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 },
+  chatInput: { flex: 1, minWidth: 0, color: '#fff', fontSize: FontSize.smPlus, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 },
   chatSendBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#7B3FF2', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
 
   // Panneau classement
   rankingOverlay: { ...StyleSheet.absoluteFill, justifyContent: 'flex-end', zIndex: 60 },
   rankingSheet: { backgroundColor: '#14101f', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 18, gap: 10 },
   rankingHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'center' },
-  rankingTitle: { color: '#fff', fontSize: 15, fontWeight: '800' },
-  rankingEmpty: { color: 'rgba(255,255,255,0.5)', fontSize: 13, textAlign: 'center', paddingVertical: 20 },
+  rankingTitle: { color: '#fff', fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold },
+  rankingEmpty: { color: 'rgba(255,255,255,0.5)', fontSize: FontSize.smPlus, textAlign: 'center', paddingVertical: 20 },
   rankRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 14 },
-  rankPos: { width: 20, color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  rankPos: { width: 20, color: 'rgba(255,255,255,0.6)', fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, textAlign: 'center' },
   rankAvatar: { width: 30, height: 30, borderRadius: 15 },
   rankAvatarFallback: { backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
-  rankName: { flex: 1, color: '#fff', fontSize: 13, fontWeight: '600' },
-  rankAmount: { color: '#FFD700', fontSize: 12, fontWeight: '700' },
+  rankName: { flex: 1, color: '#fff', fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
+  rankAmount: { color: '#FFD700', fontSize: FontSize.sm, fontWeight: FontWeight.bold },
   surpriseRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.1)' },
-  surpriseText: { color: 'rgba(255,255,255,0.75)', fontSize: 12 },
+  surpriseText: { color: 'rgba(255,255,255,0.75)', fontSize: FontSize.sm },
 
   bigGiftOverlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', zIndex: 80, backgroundColor: 'rgba(0,0,0,0.35)' },
   bigGiftGlow: {
@@ -1795,16 +1796,16 @@ const styles = StyleSheet.create({
   },
   bigGiftCrownOnThrone: { position: 'absolute', top: -8, alignSelf: 'center', fontSize: 34 },
   bigGiftKingLabel: {
-    color: '#FFD700', fontSize: 13, fontWeight: '900', letterSpacing: 1.5,
+    color: '#FFD700', fontSize: FontSize.smPlus, fontWeight: FontWeight.black, letterSpacing: 1.5,
     marginTop: 10, textShadowColor: 'rgba(0,0,0,0.4)', textShadowRadius: 3, textShadowOffset: { width: 0, height: 1 },
   },
   bigGiftEmoji: { fontSize: 44, marginTop: 4 },
-  bigGiftGiftName: { color: '#fff', fontSize: 16, fontWeight: '800', marginTop: 4 },
-  bigGiftSender: { color: '#fff', fontSize: 22, fontWeight: '900', textAlign: 'center', marginTop: 2 },
+  bigGiftGiftName: { color: '#fff', fontSize: FontSize.md, fontWeight: FontWeight.extraBold, marginTop: 4 },
+  bigGiftSender: { color: '#fff', fontSize: FontSize['2xl'], fontWeight: FontWeight.black, textAlign: 'center', marginTop: 2 },
   bigGiftGogoldPill: {
     marginTop: 8, backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 16,
     paddingVertical: 6, paddingHorizontal: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
   },
-  bigGiftGogoldText: { color: '#FFD700', fontSize: 14, fontWeight: '800' },
+  bigGiftGogoldText: { color: '#FFD700', fontSize: FontSize.base, fontWeight: FontWeight.extraBold },
 
 });

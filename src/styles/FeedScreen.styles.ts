@@ -1,5 +1,5 @@
 import { StyleSheet, Platform, Dimensions } from 'react-native';
-import { Spacing } from '../theme';
+import { Spacing, FontSize, FontWeight } from '../theme';
 import { TAB_BAR_HEIGHT } from './layout';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -23,52 +23,52 @@ export const feedStyles = StyleSheet.create({
     flexDirection:  'row',
     alignItems:     'center',
     justifyContent: 'space-between',
-    minHeight:      44,
+    minHeight:      37,
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems:    'center',
-    gap:           8,
+    gap:           7,
     maxWidth:      Math.round(SCREEN_W * 0.30),
     overflow:      'hidden',
     flexShrink:    1,
   },
   avatar: {
-    width: 36, height: 36, borderRadius: 18,
+    width: 31, height: 31, borderRadius: 16,
   },
   avatarFallback: {
-    width: 36, height: 36, borderRadius: 18,
+    width: 31, height: 31, borderRadius: 16,
     alignItems: 'center', justifyContent: 'center',
   },
-  avatarText: { fontSize: 13, fontWeight: '700' },
-  userName:   { fontSize: 14, fontWeight: '600', flexShrink: 1 },
+  avatarText: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold },
+  userName:   { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, flexShrink: 1 },
   headerCenter: {
     position: 'absolute', left: 0, right: 0, alignItems: 'center',
   },
-  headerBrand: { fontSize: 22, fontWeight: '900', letterSpacing: 1 },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  headerBrand: { fontSize: FontSize.mdPlus, fontWeight: FontWeight.black, letterSpacing: 1 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   // Boutons d'icône nus (pas de fond ni de bordure "bouton sur bouton") — style
-  // Instagram/X. La zone de tap reste à 40px, l'icône visuellement légère.
+  // Instagram/X. La zone de tap reste compacte, l'icône visuellement légère.
   iconBtn: {
-    width: 40, height: 40, borderRadius: 20,
+    width: 34, height: 34, borderRadius: 17,
     alignItems: 'center', justifyContent: 'center',
   },
 
   // ── Pills sous le header (Mes amis · Favoris · Direct) ────────────────────
   headerPills: {
     flexDirection: 'row',
-    gap: 8,
-    marginTop: 10,
-    paddingBottom: 10,
+    gap: 7,
+    marginTop: 9,
+    paddingBottom: 9,
   },
   headerPill: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    height: 40,
-    borderRadius: 12,
+    gap: 5,
+    height: 34,
+    borderRadius: 10,
     borderWidth: 1,
   },
   // Variante navigable : contenu à gauche, chevron collé à droite (indique un
@@ -78,19 +78,19 @@ export const feedStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    height: 40,
-    borderRadius: 12,
+    height: 34,
+    borderRadius: 10,
     borderWidth: 1,
-    paddingHorizontal: 10,
+    paddingHorizontal: 9,
   },
   headerPillNavInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
   },
   headerPillText: {
-    fontSize: 12.5,
-    fontWeight: '600',
+    fontSize: FontSize.xsPlus,
+    fontWeight: FontWeight.semiBold,
   },
 
   // ── Filtres ───────────────────────────────────────────────────────────────
@@ -112,7 +112,7 @@ export const feedStyles = StyleSheet.create({
     borderRadius:     4,
     borderWidth:      1.5,
   },
-  filterText: { fontSize: 13, fontWeight: '700' },
+  filterText: { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
 
   // ── Card — pleine largeur, 0 border radius ────────────────────────────────
   card: {
@@ -133,9 +133,9 @@ export const feedStyles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     overflow: 'hidden',
   },
-  cardAuthorAvatarText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  cardAuthorName: { fontSize: 14, fontWeight: '700' },
-  cardTimeAgo:    { fontSize: 12 },
+  cardAuthorAvatarText: { color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.md },
+  cardAuthorName: { fontSize: FontSize.base, fontWeight: FontWeight.bold },
+  cardTimeAgo:    { fontSize: FontSize.sm },
 
   // Bouton Suivre
   followBtn: {
@@ -149,8 +149,8 @@ export const feedStyles = StyleSheet.create({
     marginRight:       8,
   },
   followBtnText: {
-    fontSize:   12,
-    fontWeight: '700',
+    fontSize:   FontSize.sm,
+    fontWeight: FontWeight.bold,
   },
 
   // Titre + desc avant la bannière
@@ -159,9 +159,9 @@ export const feedStyles = StyleSheet.create({
     paddingTop:        4,
     paddingBottom:     Spacing[2],
   },
-  cardTitle:    { fontSize: 16, fontWeight: '800', lineHeight: 22 },
-  cardDesc:     { fontSize: 13, lineHeight: 19, marginTop: 4 },
-  seeMoreText:  { fontSize: 13, fontWeight: '700', marginTop: 4 },
+  cardTitle:    { fontSize: FontSize.md, fontWeight: FontWeight.extraBold, lineHeight: 22 },
+  cardDesc:     { fontSize: FontSize.smPlus, lineHeight: 19, marginTop: 4 },
+  seeMoreText:  { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, marginTop: 4 },
 
   // ── Banner image — pleine largeur ─────────────────────────────────────────
   cardBanner: {
@@ -191,7 +191,7 @@ export const feedStyles = StyleSheet.create({
     borderRadius:     4,
   },
   badgeDot:  { width: 6, height: 6, borderRadius: 3 },
-  badgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.6 },
+  badgeText: { fontSize: FontSize.xs, fontWeight: FontWeight.extraBold, letterSpacing: 0.6 },
 
   // Overlay bas du banner avec meta (date, lieu, prix)
   bannerOverlay: {
@@ -203,8 +203,8 @@ export const feedStyles = StyleSheet.create({
     gap:            4,
   },
   bannerTitle: {
-    fontSize:   20,
-    fontWeight: '800',
+    fontSize:   FontSize.xl,
+    fontWeight: FontWeight.extraBold,
     color:      '#fff',
     lineHeight: 26,
   },
@@ -215,12 +215,12 @@ export const feedStyles = StyleSheet.create({
     flexWrap:      'wrap',
   },
   bannerMetaText: {
-    fontSize:   12,
+    fontSize:   FontSize.sm,
     color:      'rgba(255,255,255,0.9)',
-    fontWeight: '600',
+    fontWeight: FontWeight.semiBold,
   },
   bannerMetaDot: {
-    fontSize: 12,
+    fontSize: FontSize.sm,
     color:    'rgba(255,255,255,0.5)',
   },
 
@@ -242,7 +242,7 @@ export const feedStyles = StyleSheet.create({
     width: 18, height: 18, borderRadius: 9,
     alignItems: 'center', justifyContent: 'center',
   },
-  likeCountText: { fontSize: 12 },
+  likeCountText: { fontSize: FontSize.sm },
 
   // ── Barre d'actions sociale ───────────────────────────────────────────────
   socialBar: {
@@ -263,7 +263,7 @@ export const feedStyles = StyleSheet.create({
     flex:           1,
     justifyContent: 'center',
   },
-  socialBtnText: { fontSize: 13, fontWeight: '600' },
+  socialBtnText: { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
 
   saveBtn: {
     paddingHorizontal: 10,
@@ -289,8 +289,8 @@ export const feedStyles = StyleSheet.create({
     marginBottom: 8,
   },
   commentsTitle: {
-    fontSize:    16,
-    fontWeight:  '800',
+    fontSize:    FontSize.md,
+    fontWeight:  FontWeight.extraBold,
     paddingHorizontal: Spacing[4],
     paddingBottom:     Spacing[3],
   },
@@ -305,11 +305,11 @@ export const feedStyles = StyleSheet.create({
     width: 34, height: 34, borderRadius: 17,
     alignItems: 'center', justifyContent: 'center',
   },
-  commentAvatarText: { fontSize: 13, fontWeight: '700', color: '#fff' },
+  commentAvatarText: { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, color: '#fff' },
   commentBody:       { flex: 1, gap: 3 },
-  commentAuthor:     { fontSize: 13, fontWeight: '700' },
-  commentText:       { fontSize: 13, lineHeight: 18 },
-  commentDate:       { fontSize: 11 },
+  commentAuthor:     { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
+  commentText:       { fontSize: FontSize.smPlus, lineHeight: 18 },
+  commentDate:       { fontSize: FontSize.xsPlus },
 
   commentInput: {
     flexDirection:     'row',
@@ -325,7 +325,7 @@ export const feedStyles = StyleSheet.create({
     borderRadius:      20,
     paddingHorizontal: Spacing[4],
     paddingVertical:   Platform.OS === 'ios' ? 10 : 6,
-    fontSize:          14,
+    fontSize:          FontSize.base,
   },
   commentSendBtn: {
     width: 36, height: 36,
@@ -347,7 +347,7 @@ export const feedStyles = StyleSheet.create({
     paddingTop:     80,
     gap:            12,
   },
-  emptyText:  { fontSize: 15 },
+  emptyText:  { fontSize: FontSize.basePlus },
 
   // ── Menu Drawer ────────────────────────────────────────────────────────────
   menuOverlay: {
@@ -365,7 +365,7 @@ export const feedStyles = StyleSheet.create({
     paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  menuTitle: { fontSize: 20, fontWeight: '800', letterSpacing: 0.5 },
+  menuTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.extraBold, letterSpacing: 0.5 },
   menuCloseBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   menuItem: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
@@ -376,7 +376,7 @@ export const feedStyles = StyleSheet.create({
     width: 36, height: 36, borderRadius: 8,
     alignItems: 'center', justifyContent: 'center',
   },
-  menuItemLabel: { flex: 1, fontSize: 15, fontWeight: '600' },
+  menuItemLabel: { flex: 1, fontSize: FontSize.basePlus, fontWeight: FontWeight.semiBold },
 
   // ── Reel play overlay (Feed preview) ──────────────────────────────────────
   reelPlayOverlay: {
@@ -453,7 +453,7 @@ export const fS = StyleSheet.create({
   },
   dropdownLabel: {
     flex: 1,
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.semiBold,
   },
 });

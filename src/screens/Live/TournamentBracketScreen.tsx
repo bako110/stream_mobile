@@ -20,6 +20,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { useWs } from '../../context/WebSocketContext';
@@ -95,7 +96,7 @@ const ExpandableText: React.FC<{ text: string; textStyle: any; linkColor: string
       </Text>
       {truncatable && (
         <TouchableOpacity onPress={() => setExpanded(v => !v)} activeOpacity={0.7} style={{ marginTop: 4 }}>
-          <Text style={{ fontSize: 12, fontWeight: '700', color: linkColor }}>
+          <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: linkColor }}>
             {expanded ? 'Voir moins' : 'Voir plus'}
           </Text>
         </TouchableOpacity>
@@ -902,9 +903,11 @@ export const TournamentBracketScreen: React.FC = () => {
         )}
       </ScrollView>
 
-      <Modal visible={showJoin} transparent animationType="fade" onRequestClose={() => setShowJoin(false)}>
+      <Modal visible={showJoin} transparent animationType="slide" onRequestClose={() => setShowJoin(false)} statusBarTranslucent>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setShowJoin(false)} />
+          <View style={[styles.modalCard, { backgroundColor: colors.surface, paddingBottom: 20 + insets.bottom }]}>
+            <View style={[styles.modalHandle, { backgroundColor: colors.divider }]} />
             <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Rejoindre le tournoi</Text>
             {tournament.has_password && (
               <TextInput
@@ -940,10 +943,12 @@ export const TournamentBracketScreen: React.FC = () => {
         </KeyboardAvoidingView>
       </Modal>
 
-      <Modal visible={showEdit} transparent animationType="fade" onRequestClose={() => setShowEdit(false)}>
+      <Modal visible={showEdit} transparent animationType="slide" onRequestClose={() => setShowEdit(false)} statusBarTranslucent>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
-          <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }} keyboardShouldPersistTaps="handled">
-            <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setShowEdit(false)} />
+          <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }} keyboardShouldPersistTaps="handled">
+            <View style={[styles.modalCard, { backgroundColor: colors.surface, paddingBottom: 20 + insets.bottom }]}>
+              <View style={[styles.modalHandle, { backgroundColor: colors.divider }]} />
               <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Modifier le tournoi</Text>
               <Text style={[styles.modalSub, { color: colors.textTertiary }]}>Possible tant que les inscriptions sont ouvertes</Text>
 
@@ -1010,9 +1015,11 @@ export const TournamentBracketScreen: React.FC = () => {
         </KeyboardAvoidingView>
       </Modal>
 
-      <Modal visible={!!selectedMatch} transparent animationType="fade" onRequestClose={() => setSelectedMatch(null)}>
+      <Modal visible={!!selectedMatch} transparent animationType="slide" onRequestClose={() => setSelectedMatch(null)} statusBarTranslucent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setSelectedMatch(null)} />
+          <View style={[styles.modalCard, { backgroundColor: colors.surface, paddingBottom: 20 + insets.bottom }]}>
+            <View style={[styles.modalHandle, { backgroundColor: colors.divider }]} />
             {selectedMatch && (() => {
               const partA = participants.find(p => p.id === selectedMatch.participant_a_id);
               const partB = participants.find(p => p.id === selectedMatch.participant_b_id);
@@ -1117,7 +1124,7 @@ const MatchDetailSide: React.FC<{ name: string; avatar?: string | null; isWinner
     {avatar
       ? <Image source={{ uri: avatar }} style={styles.matchDetailAvatar} />
       : <View style={[styles.matchDetailAvatar, styles.slotAvatarFallback]}><Icon name="user" size={18} color="rgba(255,255,255,0.4)" /></View>}
-    <Text style={[styles.matchDetailName, { color }, isWinner && { color: '#FFD700', fontWeight: '800' }]} numberOfLines={2}>{name}</Text>
+    <Text style={[styles.matchDetailName, { color }, isWinner && { color: '#FFD700', fontWeight: FontWeight.extraBold }]} numberOfLines={2}>{name}</Text>
     {isWinner && <Icon name="award" size={14} color="#FFD700" />}
   </View>
 );
@@ -1139,7 +1146,7 @@ const MatchSlot: React.FC<{ name: string; avatar?: string | null; isWinner: bool
 const styles = StyleSheet.create({
   root: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
-  headerTitle: { fontSize: 16, fontWeight: '700', flex: 1, textAlign: 'center' },
+  headerTitle: { fontSize: FontSize.md, fontWeight: FontWeight.bold, flex: 1, textAlign: 'center' },
   financeBtn: {
     width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center',
     backgroundColor: 'rgba(245,158,11,0.15)',
@@ -1150,9 +1157,9 @@ const styles = StyleSheet.create({
   },
 
   errorBox: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 32 },
-  errorText: { fontSize: 14, fontWeight: '600', textAlign: 'center' },
+  errorText: { fontSize: FontSize.base, fontWeight: FontWeight.semiBold, textAlign: 'center' },
   errorRetryBtn: { backgroundColor: '#7B3FF2', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 22, marginTop: 6 },
-  errorRetryText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  errorRetryText: { color: '#fff', fontSize: FontSize.base, fontWeight: FontWeight.bold },
 
   statusCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginTop: 16,
@@ -1162,77 +1169,78 @@ const styles = StyleSheet.create({
     width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center',
     shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.35, shadowRadius: 6, elevation: 3,
   },
-  statusLabel: { fontSize: 14, fontWeight: '800', letterSpacing: 0.2 },
-  statusPhase: { fontSize: 12, fontWeight: '600', marginTop: 3 },
-  statusOpponent: { fontSize: 12, fontWeight: '700', marginTop: 2 },
+  statusLabel: { fontSize: FontSize.base, fontWeight: FontWeight.extraBold, letterSpacing: 0.2 },
+  statusPhase: { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, marginTop: 3 },
+  statusOpponent: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, marginTop: 2 },
 
   regCard: { margin: 16, marginTop: 12, borderRadius: 18, borderWidth: 1, padding: 16, gap: 10 },
   regHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  regTitle: { fontSize: 15, fontWeight: '800' },
+  regTitle: { fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold },
   regCountPill: { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
-  regCountText: { color: '#7B3FF2', fontSize: 12, fontWeight: '800' },
+  regCountText: { color: '#7B3FF2', fontSize: FontSize.sm, fontWeight: FontWeight.extraBold },
   regProgressTrack: { height: 6, borderRadius: 3, overflow: 'hidden' },
   regProgressFill: { height: '100%', backgroundColor: '#7B3FF2', borderRadius: 3 },
   regBtn: { flexDirection: 'row', gap: 8, borderRadius: 13, paddingVertical: 13, alignItems: 'center', justifyContent: 'center' },
-  regBtnText: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  regBtnText: { color: '#fff', fontSize: FontSize.base, fontWeight: FontWeight.extraBold },
   regOrganizerRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
   regEditBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 13, borderWidth: 1,
     paddingVertical: 13, paddingHorizontal: 16, justifyContent: 'center',
   },
-  regEditBtnText: { fontSize: 13, fontWeight: '700' },
+  regEditBtnText: { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
 
   aboutCard: { marginHorizontal: 16, marginTop: 12, borderRadius: 18, borderWidth: 1, padding: 16, gap: 10 },
-  aboutTitle: { fontSize: 15, fontWeight: '800' },
-  aboutText: { fontSize: 13, lineHeight: 19, marginLeft: 34 },
+  aboutTitle: { fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold },
+  aboutText: { fontSize: FontSize.smPlus, lineHeight: 19, marginLeft: 34 },
   aboutRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  aboutRowText: { fontSize: 13, fontWeight: '600', flexShrink: 1 },
-  aboutRulesText: { fontSize: 12, lineHeight: 18, marginLeft: 34 },
+  aboutRowText: { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold, flexShrink: 1 },
+  aboutRulesText: { fontSize: FontSize.sm, lineHeight: 18, marginLeft: 34 },
   sectionIconWrap: { width: 26, height: 26, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   sponsorShowcase: { flexDirection: 'row', alignItems: 'center', gap: 12, marginLeft: 34 },
   sponsorShowcaseLogo: { width: 44, height: 44, borderRadius: 12 },
   sponsorShowcaseLogoFallback: { alignItems: 'center', justifyContent: 'center' },
-  sponsorShowcaseLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4 },
-  sponsorShowcaseName: { fontSize: 15, fontWeight: '800', marginTop: 2 },
+  sponsorShowcaseLabel: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold, textTransform: 'uppercase', letterSpacing: 0.4 },
+  sponsorShowcaseName: { fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold, marginTop: 2 },
 
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 24 },
-  modalCard: { width: '100%', borderRadius: 20, padding: 20, gap: 10 },
-  modalTitle: { fontSize: 16, fontWeight: '800' },
-  modalSub: { fontSize: 12, fontWeight: '600', marginBottom: 4 },
-  modalFieldLabel: { fontSize: 12, fontWeight: '700', marginTop: 6 },
-  modalInput: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  modalCard: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 10, gap: 10 },
+  modalHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 14 },
+  modalTitle: { fontSize: FontSize.md, fontWeight: FontWeight.extraBold },
+  modalSub: { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, marginBottom: 4 },
+  modalFieldLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, marginTop: 6 },
+  modalInput: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: FontSize.base },
   modalInputMultiline: { minHeight: 70, textAlignVertical: 'top' },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 10 },
   modalCancelBtn: { paddingVertical: 12, paddingHorizontal: 16, justifyContent: 'center' },
-  modalCancelText: { fontSize: 14, fontWeight: '700' },
+  modalCancelText: { fontSize: FontSize.base, fontWeight: FontWeight.bold },
   modalSendBtn: { borderRadius: 12, paddingVertical: 12, paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center' },
-  modalSendText: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  modalSendText: { color: '#fff', fontSize: FontSize.base, fontWeight: FontWeight.extraBold },
 
   myMatchCard: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginTop: 12, marginBottom: 4, borderRadius: 16, padding: 14 },
   myMatchIconWrap: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(123,63,242,0.18)', alignItems: 'center', justifyContent: 'center' },
-  myMatchText: { flex: 1, fontSize: 14, fontWeight: '800' },
+  myMatchText: { flex: 1, fontSize: FontSize.base, fontWeight: FontWeight.extraBold },
   readyBtn: { borderRadius: 11, paddingVertical: 9, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
-  readyBtnText: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  readyBtnText: { color: '#fff', fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold },
 
   liveCenterSection: { marginTop: 18, marginBottom: 4 },
   liveCenterHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginBottom: 10 },
-  liveCenterTitle: { fontSize: 13, fontWeight: '800', letterSpacing: 0.2 },
+  liveCenterTitle: { fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold, letterSpacing: 0.2 },
   liveCenterRow: { paddingHorizontal: 16, gap: 10 },
   liveCenterCard: { width: 210, borderRadius: 16, borderWidth: 1.5, padding: 13, gap: 10 },
-  liveCenterNames: { fontSize: 12, fontWeight: '700' },
+  liveCenterNames: { fontSize: FontSize.sm, fontWeight: FontWeight.bold },
   liveCenterWatchBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     borderRadius: 10, paddingVertical: 7, paddingHorizontal: 11, alignSelf: 'flex-start',
   },
-  liveCenterWatchText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  liveCenterWatchText: { color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold },
 
   winnerCard: { alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 12, marginBottom: 12, borderRadius: 20, padding: 22, borderWidth: 1, borderColor: '#FFD70040' },
   winnerIconWrap: {
     width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(255,215,0,0.15)', alignItems: 'center', justifyContent: 'center',
     marginBottom: 4, shadowColor: '#FFD700', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 10, elevation: 4,
   },
-  winnerText: { fontSize: 15, fontWeight: '800', color: '#B45309', textAlign: 'center' },
-  winnerPrizeText: { fontSize: 19, fontWeight: '900', color: '#B45309' },
+  winnerText: { fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold, color: '#B45309', textAlign: 'center' },
+  winnerPrizeText: { fontSize: 19, fontWeight: FontWeight.black, color: '#B45309' },
 
   prizePoolCard: {
     flexDirection: 'row', alignItems: 'center', gap: 14, marginHorizontal: 16, marginTop: 12, marginBottom: 4,
@@ -1241,23 +1249,23 @@ const styles = StyleSheet.create({
   prizePoolIconWrap: {
     width: 46, height: 46, borderRadius: 14, backgroundColor: 'rgba(255,215,0,0.15)', alignItems: 'center', justifyContent: 'center',
   },
-  prizePoolEmoji: { fontSize: 24 },
-  prizePoolLabel: { fontSize: 11, fontWeight: '700', color: '#B45309', textTransform: 'uppercase', letterSpacing: 0.5 },
-  prizePoolValue: { fontSize: 19, fontWeight: '900', color: '#B45309', marginTop: 2 },
+  prizePoolEmoji: { fontSize: FontSize['2xl'] },
+  prizePoolLabel: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, color: '#B45309', textTransform: 'uppercase', letterSpacing: 0.5 },
+  prizePoolValue: { fontSize: 19, fontWeight: FontWeight.black, color: '#B45309', marginTop: 2 },
 
   standingsCard: { marginHorizontal: 16, marginTop: 12, marginBottom: 16, borderRadius: 18, borderWidth: 1, padding: 15, gap: 2 },
-  standingsTitle: { fontSize: 15, fontWeight: '800', marginBottom: 8 },
+  standingsTitle: { fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold, marginBottom: 8 },
   standingsRow: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 7, borderRadius: 10 },
   standingsRowFirst: { backgroundColor: 'rgba(255,215,0,0.08)' },
-  standingsRank: { width: 18, fontSize: 12, fontWeight: '800', textAlign: 'center' },
+  standingsRank: { width: 18, fontSize: FontSize.sm, fontWeight: FontWeight.extraBold, textAlign: 'center' },
   standingsAvatar: { width: 26, height: 26, borderRadius: 13 },
-  standingsName: { flex: 1, fontSize: 13, fontWeight: '700' },
-  standingsStat: { fontSize: 11, fontWeight: '600' },
-  standingsPoints: { fontSize: 13, fontWeight: '900', minWidth: 48, textAlign: 'right' },
+  standingsName: { flex: 1, fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
+  standingsStat: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold },
+  standingsPoints: { fontSize: FontSize.smPlus, fontWeight: FontWeight.black, minWidth: 48, textAlign: 'right' },
 
   bracketRow: { paddingHorizontal: 16, gap: 22, paddingBottom: 20, paddingTop: 4 },
   roundCol: { width: 184, gap: 14 },
-  roundTitle: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
+  roundTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.extraBold, letterSpacing: 0.6, textTransform: 'uppercase' },
   matchCard: { borderRadius: 14, borderWidth: 1.5, padding: 11, gap: 7 },
   matchCardFullWidth: { width: '100%' },
   matchCardMine: {
@@ -1266,28 +1274,28 @@ const styles = StyleSheet.create({
 
   roundPage: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 20, gap: 14 },
   roundPageHeader: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
-  roundPageTitle: { fontSize: 18, fontWeight: '900' },
-  roundPageProgress: { fontSize: 12, fontWeight: '700' },
+  roundPageTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.black },
+  roundPageProgress: { fontSize: FontSize.sm, fontWeight: FontWeight.bold },
   roundPageDots: { flexDirection: 'row', gap: 6 },
   roundPageDot: { flex: 1, height: 4, borderRadius: 2 },
   roundPageGrid: { gap: 12 },
   roundPagePrevBox: { marginTop: 8, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 14, gap: 8 },
-  roundPagePrevTitle: { fontSize: 12, fontWeight: '800', letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: 2 },
+  roundPagePrevTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.extraBold, letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: 2 },
   roundPagePrevRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  roundPagePrevText: { fontSize: 13, fontWeight: '700', flexShrink: 1 },
-  roundPagePrevVs: { fontSize: 11, fontWeight: '600' },
+  roundPagePrevText: { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, flexShrink: 1 },
+  roundPagePrevVs: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold },
   matchDivider: { height: StyleSheet.hairlineWidth },
   slot: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 4 },
   slotAvatar: { width: 24, height: 24, borderRadius: 12 },
   slotAvatarWinner: { borderWidth: 1.5, borderColor: '#10B981' },
   slotAvatarFallback: { backgroundColor: 'rgba(120,120,120,0.2)', alignItems: 'center', justifyContent: 'center' },
-  slotName: { flex: 1, fontSize: 12, fontWeight: '600' },
-  slotNameWinner: { fontWeight: '800' },
+  slotName: { flex: 1, fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
+  slotNameWinner: { fontWeight: FontWeight.extraBold },
   liveBadge: {
     position: 'absolute', top: -9, right: 8, flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: '#EF4444', borderRadius: 7, paddingHorizontal: 7, paddingVertical: 3,
   },
-  liveBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
+  liveBadgeText: { color: '#fff', fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold, letterSpacing: 0.3 },
   watchHint: {
     position: 'absolute', bottom: -8, right: 8, backgroundColor: '#7B3FF2', borderRadius: 9,
     width: 18, height: 18, alignItems: 'center', justifyContent: 'center',
@@ -1296,14 +1304,14 @@ const styles = StyleSheet.create({
   matchDetailRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 18, marginBottom: 6, gap: 10 },
   matchDetailSide: { flex: 1, alignItems: 'center', gap: 6 },
   matchDetailAvatar: { width: 52, height: 52, borderRadius: 26 },
-  matchDetailName: { fontSize: 13, fontWeight: '700', textAlign: 'center' },
-  matchDetailVs: { fontSize: 12, fontWeight: '800' },
+  matchDetailName: { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, textAlign: 'center' },
+  matchDetailVs: { fontSize: FontSize.sm, fontWeight: FontWeight.extraBold },
   matchDetailReadyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 4, marginBottom: 8 },
-  matchDetailReadyText: { fontSize: 11, fontWeight: '600', marginLeft: 5 },
+  matchDetailReadyText: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold, marginLeft: 5 },
 
   forfeitBox: { marginTop: 14, gap: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(120,120,120,0.25)', paddingTop: 14 },
-  forfeitTitle: { fontSize: 12, fontWeight: '600', textAlign: 'center' },
+  forfeitTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, textAlign: 'center' },
   forfeitBtnsRow: { flexDirection: 'row', gap: 8 },
   forfeitBtn: { flex: 1, borderWidth: 1, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 8, alignItems: 'center' },
-  forfeitBtnText: { fontSize: 12, fontWeight: '700' },
+  forfeitBtnText: { fontSize: FontSize.sm, fontWeight: FontWeight.bold },
 });

@@ -9,6 +9,7 @@ import { launchImageLibrary } from 'react-native-image-picker';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { VideoView, useVideoPlayer } from 'react-native-video';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { postService } from '../../services/postService';
@@ -19,7 +20,7 @@ import { LinkPreviewCard } from '../../components/common/LinkPreviewCard';
 import { toastService } from '../../services';
 
 const { width: W } = Dimensions.get('window');
-const MAX_IMAGES   = 6;
+const MAX_IMAGES   = 30; // aligné sur la limite Facebook pour un post multi-photos
 
 // Première URL http(s) trouvée dans un texte
 const URL_RE = /https?:\/\/[^\s<>"')\]]+/i;
@@ -359,7 +360,7 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
             <Image source={{ uri: currentUser.avatar_url }} style={s.avatar} />
           ) : (
             <View style={[s.avatar, { backgroundColor: colors.primary + '22', alignItems: 'center', justifyContent: 'center' }]}>
-              <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 17 }}>{initials}</Text>
+              <Text style={{ color: colors.primary, fontWeight: FontWeight.extraBold, fontSize: FontSize.mdPlus }}>{initials}</Text>
             </View>
           )}
           <View style={{ flex: 1 }}>
@@ -373,7 +374,7 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
                 onPress={() => setShowVisibility(v => !v)}
               >
                 <Icon name={isPrivate ? 'users' : 'globe'} size={11} color={colors.textTertiary} />
-                <Text style={[s.audience, { color: colors.textTertiary, fontWeight: '600' }]}>
+                <Text style={[s.audience, { color: colors.textTertiary, fontWeight: FontWeight.semiBold }]}>
                   {isPrivate ? 'Amis' : 'Public'}
                 </Text>
                 <Icon name="chevron-down" size={10} color={colors.textTertiary} />
@@ -463,7 +464,7 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
                 onPress={handlePickImages}
               >
                 <Icon name="plus" size={20} color={colors.textTertiary} />
-                <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 4 }}>Ajouter</Text>
+                <Text style={{ fontSize: FontSize.sm, color: colors.textTertiary, marginTop: 4 }}>Ajouter</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -506,7 +507,7 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
                   }]}
                   onPress={() => { setFeeling(feeling === f ? undefined : f); setShowFeelings(false); }}
                 >
-                  <Text style={{ fontSize: 13, color: feeling === f ? colors.primary : colors.textPrimary }}>{f}</Text>
+                  <Text style={{ fontSize: FontSize.smPlus, color: feeling === f ? colors.primary : colors.textPrimary }}>{f}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -555,7 +556,7 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
             style={[s.actionBtn, { backgroundColor: showFeelings ? colors.primary + '18' : colors.backgroundSecondary }]}
             onPress={() => setShowFeelings(v => !v)}
           >
-            <Text style={{ fontSize: 18 }}>😊</Text>
+            <Text style={{ fontSize: FontSize.lg }}>😊</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -569,27 +570,27 @@ const HALF_H = GRID_H / 2 - 1;
 const s = StyleSheet.create({
   root:           { flex: 1 },
   header:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  headerTitle:    { fontSize: 17, fontWeight: '700' },
+  headerTitle:    { fontSize: FontSize.mdPlus, fontWeight: FontWeight.bold },
   publishBtn:     { paddingHorizontal: 18, paddingVertical: 7, borderRadius: 20 },
-  publishBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  publishBtnText: { color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.base },
 
   bgHint:         { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
-  bgHintText:     { fontSize: 12, fontWeight: '500' },
+  bgHintText:     { fontSize: FontSize.sm, fontWeight: FontWeight.medium },
 
   authorRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
   avatar:         { width: 46, height: 46, borderRadius: 23, overflow: 'hidden' },
-  authorName:     { fontSize: 15, fontWeight: '700' },
+  authorName:     { fontSize: FontSize.basePlus, fontWeight: FontWeight.bold },
   audienceRow:    { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  audience:       { fontSize: 12, marginTop: 2 },
+  audience:       { fontSize: FontSize.sm, marginTop: 2 },
   audienceLine:   { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' },
   visibilityChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
   visibilityMenu: { marginHorizontal: 14, marginBottom: 8, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
   visibilityOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
-  visibilityOptionTitle: { fontSize: 14, fontWeight: '700' },
-  visibilityOptionDesc:  { fontSize: 11, marginTop: 1 },
+  visibilityOptionTitle: { fontSize: FontSize.base, fontWeight: FontWeight.bold },
+  visibilityOptionDesc:  { fontSize: FontSize.xsPlus, marginTop: 1 },
 
   inputWrap:      { paddingHorizontal: 14, paddingBottom: 12, minHeight: 120 },
-  input:          { fontSize: 18, lineHeight: 26, textAlignVertical: 'top', flex: 1 },
+  input:          { fontSize: FontSize.lg, lineHeight: 26, textAlignVertical: 'top', flex: 1 },
 
   linkPreviewWrap:  { marginHorizontal: 14, marginBottom: 12, position: 'relative' },
   linkPreviewClose: { position: 'absolute', top: 8, right: 8, width: 26, height: 26, borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
@@ -598,7 +599,7 @@ const s = StyleSheet.create({
   videoPreview:     { width: '100%', height: '100%' },
   removeVideoBtn:   { position: 'absolute', top: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 14, padding: 2 },
   videoBadge:       { position: 'absolute', bottom: 10, left: 10, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-  videoBadgeText:   { color: '#fff', fontSize: 11, fontWeight: '700' },
+  videoBadgeText:   { color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold },
 
   gridWrap:         { marginHorizontal: 14, marginBottom: 12 },
   gridSingle:       { borderRadius: 12, overflow: 'hidden', height: GRID_H },
@@ -611,24 +612,24 @@ const s = StyleSheet.create({
   imgFill:          { width: '100%', height: '100%' },
   removeBtn:        { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
   extraOverlay:     { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
-  extraText:        { color: '#fff', fontSize: 22, fontWeight: '800' },
+  extraText:        { color: '#fff', fontSize: FontSize['2xl'], fontWeight: FontWeight.extraBold },
   addMoreBtn:       { marginTop: 8, height: 48, borderRadius: 10, borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
 
   emptyMediaWrap:   { marginHorizontal: 14, marginBottom: 12 },
   emptyMediaCard:   { borderRadius: 18, borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center', paddingVertical: 28, paddingHorizontal: 20 },
   emptyMediaIcon:   { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  emptyMediaTitle:  { fontSize: 15, fontWeight: '800' },
-  emptyMediaSub:    { fontSize: 12, marginTop: 4 },
+  emptyMediaTitle:  { fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold },
+  emptyMediaSub:    { fontSize: FontSize.sm, marginTop: 4 },
 
   feelingsWrap:   { padding: 14, borderTopWidth: StyleSheet.hairlineWidth },
-  feelingsTitle:  { fontSize: 13, fontWeight: '600', marginBottom: 10 },
+  feelingsTitle:  { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold, marginBottom: 10 },
   feelingsGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   feelingChip:    { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
 
   actionBar:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
-  actionLabel:    { fontSize: 14, fontWeight: '600' },
+  actionLabel:    { fontSize: FontSize.base, fontWeight: FontWeight.semiBold },
   actionBtns:     { flexDirection: 'row', gap: 8 },
   actionBtn:      { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   actionBadge:    { position: 'absolute', top: -2, right: -2, width: 17, height: 17, borderRadius: 9, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  actionBadgeText:{ color: '#fff', fontSize: 9, fontWeight: '800' },
+  actionBadgeText:{ color: '#fff', fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold },
 });

@@ -94,9 +94,10 @@ interface SpontLiveCardProps {
   isOwn: boolean;
   onPress: (live: LiveStream) => void;
   styles: any;
+  accent: string;
 }
 
-const SpontLiveCard: React.FC<SpontLiveCardProps> = React.memo(({ live, isOwn, onPress, styles: s }) => {
+const SpontLiveCard: React.FC<SpontLiveCardProps> = React.memo(({ live, isOwn, onPress, styles: s, accent }) => {
   const name = live.user?.display_name || live.user?.username || 'Artiste';
   const initials = name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
   const handlePress = useCallback(() => onPress(live), [live, onPress]);
@@ -122,7 +123,7 @@ const SpontLiveCard: React.FC<SpontLiveCardProps> = React.memo(({ live, isOwn, o
           <View style={s.spontAvatarSmall}>
             {live.user?.avatar_url
               ? <Image source={{ uri: live.user.avatar_url }} style={{ width: '100%', height: '100%' }} />
-              : <LinearGradient colors={['#F0365A', '#E0389A']} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={s.spontAvatarSmallText}>{initials[0]}</Text></LinearGradient>
+              : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: accent }}><Text style={s.spontAvatarSmallText}>{initials[0]}</Text></View>
             }
           </View>
           <View style={{ flex: 1 }}>
@@ -531,6 +532,7 @@ export const HomeScreen: React.FC = () => {
                 live={live}
                 isOwn={currentUser?.id === live.user_id}
                 onPress={handleSpontPress}
+                accent={colors.primary}
                 styles={s}
               />
             ))}
@@ -556,10 +558,7 @@ export const HomeScreen: React.FC = () => {
                 {c.thumbnail_url ? (
                   <Image source={{ uri: c.thumbnail_url }} style={s.liveCardImg} />
                 ) : (
-                  <LinearGradient
-                    colors={['#7B3FF2CC', '#9B65F544']}
-                    style={s.liveCardImg}
-                  />
+                  <View style={[s.liveCardImg, { backgroundColor: colors.primary + '55' }]} />
                 )}
                 <LinearGradient
                   colors={['transparent', 'rgba(0,0,0,0.75)']}
@@ -1039,11 +1038,11 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                 {u.avatar_url ? (
                   <Image source={{ uri: u.avatar_url }} style={s.srAvatar} />
                 ) : (
-                  <LinearGradient colors={['#7B3FF2', '#A855F7']} style={s.srAvatar}>
+                  <View style={[s.srAvatar, { backgroundColor: colors.primary }]}>
                     <Text style={s.srAvatarText}>
                       {(u.display_name || u.username || '?')[0].toUpperCase()}
                     </Text>
-                  </LinearGradient>
+                  </View>
                 )}
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={[s.srUserName, { color: colors.textPrimary }]} numberOfLines={1}>
@@ -1073,10 +1072,10 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                 activeOpacity={0.7}
                 style={[s.srCardRow, { backgroundColor: colors.surface }]}
               >
-                <View style={[s.srCardThumb, { backgroundColor: '#7B3FF215' }]}>
+                <View style={[s.srCardThumb, { backgroundColor: colors.primary + '15' }]}>
                   {c.thumbnail_url
                     ? <Image source={{ uri: c.thumbnail_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                    : <Icon name="music" size={20} color="#7B3FF2" />
+                    : <Icon name="music" size={20} color={colors.primary} />
                   }
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
@@ -1350,7 +1349,7 @@ const PostCard: React.FC<PostCardProps> = React.memo(({ item, colors, isDark, on
             <Text style={s.postBadgeText}>{typeLabel.toUpperCase()}</Text>
           </View>
           {accessType === 'free' && (
-            <View style={[s.postBadge, { backgroundColor: '#36D9A0EE' }]}>
+            <View style={[s.postBadge, { backgroundColor: colors.primary + 'EE' }]}>
               <Text style={s.postBadgeText}>GRATUIT</Text>
             </View>
           )}

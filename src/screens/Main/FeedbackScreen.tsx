@@ -15,10 +15,12 @@ interface Props {
   navigation: any;
 }
 
-const CATEGORIES: { value: FeedbackCategory; label: string; icon: string; color: string }[] = [
-  { value: 'bug',        label: 'Signaler un bug',       icon: 'alert-triangle', color: '#EF4444' },
-  { value: 'suggestion', label: "Suggérer une amélioration", icon: 'zap',        color: '#F59E0B' },
-  { value: 'avis',       label: 'Donner un avis général', icon: 'message-circle', color: '#7B3FF2' },
+// Une seule couleur d'accent (colors.primary, voir CategoryRow) — 'bug' garde
+// le rouge, seule catégorie qui signale un problème réel.
+const CATEGORIES: { value: FeedbackCategory; label: string; icon: string; danger?: boolean }[] = [
+  { value: 'bug',        label: 'Signaler un bug',       icon: 'alert-triangle', danger: true },
+  { value: 'suggestion', label: "Suggérer une amélioration", icon: 'zap' },
+  { value: 'avis',       label: 'Donner un avis général', icon: 'message-circle' },
 ];
 
 const STATUS_LABEL: Record<Feedback['status'], { label: string; color: string }> = {
@@ -102,26 +104,29 @@ export const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
         {/* Catégorie */}
         <Text style={[s.sectionTitle, { color: colors.textTertiary }]}>TYPE DE RETOUR</Text>
         <View style={{ paddingHorizontal: 16, gap: 10 }}>
-          {CATEGORIES.map(c => (
-            <TouchableOpacity
-              key={c.value}
-              style={[
-                s.categoryRow,
-                { backgroundColor: colors.surface, borderColor: category === c.value ? c.color : colors.border },
-                category === c.value && { backgroundColor: c.color + '12' },
-              ]}
-              activeOpacity={0.75}
-              onPress={() => setCategory(c.value)}
-            >
-              <View style={[s.categoryIcon, { backgroundColor: c.color + '18' }]}>
-                <Icon name={c.icon} size={18} color={c.color} />
-              </View>
-              <Text style={[s.categoryLabel, { color: colors.textPrimary }]}>{c.label}</Text>
-              <View style={[s.radio, { borderColor: category === c.value ? c.color : colors.border }]}>
-                {category === c.value && <View style={[s.radioDot, { backgroundColor: c.color }]} />}
-              </View>
-            </TouchableOpacity>
-          ))}
+          {CATEGORIES.map(c => {
+            const accent = c.danger ? '#EF4444' : colors.primary;
+            return (
+              <TouchableOpacity
+                key={c.value}
+                style={[
+                  s.categoryRow,
+                  { backgroundColor: colors.surface, borderColor: category === c.value ? accent : colors.border },
+                  category === c.value && { backgroundColor: accent + '12' },
+                ]}
+                activeOpacity={0.75}
+                onPress={() => setCategory(c.value)}
+              >
+                <View style={[s.categoryIcon, { backgroundColor: accent + '18' }]}>
+                  <Icon name={c.icon} size={18} color={accent} />
+                </View>
+                <Text style={[s.categoryLabel, { color: colors.textPrimary }]}>{c.label}</Text>
+                <View style={[s.radio, { borderColor: category === c.value ? accent : colors.border }]}>
+                  {category === c.value && <View style={[s.radioDot, { backgroundColor: accent }]} />}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         {/* Message */}
@@ -171,7 +176,7 @@ export const FeedbackScreen: React.FC<Props> = ({ navigation }) => {
                 <View key={f.id} style={[s.historyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                   <View style={s.historyHeader}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
-                      <Icon name={cat?.icon ?? 'message-circle'} size={14} color={cat?.color ?? colors.textTertiary} />
+                      <Icon name={cat?.icon ?? 'message-circle'} size={14} color={cat?.danger ? '#EF4444' : colors.primary} />
                       <Text style={[s.historyCategory, { color: colors.textPrimary }]}>{cat?.label ?? f.category}</Text>
                     </View>
                     <View style={[s.statusPill, { backgroundColor: st.color + '18' }]}>

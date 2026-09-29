@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api';
 import { Endpoints } from '../../api/endpoints';
@@ -32,12 +33,13 @@ const CREATOR_TYPES: { key: CreatorType; icon: string; label: string; sub: strin
 
 const AUDIENCE_OPTIONS = ['< 500', '500–1 000', '1 000–5 000', '5 000–10 000', '> 10 000'];
 
-const GREEN = '#10B981';
-
 export const SettingsMonetisationScreen: React.FC = () => {
   const nav = useNavigation<any>();
   const { theme } = useTheme();
   const { colors } = theme;
+  // Une seule couleur d'accent partout sur cet écran (plus de vert/orange/rouge
+  // distincts par statut) — même parti pris que le FeedScreen désaturé.
+  const ACCENT = colors.primary;
 
   const [status,       setStatus]       = useState<MonetStatus>('none');
   const [adminNote,    setAdminNote]    = useState<string | null>(null);
@@ -62,6 +64,19 @@ export const SettingsMonetisationScreen: React.FC = () => {
       const res = await apiClient.get<{ status: MonetStatus; admin_note: string | null } & EligibilityInfo>(
         Endpoints.monetization.status,
       );
+      // Compte déjà monétisé — cet écran ne sert qu'à faire/suivre une demande,
+      // il n'a rien à montrer une fois approuvé. On redirige directement vers le
+      // dashboard créateur (replace, pas navigate : cet écran intermédiaire ne
+      // doit pas rester dans l'historique de navigation), tout se passe en
+      // arrière-plan, jamais de bouton "Accéder à mon espace créateur" à cliquer.
+      if (res.data.status === 'approved') {
+        // preloadedStatus — évite que Monetisation refasse le même appel réseau
+        // et affiche son propre spinner juste après celui-ci : transition en un
+        // seul chargement continu, jamais deux écrans de chargement qui se
+        // succèdent visiblement.
+        nav.replace('Monetisation', { preloadedStatus: 'approved' });
+        return;
+      }
       setStatus(res.data.status);
       setAdminNote(res.data.admin_note ?? null);
       setElig({
@@ -107,9 +122,9 @@ export const SettingsMonetisationScreen: React.FC = () => {
   const renderStatus = () => {
     const CFG: Record<MonetStatus, { icon: string; color: string; title: string; sub: string }> = {
       none:     { icon: 'bar-chart-2',  color: colors.textTertiary, title: 'Non monétisé',         sub: '' },
-      pending:  { icon: 'clock',        color: '#F59E0B',           title: "En cours d'examen",    sub: 'Notre équipe examine votre dossier. Cela peut prendre quelques jours.' },
-      approved: { icon: 'check-circle', color: GREEN,               title: 'Monétisation activée', sub: 'Votre compte est monétisé Gofolyx. Accédez à votre espace créateur.' },
-      rejected: { icon: 'x-circle',     color: '#EF4444',           title: 'Demande refusée',      sub: (adminNote ? adminNote + '\n\n' : '') + 'Vous pouvez soumettre une nouvelle demande.' },
+      pending:  { icon: 'clock',        color: ACCENT,               title: "En cours d'examen",    sub: 'Notre équipe examine votre dossier. Cela peut prendre quelques jours.' },
+      approved: { icon: 'check-circle', color: ACCENT,               title: 'Monétisation activée', sub: 'Votre compte est monétisé Gofolyx. Accédez à votre espace créateur.' },
+      rejected: { icon: 'x-circle',     color: ACCENT,               title: 'Demande refusée',      sub: (adminNote ? adminNote + '\n\n' : '') + 'Vous pouvez soumettre une nouvelle demande.' },
     };
     const cfg = CFG[status];
     return (
@@ -119,7 +134,7 @@ export const SettingsMonetisationScreen: React.FC = () => {
         <Text style={[ms.statusSub, { color: colors.textSecondary }]}>{cfg.sub}</Text>
         {status === 'approved' && (
           <TouchableOpacity
-            style={[ms.primaryBtn, { backgroundColor: GREEN, marginTop: 8 }]}
+            style={[ms.primaryBtn, { backgroundColor: ACCENT, marginTop: 8 }]}
             onPress={() => nav.navigate('Monetisation')}
           >
             <Icon name="trending-up" size={16} color="#fff" />
@@ -128,7 +143,7 @@ export const SettingsMonetisationScreen: React.FC = () => {
         )}
         {status === 'rejected' && (
           <TouchableOpacity
-            style={[ms.primaryBtn, { backgroundColor: GREEN, marginTop: 8 }]}
+            style={[ms.primaryBtn, { backgroundColor: ACCENT, marginTop: 8 }]}
             onPress={() => setStep(1)}
           >
             <Icon name="refresh-cw" size={16} color="#fff" />
@@ -142,9 +157,9 @@ export const SettingsMonetisationScreen: React.FC = () => {
   // ── Step 0 — Hero ──────────────────────────────────────────────────────────
   const renderStep0 = () => (
     <View style={{ gap: 16 }}>
-      <View style={[ms.heroBadge, { backgroundColor: GREEN + '15' }]}>
-        <View style={[ms.heroBadgeIcon, { backgroundColor: GREEN + '20' }]}>
-          <Icon name="bar-chart-2" size={32} color={GREEN} />
+      <View style={[ms.heroBadge, { backgroundColor: ACCENT + '15' }]}>
+        <View style={[ms.heroBadgeIcon, { backgroundColor: ACCENT + '20' }]}>
+          <Icon name="bar-chart-2" size={32} color={ACCENT} />
         </View>
         <Text style={[ms.heroTitle, { color: colors.textPrimary }]}>Programme Créateur Gofolyx</Text>
         <Text style={[ms.heroSub, { color: colors.textSecondary }]}>
@@ -168,13 +183,13 @@ export const SettingsMonetisationScreen: React.FC = () => {
             { icon: 'clock',        label: 'Validation automatique sous 24h si les conditions restent remplies', ok: true },
           ];
           return items.map((item, i, arr) => (
-            <Row key={i} icon={item.icon} label={item.label} color={item.ok ? GREEN : '#EF4444'} last={i === arr.length - 1} />
+            <Row key={i} icon={item.icon} label={item.label} color={item.ok ? ACCENT : colors.textTertiary} last={i === arr.length - 1} />
           ));
         })()}
         {elig && !elig.eligible && elig.eligibility_reasons.length > 0 && (
-          <View style={{ marginTop: 10, borderRadius: 10, padding: 10, gap: 4, backgroundColor: '#EF444415' }}>
+          <View style={{ marginTop: 10, borderRadius: 10, padding: 10, gap: 4, backgroundColor: colors.backgroundSecondary }}>
             {elig.eligibility_reasons.map(reason => (
-              <Text key={reason} style={{ fontSize: 12, lineHeight: 17, color: '#EF4444' }}>{reason}</Text>
+              <Text key={reason} style={{ fontSize: FontSize.sm, lineHeight: 17, color: colors.textSecondary }}>{reason}</Text>
             ))}
           </View>
         )}
@@ -189,12 +204,12 @@ export const SettingsMonetisationScreen: React.FC = () => {
           { icon: 'award',       text: 'Badge "Créateur monétisé" sur votre profil' },
           { icon: 'users',       text: "Accès à l'abonnement payant pour vos fans" },
         ].map((it, i, arr) => (
-          <Row key={i} icon={it.icon} label={it.text} color={GREEN} last={i === arr.length - 1} />
+          <Row key={i} icon={it.icon} label={it.text} color={ACCENT} last={i === arr.length - 1} />
         ))}
       </Card>
 
       <TouchableOpacity
-        style={[ms.primaryBtn, { backgroundColor: elig && !elig.eligible ? colors.border : GREEN }]}
+        style={[ms.primaryBtn, { backgroundColor: elig && !elig.eligible ? colors.border : ACCENT }]}
         onPress={() => setStep(1)}
         disabled={!!elig && !elig.eligible}
       >
@@ -213,18 +228,18 @@ export const SettingsMonetisationScreen: React.FC = () => {
         return (
           <TouchableOpacity
             key={t.key}
-            style={[ms.typeCard, { backgroundColor: colors.surface, borderColor: selected ? GREEN : colors.divider, borderWidth: selected ? 2 : StyleSheet.hairlineWidth }]}
+            style={[ms.typeCard, { backgroundColor: colors.surface, borderColor: selected ? ACCENT : colors.divider, borderWidth: selected ? 2 : StyleSheet.hairlineWidth }]}
             onPress={() => setCreatorType(t.key)}
             activeOpacity={0.75}
           >
-            <View style={[ms.typeIcon, { backgroundColor: selected ? GREEN + '20' : colors.backgroundSecondary }]}>
-              <Icon name={t.icon} size={20} color={selected ? GREEN : colors.textSecondary} />
+            <View style={[ms.typeIcon, { backgroundColor: selected ? ACCENT + '20' : colors.backgroundSecondary }]}>
+              <Icon name={t.icon} size={20} color={selected ? ACCENT : colors.textSecondary} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[ms.typeLabel, { color: colors.textPrimary }]}>{t.label}</Text>
-              <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }}>{t.sub}</Text>
+              <Text style={{ fontSize: FontSize.sm, color: colors.textTertiary, marginTop: 2 }}>{t.sub}</Text>
             </View>
-            {selected && <Icon name="check-circle" size={20} color={GREEN} />}
+            {selected && <Icon name="check-circle" size={20} color={ACCENT} />}
           </TouchableOpacity>
         );
       })}
@@ -234,7 +249,7 @@ export const SettingsMonetisationScreen: React.FC = () => {
           <Text style={[ms.secondaryBtnText, { color: colors.textSecondary }]}>Retour</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[ms.primaryBtn, { flex: 1, backgroundColor: canGoStep2 ? GREEN : colors.border }]}
+          style={[ms.primaryBtn, { flex: 1, backgroundColor: canGoStep2 ? ACCENT : colors.border }]}
           onPress={() => canGoStep2 && setStep(2)}
           disabled={!canGoStep2}
         >
@@ -257,7 +272,7 @@ export const SettingsMonetisationScreen: React.FC = () => {
           onChangeText={setDisplayName}
           placeholder="Ex : Sah Douss, DJ Krys…"
           placeholderTextColor={colors.textDisabled}
-          style={[ms.input, { borderColor: displayName.trim().length >= 2 ? GREEN : colors.border, backgroundColor: colors.backgroundSecondary, color: colors.textPrimary }]}
+          style={[ms.input, { borderColor: displayName.trim().length >= 2 ? ACCENT : colors.border, backgroundColor: colors.backgroundSecondary, color: colors.textPrimary }]}
         />
       </View>
 
@@ -270,9 +285,9 @@ export const SettingsMonetisationScreen: React.FC = () => {
           placeholderTextColor={colors.textDisabled}
           multiline
           numberOfLines={4}
-          style={[ms.input, ms.inputMulti, { borderColor: description.trim().length >= 30 ? GREEN : colors.border, backgroundColor: colors.backgroundSecondary, color: colors.textPrimary }]}
+          style={[ms.input, ms.inputMulti, { borderColor: description.trim().length >= 30 ? ACCENT : colors.border, backgroundColor: colors.backgroundSecondary, color: colors.textPrimary }]}
         />
-        <Text style={{ fontSize: 11, marginTop: 4, textAlign: 'right', color: description.trim().length >= 30 ? '#22C55E' : colors.textDisabled }}>
+        <Text style={{ fontSize: FontSize.xsPlus, marginTop: 4, textAlign: 'right', color: description.trim().length >= 30 ? ACCENT : colors.textDisabled }}>
           {description.trim().length} / 30 min
         </Text>
       </View>
@@ -286,9 +301,9 @@ export const SettingsMonetisationScreen: React.FC = () => {
               <TouchableOpacity
                 key={opt}
                 onPress={() => setAudience(selected ? null : opt)}
-                style={[ms.audienceChip, { backgroundColor: selected ? GREEN + '20' : colors.backgroundSecondary, borderColor: selected ? GREEN : colors.border }]}
+                style={[ms.audienceChip, { backgroundColor: selected ? ACCENT + '20' : colors.backgroundSecondary, borderColor: selected ? ACCENT : colors.border }]}
               >
-                <Text style={{ fontSize: 13, fontWeight: '600', color: selected ? GREEN : colors.textSecondary }}>{opt}</Text>
+                <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold, color: selected ? ACCENT : colors.textSecondary }}>{opt}</Text>
               </TouchableOpacity>
             );
           })}
@@ -309,13 +324,13 @@ export const SettingsMonetisationScreen: React.FC = () => {
       <View style={[ms.toggleRow, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
         <View style={{ flex: 1 }}>
           <Text style={[ms.toggleLabel, { color: colors.textPrimary }]}>Revenus existants</Text>
-          <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }}>Générez-vous déjà des revenus avec votre contenu ?</Text>
+          <Text style={{ fontSize: FontSize.sm, color: colors.textTertiary, marginTop: 2 }}>Générez-vous déjà des revenus avec votre contenu ?</Text>
         </View>
         <Switch
           value={hasRevenue}
           onValueChange={setHasRevenue}
-          trackColor={{ false: colors.border, true: GREEN + '80' }}
-          thumbColor={hasRevenue ? GREEN : colors.textTertiary}
+          trackColor={{ false: colors.border, true: ACCENT + '80' }}
+          thumbColor={hasRevenue ? ACCENT : colors.textTertiary}
         />
       </View>
 
@@ -325,7 +340,7 @@ export const SettingsMonetisationScreen: React.FC = () => {
           <Text style={[ms.secondaryBtnText, { color: colors.textSecondary }]}>Retour</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[ms.primaryBtn, { flex: 1, backgroundColor: canGoStep3 ? GREEN : colors.border }]}
+          style={[ms.primaryBtn, { flex: 1, backgroundColor: canGoStep3 ? ACCENT : colors.border }]}
           onPress={() => canGoStep3 && setStep(3)}
           disabled={!canGoStep3}
         >
@@ -353,23 +368,23 @@ export const SettingsMonetisationScreen: React.FC = () => {
             { label: 'Revenus existants', value: hasRevenue ? 'Oui' : 'Non' },
           ].map((row, i, arr) => (
             <View key={i} style={[ms.summaryRow, i < arr.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }]}>
-              <Text style={{ fontSize: 13, color: colors.textTertiary }}>{row.label}</Text>
-              <Text style={{ fontSize: 13, fontWeight: '600', color: colors.textPrimary, flex: 1, textAlign: 'right' }} numberOfLines={3}>{row.value}</Text>
+              <Text style={{ fontSize: FontSize.smPlus, color: colors.textTertiary }}>{row.label}</Text>
+              <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold, color: colors.textPrimary, flex: 1, textAlign: 'right' }} numberOfLines={3}>{row.value}</Text>
             </View>
           ))}
         </View>
 
         <TouchableOpacity
-          style={[ms.termsRow, { backgroundColor: colors.surface, borderColor: acceptsTerms ? GREEN + '40' : colors.divider }]}
+          style={[ms.termsRow, { backgroundColor: colors.surface, borderColor: acceptsTerms ? ACCENT + '40' : colors.divider }]}
           onPress={() => setAcceptsTerms(v => !v)}
           activeOpacity={0.8}
         >
-          <View style={[ms.checkbox, { borderColor: acceptsTerms ? GREEN : colors.border, backgroundColor: acceptsTerms ? GREEN : 'transparent' }]}>
+          <View style={[ms.checkbox, { borderColor: acceptsTerms ? ACCENT : colors.border, backgroundColor: acceptsTerms ? ACCENT : 'transparent' }]}>
             {acceptsTerms && <Icon name="check" size={12} color="#fff" />}
           </View>
-          <Text style={{ fontSize: 13, color: colors.textSecondary, flex: 1, lineHeight: 19 }}>
+          <Text style={{ fontSize: FontSize.smPlus, color: colors.textSecondary, flex: 1, lineHeight: 19 }}>
             {"J'accepte les "}
-            <Text style={{ color: GREEN, fontWeight: '700' }}>Conditions d'utilisation Gofolyx Creator Program</Text>
+            <Text style={{ color: ACCENT, fontWeight: FontWeight.bold }}>Conditions d'utilisation Gofolyx Creator Program</Text>
           </Text>
         </TouchableOpacity>
 
@@ -379,7 +394,7 @@ export const SettingsMonetisationScreen: React.FC = () => {
             <Text style={[ms.secondaryBtnText, { color: colors.textSecondary }]}>Modifier</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[ms.primaryBtn, { flex: 1, backgroundColor: canSubmit ? GREEN : colors.border, opacity: loading ? 0.7 : 1 }]}
+            style={[ms.primaryBtn, { flex: 1, backgroundColor: canSubmit ? ACCENT : colors.border, opacity: loading ? 0.7 : 1 }]}
             onPress={handleSubmit}
             disabled={loading || !canSubmit}
           >
@@ -401,7 +416,7 @@ export const SettingsMonetisationScreen: React.FC = () => {
       <PageHeader title="Monetisation Gofolyx" onBack={() => nav.goBack()} />
 
       {fetching
-        ? <ActivityIndicator color={GREEN} style={{ marginTop: 40 }} />
+        ? <ActivityIndicator color={ACCENT} style={{ marginTop: 40 }} />
         : (
           <ScrollView
             contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
@@ -416,15 +431,15 @@ export const SettingsMonetisationScreen: React.FC = () => {
                   return (
                     <React.Fragment key={label}>
                       <View style={ms.progressStep}>
-                        <View style={[ms.progressDot, { backgroundColor: done || current ? GREEN : colors.border }]}>
+                        <View style={[ms.progressDot, { backgroundColor: done || current ? ACCENT : colors.border }]}>
                           {done
                             ? <Icon name="check" size={10} color="#fff" />
                             : <Text style={[ms.progressNum, { color: current ? '#fff' : colors.textTertiary }]}>{i + 1}</Text>
                           }
                         </View>
-                        <Text style={[ms.progressLabel, { color: current ? GREEN : colors.textTertiary }]}>{label}</Text>
+                        <Text style={[ms.progressLabel, { color: current ? ACCENT : colors.textTertiary }]}>{label}</Text>
                       </View>
-                      {i < STEPS.length - 1 && <View style={[ms.progressLine, { backgroundColor: done ? GREEN : colors.border }]} />}
+                      {i < STEPS.length - 1 && <View style={[ms.progressLine, { backgroundColor: done ? ACCENT : colors.border }]} />}
                     </React.Fragment>
                   );
                 })}
@@ -447,28 +462,28 @@ export const SettingsMonetisationScreen: React.FC = () => {
 
 const ms = StyleSheet.create({
   statusCard:       { borderRadius: 18, borderWidth: 1, padding: 24, alignItems: 'center', gap: 10 },
-  statusTitle:      { fontSize: 20, fontWeight: '800', textAlign: 'center' },
-  statusSub:        { fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  statusTitle:      { fontSize: FontSize.xl, fontWeight: FontWeight.extraBold, textAlign: 'center' },
+  statusSub:        { fontSize: FontSize.smPlus, textAlign: 'center', lineHeight: 20 },
   heroBadge:        { borderRadius: 20, padding: 24, alignItems: 'center', gap: 12 },
   heroBadgeIcon:    { width: 70, height: 70, borderRadius: 35, alignItems: 'center', justifyContent: 'center' },
-  heroTitle:        { fontSize: 22, fontWeight: '800', textAlign: 'center' },
-  heroSub:          { fontSize: 13, textAlign: 'center', lineHeight: 20 },
-  sectionLabel:     { fontSize: 11, fontWeight: '700', letterSpacing: 0.6, marginBottom: 6 },
+  heroTitle:        { fontSize: FontSize['2xl'], fontWeight: FontWeight.extraBold, textAlign: 'center' },
+  heroSub:          { fontSize: FontSize.smPlus, textAlign: 'center', lineHeight: 20 },
+  sectionLabel:     { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, letterSpacing: 0.6, marginBottom: 6 },
   primaryBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, paddingVertical: 15 },
-  primaryBtnText:   { color: '#fff', fontSize: 15, fontWeight: '700' },
+  primaryBtnText:   { color: '#fff', fontSize: FontSize.basePlus, fontWeight: FontWeight.bold },
   secondaryBtn:     { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 14, paddingVertical: 15, paddingHorizontal: 18, borderWidth: 1 },
-  secondaryBtnText: { fontSize: 15, fontWeight: '600' },
+  secondaryBtnText: { fontSize: FontSize.basePlus, fontWeight: FontWeight.semiBold },
   navRow:           { flexDirection: 'row', gap: 10, marginTop: 4 },
-  stepTitle:        { fontSize: 20, fontWeight: '800' },
+  stepTitle:        { fontSize: FontSize.xl, fontWeight: FontWeight.extraBold },
   typeCard:         { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, padding: 14 },
   typeIcon:         { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  typeLabel:        { fontSize: 15, fontWeight: '700' },
-  fieldLabel:       { fontSize: 11, fontWeight: '700', letterSpacing: 0.6, marginBottom: 6 },
-  input:            { borderWidth: 1.5, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14 },
+  typeLabel:        { fontSize: FontSize.basePlus, fontWeight: FontWeight.bold },
+  fieldLabel:       { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, letterSpacing: 0.6, marginBottom: 6 },
+  input:            { borderWidth: 1.5, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: FontSize.base },
   inputMulti:       { minHeight: 100, textAlignVertical: 'top', paddingTop: 12 },
   audienceChip:     { borderWidth: 1.5, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7 },
   toggleRow:        { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, padding: 14 },
-  toggleLabel:      { fontSize: 14, fontWeight: '600' },
+  toggleLabel:      { fontSize: FontSize.base, fontWeight: FontWeight.semiBold },
   summaryCard:      { borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
   summaryRow:       { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
   termsRow:         { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderRadius: 14, borderWidth: 1, padding: 14 },
@@ -476,7 +491,7 @@ const ms = StyleSheet.create({
   progressBar:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 14 },
   progressStep:     { alignItems: 'center', gap: 4 },
   progressDot:      { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  progressNum:      { fontSize: 12, fontWeight: '700' },
-  progressLabel:    { fontSize: 10, fontWeight: '600' },
+  progressNum:      { fontSize: FontSize.sm, fontWeight: FontWeight.bold },
+  progressLabel:    { fontSize: FontSize.xs, fontWeight: FontWeight.semiBold },
   progressLine:     { flex: 1, height: 2, marginBottom: 14 },
 });

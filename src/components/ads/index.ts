@@ -1,6 +1,6 @@
 export type { AdData } from './types';
 export {
-  adIsVideo, adDomain, adIsPhone, adAdvertiserLabel, adInitials,
+  adIsVideo, adDomain, adIsPhone, adIsAppStore, adCtaLabel, adAdvertiserLabel, adInitials,
 } from './types';
 export { useNextAd, useAdImpression, useAdClick } from './useAd';
 export { AdvertiserRow } from './AdvertiserRow';

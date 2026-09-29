@@ -9,6 +9,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { launchImageLibrary } from 'react-native-image-picker';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { BackButton, GofolyxLoader } from '../../components/common';
 import { communityService } from '../../services/communityService';
@@ -296,7 +297,7 @@ export const CommunityChannelSettingsScreen: React.FC = () => {
               </TouchableOpacity>
               {avatarUrl && canManage && (
                 <TouchableOpacity onPress={() => setAvatarUrl(null)} style={{ marginTop: 8 }}>
-                  <Text style={{ color: '#EF4444', fontSize: 12 }}>Supprimer la photo</Text>
+                  <Text style={{ color: '#EF4444', fontSize: FontSize.sm }}>Supprimer la photo</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -355,8 +356,8 @@ export const CommunityChannelSettingsScreen: React.FC = () => {
                 <Icon name="lock" size={16} color={formPrivate ? colors.primary : colors.textTertiary} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }]}>Canal privé</Text>
-                <Text style={[{ fontSize: 12, color: colors.textTertiary, marginTop: 1 }]}>Visible uniquement sur invitation</Text>
+                <Text style={[{ fontSize: FontSize.base, fontWeight: FontWeight.semiBold, color: colors.textPrimary }]}>Canal privé</Text>
+                <Text style={[{ fontSize: FontSize.sm, color: colors.textTertiary, marginTop: 1 }]}>Visible uniquement sur invitation</Text>
               </View>
               <View style={[S.checkBox, { backgroundColor: formPrivate ? colors.primary : colors.backgroundSecondary, borderColor: formPrivate ? colors.primary : colors.divider }]}>
                 {formPrivate && <Icon name="check" size={12} color="#fff" />}
@@ -369,19 +370,19 @@ export const CommunityChannelSettingsScreen: React.FC = () => {
               <View style={{ gap: 8, marginBottom: 8 }}>
                 <View style={[S.pwdStatus, { backgroundColor: '#F59E0B15', borderColor: '#F59E0B40' }]}>
                   <Icon name="key" size={14} color="#F59E0B" />
-                  <Text style={{ flex: 1, color: '#D97706', fontSize: 13, fontWeight: '600' }}>Mot de passe actif</Text>
+                  <Text style={{ flex: 1, color: '#D97706', fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold }}>Mot de passe actif</Text>
                 </View>
                 {canManage && (
                   <TouchableOpacity style={[S.pwdStatus, { backgroundColor: '#EF444415', borderColor: '#EF444440' }]} onPress={() => setRemovePwd(true)}>
                     <Icon name="trash-2" size={14} color="#EF4444" />
-                    <Text style={{ color: '#EF4444', fontSize: 13, fontWeight: '600' }}>Supprimer le mot de passe</Text>
+                    <Text style={{ color: '#EF4444', fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold }}>Supprimer le mot de passe</Text>
                   </TouchableOpacity>
                 )}
               </View>
             ) : removePwd ? (
               <View style={[S.pwdStatus, { backgroundColor: '#EF444415', borderColor: '#EF444440', marginBottom: 8 }]}>
                 <Icon name="trash-2" size={14} color="#EF4444" />
-                <Text style={{ flex: 1, color: '#EF4444', fontSize: 13 }}>Supprimé à la sauvegarde</Text>
+                <Text style={{ flex: 1, color: '#EF4444', fontSize: FontSize.smPlus }}>Supprimé à la sauvegarde</Text>
                 <TouchableOpacity onPress={() => setRemovePwd(false)}>
                   <Icon name="x" size={16} color="#EF4444" />
                 </TouchableOpacity>
@@ -391,7 +392,7 @@ export const CommunityChannelSettingsScreen: React.FC = () => {
               <View style={[S.pwdRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
                 <Icon name="key" size={15} color={colors.textTertiary} />
                 <TextInput
-                  style={[{ flex: 1, color: colors.textPrimary, fontSize: 14, marginLeft: 8 }]}
+                  style={[{ flex: 1, color: colors.textPrimary, fontSize: FontSize.base, marginLeft: 8 }]}
                   value={formPassword}
                   onChangeText={setFormPassword}
                   placeholder={channel?.has_password ? 'Nouveau mot de passe…' : 'Définir un mot de passe…'}
@@ -422,7 +423,7 @@ export const CommunityChannelSettingsScreen: React.FC = () => {
 
                 <TouchableOpacity style={[S.deleteBtn, { borderColor: '#EF444440' }]} onPress={handleDeleteChannel}>
                   <Icon name="trash-2" size={16} color="#EF4444" />
-                  <Text style={{ color: '#EF4444', fontWeight: '700', fontSize: 14 }}>Supprimer le canal</Text>
+                  <Text style={{ color: '#EF4444', fontWeight: FontWeight.bold, fontSize: FontSize.base }}>Supprimer le canal</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -439,8 +440,8 @@ export const CommunityChannelSettingsScreen: React.FC = () => {
           ListEmptyComponent={
             <View style={S.empty}>
               <Icon name="users" size={36} color={colors.textTertiary} />
-              <Text style={[{ fontSize: 16, fontWeight: '700', marginTop: 14, color: colors.textPrimary }]}>Aucun membre</Text>
-              <Text style={[{ fontSize: 13, color: colors.textTertiary, marginTop: 6, textAlign: 'center' }]}>
+              <Text style={[{ fontSize: FontSize.md, fontWeight: FontWeight.bold, marginTop: 14, color: colors.textPrimary }]}>Aucun membre</Text>
+              <Text style={[{ fontSize: FontSize.smPlus, color: colors.textTertiary, marginTop: 6, textAlign: 'center' }]}>
                 Les membres rejoignent le canal depuis la liste des canaux.
               </Text>
             </View>
@@ -457,13 +458,13 @@ export const CommunityChannelSettingsScreen: React.FC = () => {
               {menuMember?.avatar_url
                 ? <Image source={{ uri: menuMember.avatar_url }} style={{ width: 40, height: 40, borderRadius: 12 }} />
                 : <View style={[{ width: 40, height: 40, borderRadius: 12, backgroundColor: colors.primary + '25', alignItems: 'center', justifyContent: 'center' }]}>
-                    <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 16 }}>
+                    <Text style={{ color: colors.primary, fontWeight: FontWeight.extraBold, fontSize: FontSize.md }}>
                       {(menuMember?.display_name || menuMember?.username || '?')[0].toUpperCase()}
                     </Text>
                   </View>
               }
               <View style={{ flex: 1 }}>
-                <Text style={[{ fontWeight: '700', color: colors.textPrimary, fontSize: 15 }]} numberOfLines={1}>
+                <Text style={[{ fontWeight: FontWeight.bold, color: colors.textPrimary, fontSize: FontSize.basePlus }]} numberOfLines={1}>
                   {menuMember?.display_name || menuMember?.username}
                 </Text>
                 <View style={[S.roleBadge, { backgroundColor: (ROLE_COLORS[menuMember?.role ?? 'member'] ?? '#9390AB') + '20', alignSelf: 'flex-start', marginTop: 3 }]}>
@@ -515,7 +516,7 @@ export const CommunityChannelSettingsScreen: React.FC = () => {
             <View style={[S.addSearch, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
               <Icon name="search" size={15} color={colors.textTertiary} />
               <TextInput
-                style={[{ flex: 1, color: colors.textPrimary, fontSize: 14, marginLeft: 8 }]}
+                style={[{ flex: 1, color: colors.textPrimary, fontSize: FontSize.base, marginLeft: 8 }]}
                 placeholder="Rechercher…"
                 placeholderTextColor={colors.textTertiary}
                 value={addSearch}
@@ -567,7 +568,7 @@ export const CommunityChannelSettingsScreen: React.FC = () => {
               )}
               ListEmptyComponent={
                 <View style={{ alignItems: 'center', padding: 32 }}>
-                  <Text style={{ color: colors.textTertiary, fontSize: 14 }}>
+                  <Text style={{ color: colors.textTertiary, fontSize: FontSize.base }}>
                     {communityMembers.length === 0 ? 'Tous les membres sont déjà dans ce canal' : 'Aucun résultat'}
                   </Text>
                 </View>
@@ -590,19 +591,19 @@ export const CommunityChannelSettingsScreen: React.FC = () => {
 const S = StyleSheet.create({
   root:        { flex: 1 },
   header:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth, gap: 12 },
-  headerTitle: { fontSize: 17, fontWeight: '800' },
-  headerSub:   { fontSize: 12, marginTop: 1 },
+  headerTitle: { fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold },
+  headerSub:   { fontSize: FontSize.sm, marginTop: 1 },
 
   tabs:    { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth },
   tab:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 13 },
-  tabText: { fontSize: 13, fontWeight: '600' },
+  tabText: { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
 
-  label:     { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8, marginTop: 16 },
-  input:     { height: 48, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, fontSize: 15, marginBottom: 4 },
-  inputMulti: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, minHeight: 70, textAlignVertical: 'top', marginBottom: 4 },
+  label:     { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8, marginTop: 16 },
+  input:     { height: 48, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, fontSize: FontSize.basePlus, marginBottom: 4 },
+  inputMulti: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, fontSize: FontSize.base, minHeight: 70, textAlignVertical: 'top', marginBottom: 4 },
 
   typeChip:     { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1.5, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 },
-  typeChipText: { fontSize: 13, fontWeight: '600' },
+  typeChipText: { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
 
   toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 4 },
   toggleIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
@@ -616,25 +617,25 @@ const S = StyleSheet.create({
 
   saveBtn:     { borderRadius: 14, overflow: 'hidden', height: 52 },
   saveBtnGrad: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  saveBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  saveBtnText: { color: '#fff', fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold },
   deleteBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 12, borderWidth: 1.5, borderRadius: 14, paddingVertical: 14 },
 
   memberRow:             { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, gap: 12 },
   memberAvatar:          { width: 44, height: 44, borderRadius: 13 },
   memberAvatarPlaceholder: { width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  memberAvatarLetter:    { fontSize: 17, fontWeight: '800' },
-  memberName:            { fontSize: 14, fontWeight: '700' },
-  memberUsername:        { fontSize: 12, marginTop: 1 },
+  memberAvatarLetter:    { fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold },
+  memberName:            { fontSize: FontSize.base, fontWeight: FontWeight.bold },
+  memberUsername:        { fontSize: FontSize.sm, marginTop: 1 },
   roleBadge:             { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  roleText:              { fontSize: 11, fontWeight: '700' },
+  roleText:              { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold },
 
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
 
   addMemberBtn:     { flexDirection: 'row', alignItems: 'center', gap: 8, margin: 12, marginBottom: 0, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, justifyContent: 'center' },
-  addMemberBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  addMemberBtnText: { color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.base },
   addSheet:         { borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   addSheetHandle:   { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 6 },
-  addSheetTitle:    { fontSize: 16, fontWeight: '800', paddingHorizontal: 18, paddingVertical: 10 },
+  addSheetTitle:    { fontSize: FontSize.md, fontWeight: FontWeight.extraBold, paddingHorizontal: 18, paddingVertical: 10 },
   addSearch:        { flexDirection: 'row', alignItems: 'center', marginHorizontal: 14, marginBottom: 8, borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8 },
   addMemberRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, gap: 12 },
 
@@ -643,5 +644,5 @@ const S = StyleSheet.create({
   menuPreview:  { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
   menuItem:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 14, borderTopWidth: StyleSheet.hairlineWidth },
   menuItemIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  menuItemText: { fontSize: 15, fontWeight: '500' },
+  menuItemText: { fontSize: FontSize.basePlus, fontWeight: FontWeight.medium },
 });

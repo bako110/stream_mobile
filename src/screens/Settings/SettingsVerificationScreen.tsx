@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api';
 import { Endpoints } from '../../api/endpoints';
@@ -144,7 +145,7 @@ export const SettingsVerificationScreen: React.FC = () => {
             {subInfo.plan && (
               <View style={[vs.subRow, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
                 <Icon name="repeat" size={14} color={colors.textSecondary} />
-                <Text style={{ fontSize: 12, color: colors.textSecondary, flex: 1 }}>
+                <Text style={{ fontSize: FontSize.sm, color: colors.textSecondary, flex: 1 }}>
                   Abonnement {PLAN_INFO[subInfo.plan].label.toLowerCase()} · {PLAN_INFO[subInfo.plan].priceEur.toFixed(2)} € / {PLAN_INFO[subInfo.plan].months} mois
                 </Text>
               </View>
@@ -152,7 +153,7 @@ export const SettingsVerificationScreen: React.FC = () => {
             {subInfo.expiresAt && (
               <View style={[vs.subRow, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
                 <Icon name="calendar" size={14} color={colors.textSecondary} />
-                <Text style={{ fontSize: 12, color: colors.textSecondary, flex: 1 }}>
+                <Text style={{ fontSize: FontSize.sm, color: colors.textSecondary, flex: 1 }}>
                   Prochain renouvellement : {new Date(subInfo.expiresAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
                 </Text>
               </View>
@@ -160,7 +161,7 @@ export const SettingsVerificationScreen: React.FC = () => {
             {subInfo.failedMonths > 0 && (
               <View style={[vs.subRow, { backgroundColor: '#F59E0B15', borderColor: '#F59E0B40' }]}>
                 <Icon name="alert-triangle" size={14} color="#F59E0B" />
-                <Text style={{ fontSize: 12, color: '#F59E0B', flex: 1, fontWeight: '600' }}>
+                <Text style={{ fontSize: FontSize.sm, color: '#F59E0B', flex: 1, fontWeight: FontWeight.semiBold }}>
                   Solde insuffisant lors du dernier renouvellement — recharge ton wallet avant le prochain prélèvement pour ne pas perdre le badge.
                 </Text>
               </View>
@@ -225,7 +226,7 @@ export const SettingsVerificationScreen: React.FC = () => {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[vs.typeLabel, { color: colors.textPrimary }]}>{t.label}</Text>
-              <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }}>{t.sub}</Text>
+              <Text style={{ fontSize: FontSize.sm, color: colors.textTertiary, marginTop: 2 }}>{t.sub}</Text>
             </View>
             {selected && <Icon name="check-circle" size={20} color={BLUE} />}
           </TouchableOpacity>
@@ -261,7 +262,7 @@ export const SettingsVerificationScreen: React.FC = () => {
         <TextInput value={bio} onChangeText={setBio} placeholder="Ex : Artiste avec 50 000 écoutes sur Spotify…" placeholderTextColor={colors.textDisabled}
           multiline numberOfLines={4}
           style={[vs.input, vs.inputMulti, { borderColor: bio.trim().length >= 20 ? BLUE : colors.border, backgroundColor: colors.backgroundSecondary, color: colors.textPrimary }]} />
-        <Text style={[{ fontSize: 11, marginTop: 4, textAlign: 'right', color: bio.trim().length >= 20 ? '#22C55E' : colors.textDisabled }]}>{bio.trim().length} / 20 min</Text>
+        <Text style={[{ fontSize: FontSize.xsPlus, marginTop: 4, textAlign: 'right', color: bio.trim().length >= 20 ? '#22C55E' : colors.textDisabled }]}>{bio.trim().length} / 20 min</Text>
       </View>
       <View>
         <Text style={[vs.fieldLabel, { color: colors.textTertiary }]}>LIENS (optionnel)</Text>
@@ -315,7 +316,7 @@ export const SettingsVerificationScreen: React.FC = () => {
                 )}
                 <Text style={[vs.planLabel, { color: selected ? BLUE : colors.textPrimary }]}>{info.label}</Text>
                 <Text style={[vs.planPrice, { color: colors.textPrimary }]}>{info.priceEur.toFixed(2)} €</Text>
-                <Text style={{ fontSize: 10, color: colors.textTertiary }}>{perMonth.toFixed(2)} €/mois</Text>
+                <Text style={{ fontSize: FontSize.xs, color: colors.textTertiary }}>{perMonth.toFixed(2)} €/mois</Text>
               </TouchableOpacity>
             );
           })}
@@ -330,8 +331,8 @@ export const SettingsVerificationScreen: React.FC = () => {
             ...(links.trim() ? [{ label: 'Liens', value: links.trim() }] : []),
           ].map((row, i, arr) => (
             <View key={i} style={[vs.summaryRow, i < arr.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }]}>
-              <Text style={{ fontSize: 13, color: colors.textTertiary }}>{row.label}</Text>
-              <Text style={{ fontSize: 13, fontWeight: '600', color: colors.textPrimary, flex: 1, textAlign: 'right' }} numberOfLines={3}>{row.value}</Text>
+              <Text style={{ fontSize: FontSize.smPlus, color: colors.textTertiary }}>{row.label}</Text>
+              <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold, color: colors.textPrimary, flex: 1, textAlign: 'right' }} numberOfLines={3}>{row.value}</Text>
             </View>
           ))}
         </View>
@@ -340,22 +341,22 @@ export const SettingsVerificationScreen: React.FC = () => {
         <View style={[vs.feeBox, { backgroundColor: canAfford ? BLUE + '12' : '#EF444412', borderColor: canAfford ? BLUE + '40' : '#EF444440' }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <Icon name="zap" size={16} color={canAfford ? BLUE : '#EF4444'} />
-            <Text style={{ fontSize: 14, fontWeight: '800', color: canAfford ? BLUE : '#EF4444' }}>
+            <Text style={{ fontSize: FontSize.base, fontWeight: FontWeight.extraBold, color: canAfford ? BLUE : '#EF4444' }}>
               Frais de dossier : {VERIFICATION_FEE} GoGold
             </Text>
           </View>
           {myGoGold !== null && (
-            <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 4 }}>
+            <Text style={{ fontSize: FontSize.sm, color: colors.textSecondary, marginBottom: 4 }}>
               Ton solde : {myGoGold.toLocaleString('fr-FR')} GoGold
               {canAfford && soldeApres !== null ? `  →  ${soldeApres.toLocaleString('fr-FR')} GoGold après` : ''}
             </Text>
           )}
-          <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 4 }}>
+          <Text style={{ fontSize: FontSize.sm, color: colors.textSecondary, marginBottom: 4 }}>
             Une fois approuvée, l'abonnement {PLAN_INFO[plan].label.toLowerCase()} ({PLAN_INFO[plan].priceEur.toFixed(2)} € ≈ {Math.round(PLAN_INFO[plan].priceEur * EUR_TO_GOGOLD_RATE)} GoGold) démarre et se renouvelle automatiquement tous les {PLAN_INFO[plan].months} mois.
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 4 }}>
             <Icon name="rotate-ccw" size={12} color="#22C55E" style={{ marginTop: 2 }} />
-            <Text style={{ fontSize: 12, color: '#22C55E', flex: 1, lineHeight: 17 }}>
+            <Text style={{ fontSize: FontSize.sm, color: '#22C55E', flex: 1, lineHeight: 17 }}>
               Ces GoGold sont remboursés automatiquement dans ton wallet si ta demande est refusée.
             </Text>
           </View>
@@ -365,7 +366,7 @@ export const SettingsVerificationScreen: React.FC = () => {
               style={{ marginTop: 10, backgroundColor: '#EF4444', borderRadius: 10, paddingVertical: 8, alignItems: 'center' }}
               activeOpacity={0.85}
             >
-              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>
+              <Text style={{ color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.smPlus }}>
                 Acheter des GoGold — il te manque {VERIFICATION_FEE - (myGoGold ?? 0)} GoGold
               </Text>
             </TouchableOpacity>
@@ -436,37 +437,37 @@ export const SettingsVerificationScreen: React.FC = () => {
 
 const vs = StyleSheet.create({
   statusCard:     { borderRadius: 18, borderWidth: 1, padding: 24, alignItems: 'center', gap: 10 },
-  statusTitle:    { fontSize: 20, fontWeight: '800', textAlign: 'center' },
-  statusSub:      { fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  statusTitle:    { fontSize: FontSize.xl, fontWeight: FontWeight.extraBold, textAlign: 'center' },
+  statusSub:      { fontSize: FontSize.smPlus, textAlign: 'center', lineHeight: 20 },
   heroBadge:      { borderRadius: 20, padding: 24, alignItems: 'center', gap: 12 },
   heroBadgeIcon:  { width: 70, height: 70, borderRadius: 35, alignItems: 'center', justifyContent: 'center' },
-  heroTitle:      { fontSize: 22, fontWeight: '800', textAlign: 'center' },
-  heroSub:        { fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  heroTitle:      { fontSize: FontSize['2xl'], fontWeight: FontWeight.extraBold, textAlign: 'center' },
+  heroSub:        { fontSize: FontSize.smPlus, textAlign: 'center', lineHeight: 20 },
   primaryBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, paddingVertical: 15 },
-  primaryBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  primaryBtnText: { color: '#fff', fontSize: FontSize.basePlus, fontWeight: FontWeight.bold },
   secondaryBtn:   { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 14, paddingVertical: 15, paddingHorizontal: 18, borderWidth: 1 },
-  secondaryBtnText: { fontSize: 15, fontWeight: '600' },
+  secondaryBtnText: { fontSize: FontSize.basePlus, fontWeight: FontWeight.semiBold },
   navRow:         { flexDirection: 'row', gap: 10, marginTop: 4 },
-  stepTitle:      { fontSize: 20, fontWeight: '800' },
+  stepTitle:      { fontSize: FontSize.xl, fontWeight: FontWeight.extraBold },
   typeCard:       { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, padding: 14 },
   typeIcon:       { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  typeLabel:      { fontSize: 15, fontWeight: '700' },
-  fieldLabel:     { fontSize: 11, fontWeight: '700', letterSpacing: 0.6, marginBottom: 6 },
-  input:          { borderWidth: 1.5, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14 },
+  typeLabel:      { fontSize: FontSize.basePlus, fontWeight: FontWeight.bold },
+  fieldLabel:     { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, letterSpacing: 0.6, marginBottom: 6 },
+  input:          { borderWidth: 1.5, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: FontSize.base },
   inputMulti:     { minHeight: 100, textAlignVertical: 'top', paddingTop: 12 },
   summaryCard:    { borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
   summaryRow:     { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
   progressBar:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 14 },
   progressStep:   { alignItems: 'center', gap: 4 },
   progressDot:    { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  progressNum:    { fontSize: 12, fontWeight: '700' },
-  progressLabel:  { fontSize: 10, fontWeight: '600' },
+  progressNum:    { fontSize: FontSize.sm, fontWeight: FontWeight.bold },
+  progressLabel:  { fontSize: FontSize.xs, fontWeight: FontWeight.semiBold },
   progressLine:   { flex: 1, height: 2, marginBottom: 14 },
   feeBox:         { borderRadius: 16, borderWidth: 1, padding: 14 },
   planCard:       { flex: 1, borderRadius: 14, padding: 10, alignItems: 'center', gap: 3, position: 'relative' },
   planBadge:      { position: 'absolute', top: -8, right: -6, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
-  planBadgeText:  { color: '#fff', fontSize: 9, fontWeight: '800' },
-  planLabel:      { fontSize: 12, fontWeight: '700', marginTop: 4 },
-  planPrice:      { fontSize: 16, fontWeight: '800' },
+  planBadgeText:  { color: '#fff', fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold },
+  planLabel:      { fontSize: FontSize.sm, fontWeight: FontWeight.bold, marginTop: 4 },
+  planPrice:      { fontSize: FontSize.md, fontWeight: FontWeight.extraBold },
   subRow:         { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 9 },
 });

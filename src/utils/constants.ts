@@ -53,6 +53,7 @@ export const STORAGE_KEYS = {
   CACHED_USER:    'gofolyx_cached_user',
   CURRENCY_CODE:  'gofolyx_currency_code',
   ACCOUNTS:       'gofolyx_accounts_v1',
+  REELS_AUTO_ADVANCE: 'gofolyx_reels_auto_advance',
 } as const;
 
 // ── Multi-compte ───────────────────────────────────────────────────────────

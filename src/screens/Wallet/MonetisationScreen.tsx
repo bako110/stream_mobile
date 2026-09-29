@@ -4,7 +4,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar, ActivityIndicator,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api';
@@ -15,40 +15,36 @@ type MonetStatus = 'none' | 'pending' | 'approved' | 'rejected';
 
 interface RowItem {
   icon: string;
-  color: string;
   label: string;
   sub: string;
   screen: string;
 }
 
-const SECTIONS: { title: string; accent: string; rows: RowItem[] }[] = [
+// Une seule couleur d'accent pour tout l'écran (plus d'accent par section ni
+// par ligne) — même parti pris que SettingsMonetisationScreen désaturé.
+const SECTIONS: { title: string; rows: RowItem[] }[] = [
   {
     title: 'Revenus & Gains',
-    accent: '#FFD700',
     rows: [
-      { icon: 'trending-up',  color: '#8B5CF6', label: 'Statistiques',       sub: 'Vues, audience, évolution par contenu', screen: 'CreatorAnalytics' },
-      { icon: 'dollar-sign',  color: '#22C55E', label: 'Revenus détaillés',  sub: 'Historique, par mois, par reel',       screen: 'RevenueDetail' },
-      { icon: 'credit-card',  color: '#10B981', label: 'Retirer mes gains',   sub: 'Bientôt sur l\'app — via gofolyx.com', screen: 'Withdraw' },
+      { icon: 'trending-up',  label: 'Statistiques',       sub: 'Vues, audience, évolution par contenu', screen: 'CreatorAnalytics' },
+      { icon: 'dollar-sign',  label: 'Revenus détaillés',  sub: 'Historique, par mois, par reel',       screen: 'RevenueDetail' },
+      { icon: 'credit-card',  label: 'Retirer mes gains',   sub: 'Bientôt sur l\'app — via gofolyx.com', screen: 'Withdraw' },
     ],
   },
   {
     title: 'GoGold & Achats',
-    accent: '#FF8C00',
     rows: [
-      { icon: 'shopping-bag', color: '#FF8C00', label: 'Acheter des GoGold',   sub: 'Packs de GoGold via Stripe',            screen: 'BuyGoGold' },
-      { icon: 'send',         color: '#9B65F5', label: 'Transférer des GoGold',sub: 'Envoyer des GoGold à un utilisateur',   screen: 'Transfer' },
+      { icon: 'shopping-bag', label: 'Acheter des GoGold',   sub: 'Packs de GoGold via Stripe',            screen: 'BuyGoGold' },
+      { icon: 'send',         label: 'Transférer des GoGold',sub: 'Envoyer des GoGold à un utilisateur',   screen: 'Transfer' },
     ],
   },
   {
     title: 'Visibilité',
-    accent: '#E0389A',
     rows: [
-      { icon: 'zap',          color: '#E0389A', label: 'Booster mon compte',  sub: 'Abonnés, vues, portée de contenu',     screen: 'Boost' },
+      { icon: 'zap',          label: 'Booster mon compte',  sub: 'Abonnés, vues, portée de contenu',     screen: 'Boost' },
     ],
   },
 ];
-
-const GREEN = '#10B981';
 
 const GATE_CONFIG: Record<MonetStatus, { icon: string; title: string; message: string }> = {
   none:     { icon: 'lock',        title: 'Monetisation non activee',    message: 'Soumettez une demande pour acceder a votre espace createur.' },
@@ -59,15 +55,24 @@ const GATE_CONFIG: Record<MonetStatus, { icon: string; title: string; message: s
 
 export function MonetisationScreen() {
   const nav = useNavigation<any>();
+  const route = useRoute<any>();
   const { theme, isDark } = useTheme();
   const { colors } = theme;
   const insets = useSafeAreaInsets();
+  const ACCENT = colors.primary;
 
-  const [monetStatus, setMonetStatus] = useState<MonetStatus | null>(null);
+  // preloadedStatus — transmis par SettingsMonetisationScreen quand il vient de
+  // rediriger ici (statut 'approved' déjà connu, appel réseau déjà fait) : évite
+  // un second fetch et un second spinner qui se succéderaient visiblement à la
+  // suite du premier lors de la transition entre les deux écrans.
+  const preloadedStatus: MonetStatus | undefined = route.params?.preloadedStatus;
+
+  const [monetStatus, setMonetStatus] = useState<MonetStatus | null>(preloadedStatus ?? null);
   const [adminNote, setAdminNote] = useState<string | null>(null);
-  const [fetching, setFetching] = useState(true);
+  const [fetching, setFetching] = useState(!preloadedStatus);
 
   useEffect(() => {
+    if (preloadedStatus) return;
     apiClient
       .get<{ status: MonetStatus; admin_note: string | null }>(Endpoints.monetization.status)
       .then(res => {
@@ -76,12 +81,12 @@ export function MonetisationScreen() {
       })
       .catch(() => setMonetStatus('none'))
       .finally(() => setFetching(false));
-  }, []);
+  }, [preloadedStatus]);
 
   if (fetching) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={GREEN} />
+        <ActivityIndicator color={ACCENT} />
       </View>
     );
   }
@@ -97,19 +102,19 @@ export function MonetisationScreen() {
           <View style={{ width: 38 }} />
         </View>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 16 }}>
-          <View style={[gateStyles.iconWrap, { backgroundColor: '#EF444415' }]}>
-            <Icon name={cfg.icon} size={36} color="#EF4444" />
+          <View style={[gateStyles.iconWrap, { backgroundColor: ACCENT + '15' }]}>
+            <Icon name={cfg.icon} size={36} color={ACCENT} />
           </View>
           <Text style={[gateStyles.title, { color: colors.textPrimary }]}>{cfg.title}</Text>
           <Text style={[gateStyles.message, { color: colors.textSecondary }]}>{cfg.message}</Text>
           {monetStatus === 'rejected' && adminNote && (
-            <View style={[gateStyles.reasonBox, { backgroundColor: '#EF444415' }]}>
-              <Text style={[gateStyles.reasonLabel, { color: '#EF4444' }]}>Motif du refus</Text>
+            <View style={[gateStyles.reasonBox, { backgroundColor: colors.backgroundSecondary }]}>
+              <Text style={[gateStyles.reasonLabel, { color: colors.textTertiary }]}>Motif du refus</Text>
               <Text style={[gateStyles.reasonText, { color: colors.textSecondary }]}>{adminNote}</Text>
             </View>
           )}
           <TouchableOpacity
-            style={[gateStyles.btn, { backgroundColor: GREEN }]}
+            style={[gateStyles.btn, { backgroundColor: ACCENT }]}
             onPress={() => nav.navigate('MonetisationRequest')}
           >
             <Icon name="bar-chart-2" size={16} color="#fff" />
@@ -133,8 +138,8 @@ export function MonetisationScreen() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {SECTIONS.map(sec => (
           <View key={sec.title} style={styles.section}>
-            <View style={[styles.sectionHeader, { borderLeftColor: sec.accent }]}>
-              <Text style={[styles.sectionTitle, { color: sec.accent }]}>{sec.title.toUpperCase()}</Text>
+            <View style={[styles.sectionHeader, { borderLeftColor: ACCENT }]}>
+              <Text style={[styles.sectionTitle, { color: ACCENT }]}>{sec.title.toUpperCase()}</Text>
             </View>
             <View style={[styles.card, { backgroundColor: colors.backgroundSecondary }]}>
               {sec.rows.map((row, i) => (
@@ -147,8 +152,8 @@ export function MonetisationScreen() {
                   onPress={() => (row.screen === 'Withdraw' ? showWithdrawUnavailable() : nav.navigate(row.screen))}
                   activeOpacity={0.7}
                 >
-                  <View style={[styles.iconWrap, { backgroundColor: row.color + '22' }]}>
-                    <Icon name={row.icon} size={18} color={row.color} />
+                  <View style={[styles.iconWrap, { backgroundColor: ACCENT + '22' }]}>
+                    <Icon name={row.icon} size={18} color={ACCENT} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{row.label}</Text>

@@ -10,6 +10,7 @@ import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { AvatarWithBadge } from '../../components/common/AvatarWithBadge';
@@ -566,7 +567,7 @@ const st = StyleSheet.create({
     paddingBottom: 14,
   },
   backBtn:     { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: '800' },
+  headerTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.extraBold },
 
   body: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 32, gap: 8 },
 
@@ -581,8 +582,8 @@ const st = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   cardLabels:   { flex: 1 },
-  cardTitle:    { fontSize: 13, fontWeight: '800', marginBottom: 1 },
-  cardSub:      { fontSize: 10, lineHeight: 13 },
+  cardTitle:    { fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold, marginBottom: 1 },
+  cardSub:      { fontSize: FontSize.xs, lineHeight: 13 },
 
   // ── Boutons Métadonnées / Monétiser ────────────────────────────────────────
   optionRow: { flexDirection: 'row', gap: 5, marginBottom: 2 },
@@ -591,7 +592,7 @@ const st = StyleSheet.create({
     borderRadius: 8, borderWidth: 1.5,
     paddingHorizontal: 7, paddingVertical: 5,
   },
-  optionBtnText: { flex: 1, fontSize: 10, fontWeight: '600' },
+  optionBtnText: { flex: 1, fontSize: FontSize.xs, fontWeight: FontWeight.semiBold },
 
   // ── Métadonnées collapsibles ───────────────────────────────────────────────
   metaBox: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 8, gap: 5, marginTop: 5 },
@@ -602,7 +603,7 @@ const st = StyleSheet.create({
   },
   inputWrapMulti: { alignItems: 'flex-start', paddingVertical: 6 },
   inputIcon:      { marginRight: 7 },
-  input:          { flex: 1, fontSize: 12 },
+  input:          { flex: 1, fontSize: FontSize.sm },
   inputMulti:     { minHeight: 40, textAlignVertical: 'top' },
 
   // ── Visibilité ─────────────────────────────────────────────────────────────
@@ -614,8 +615,8 @@ const st = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.06)',
   },
   privacyBtnActive: { backgroundColor: 'rgba(255,255,255,0.1)' },
-  privacyLabel:     { fontSize: 11, fontWeight: '700' },
-  privacySub:       { fontSize: 9, marginTop: 1 },
+  privacyLabel:     { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold },
+  privacySub:       { fontSize: FontSize['2xs'], marginTop: 1 },
 
   // ── Badge monétisation ─────────────────────────────────────────────────────
   monetBadge: {
@@ -623,7 +624,7 @@ const st = StyleSheet.create({
     backgroundColor: '#F59E0B18', borderRadius: 8, borderWidth: 1, borderColor: '#F59E0B44',
     paddingHorizontal: 8, paddingVertical: 5, marginTop: 6,
   },
-  monetBadgeText: { color: '#F59E0B', fontSize: 10, fontWeight: '600', flex: 1 },
+  monetBadgeText: { color: '#F59E0B', fontSize: FontSize.xs, fontWeight: FontWeight.semiBold, flex: 1 },
 
   // ── Go Live btn ────────────────────────────────────────────────────────────
   goBtn: {
@@ -631,21 +632,21 @@ const st = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
   },
   liveDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff', opacity: 0.9 },
-  goBtnText: { color: '#fff', fontSize: 12, fontWeight: '800', letterSpacing: 0.2 },
+  goBtnText: { color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.extraBold, letterSpacing: 0.2 },
 
   // ── Concert card ───────────────────────────────────────────────────────────
   concertCard: { borderRadius: 12, borderWidth: 1.5, overflow: 'hidden', padding: 9 },
   concertInner: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   concertIconGrad: { width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   concertLabels: { flex: 1 },
-  concertTitle:  { fontSize: 12, fontWeight: '700', marginBottom: 1 },
-  concertSub:    { fontSize: 10, lineHeight: 12 },
+  concertTitle:  { fontSize: FontSize.sm, fontWeight: FontWeight.bold, marginBottom: 1 },
+  concertSub:    { fontSize: FontSize.xs, lineHeight: 12 },
   arrowWrap:     { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
 
   // ── Découvrir les lives ──────────────────────────────────────────────────────
   discoverSection: { marginTop: 4 },
   discoverHeader:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  discoverTitle:   { fontSize: 17, fontWeight: '800' },
+  discoverTitle:   { fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold },
   discoverGrid:    { flexDirection: 'row', flexWrap: 'wrap' },
   discoverCard:      { width: '50%', padding: 5 },
   discoverCardInner: { aspectRatio: 0.82, borderRadius: 16, overflow: 'hidden' },
@@ -663,34 +664,34 @@ const st = StyleSheet.create({
     paddingHorizontal: 6, paddingVertical: 3,
   },
   discoverLiveDot:      { width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#fff' },
-  discoverLiveBadgeText:{ color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
+  discoverLiveBadgeText:{ color: '#fff', fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold, letterSpacing: 0.3 },
   discoverViewerBadge: {
     position: 'absolute', top: 8, right: 8,
     flexDirection: 'row', alignItems: 'center', gap: 3,
     backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 6,
     paddingHorizontal: 6, paddingVertical: 3,
   },
-  discoverViewerText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  discoverViewerText: { color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.bold },
   discoverCardBottom: { position: 'absolute', left: 10, right: 10, bottom: 10, gap: 6 },
-  discoverCardTitle:  { color: '#fff', fontSize: 13, fontWeight: '700' },
+  discoverCardTitle:  { color: '#fff', fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
   discoverAuthorRow:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  discoverAuthorName: { color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '600', flexShrink: 1 },
+  discoverAuthorName: { color: 'rgba(255,255,255,0.85)', fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold, flexShrink: 1 },
 
   // ── Modal monétisation ─────────────────────────────────────────────────────
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   monetSheet:   { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 20, paddingBottom: 36 },
   sheetHandle:  { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 18 },
-  sheetTitle:   { fontSize: 20, fontWeight: '800', marginBottom: 6 },
-  sheetSub:     { fontSize: 13, lineHeight: 18, marginBottom: 20 },
+  sheetTitle:   { fontSize: FontSize.xl, fontWeight: FontWeight.extraBold, marginBottom: 6 },
+  sheetSub:     { fontSize: FontSize.smPlus, lineHeight: 18, marginBottom: 20 },
 
   typeRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
   typeBtn: {
     flex: 1, borderRadius: 16, borderWidth: 1.5,
     padding: 14, alignItems: 'center', gap: 4,
   },
-  typeEmoji: { fontSize: 28 },
-  typeLabel: { fontSize: 13, fontWeight: '700' },
-  typeSub:   { fontSize: 11 },
+  typeEmoji: { fontSize: FontSize['3xl'] },
+  typeLabel: { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
+  typeSub:   { fontSize: FontSize.xsPlus },
   typeCheck: { position: 'absolute', top: 8, right: 8 },
 
   goGoldInputWrap: {
@@ -698,25 +699,25 @@ const st = StyleSheet.create({
     borderRadius: 14, borderWidth: 1.5,
     paddingHorizontal: 16, height: 52, marginBottom: 16,
   },
-  goGoldInputEmoji:  { fontSize: 22 },
-  goGoldInput:       { flex: 1, fontSize: 22, fontWeight: '700' },
-  goGoldInputSuffix: { fontSize: 14 },
+  goGoldInputEmoji:  { fontSize: FontSize['2xl'] },
+  goGoldInput:       { flex: 1, fontSize: FontSize['2xl'], fontWeight: FontWeight.bold },
+  goGoldInputSuffix: { fontSize: FontSize.base },
 
   giftSection:      { marginBottom: 16 },
-  giftSectionTitle: { fontSize: 12, fontWeight: '600', marginBottom: 10 },
+  giftSectionTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, marginBottom: 10 },
   giftCard: {
     flex: 1, margin: 4, borderRadius: 12, borderWidth: 2,
     padding: 8, alignItems: 'center', gap: 3,
   },
-  giftEmoji:       { fontSize: 28 },
-  giftName:        { fontSize: 9, fontWeight: '600', textAlign: 'center' },
-  giftCost:        { fontSize: 9, color: '#FFD700', fontWeight: '700' },
+  giftEmoji:       { fontSize: FontSize['3xl'] },
+  giftName:        { fontSize: FontSize['2xs'], fontWeight: FontWeight.semiBold, textAlign: 'center' },
+  giftCost:        { fontSize: FontSize['2xs'], color: '#FFD700', fontWeight: FontWeight.bold },
   giftSelectedDot: { position: 'absolute', top: 4, right: 4, width: 8, height: 8, borderRadius: 4, backgroundColor: '#E85DAD' },
 
   sheetActions:     { flexDirection: 'row', gap: 10, marginTop: 4 },
   sheetCancelBtn:   { flex: 1, borderRadius: 16, borderWidth: 1.5, height: 52, alignItems: 'center', justifyContent: 'center' },
-  sheetCancelText:  { fontSize: 15, fontWeight: '700' },
+  sheetCancelText:  { fontSize: FontSize.basePlus, fontWeight: FontWeight.bold },
   sheetConfirmBtn:  { flex: 2, borderRadius: 16, overflow: 'hidden' },
   sheetConfirmGrad: { height: 52, alignItems: 'center', justifyContent: 'center' },
-  sheetConfirmText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  sheetConfirmText: { color: '#fff', fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold },
 });

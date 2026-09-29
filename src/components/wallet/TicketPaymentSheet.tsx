@@ -8,6 +8,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import ReactNativeBlobUtil from 'react-native-blob-util';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient, getAuthToken } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
@@ -221,12 +222,12 @@ export const TicketPaymentSheet: React.FC<Props> = ({
                         }}
                       >
                         <Icon name={tier.icon} size={13} color={active ? tier.color : colors.textTertiary} />
-                        <Text style={{ fontSize: 12, fontWeight: '800', color: active ? tier.color : colors.textSecondary }}>
+                        <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.extraBold, color: active ? tier.color : colors.textSecondary }}>
                           {tier.label}
                         </Text>
                         <PriceWithLocal
                           amountEur={tier.price}
-                          style={{ fontSize: 12, fontWeight: '700', color: active ? tier.color : colors.textTertiary }}
+                          style={{ fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: active ? tier.color : colors.textTertiary }}
                         />
                       </TouchableOpacity>
                     );
@@ -260,10 +261,10 @@ export const TicketPaymentSheet: React.FC<Props> = ({
                     ) : (
                       <Text style={[sh.balValue, { color: colors.textPrimary }]}>
                         {fmtGoGold(balance ?? 0)}{' '}
-                        <Text style={{ fontSize: 13, fontWeight: '500', color: colors.textTertiary }}>GoGold</Text>
+                        <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.medium, color: colors.textTertiary }}>GoGold</Text>
                         {'  '}
-                        <Text style={{ fontSize: 13, color: colors.textTertiary }}>
-                          ≈ <PriceWithLocal amountEur={goGoldToEur(balance ?? 0)} style={{ fontSize: 13, color: colors.textTertiary }} />
+                        <Text style={{ fontSize: FontSize.smPlus, color: colors.textTertiary }}>
+                          ≈ <PriceWithLocal amountEur={goGoldToEur(balance ?? 0)} style={{ fontSize: FontSize.smPlus, color: colors.textTertiary }} />
                         </Text>
                       </Text>
                     )}
@@ -280,8 +281,8 @@ export const TicketPaymentSheet: React.FC<Props> = ({
                         <Icon name={activeTier.icon} size={14} color={activeTier.color} />
                       </View>
                       <View>
-                        <Text style={{ fontSize: 13, fontWeight: '900', color: activeTier.color }}>{activeTier.label.toUpperCase()}</Text>
-                        {activeTier.sub && <Text style={{ fontSize: 10, color: colors.textTertiary }}>{activeTier.sub}</Text>}
+                        <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.black, color: activeTier.color }}>{activeTier.label.toUpperCase()}</Text>
+                        {activeTier.sub && <Text style={{ fontSize: FontSize.xs, color: colors.textTertiary }}>{activeTier.sub}</Text>}
                       </View>
                     </View>
                   </View>
@@ -301,12 +302,12 @@ export const TicketPaymentSheet: React.FC<Props> = ({
                   </View>
                   <View style={[sh.priceRow, { marginTop: 2 }]}>
                     <Text style={[sh.priceLabel, { color: colors.textTertiary }]}>Équivalent GoGold</Text>
-                    <Text style={[sh.priceVal, { color: colors.primary, fontWeight: '700' }]}>{fmtGoGold(priceGoGold)} GoGold</Text>
+                    <Text style={[sh.priceVal, { color: colors.primary, fontWeight: FontWeight.bold }]}>{fmtGoGold(priceGoGold)} GoGold</Text>
                   </View>
                   {!loadingBal && goGoldAfter !== null && (
                     <View style={[sh.priceRow, { paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider, marginTop: 4 }]}>
                       <Text style={[sh.priceLabel, { color: colors.textSecondary }]}>Solde après</Text>
-                      <Text style={[sh.priceVal, { color: hasEnough ? '#10B981' : '#EF4444', fontWeight: '700' }]}>
+                      <Text style={[sh.priceVal, { color: hasEnough ? '#10B981' : '#EF4444', fontWeight: FontWeight.bold }]}>
                         {hasEnough ? `${fmtGoGold(goGoldAfter)} GoGold` : 'Insuffisant'}
                       </Text>
                     </View>
@@ -410,46 +411,46 @@ const sh = StyleSheet.create({
   sheet:       { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingTop: 10, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 20, elevation: 14 },
   handle:      { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
   sep:         { height: StyleSheet.hairlineWidth, marginVertical: 12, marginHorizontal: 16 },
-  sectionLabel:{ fontSize: 10, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 },
+  sectionLabel:{ fontSize: FontSize.xs, fontWeight: FontWeight.extraBold, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 },
 
   header:      { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingHorizontal: 16 },
   thumb:       { width: 56, height: 56, borderRadius: 10, overflow: 'hidden' },
-  eventTitle:  { fontSize: 15, fontWeight: '700', lineHeight: 20 },
+  eventTitle:  { fontSize: FontSize.basePlus, fontWeight: FontWeight.bold, lineHeight: 20 },
   badge:       { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
-  badgeTxt:    { fontSize: 11, fontWeight: '700' },
+  badgeTxt:    { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold },
 
   freeBlock:   { alignItems: 'center', paddingVertical: 20, paddingHorizontal: 24, gap: 8 },
   freeIcon:    { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
-  freeTitle:   { fontSize: 17, fontWeight: '800', textAlign: 'center' },
-  freeSub:     { fontSize: 13, textAlign: 'center', lineHeight: 18 },
+  freeTitle:   { fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold, textAlign: 'center' },
+  freeSub:     { fontSize: FontSize.smPlus, textAlign: 'center', lineHeight: 18 },
 
   walletBlock: { paddingHorizontal: 16, gap: 10 },
   balanceRow:  { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 12, borderWidth: 1, gap: 10 },
-  balLabel:    { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
-  balValue:    { fontSize: 20, fontWeight: '800' },
+  balLabel:    { fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
+  balValue:    { fontSize: FontSize.xl, fontWeight: FontWeight.extraBold },
 
   recapBox:        { borderRadius: 14, borderWidth: 1.5, overflow: 'hidden' },
   recapTierRow:    { padding: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   priceRow:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 5 },
-  priceLabel:      { fontSize: 13 },
-  priceVal:        { fontSize: 13, fontWeight: '600' },
+  priceLabel:      { fontSize: FontSize.smPlus },
+  priceVal:        { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
   totalRow:        { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 8, marginTop: 2 },
-  totalLabel:      { fontSize: 14, fontWeight: '800' },
-  totalVal:        { fontSize: 16, fontWeight: '900' },
+  totalLabel:      { fontSize: FontSize.base, fontWeight: FontWeight.extraBold },
+  totalVal:        { fontSize: FontSize.md, fontWeight: FontWeight.black },
 
   insuffBanner:    { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 12, borderRadius: 10, borderWidth: 1 },
-  insuffTitle:     { color: '#EF4444', fontSize: 13, fontWeight: '700' },
-  insuffSub:       { color: '#EF4444', fontSize: 12, marginTop: 2, lineHeight: 16, opacity: 0.85 },
+  insuffTitle:     { color: '#EF4444', fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
+  insuffSub:       { color: '#EF4444', fontSize: FontSize.sm, marginTop: 2, lineHeight: 16, opacity: 0.85 },
 
   btnRow:          { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 16 },
   btnCancel:       { flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  btnCancelTxt:    { fontSize: 14, fontWeight: '600' },
+  btnCancelTxt:    { fontSize: FontSize.base, fontWeight: FontWeight.semiBold },
   btnMain:         { flex: 2, borderRadius: 12, overflow: 'hidden' },
   btnGradient:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 },
-  btnTxt:          { color: '#fff', fontSize: 14, fontWeight: '800' },
+  btnTxt:          { color: '#fff', fontSize: FontSize.base, fontWeight: FontWeight.extraBold },
 
   centerStep:      { alignItems: 'center', paddingVertical: 32, paddingHorizontal: 24, gap: 10 },
   successIcon:     { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
-  stepTitle:       { fontSize: 18, fontWeight: '800', textAlign: 'center' },
-  stepSub:         { fontSize: 13, textAlign: 'center', lineHeight: 18 },
+  stepTitle:       { fontSize: FontSize.lg, fontWeight: FontWeight.extraBold, textAlign: 'center' },
+  stepSub:         { fontSize: FontSize.smPlus, textAlign: 'center', lineHeight: 18 },
 });

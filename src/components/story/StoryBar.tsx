@@ -28,7 +28,7 @@ interface Props {
 // au-dessus/dessous) : padding vertical du scroll ramené au minimum, hauteur de
 // carte recalculée en conséquence — largeur inchangée (tokens du feed).
 import { StoryCard as StoryCardToken } from '../../theme/feed';
-const CARD_W   = StoryCardToken.w;      // 72
+const CARD_W   = StoryCardToken.w;      // 84
 const RADIUS   = StoryCardToken.radius; // 12
 const CARD_GAP = StoryCardToken.gap;    // 8
 const BAR_V_PAD = 6;    // marge haut/bas minimale de la barre
@@ -217,35 +217,35 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
               </TouchableOpacity>
             </LinearGradient>
           ) : (
-            // Pas encore de story : carte "Ajouter" — fond dégradé uni (pas de
-            // photo plaquée arbitrairement), avatar centré avec + superposé,
-            // grande initiale, comme la référence.
+            // Pas encore de story : carte "Ajouter" — fond neutre sobre (plus de
+            // dégradé de marque plaqué ici, réservé aux vrais accents/signaux),
+            // avatar centré avec + superposé, grande initiale.
             <View style={[s.cardBorderWrap, { padding: 0 }]}>
               <TouchableOpacity activeOpacity={0.85} style={s.card} onPress={() => setCreatorOpen(true)}>
-                <LinearGradient colors={brandGrad} style={s.cardBg} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
+                <View style={[s.cardBg, { backgroundColor: colors.backgroundSecondary ?? '#e8e8e8' }]} />
 
                 <View style={s.addCardBody}>
                   <View style={s.addCardAvatarWrap}>
                     <View style={s.addCardAvatarInner}>
                       {currentUser?.avatar_url
                         ? <CachedImage uri={currentUser.avatar_url} style={s.cardAvatar} />
-                        : <View style={[s.cardAvatarFallback, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
+                        : <View style={[s.cardAvatarFallback, { backgroundColor: colors.primary ?? '#7B3FF2' }]}>
                             <Text style={s.cardAvatarInitial}>{initials}</Text>
                           </View>
                       }
                     </View>
                     <TouchableOpacity
-                      style={[s.addBtnOnAvatar, { backgroundColor: colors.primary ?? '#7B3FF2', borderColor: colors.gradientEnd ?? '#E0389A' }]}
+                      style={[s.addBtnOnAvatar, { backgroundColor: colors.primary ?? '#7B3FF2', borderColor: colors.surface ?? '#fff' }]}
                       onPress={() => setCreatorOpen(true)}
                       hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                     >
                       <Icon name="plus" size={11} color="#fff" />
                     </TouchableOpacity>
                   </View>
-                  <Text style={s.addCardInitial} numberOfLines={1}>{initials}</Text>
+                  <Text style={[s.addCardInitial, { color: colors.textTertiary ?? 'rgba(255,255,255,0.85)' }]} numberOfLines={1}>{initials}</Text>
                 </View>
 
-                <Text style={s.cardLabelAbs} numberOfLines={1}>Ajouter</Text>
+                <Text style={[s.cardLabelAbs, { color: colors.textPrimary ?? '#fff', textShadowColor: 'transparent' }]} numberOfLines={1}>Ajouter</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -310,7 +310,8 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
                   />
                 )}
 
-                {/* Mini avatar haut gauche */}
+                {/* Mini avatar haut gauche + pastille "non vu" discrète (remplace
+                    l'ancien cadre plein contour saturé — indicateur plus sobre) */}
                 <View style={s.cardAvatarWrap}>
                   <View style={s.cardMiniAvatarInner}>
                     {user.avatar_url
@@ -320,6 +321,9 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
                         </View>
                     }
                   </View>
+                  {!seen && (
+                    <View style={[s.unseenDot, { backgroundColor: colors.primary ?? '#7B3FF2', borderColor: colors.surface ?? '#fff' }]} />
+                  )}
                 </View>
 
                 {/* Nom + badge verifie + count */}
@@ -337,22 +341,16 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
               </TouchableOpacity>
             );
 
-            // Bordure gradient pour non-vu, bordure simple pour vu
-            if (!seen) {
-              return (
-                <LinearGradient
-                  key={group.user.id}
-                  colors={brandGrad}
-                  style={s.cardBorderWrap}
-                >
-                  {cardContent}
-                </LinearGradient>
-              );
-            }
+            // Bordure fine neutre — la pastille sur l'avatar suffit à signaler le
+            // "non vu", pas besoin d'un cadre coloré saturé autour de toute la carte.
             return (
               <View
                 key={group.user.id}
-                style={[s.cardBorderWrap, { backgroundColor: colors.border ?? '#ccc' }]}
+                style={[
+                  s.cardBorderWrap,
+                  { backgroundColor: colors.border ?? '#ccc' },
+                  !seen && { backgroundColor: colors.textTertiary ?? '#9290AE' },
+                ]}
               >
                 {cardContent}
               </View>
@@ -403,12 +401,12 @@ const s = StyleSheet.create({
     alignItems:        'flex-start',
   },
 
-  // ── Wrapper bordure (gradient non-vu / gris vu) ────────────────────────────
+  // ── Wrapper bordure — fin liseré neutre (gris clair vu / gris moyen non-vu) ─
   cardBorderWrap: {
-    width:        CARD_W + 4,
-    height:       CARD_H + 4,
-    borderRadius: RADIUS + 2,
-    padding:      2,
+    width:        CARD_W + 2,
+    height:       CARD_H + 2,
+    borderRadius: RADIUS + 1,
+    padding:      1,
   },
 
   // ── Carte principale ────────────────────────────────────────────────────────
@@ -470,6 +468,17 @@ const s = StyleSheet.create({
     overflow:     'hidden',
     borderWidth:  2,
     borderColor:  '#fff',
+  },
+  // Pastille "non vu" — petit point discret sur le coin de l'avatar plutôt
+  // qu'un cadre saturé autour de toute la carte.
+  unseenDot: {
+    position:     'absolute',
+    top:          -1,
+    right:        -1,
+    width:        9,
+    height:       9,
+    borderRadius: 4.5,
+    borderWidth:  1.5,
   },
   cardAvatar: { width: '100%', height: '100%' },
   cardAvatarFallback: {

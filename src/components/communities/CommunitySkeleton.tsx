@@ -22,33 +22,42 @@ const SkeletonPulse: React.FC<{ style?: object }> = ({ style }) => {
   );
 };
 
+// Reflète la disposition réelle de CommunityCard (ligne WhatsApp-style : avatar
+// rond à gauche, 2 lignes de texte + séparateur à droite) — avant, ce skeleton
+// simulait une carte avec grande bannière en haut, un format qui n'existe plus.
 export const CommunitySkeletonCard: React.FC = () => (
-  <View style={SK.card}>
-    <SkeletonPulse style={SK.banner} />
-    <View style={SK.body}>
-      <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', marginBottom: 10 }}>
-        <SkeletonPulse style={SK.avatar} />
-        <View style={{ flex: 1, gap: 6 }}>
-          <SkeletonPulse style={SK.line1} />
-          <SkeletonPulse style={SK.line2} />
-        </View>
+  <View style={SK.row}>
+    <SkeletonPulse style={SK.avatar} />
+    <View style={SK.inner}>
+      <View style={SK.row1}>
+        <SkeletonPulse style={SK.name} />
+        <SkeletonPulse style={SK.members} />
       </View>
-      <SkeletonPulse style={SK.btn} />
+      <View style={SK.row2}>
+        <SkeletonPulse style={SK.subline} />
+        <SkeletonPulse style={SK.pill} />
+      </View>
     </View>
   </View>
 );
 
 const SK = StyleSheet.create({
-  card: {
-    backgroundColor: '#1A1A2E',
-    borderRadius: 18,
-    overflow: 'hidden',
-    marginBottom: 14,
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 16,
   },
-  banner: { height: 120, borderRadius: 0 },
-  body: { padding: 14 },
-  avatar: { width: 52, height: 52, borderRadius: 14 },
-  line1: { height: 14, width: '60%' },
-  line2: { height: 11, width: '40%' },
-  btn: { height: 40, borderRadius: 12 },
+  avatar: { width: 52, height: 52, borderRadius: 26, marginRight: 14 },
+  inner: {
+    flex: 1,
+    paddingVertical: 13,
+    paddingRight: 16,
+    gap: 8,
+  },
+  row1: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  name: { height: 15, width: '45%', borderRadius: 4 },
+  members: { height: 12, width: 28, borderRadius: 4 },
+  row2: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  subline: { height: 13, width: '60%', borderRadius: 4 },
+  pill: { height: 24, width: 72, borderRadius: 14 },
 });

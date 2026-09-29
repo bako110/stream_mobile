@@ -8,12 +8,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  StatusBar, ActivityIndicator,
+  StatusBar, ActivityIndicator, useWindowDimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { BackButton, GofolyxLoader } from '../../components/common';
 import { revenueService } from '../../services/revenueService';
@@ -45,6 +46,11 @@ export const RevenueDetailScreen: React.FC = () => {
   const { colors } = theme;
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
+  const { width: screenW } = useWindowDimensions();
+  // Largeur réelle disponible pour le graphique à l'intérieur de sa carte —
+  // s.card a marginHorizontal:16 + padding:16 de chaque côté (64px au total).
+  // Un width fixe (320) débordait de la carte sur les écrans plus étroits.
+  const chartWidth = Math.max(200, screenW - 64);
 
   const [granularity, setGranularity] = useState<Granularity>('month');
   const [period, setPeriod] = useState<ContentPeriod>('all');
@@ -188,7 +194,7 @@ export const RevenueDetailScreen: React.FC = () => {
                 })}
               </View>
             </View>
-            <RevenueBarChart data={timeseries} color={colors.primary} width={320} />
+            <RevenueBarChart data={timeseries} color={colors.primary} width={chartWidth} />
           </View>
 
           {/* Répartition par source */}
@@ -250,40 +256,40 @@ export const RevenueDetailScreen: React.FC = () => {
 const s = StyleSheet.create({
   root:   { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 32 },
-  emptyText: { fontSize: 13, fontWeight: '600', textAlign: 'center' },
+  emptyText: { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold, textAlign: 'center' },
 
   header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 14, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
-  headerTitle: { fontSize: 18, fontWeight: '800' },
+  headerTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.extraBold },
 
   periodRow:  { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 16 },
   periodPill: { flex: 1, paddingVertical: 9, borderRadius: 20, borderWidth: 1, alignItems: 'center' },
-  periodText: { fontSize: 12.5, fontWeight: '700' },
+  periodText: { fontSize: FontSize.sm, fontWeight: FontWeight.bold },
 
   kpiCard:  { marginHorizontal: 16, marginTop: 16, borderRadius: 18, borderWidth: 1, padding: 18, alignItems: 'center', gap: 4 },
-  kpiValue: { fontSize: 30, fontWeight: '900' },
-  kpiLabel: { fontSize: 13, fontWeight: '600' },
-  kpiSub:   { fontSize: 11, marginTop: 2 },
+  kpiValue: { fontSize: 30, fontWeight: FontWeight.black },
+  kpiLabel: { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
+  kpiSub:   { fontSize: FontSize.xsPlus, marginTop: 2 },
 
   kpiRow:       { flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginTop: 12 },
   kpiMini:      { flex: 1, borderRadius: 14, borderWidth: 1, padding: 12, gap: 4, alignItems: 'center' },
-  kpiMiniValue: { fontSize: 17, fontWeight: '800' },
-  kpiMiniLabel: { fontSize: 11, fontWeight: '600', textAlign: 'center' },
+  kpiMiniValue: { fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold },
+  kpiMiniLabel: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold, textAlign: 'center' },
 
   card:          { marginHorizontal: 16, marginTop: 16, borderRadius: 18, borderWidth: 1, padding: 16, gap: 12 },
   cardHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  cardTitle:     { fontSize: 15, fontWeight: '800' },
-  linkText:      { fontSize: 12, fontWeight: '700' },
+  cardTitle:     { fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold },
+  linkText:      { fontSize: FontSize.sm, fontWeight: FontWeight.bold },
 
   granPill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
-  granText: { fontSize: 11, fontWeight: '700' },
+  granText: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold },
 
-  emptyInline: { fontSize: 12.5, textAlign: 'center', paddingVertical: 12 },
+  emptyInline: { fontSize: FontSize.sm, textAlign: 'center', paddingVertical: 12 },
 
   contentRow:    { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 10 },
-  contentTitle:  { fontSize: 13, fontWeight: '700' },
-  contentSub:    { fontSize: 11, marginTop: 2 },
-  contentAmount: { fontSize: 13, fontWeight: '800' },
+  contentTitle:  { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
+  contentSub:    { fontSize: FontSize.xsPlus, marginTop: 2 },
+  contentAmount: { fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold },
 
   historyBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginHorizontal: 16, marginTop: 16, paddingVertical: 14, borderRadius: 18, borderWidth: 1 },
-  historyBtnText: { fontSize: 13, fontWeight: '700' },
+  historyBtnText: { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
 });

@@ -258,7 +258,14 @@ function _handleNotificationOpen(data?: Record<string, string>): void {
   if (!data) return;
   const type = data.type;
   if (type === 'message') {
-    navigate('Chat', { partnerId: data.sender_id, partnerName: data.sender_name ?? '' });
+    // avatarUrl transmis dès que le backend l'envoie dans le payload — sans ça,
+    // ChatScreen n'a aucune photo tant qu'il n'est pas arrivé depuis la liste
+    // des conversations (seul endroit où avatarUrl était déjà en mémoire).
+    navigate('Chat', {
+      partnerId:   data.sender_id,
+      partnerName: data.sender_name ?? '',
+      avatarUrl:   data.sender_avatar || undefined,
+    });
   } else if (type === 'subscription_expired') {
     const missingGoGold = parseInt(data.missing_gogold ?? '0', 10);
     const missingEur   = parseFloat(data.missing_eur ?? '0');

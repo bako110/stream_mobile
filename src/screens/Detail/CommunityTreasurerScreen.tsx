@@ -15,6 +15,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { BackButton, GofolyxLoader, PriceWithLocal } from '../../components/common';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
 import { toastService, showConfirm } from '../../services';
@@ -324,8 +325,8 @@ export const CommunityTreasurerScreen: React.FC = () => {
       <View style={[st.header, { paddingTop: insets.top + 8, borderBottomColor: colors.divider, backgroundColor: colors.surface }]}>
         <BackButton onPress={() => nav.goBack()} />
         <View style={{ flex: 1 }}>
-          <Text style={{ color: colors.textPrimary, fontSize: 17, fontWeight: '800' }}>Trésorier</Text>
-          <Text style={{ color: colors.textTertiary, fontSize: 11 }}>{communityName}</Text>
+          <Text style={{ color: colors.textPrimary, fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold }}>Trésorier</Text>
+          <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus }}>{communityName}</Text>
         </View>
         {(isAdmin || isTreasurer) && (
           <TouchableOpacity
@@ -334,7 +335,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
               backgroundColor: '#10B981', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20 }}
           >
             <Icon name="arrow-up-right" size={13} color="#fff" />
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Retirer</Text>
+            <Text style={{ color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.sm }}>Retirer</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -351,7 +352,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
           <View>
             {/* Card trésorier */}
             <View style={{ margin: 16 }}>
-              <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '700', marginBottom: 8 }}>
+              <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, marginBottom: 8 }}>
                 TRÉSORIER ACTUEL
               </Text>
               {treasurer ? (
@@ -362,21 +363,21 @@ export const CommunityTreasurerScreen: React.FC = () => {
                       <Image source={{ uri: treasurer.avatar_url }} style={st.avatar} />
                     ) : (
                       <View style={[st.avatar, { backgroundColor: '#7B3FF220', alignItems: 'center', justifyContent: 'center' }]}>
-                        <Text style={{ color: '#7B3FF2', fontWeight: '800', fontSize: 16 }}>
+                        <Text style={{ color: '#7B3FF2', fontWeight: FontWeight.extraBold, fontSize: FontSize.md }}>
                           {(treasurer.display_name || treasurer.username || '?')[0].toUpperCase()}
                         </Text>
                       </View>
                     )}
                     <View style={{ flex: 1 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <Text style={{ color: colors.textPrimary, fontWeight: '800', fontSize: 15 }}>
+                        <Text style={{ color: colors.textPrimary, fontWeight: FontWeight.extraBold, fontSize: FontSize.basePlus }}>
                           {treasurer.display_name || treasurer.username}
                         </Text>
                         <View style={{ backgroundColor: '#7B3FF220', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 }}>
-                          <Text style={{ color: '#7B3FF2', fontSize: 10, fontWeight: '800' }}>TRÉSORIER</Text>
+                          <Text style={{ color: '#7B3FF2', fontSize: FontSize.xs, fontWeight: FontWeight.extraBold }}>TRÉSORIER</Text>
                         </View>
                       </View>
-                      <Text style={{ color: colors.textTertiary, fontSize: 11, marginTop: 2 }}>
+                      <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus, marginTop: 2 }}>
                         Nommé par {treasurer.appointer_name} · {fmtDate(treasurer.appointed_at)}
                       </Text>
                     </View>
@@ -398,17 +399,17 @@ export const CommunityTreasurerScreen: React.FC = () => {
                 <View style={[st.noTreasurerBox, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
                   <Icon name="alert-circle" size={20} color="#F59E0B" />
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: colors.textPrimary, fontWeight: '700', fontSize: 14 }}>
+                    <Text style={{ color: colors.textPrimary, fontWeight: FontWeight.bold, fontSize: FontSize.base }}>
                       Aucun trésorier
                     </Text>
-                    <Text style={{ color: colors.textTertiary, fontSize: 12 }}>
+                    <Text style={{ color: colors.textTertiary, fontSize: FontSize.sm }}>
                       Sans trésorier, les retraits sont approuvés par l'admin seul.
                     </Text>
                   </View>
                   {isAdmin && (
                     <TouchableOpacity onPress={handlePickTreasurer}
                       style={{ backgroundColor: '#7B3FF2', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7 }}>
-                      <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Nommer</Text>
+                      <Text style={{ color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.bold }}>Nommer</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -419,7 +420,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
             {(election || isAdmin) && (
               <View style={{ marginHorizontal: 16, marginBottom: 16 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                  <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '700' }}>
+                  <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold }}>
                     {election
                       ? 'VOTE EN COURS'
                       : treasurer
@@ -444,7 +445,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
                         borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 }}>
                       {launching ? <ActivityIndicator size="small" color="#fff" /> : (
                         <><Icon name="users" size={12} color="#fff" />
-                        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>
+                        <Text style={{ color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.sm }}>
                           Lancer un vote
                         </Text></>
                       )}
@@ -455,7 +456,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
                       style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
                         backgroundColor: '#10B981', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 }}>
                       <Icon name="check" size={12} color="#fff" />
-                      <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Clôturer et élire</Text>
+                      <Text style={{ color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.sm }}>Clôturer et élire</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -475,8 +476,8 @@ export const CommunityTreasurerScreen: React.FC = () => {
                         ].map(s => (
                           <View key={s.lbl} style={{ flex: 1, backgroundColor: s.color + '12',
                             borderRadius: 10, padding: 8, alignItems: 'center' }}>
-                            <Text style={{ color: s.color, fontWeight: '900', fontSize: 16 }}>{String(s.val)}</Text>
-                            <Text style={{ color: colors.textTertiary, fontSize: 9 }}>{s.lbl}</Text>
+                            <Text style={{ color: s.color, fontWeight: FontWeight.black, fontSize: FontSize.md }}>{String(s.val)}</Text>
+                            <Text style={{ color: colors.textTertiary, fontSize: FontSize['2xs'] }}>{s.lbl}</Text>
                           </View>
                         ))}
                       </View>
@@ -485,7 +486,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
                       {!election.my_vote && (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                           <Icon name="info" size={12} color={colors.textTertiary} />
-                          <Text style={{ color: colors.textTertiary, fontSize: 11, flex: 1 }}>
+                          <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus, flex: 1 }}>
                             Choisissez un candidat — votre vote est définitif.
                           </Text>
                         </View>
@@ -516,16 +517,16 @@ export const CommunityTreasurerScreen: React.FC = () => {
                                 ) : (
                                   <View style={[st.avatarSm, { backgroundColor: '#7B3FF220',
                                     alignItems: 'center', justifyContent: 'center' }]}>
-                                    <Text style={{ color: '#7B3FF2', fontWeight: '800' }}>
+                                    <Text style={{ color: '#7B3FF2', fontWeight: FontWeight.extraBold }}>
                                       {(c.display_name || c.username || '?')[0].toUpperCase()}
                                     </Text>
                                   </View>
                                 )}
                                 <View style={{ flex: 1 }}>
-                                  <Text style={{ color: colors.textPrimary, fontWeight: '700', fontSize: 14 }}>
+                                  <Text style={{ color: colors.textPrimary, fontWeight: FontWeight.bold, fontSize: FontSize.base }}>
                                     {c.display_name || c.username}
                                   </Text>
-                                  <Text style={{ color: colors.textTertiary, fontSize: 11 }}>
+                                  <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus }}>
                                     {c.votes} vote{c.votes !== 1 ? 's' : ''} · {c.pct}%
                                   </Text>
                                 </View>
@@ -533,7 +534,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
                                 {isMyVote && (
                                   <View style={{ backgroundColor: '#7B3FF220', borderRadius: 8,
                                     paddingHorizontal: 8, paddingVertical: 3 }}>
-                                    <Text style={{ color: '#7B3FF2', fontSize: 10, fontWeight: '800' }}>MON VOTE</Text>
+                                    <Text style={{ color: '#7B3FF2', fontSize: FontSize.xs, fontWeight: FontWeight.extraBold }}>MON VOTE</Text>
                                   </View>
                                 )}
                                 {voteLoading === c.user_id && <ActivityIndicator size="small" color="#7B3FF2" />}
@@ -551,12 +552,12 @@ export const CommunityTreasurerScreen: React.FC = () => {
             {/* Explication double approbation */}
             <View style={[st.infoBox, { backgroundColor: '#7B3FF210', borderColor: '#7B3FF230', marginHorizontal: 16, marginBottom: 16 }]}>
               <Icon name="shield" size={14} color="#7B3FF2" />
-              <Text style={{ color: '#7B3FF2', fontSize: 12, flex: 1, lineHeight: 17 }}>
-                Chaque retrait nécessite l'approbation de <Text style={{ fontWeight: '800' }}>l'admin ET du trésorier</Text> avant d'être exécuté.
+              <Text style={{ color: '#7B3FF2', fontSize: FontSize.sm, flex: 1, lineHeight: 17 }}>
+                Chaque retrait nécessite l'approbation de <Text style={{ fontWeight: FontWeight.extraBold }}>l'admin ET du trésorier</Text> avant d'être exécuté.
               </Text>
             </View>
 
-            <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '700', marginHorizontal: 16, marginBottom: 8 }}>
+            <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, marginHorizontal: 16, marginBottom: 8 }}>
               DEMANDES DE RETRAIT ({requests.length})
             </Text>
           </View>
@@ -574,20 +575,20 @@ export const CommunityTreasurerScreen: React.FC = () => {
                 {/* Header */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: colors.textPrimary, fontSize: 18, fontWeight: '900' }}>
-                      {req.gogold_amount.toLocaleString('fr-FR')} <Text style={{ fontSize: 13, fontWeight: '400' }}>GoGold</Text>
+                    <Text style={{ color: colors.textPrimary, fontSize: FontSize.lg, fontWeight: FontWeight.black }}>
+                      {req.gogold_amount.toLocaleString('fr-FR')} <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.regular }}>GoGold</Text>
                     </Text>
-                    <Text style={{ color: colors.textTertiary, fontSize: 12 }}>≈ <PriceWithLocal amountEur={req.eur_amount} style={{ color: colors.textTertiary, fontSize: 12 }} /></Text>
+                    <Text style={{ color: colors.textTertiary, fontSize: FontSize.sm }}>≈ <PriceWithLocal amountEur={req.eur_amount} style={{ color: colors.textTertiary, fontSize: FontSize.sm }} /></Text>
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
                     backgroundColor: cfg.color + '15', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5 }}>
                     <Icon name={cfg.icon} size={12} color={cfg.color} />
-                    <Text style={{ color: cfg.color, fontSize: 11, fontWeight: '800' }}>{cfg.label}</Text>
+                    <Text style={{ color: cfg.color, fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold }}>{cfg.label}</Text>
                   </View>
                 </View>
 
                 {req.description && (
-                  <Text style={{ color: colors.textSecondary, fontSize: 13 }}>{req.description}</Text>
+                  <Text style={{ color: colors.textSecondary, fontSize: FontSize.smPlus }}>{req.description}</Text>
                 )}
 
                 {/* Qui a lancé */}
@@ -595,7 +596,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
                     backgroundColor: '#3B82F610', borderRadius: 10, padding: 8 }}>
                     <Icon name="send" size={12} color="#3B82F6" />
-                    <Text style={{ color: '#3B82F6', fontSize: 12, fontWeight: '700' }}>
+                    <Text style={{ color: '#3B82F6', fontSize: FontSize.sm, fontWeight: FontWeight.bold }}>
                       Vous avez lancé cette demande · en attente de {isAdmin ? 'l\'approbation du trésorier' : 'l\'approbation de l\'admin'}
                     </Text>
                   </View>
@@ -615,8 +616,8 @@ export const CommunityTreasurerScreen: React.FC = () => {
                       <Icon name={a.approved ? 'check-circle' : a.isMe ? 'alert-circle' : 'clock'} size={14}
                         color={a.approved ? '#10B981' : a.isMe ? '#F59E0B' : colors.textTertiary} />
                       <View>
-                        <Text style={{ color: colors.textPrimary, fontSize: 12, fontWeight: '700' }}>{a.label}</Text>
-                        <Text style={{ color: a.approved ? '#10B981' : a.isMe ? '#F59E0B' : colors.textTertiary, fontSize: 10 }}>
+                        <Text style={{ color: colors.textPrimary, fontSize: FontSize.sm, fontWeight: FontWeight.bold }}>{a.label}</Text>
+                        <Text style={{ color: a.approved ? '#10B981' : a.isMe ? '#F59E0B' : colors.textTertiary, fontSize: FontSize.xs }}>
                           {a.approved ? (a.at ? fmtDate(a.at) : 'Approuvé') : a.isMe ? 'Votre approbation requise' : 'En attente'}
                         </Text>
                       </View>
@@ -627,7 +628,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
                 {req.rejection_note && (
                   <View style={{ flexDirection: 'row', gap: 6, backgroundColor: '#EF444410', borderRadius: 8, padding: 8 }}>
                     <Icon name="x-circle" size={13} color="#EF4444" />
-                    <Text style={{ color: '#EF4444', fontSize: 12, flex: 1 }}>{req.rejection_note}</Text>
+                    <Text style={{ color: '#EF4444', fontSize: FontSize.sm, flex: 1 }}>{req.rejection_note}</Text>
                   </View>
                 )}
 
@@ -645,7 +646,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
                           gap: 6, paddingVertical: 11 }}>
                         {actionLoading === req.id
                           ? <ActivityIndicator size="small" color="#fff" />
-                          : <><Icon name="check" size={14} color="#fff" /><Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>Approuver</Text></>
+                          : <><Icon name="check" size={14} color="#fff" /><Text style={{ color: '#fff', fontWeight: FontWeight.extraBold, fontSize: FontSize.smPlus }}>Approuver</Text></>
                         }
                       </LinearGradient>
                     </TouchableOpacity>
@@ -658,13 +659,13 @@ export const CommunityTreasurerScreen: React.FC = () => {
                     >
                       {actionLoading === req.id + '_reject'
                         ? <ActivityIndicator size="small" color="#EF4444" />
-                        : <><Icon name="x" size={14} color="#EF4444" /><Text style={{ color: '#EF4444', fontWeight: '800', fontSize: 13 }}>Rejeter</Text></>
+                        : <><Icon name="x" size={14} color="#EF4444" /><Text style={{ color: '#EF4444', fontWeight: FontWeight.extraBold, fontSize: FontSize.smPlus }}>Rejeter</Text></>
                       }
                     </TouchableOpacity>
                   </View>
                 )}
 
-                <Text style={{ color: colors.textTertiary, fontSize: 10, textAlign: 'right' }}>
+                <Text style={{ color: colors.textTertiary, fontSize: FontSize.xs, textAlign: 'right' }}>
                   Créée le {fmtDate(req.created_at)}
                 </Text>
               </View>
@@ -674,7 +675,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
         ListEmptyComponent={
           <View style={{ alignItems: 'center', paddingTop: 32, gap: 8 }}>
             <Icon name="inbox" size={32} color={colors.textTertiary} />
-            <Text style={{ color: colors.textTertiary, fontSize: 14 }}>Aucune demande de retrait</Text>
+            <Text style={{ color: colors.textTertiary, fontSize: FontSize.base }}>Aucune demande de retrait</Text>
           </View>
         }
       />
@@ -684,7 +685,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
         <TouchableOpacity style={st.overlay} activeOpacity={1} onPress={() => setPickOpen(false)} />
         <View style={[st.sheet, { backgroundColor: colors.background, paddingBottom: insets.bottom }]}>
           <View style={[st.sheetHandle]}><View style={[st.handle, { backgroundColor: colors.divider }]} /></View>
-          <Text style={{ color: colors.textPrimary, fontWeight: '800', fontSize: 16, paddingHorizontal: 16, marginBottom: 12 }}>
+          <Text style={{ color: colors.textPrimary, fontWeight: FontWeight.extraBold, fontSize: FontSize.md, paddingHorizontal: 16, marginBottom: 12 }}>
             Choisir un trésorier
           </Text>
           {pickLoading ? (
@@ -700,16 +701,16 @@ export const CommunityTreasurerScreen: React.FC = () => {
                   {m.avatar_url
                     ? <Image source={{ uri: m.avatar_url }} style={st.avatarSm} />
                     : <View style={[st.avatarSm, { backgroundColor: '#7B3FF220', alignItems: 'center', justifyContent: 'center' }]}>
-                        <Text style={{ color: '#7B3FF2', fontWeight: '700' }}>
+                        <Text style={{ color: '#7B3FF2', fontWeight: FontWeight.bold }}>
                           {(m.display_name || m.username || '?')[0].toUpperCase()}
                         </Text>
                       </View>
                   }
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: colors.textPrimary, fontWeight: '600', fontSize: 14 }}>
+                    <Text style={{ color: colors.textPrimary, fontWeight: FontWeight.semiBold, fontSize: FontSize.base }}>
                       {m.display_name || m.username}
                     </Text>
-                    {m.role && <Text style={{ color: colors.textTertiary, fontSize: 11 }}>{m.role}</Text>}
+                    {m.role && <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus }}>{m.role}</Text>}
                   </View>
                   <Icon name="chevron-right" size={16} color={colors.textTertiary} />
                 </TouchableOpacity>
@@ -728,19 +729,19 @@ export const CommunityTreasurerScreen: React.FC = () => {
             <TouchableOpacity onPress={() => setCandidatesOpen(false)}>
               <Icon name="x" size={20} color={colors.textPrimary} />
             </TouchableOpacity>
-            <Text style={{ color: colors.textPrimary, fontWeight: '800', fontSize: 16, flex: 1, textAlign: 'center' }}>
+            <Text style={{ color: colors.textPrimary, fontWeight: FontWeight.extraBold, fontSize: FontSize.md, flex: 1, textAlign: 'center' }}>
               Choisir les candidats
             </Text>
             <TouchableOpacity onPress={handleLaunchElection} disabled={launching || selectedCandidates.length < 2}>
               {launching
                 ? <ActivityIndicator size="small" color="#7B3FF2" />
-                : <Text style={{ color: selectedCandidates.length < 2 ? colors.textTertiary : '#7B3FF2', fontWeight: '700', fontSize: 14 }}>
+                : <Text style={{ color: selectedCandidates.length < 2 ? colors.textTertiary : '#7B3FF2', fontWeight: FontWeight.bold, fontSize: FontSize.base }}>
                     Lancer ({selectedCandidates.length})
                   </Text>
               }
             </TouchableOpacity>
           </View>
-          <Text style={{ color: colors.textTertiary, fontSize: 12, paddingHorizontal: 16, paddingTop: 10 }}>
+          <Text style={{ color: colors.textTertiary, fontSize: FontSize.sm, paddingHorizontal: 16, paddingTop: 10 }}>
             Sélectionnez au moins 2 membres — seuls ces candidats pourront recevoir des votes.
           </Text>
           {candidatesLoading ? (
@@ -758,16 +759,16 @@ export const CommunityTreasurerScreen: React.FC = () => {
                     {m.avatar_url
                       ? <Image source={{ uri: m.avatar_url }} style={st.avatarSm} />
                       : <View style={[st.avatarSm, { backgroundColor: '#7B3FF220', alignItems: 'center', justifyContent: 'center' }]}>
-                          <Text style={{ color: '#7B3FF2', fontWeight: '700' }}>
+                          <Text style={{ color: '#7B3FF2', fontWeight: FontWeight.bold }}>
                             {(m.display_name || m.username || '?')[0].toUpperCase()}
                           </Text>
                         </View>
                     }
                     <View style={{ flex: 1 }}>
-                      <Text style={{ color: colors.textPrimary, fontWeight: '600', fontSize: 14 }}>
+                      <Text style={{ color: colors.textPrimary, fontWeight: FontWeight.semiBold, fontSize: FontSize.base }}>
                         {m.display_name || m.username}
                       </Text>
-                      {m.role && <Text style={{ color: colors.textTertiary, fontSize: 11 }}>{m.role}</Text>}
+                      {m.role && <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus }}>{m.role}</Text>}
                     </View>
                     <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 2,
                       borderColor: selected ? '#7B3FF2' : colors.divider,
@@ -798,13 +799,13 @@ export const CommunityTreasurerScreen: React.FC = () => {
               <TouchableOpacity onPress={() => setCreateOpen(false)}>
                 <Icon name="x" size={20} color={colors.textPrimary} />
               </TouchableOpacity>
-              <Text style={{ color: colors.textPrimary, fontWeight: '800', fontSize: 16, flex: 1, textAlign: 'center' }}>
+              <Text style={{ color: colors.textPrimary, fontWeight: FontWeight.extraBold, fontSize: FontSize.md, flex: 1, textAlign: 'center' }}>
                 Demande de retrait
               </Text>
               <TouchableOpacity onPress={handleCreateRequest} disabled={formSaving}>
                 {formSaving
                   ? <ActivityIndicator size="small" color="#10B981" />
-                  : <Text style={{ color: '#10B981', fontWeight: '700', fontSize: 14 }}>Envoyer</Text>
+                  : <Text style={{ color: '#10B981', fontWeight: FontWeight.bold, fontSize: FontSize.base }}>Envoyer</Text>
                 }
               </TouchableOpacity>
             </View>
@@ -815,11 +816,11 @@ export const CommunityTreasurerScreen: React.FC = () => {
                 <View style={[st.infoBox, { backgroundColor: '#10B98110', borderColor: '#10B98130' }]}>
                   <Icon name="briefcase" size={14} color="#10B981" />
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: '#10B981', fontSize: 12, fontWeight: '800' }}>
+                    <Text style={{ color: '#10B981', fontSize: FontSize.sm, fontWeight: FontWeight.extraBold }}>
                       Solde communautaire : {communityBalance.toLocaleString('fr-FR')} GoGold
                     </Text>
-                    <Text style={{ color: '#10B981', fontSize: 11, opacity: 0.8 }}>
-                      ≈ <PriceWithLocal amountEur={communityBalance / 100} style={{ color: '#10B981', fontSize: 11, opacity: 0.8 }} /> disponibles
+                    <Text style={{ color: '#10B981', fontSize: FontSize.xsPlus, opacity: 0.8 }}>
+                      ≈ <PriceWithLocal amountEur={communityBalance / 100} style={{ color: '#10B981', fontSize: FontSize.xsPlus, opacity: 0.8 }} /> disponibles
                     </Text>
                   </View>
                 </View>
@@ -829,18 +830,18 @@ export const CommunityTreasurerScreen: React.FC = () => {
               {treasurer && (
                 <View style={[st.infoBox, { backgroundColor: '#F59E0B10', borderColor: '#F59E0B30' }]}>
                   <Icon name="shield" size={14} color="#F59E0B" />
-                  <Text style={{ color: '#F59E0B', fontSize: 12, flex: 1 }}>
-                    Cette demande devra être approuvée par <Text style={{ fontWeight: '800' }}>vous ET le trésorier</Text> avant exécution.
+                  <Text style={{ color: '#F59E0B', fontSize: FontSize.sm, flex: 1 }}>
+                    Cette demande devra être approuvée par <Text style={{ fontWeight: FontWeight.extraBold }}>vous ET le trésorier</Text> avant exécution.
                   </Text>
                 </View>
               )}
 
               <View>
-                <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '700', marginBottom: 6 }}>MONTANT (GoGold) *</Text>
+                <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, marginBottom: 6 }}>MONTANT (GoGold) *</Text>
                 <View style={[st.inputRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
                   <Icon name="zap" size={16} color="#10B981" />
                   <TextInput
-                    style={{ flex: 1, color: colors.textPrimary, fontSize: 16, fontWeight: '700' }}
+                    style={{ flex: 1, color: colors.textPrimary, fontSize: FontSize.md, fontWeight: FontWeight.bold }}
                     value={formAmount}
                     onChangeText={v => setFormAmount(v.replace(/[^0-9]/g, ''))}
                     placeholder="Ex: 500"
@@ -848,15 +849,15 @@ export const CommunityTreasurerScreen: React.FC = () => {
                     keyboardType="number-pad"
                   />
                   {formAmount ? (
-                    <Text style={{ color: colors.textTertiary, fontSize: 12 }}>
-                      ≈ <PriceWithLocal amountEur={parseInt(formAmount || '0') / 100} style={{ color: colors.textTertiary, fontSize: 12 }} />
+                    <Text style={{ color: colors.textTertiary, fontSize: FontSize.sm }}>
+                      ≈ <PriceWithLocal amountEur={parseInt(formAmount || '0') / 100} style={{ color: colors.textTertiary, fontSize: FontSize.sm }} />
                     </Text>
                   ) : null}
                 </View>
               </View>
 
               <View>
-                <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '700', marginBottom: 6 }}>MOTIF (optionnel)</Text>
+                <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, marginBottom: 6 }}>MOTIF (optionnel)</Text>
                 <TextInput
                   style={[st.inputText, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider, color: colors.textPrimary }]}
                   value={formDesc}
@@ -890,5 +891,5 @@ const st = StyleSheet.create({
   handle:       { width: 40, height: 4, borderRadius: 2 },
   sheetHeader:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   inputRow:     { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11 },
-  inputText:    { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14, minHeight: 80, textAlignVertical: 'top' },
+  inputText:    { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: FontSize.base, minHeight: 80, textAlignVertical: 'top' },
 });

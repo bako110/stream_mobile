@@ -44,13 +44,6 @@ function formatTime(iso: string): string {
   return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 }
 
-const ACCENT_COLORS = ['#7B3FF2','#FF7A2F','#E0389A','#36D9A0','#3B82F6','#9B65F5','#EF4444','#F59E0B'];
-function accentFor(id: string): string {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) & 0xffff;
-  return ACCENT_COLORS[h % ACCENT_COLORS.length]!;
-}
-
 // Aperçu du dernier message façon WhatsApp — libellé texte selon le type
 // (sans contenu réel pour les médias, pas d'emoji), sinon le texte tel quel
 // pour un message classique.
@@ -469,7 +462,7 @@ const ConversationRow: React.FC<{
 }> = ({ conv, colors, onPress, onLongPress, onAvatarPress, selectMode, isSelected, isLive }) => {
   const unread   = (conv.unread_count ?? 0) > 0;
   const name     = conv.partner?.full_name ?? conv.partner?.username ?? conv.partner_id;
-  const accent   = accentFor(conv.partner_id);
+  const accent   = colors.primary;
   const isOnline = conv.partner?.is_online === true;
   const avatarUri = conv.partner?.avatar_url;
 

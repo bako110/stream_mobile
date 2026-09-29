@@ -40,6 +40,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
+import { FontSize, FontWeight } from '../../theme';
 import { liveService } from '../../services/liveService';
 import { toastService, showConfirm } from '../../services';
 import { apiClient } from '../../api/client';
@@ -116,7 +117,7 @@ interface GiftTick {
 
 const Av: React.FC<{ name: string; size: number; color?: string }> = ({ name, size, color = '#F0365A' }) => (
   <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: color, alignItems: 'center', justifyContent: 'center' }}>
-    <Text style={{ color: '#fff', fontWeight: '800', fontSize: size * 0.38 }}>{(name || '?')[0].toUpperCase()}</Text>
+    <Text style={{ color: '#fff', fontWeight: FontWeight.extraBold, fontSize: size * 0.38 }}>{(name || '?')[0].toUpperCase()}</Text>
   </View>
 );
 
@@ -1010,7 +1011,7 @@ const StreamContent: React.FC<{
         {pendingCount > 0 && (
           <TouchableOpacity style={st.sideItem} onPress={() => { setShowRequests(v => !v); setShowOnStage(false); }} activeOpacity={0.8}>
             <View style={[st.sideCircle, { backgroundColor: 'rgba(255,215,0,0.14)', borderColor: 'rgba(255,215,0,0.4)' }]}>
-              <Text style={{ fontSize: 22 }}>✋</Text>
+              <Text style={{ fontSize: FontSize['2xl'] }}>✋</Text>
               <View style={[st.sideBadge, { backgroundColor: '#FFD700' }]}>
                 <Text style={[st.sideBadgeText, { color: '#000' }]}>{pendingCount}</Text>
               </View>
@@ -1361,7 +1362,7 @@ const hr = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.1)',
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  title:      { color: '#fff', fontSize: 13, fontWeight: '800' },
+  title:      { color: '#fff', fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold },
   closeBtn:   { padding: 4 },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -1369,20 +1370,20 @@ const hr = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.06)',
   },
   avatar:    { width: 38, height: 38, borderRadius: 19 },
-  name:      { flex: 1, color: '#fff', fontSize: 12, fontWeight: '600' },
+  name:      { flex: 1, color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
   acceptBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: '#4ade80', borderRadius: 12,
     paddingHorizontal: 9, paddingVertical: 5,
   },
-  acceptText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  acceptText: { color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold },
   refuseBtn:  {
     width: 28, height: 28, borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center', justifyContent: 'center',
   },
   empty:     { padding: 20, alignItems: 'center' },
-  emptyText: { color: 'rgba(255,255,255,0.4)', fontSize: 12 },
+  emptyText: { color: 'rgba(255,255,255,0.4)', fontSize: FontSize.sm },
 });
 
 // ── Styles HostVideoView ──────────────────────────────────────────────────────
@@ -1394,14 +1395,14 @@ const mv = StyleSheet.create({
     zIndex: 12, paddingHorizontal: 12,
   },
   noVideo:      { justifyContent: 'center', alignItems: 'center', backgroundColor: '#111', gap: 12 },
-  noVideoText:  { color: '#888', fontSize: 13 },
+  noVideoText:  { color: '#888', fontSize: FontSize.smPlus },
   noVideoBg:    { justifyContent: 'center', alignItems: 'center', backgroundColor: '#0e0e0e', gap: 12 },
   // Fond quand caméra désactivée — style TikTok
   noCamBg:      { justifyContent: 'center', alignItems: 'center', backgroundColor: '#0a0a12', gap: 14 },
   noCamAvatar:  { width: 120, height: 120, borderRadius: 60, borderWidth: 3, borderColor: '#F0365A' },
-  noCamName:    { color: '#fff', fontSize: 18, fontWeight: '800' },
+  noCamName:    { color: '#fff', fontSize: FontSize.lg, fontWeight: FontWeight.extraBold },
   noCamMicRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
-  noCamMicText: { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
+  noCamMicText: { color: 'rgba(255,255,255,0.7)', fontSize: FontSize.sm },
   noCamBadgeRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 16 },
   noCamBadge:    { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
   noCamBadgeOff: { backgroundColor: 'rgba(240,54,90,0.15)' },
@@ -1420,9 +1421,9 @@ const mv = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 7,
     marginBottom: 6,
   },
-  noCamCamPillText: { color: '#F0365A', fontSize: 13, fontWeight: '700' },
-  noCamBadgeText:{ color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '600' },
-  spotName:     { color: '#fff', fontSize: 16, fontWeight: '700' },
+  noCamCamPillText: { color: '#F0365A', fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
+  noCamBadgeText:{ color: 'rgba(255,255,255,0.8)', fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
+  spotName:     { color: '#fff', fontSize: FontSize.md, fontWeight: FontWeight.bold },
   spotAvatar:   { width: 96, height: 96, borderRadius: 48, marginBottom: 4 },
   thumbsCol:{ position: 'absolute', bottom: Platform.OS === 'ios' ? 190 : 170, left: 12, zIndex: 15, gap: 8 },
   thumb: {
@@ -1432,7 +1433,7 @@ const mv = StyleSheet.create({
   thumbOnStage: { borderColor: '#4ade80', borderWidth: 2 },
   thumbNoCam:   { justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a1a', flex: 1 },
   thumbGrad:    { position: 'absolute', bottom: 0, left: 0, right: 0, height: 32, justifyContent: 'flex-end', paddingBottom: 4 },
-  thumbLabel:   { color: '#fff', fontSize: 9, textAlign: 'center', paddingHorizontal: 2 },
+  thumbLabel:   { color: '#fff', fontSize: FontSize['2xs'], textAlign: 'center', paddingHorizontal: 2 },
   thumbStageDot:{
     position: 'absolute', top: 4, left: 4,
     backgroundColor: '#4ade80', borderRadius: 8, padding: 2,
@@ -1472,10 +1473,10 @@ const st = StyleSheet.create({
     backgroundColor: '#F0365A', borderWidth: 1.5, borderColor: '#050010',
   },
   hostMeta:  { flexShrink: 1 },
-  hostName:  { color: '#fff', fontSize: 11, fontWeight: '700', letterSpacing: 0.2 },
+  hostName:  { color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, letterSpacing: 0.2 },
   hostTimerRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 1 },
-  liveTagText: { color: '#F0365A', fontWeight: '900', fontSize: 8, letterSpacing: 0.4 },
-  timerText:   { color: 'rgba(255,255,255,0.7)', fontSize: 8, fontWeight: '600' },
+  liveTagText: { color: '#F0365A', fontWeight: FontWeight.black, fontSize: 8, letterSpacing: 0.4 },
+  timerText:   { color: 'rgba(255,255,255,0.7)', fontSize: 8, fontWeight: FontWeight.semiBold },
 
   subPillsRow: {
     position: 'absolute', left: 14,
@@ -1487,7 +1488,7 @@ const st = StyleSheet.create({
     backgroundColor: 'rgba(155,101,245,0.75)', borderRadius: 10,
     paddingHorizontal: 7, paddingVertical: 4,
   },
-  privateText: { color: '#fff', fontWeight: '700', fontSize: 10 },
+  privateText: { color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.xs },
 
   participantsPill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
@@ -1501,8 +1502,8 @@ const st = StyleSheet.create({
     backgroundColor: '#9B65F5', alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: '#050010',
   },
-  participantAvatarText: { color: '#fff', fontSize: 7, fontWeight: '800' },
-  viewerCount: { color: '#fff', fontSize: 10, fontWeight: '800' },
+  participantAvatarText: { color: '#fff', fontSize: 7, fontWeight: FontWeight.extraBold },
+  viewerCount: { color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.extraBold },
   likeWrap:    { marginLeft: 0, marginRight: 2 },
   moreBtn: {
     width: 30, height: 30, borderRadius: 15,
@@ -1523,7 +1524,7 @@ const st = StyleSheet.create({
     elevation: 10,
   },
   launchDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#fff' },
-  launchTxt: { color: '#fff', fontSize: 14, fontWeight: '800', flex: 1 },
+  launchTxt: { color: '#fff', fontSize: FontSize.base, fontWeight: FontWeight.extraBold, flex: 1 },
 
   tournamentWaitBanner: {
     position: 'absolute',
@@ -1536,7 +1537,7 @@ const st = StyleSheet.create({
     elevation: 9,
   },
   tournamentWaitDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#fff' },
-  tournamentWaitTxt: { color: '#fff', fontSize: 13, fontWeight: '800', flex: 1 },
+  tournamentWaitTxt: { color: '#fff', fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold, flex: 1 },
 
   // ── Toasts ────────────────────────────────────────────────────────────────────
   toastsContainer:   { position: 'absolute', top: Platform.OS === 'ios' ? 116 : 92, left: 14, zIndex: 30, gap: 4 },
@@ -1546,7 +1547,7 @@ const st = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
-  joinToastText: { color: 'rgba(255,255,255,0.9)', fontSize: 12 },
+  joinToastText: { color: 'rgba(255,255,255,0.9)', fontSize: FontSize.sm },
 
   // ── Gift ticker ───────────────────────────────────────────────────────────────
   giftTickerZone: {
@@ -1559,10 +1560,10 @@ const st = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: 10, paddingVertical: 6,
   },
-  giftTickerEmoji:  { fontSize: 16 },
-  giftTickerText:   { flex: 1, color: '#fff', fontSize: 12 },
-  giftTickerSender: { fontWeight: '800' },
-  giftTickerGoGold:  { color: '#fff', fontSize: 11, fontWeight: '700' },
+  giftTickerEmoji:  { fontSize: FontSize.md },
+  giftTickerText:   { flex: 1, color: '#fff', fontSize: FontSize.sm },
+  giftTickerSender: { fontWeight: FontWeight.extraBold },
+  giftTickerGoGold:  { color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold },
 
   // ── MVP / top donateurs (portage du battle, BattleScreen.tsx) ──────────────────
   donorsCards: {
@@ -1576,10 +1577,10 @@ const st = StyleSheet.create({
     paddingVertical: 5, paddingHorizontal: 7, paddingLeft: 4,
   },
   donorCardAvatar: { width: 28, height: 28, borderRadius: 14 },
-  donorCardName: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  donorCardGift: { color: 'rgba(255,255,255,0.65)', fontSize: 10, marginTop: 1 },
-  donorCardEmoji: { fontSize: 17 },
-  donorCardCount: { color: '#FDE68A', fontSize: 12, fontWeight: '900' },
+  donorCardName: { color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold },
+  donorCardGift: { color: 'rgba(255,255,255,0.65)', fontSize: FontSize.xs, marginTop: 1 },
+  donorCardEmoji: { fontSize: FontSize.mdPlus },
+  donorCardCount: { color: '#FDE68A', fontSize: FontSize.sm, fontWeight: FontWeight.black },
 
   mvpRow: {
     position: 'absolute', left: 12,
@@ -1589,7 +1590,7 @@ const st = StyleSheet.create({
   mvpAvatar: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: '#0B0812' },
   mvpAvatarFallback: { borderWidth: 2, borderColor: '#0B0812', borderRadius: 13 },
   mvpBadge: { marginLeft: 4, backgroundColor: '#FFD700', borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1.5 },
-  mvpBadgeText: { color: '#000', fontSize: 8, fontWeight: '900' },
+  mvpBadgeText: { color: '#000', fontSize: 8, fontWeight: FontWeight.black },
 
   // ── Colonne droite ────────────────────────────────────────────────────────────
   sideCol: {
@@ -1604,7 +1605,7 @@ const st = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)',
   },
-  sideLabel:   { color: 'rgba(255,255,255,0.78)', fontSize: 10, fontWeight: '600', textAlign: 'center' },
+  sideLabel:   { color: 'rgba(255,255,255,0.78)', fontSize: FontSize.xs, fontWeight: FontWeight.semiBold, textAlign: 'center' },
   sideBadge: {
     position: 'absolute', top: -3, right: -3,
     minWidth: 18, height: 18, borderRadius: 9,
@@ -1613,15 +1614,15 @@ const st = StyleSheet.create({
     paddingHorizontal: 3,
     borderWidth: 1.5, borderColor: '#050010',
   },
-  sideBadgeText: { color: '#fff', fontSize: 9, fontWeight: '900' },
+  sideBadgeText: { color: '#fff', fontSize: FontSize['2xs'], fontWeight: FontWeight.black },
 
   // kept for hand-requests panel (hr.panel uses st.badge/badgeText indirectly — safe to keep)
   badge:     { position: 'absolute', top: -2, right: -2, width: 18, height: 18, borderRadius: 9, backgroundColor: '#F0365A', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#050010' },
-  badgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
+  badgeText: { color: '#fff', fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold },
 
   // kept for compatibility
   sideBtnCircle: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)' },
-  sideBtnLabel:  { color: 'rgba(255,255,255,0.78)', fontSize: 10, fontWeight: '600' },
+  sideBtnLabel:  { color: 'rgba(255,255,255,0.78)', fontSize: FontSize.xs, fontWeight: FontWeight.semiBold },
 
   // ── Zone bas (chat + input) ───────────────────────────────────────────────────
   bottomZone: {
@@ -1635,12 +1636,12 @@ const st = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 5,
     flexDirection: 'row', flexWrap: 'wrap', maxWidth: 210,
   },
-  chatUser:    { color: '#F0365A', fontSize: 12, fontWeight: '800' },
-  chatText:    { color: '#fff', fontSize: 13, flexShrink: 1 },
+  chatUser:    { color: '#F0365A', fontSize: FontSize.sm, fontWeight: FontWeight.extraBold },
+  chatText:    { color: '#fff', fontSize: FontSize.smPlus, flexShrink: 1 },
   sysRow:      { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 },
-  sysText:     { color: 'rgba(255,255,255,0.4)', fontSize: 11 },
+  sysText:     { color: 'rgba(255,255,255,0.4)', fontSize: FontSize.xsPlus },
   giftMsg:     { backgroundColor: 'rgba(255,215,0,0.16)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 4, alignSelf: 'flex-start' },
-  giftMsgText: { color: '#FFD700', fontSize: 11, fontWeight: '700' },
+  giftMsgText: { color: '#FFD700', fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold },
 
   giftTargetPill: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
@@ -1649,7 +1650,7 @@ const st = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 4,
     borderWidth: 1, borderColor: 'rgba(255,215,0,0.3)',
   },
-  giftTargetText: { color: '#FFD700', fontSize: 11, fontWeight: '700', maxWidth: 160 },
+  giftTargetText: { color: '#FFD700', fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, maxWidth: 160 },
 
   inputBarRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 4 },
   inputBar: { flex: 1 },
@@ -1666,7 +1667,7 @@ const st = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
     minHeight: 38,
   },
-  chatPillText: { color: 'rgba(255,255,255,0.45)', fontSize: 13, flex: 1 },
+  chatPillText: { color: 'rgba(255,255,255,0.45)', fontSize: FontSize.smPlus, flex: 1 },
   inputRow: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.12)',
@@ -1674,7 +1675,7 @@ const st = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
     minHeight: 38,
   },
-  chatInput: { flex: 1, color: '#fff', fontSize: 13, paddingVertical: 5 },
+  chatInput: { flex: 1, color: '#fff', fontSize: FontSize.smPlus, paddingVertical: 5 },
   inputEmojiWrap: { alignItems: 'center', justifyContent: 'center', marginRight: 2 },
   sendBtn:   {
     backgroundColor: '#F0365A', borderRadius: 17, padding: 7, margin: 3,
@@ -1683,7 +1684,7 @@ const st = StyleSheet.create({
 
   modRow:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3, paddingLeft: 2 },
   modBtn:     { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(240,54,90,0.12)', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 3 },
-  modBtnText: { color: '#F0365A', fontSize: 10, fontWeight: '700' as const },
+  modBtnText: { color: '#F0365A', fontSize: FontSize.xs, fontWeight: FontWeight.bold },
 
   // unused but kept to avoid breaking anything
   settingsBtn:       { marginRight: 6 },
@@ -1707,21 +1708,21 @@ const os = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 10,
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.07)',
   },
-  title:    { color: '#4ade80', fontSize: 13, fontWeight: '700' },
+  title:    { color: '#4ade80', fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
   closeBtn: { padding: 4 },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingHorizontal: 12, paddingVertical: 8,
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
   },
-  name:      { flex: 1, color: '#fff', fontSize: 13, fontWeight: '600' },
+  name:      { flex: 1, color: '#fff', fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
   demoteBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
     backgroundColor: 'rgba(240,54,90,0.2)', borderRadius: 10,
     paddingHorizontal: 8, paddingVertical: 4,
     borderWidth: 1, borderColor: '#F0365A',
   },
-  demoteText: { color: '#F0365A', fontSize: 11, fontWeight: '700' },
+  demoteText: { color: '#F0365A', fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold },
   banBtn: {
     padding: 6, backgroundColor: 'rgba(240,54,90,0.12)',
     borderRadius: 8, borderWidth: 1, borderColor: 'rgba(240,54,90,0.3)',

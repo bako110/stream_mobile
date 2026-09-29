@@ -29,13 +29,23 @@ export const FontWeight = {
   semiBold: '600' as const,
   bold: '700' as const,
   extraBold: '800' as const,
+  black: '900' as const,
 };
 
+// Échelle enrichie (2026-09) pour coller à l'usage réel de l'app — l'échelle
+// d'origine (paliers de 2) ne couvrait pas les tailles impaires (9/11/13/15/17)
+// pourtant massivement utilisées (>1350 occurrences en dur à eux seuls avant
+// migration). Les paliers pairs d'origine sont conservés à l'identique.
 export const FontSize = {
+  '2xs': 9,
   xs: 10,
+  xsPlus: 11,
   sm: 12,
+  smPlus: 13,
   base: 14,
+  basePlus: 15,
   md: 16,
+  mdPlus: 17,
   lg: 18,
   xl: 20,
   '2xl': 24,

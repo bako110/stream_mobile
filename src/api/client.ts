@@ -226,6 +226,12 @@ export const apiClient = {
       };
       setTimeout(clear, GET_DEDUP_WINDOW_MS);
       p.finally(clear);
+      // Rejet "défensif" sur la promesse PARTAGÉE elle-même — sans lui, un
+      // échec (401 au tout premier lancement avant login, timeout réseau...)
+      // pouvait remonter comme "Uncaught (in promise)" au niveau du runtime
+      // JS dès que le premier tick s'écoule, même si l'appelant réel a bien
+      // un .catch() sur SA copie de la promesse retournée plus bas.
+      p.catch(() => {});
       return p as Promise<ApiResponse<T>>;
     }
     return request<T>(endpoint, { ...options, method: 'GET' });

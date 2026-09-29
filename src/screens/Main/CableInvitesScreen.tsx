@@ -37,11 +37,10 @@ const fmt = (iso: string) => {
   return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
-const Avatar: React.FC<{ uri?: string | null; name: string; size?: number }> = ({ uri, name, size = 44 }) => {
-  const bg = '#7B3FF2';
+const Avatar: React.FC<{ uri?: string | null; name: string; size?: number; accent: string }> = ({ uri, name, size = 44, accent }) => {
   if (uri) return <Image source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
   return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}>
+    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: accent, alignItems: 'center', justifyContent: 'center' }}>
       <Text style={{ color: '#fff', fontWeight: '800', fontSize: size * 0.38 }}>{name[0]?.toUpperCase()}</Text>
     </View>
   );
@@ -115,7 +114,7 @@ export const CableInvitesScreen: React.FC = () => {
       <View style={[s.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         {/* Ligne principale */}
         <View style={s.cardRow}>
-          <Avatar uri={person?.avatar_url} name={personName} />
+          <Avatar uri={person?.avatar_url} name={personName} accent={colors.primary} />
           <View style={s.cardInfo}>
             <Text style={[s.personName, { color: colors.textPrimary }]} numberOfLines={1}>
               {personName}

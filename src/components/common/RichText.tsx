@@ -4,15 +4,17 @@ import { useNavigation } from '@react-navigation/native';
 import { LinkPreviewCard } from './LinkPreviewCard';
 import { openPhoneMenu } from '../../utils/phoneMenu';
 
-// Matches URLs, @mentions, #hashtags, phone numbers — in order. Le numéro de
-// téléphone exige soit un + international, soit au moins un séparateur
-// (espace/point/tiret) entre les chiffres — un nombre collé (prix, date en
-// chiffres, quantité) ne matche jamais, seul un vrai numéro formaté est capturé.
-const TOKEN_RE = /(https?:\/\/[^\s<>"']+|@[\w.]+|#[\wÀ-ɏ]+|\+[0-9][0-9\s.-]{6,16}[0-9]|[0-9]{2,4}[\s.-][0-9]{2,4}(?:[\s.-][0-9]{2,4}){1,4})/g;
+// Matches URLs, @mentions, #hashtags, phone numbers, *bold* — in order. Le
+// numéro de téléphone exige soit un + international, soit au moins un
+// séparateur (espace/point/tiret) entre les chiffres — un nombre collé (prix,
+// date en chiffres, quantité) ne matche jamais, seul un vrai numéro formaté
+// est capturé. *bold* (style WhatsApp) : pas d'espace collé aux astérisques,
+// pour ne jamais confondre avec une simple multiplication ou un énumérateur.
+const TOKEN_RE = /(https?:\/\/[^\s<>"']+|@[\w.]+|#[\wÀ-ɏ]+|\+[0-9][0-9\s.-]{6,16}[0-9]|[0-9]{2,4}[\s.-][0-9]{2,4}(?:[\s.-][0-9]{2,4}){1,4}|\*[^\s*][^*]*[^\s*]\*|\*[^\s*]\*)/g;
 
 interface Segment {
   text: string;
-  type: 'text' | 'url' | 'mention' | 'hashtag' | 'phone';
+  type: 'text' | 'url' | 'mention' | 'hashtag' | 'phone' | 'bold';
 }
 
 function isPhoneLike(token: string): boolean {
@@ -29,6 +31,7 @@ function parse(text: string): Segment[] {
     if (t.startsWith('http')) segs.push({ text: t, type: 'url' });
     else if (t.startsWith('@'))  segs.push({ text: t, type: 'mention' });
     else if (t.startsWith('#'))  segs.push({ text: t, type: 'hashtag' });
+    else if (t.startsWith('*') && t.endsWith('*')) segs.push({ text: t.slice(1, -1), type: 'bold' });
     else if (isPhoneLike(t))     segs.push({ text: t, type: 'phone' });
     else                         segs.push({ text: t, type: 'text' });
     last = m.index! + t.length;
@@ -72,8 +75,8 @@ export const RichText: React.FC<Props> = ({
   maxLines = 0,
   textStyle,
   primaryColor,
-  moreLabel = 'Lire la suite',
-  lessLabel = 'Voir moins',
+  moreLabel = '…',
+  lessLabel = '…',
   onMentionPress,
   onHashtagPress,
   showLinkPreview = true,
@@ -147,6 +150,12 @@ export const RichText: React.FC<Props> = ({
             style={{ color: primaryColor, textDecorationLine: 'underline', fontWeight: '500' }}
             onPress={() => handlePhone(seg.text)}
           >
+            {seg.text}
+          </Text>
+        );
+      case 'bold':
+        return (
+          <Text key={i} style={{ fontWeight: '800' }}>
             {seg.text}
           </Text>
         );

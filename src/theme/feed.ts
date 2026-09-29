@@ -2,8 +2,8 @@
  * Tokens de layout du Feed — une seule source pour toutes les cartes et sections
  * du fil d'accueil.
  *
- * Modèle de carte : "carte douce" — flottante, marge latérale 12, radius 16,
- * ombre légère, bordure hairline. Le média a son propre radius (12) avec un
+ * Modèle de carte : "carte douce" — flottante, marge latérale 8, radius 8,
+ * ombre légère, bordure hairline. Le média a son propre radius (6) avec un
  * padding autour, jamais collé aux bords.
  *
  * Ne JAMAIS remettre de valeurs numériques de radius/spacing en dur dans le feed :
@@ -15,8 +15,8 @@ import { FontSize, FontWeight, LineHeight } from './typography';
 // ── Carte de feed (PostCard, FeedCard, encarts communities/reels, pub) ────────
 export const FeedCardLayout = {
   // Carte flottante : marge latérale + radius + ombre.
-  marginHorizontal: Spacing[3],   // 12
-  radius:           BorderRadius.lg,  // 16
+  marginHorizontal: Spacing[2],   // 8 — les cartes occupent plus de largeur (moins d'espace mort à droite/gauche)
+  radius:           8,            // même valeur que FeedRadius.card (déclaré plus bas, pas de dépendance croisée)
   // Espace vertical entre deux cartes.
   gutter:           Spacing[3],   // 12
   // Padding intérieur : le contenu (texte, header auteur, barre d'actions) est
@@ -29,9 +29,9 @@ export const FeedCardLayout = {
 
 // ── Échelle de border-radius du feed — 3 valeurs, rien d'autre ────────────────
 export const FeedRadius = {
-  chip:  BorderRadius.sm,   // 8  — filtres, petits badges
-  media: BorderRadius.md,   // 12 — thumbnails, vignettes, média des posts
-  card:  BorderRadius.lg,   // 16 — carte de feed elle-même
+  chip:  BorderRadius.sm,   // 8 — filtres, petits badges
+  media: 6,                 // thumbnails, vignettes, média des posts/événements/concerts
+  card:  8,                 // carte de feed elle-même (post/événement/concert)
   full:  BorderRadius.full, // avatars, pastilles de compteur
 };
 
@@ -65,8 +65,8 @@ export const FeedCarousel = {
 
 // ── Story ────────────────────────────────────────────────────────────────────
 export const StoryCard = {
-  w:      72,
-  h:      100,
+  w:      90,
+  h:      117,
   radius: FeedRadius.media,
   gap:    Spacing[2],
 };
@@ -80,5 +80,5 @@ export const SectionTitleStyle = {
 
 // ── Barre d'actions d'une carte (like / comment / share / save) ──────────────
 export const FeedActionIcon = {
-  size:       22,                   // cible visible, conventionnelle (FB/IG)
+  size:       18,                   // -20% par rapport à la taille conventionnelle FB/IG (22)
 };

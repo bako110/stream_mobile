@@ -3,12 +3,13 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
   ActivityIndicator, StyleSheet, ToastAndroid, Platform,
-  Modal, TextInput, KeyboardAvoidingView,
+  Modal, TextInput, KeyboardAvoidingView, Animated,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { AppHeader, SkeletonProfile } from '../../components/common';
@@ -138,6 +139,37 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
     if (age > 5_000) load(true);
   }, [load]));
 
+  // Bouton flottant "remonter + rafraîchir" — apparaît après un scroll
+  // significatif, comme sur les autres écrans à contenu long. Au clic : remonte
+  // en haut ET relance un chargement silencieux (load(true), pas de skeleton
+  // plein écran) pour repartir sur des données fraîches.
+  const scrollRef = useRef<ScrollView>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const scrollTopAnim = useRef(new Animated.Value(0)).current;
+  const SCROLL_TOP_THRESHOLD = 400;
+
+  const setScrollTopVisible = useCallback((visible: boolean) => {
+    setShowScrollTop(prev => {
+      if (prev === visible) return prev;
+      Animated.timing(scrollTopAnim, {
+        toValue: visible ? 1 : 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+      return visible;
+    });
+  }, [scrollTopAnim]);
+
+  const handleProfileScroll = useCallback((e: any) => {
+    const y = e.nativeEvent?.contentOffset?.y ?? 0;
+    setScrollTopVisible(y > SCROLL_TOP_THRESHOLD);
+  }, [setScrollTopVisible]);
+
+  const handleScrollTopPress = useCallback(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+    load(true);
+  }, [load]);
+
   const displayName = user
     ? (user.display_name
         || `${user.first_name ?? ''} ${user.last_name ?? ''}`.trim()
@@ -185,7 +217,13 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
       {loading ? (
         <SkeletonProfile />
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
+        <ScrollView
+          ref={scrollRef}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={s.scroll}
+          onScroll={handleProfileScroll}
+          scrollEventThrottle={16}
+        >
 
           {/* ── HEADER : Bannière + Avatar + Identité + Stats + Actions ── */}
           <View style={{ backgroundColor: colors.surface }}>
@@ -208,7 +246,7 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                 activeOpacity={0.8}
               >
                 <Icon name="camera" size={13} color="#fff" />
-                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>Modifier la bannière</Text>
+                <Text style={{ color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.semiBold }}>Modifier la bannière</Text>
               </TouchableOpacity>
             </View>
 
@@ -224,7 +262,7 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                       colors={[colors.gradientStart, colors.gradientEnd]}
                       style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
                     >
-                      <Text style={{ fontSize: 32, fontWeight: '900', color: colors.textOnBrand }}>{initials}</Text>
+                      <Text style={{ fontSize: FontSize['4xl'], fontWeight: FontWeight.black, color: colors.textOnBrand }}>{initials}</Text>
                     </LinearGradient>
                   )}
                 </View>
@@ -241,25 +279,25 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                 activeOpacity={0.8}
               >
                 <Icon name="edit-2" size={13} color="#fff" />
-                <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>Modifier le profil</Text>
+                <Text style={{ fontSize: FontSize.base, fontWeight: FontWeight.bold, color: '#fff' }}>Modifier le profil</Text>
               </TouchableOpacity>
             </View>
 
             {/* Identité : nom + badge verified + username + badge role */}
             <View style={{ paddingHorizontal: 16, paddingBottom: 16, gap: 4 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={{ fontSize: 20, fontWeight: '800', color: colors.textPrimary }} numberOfLines={1}>{displayName}</Text>
+                <Text style={{ fontSize: FontSize.xl, fontWeight: FontWeight.extraBold, color: colors.textPrimary }} numberOfLines={1}>{displayName}</Text>
                 {user?.is_verified && <VerifiedBadge size={18} />}
               </View>
               {user?.username && (
-                <Text style={{ fontSize: 13, fontWeight: '500', color: colors.textSecondary }}>@{user.username}</Text>
+                <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.medium, color: colors.textSecondary }}>@{user.username}</Text>
               )}
               {user?.bio ? (
-                <Text style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 18, marginTop: 4 }} numberOfLines={3}>{user.bio}</Text>
+                <Text style={{ fontSize: FontSize.smPlus, color: colors.textSecondary, lineHeight: 18, marginTop: 4 }} numberOfLines={3}>{user.bio}</Text>
               ) : null}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6, alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 14, backgroundColor: colors.primary + '18', borderWidth: 1, borderColor: colors.primary + '40' }}>
                 <Icon name={roleIcon} size={12} color={colors.primary} />
-                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>{roleLabel}</Text>
+                <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: colors.primary }}>{roleLabel}</Text>
               </View>
             </View>
 
@@ -272,8 +310,8 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                   activeOpacity={0.7}
                 >
                   <Icon name="users" size={18} color={colors.textSecondary} style={{ marginBottom: 2 }} />
-                  <Text style={{ fontSize: 18, fontWeight: '800', color: colors.textPrimary }}>{followersCount}</Text>
-                  <Text style={{ fontSize: 11, fontWeight: '500', color: colors.textTertiary }}>Abonnés</Text>
+                  <Text style={{ fontSize: FontSize.lg, fontWeight: FontWeight.extraBold, color: colors.textPrimary }}>{followersCount}</Text>
+                  <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.medium, color: colors.textTertiary }}>Abonnés</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={{ flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 14, backgroundColor: colors.backgroundSecondary, gap: 3 }}
@@ -281,8 +319,8 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                   activeOpacity={0.7}
                 >
                   <Icon name="user-plus" size={18} color={colors.textSecondary} style={{ marginBottom: 2 }} />
-                  <Text style={{ fontSize: 18, fontWeight: '800', color: colors.textPrimary }}>{followingCount}</Text>
-                  <Text style={{ fontSize: 11, fontWeight: '500', color: colors.textTertiary }}>Abonnements</Text>
+                  <Text style={{ fontSize: FontSize.lg, fontWeight: FontWeight.extraBold, color: colors.textPrimary }}>{followingCount}</Text>
+                  <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.medium, color: colors.textTertiary }}>Abonnements</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -293,31 +331,31 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                 <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
                   <Icon name="credit-card" size={20} color={colors.textSecondary} />
                 </View>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: colors.textTertiary }}>Wallet</Text>
+                <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold, color: colors.textTertiary }}>Wallet</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => nav.navigate('MyStories')} activeOpacity={0.75} style={{ flex: 1, alignItems: 'center', gap: 5 }}>
                 <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
                   <Icon name="camera" size={20} color={colors.textSecondary} />
                 </View>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: colors.textTertiary }}>Story</Text>
+                <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold, color: colors.textTertiary }}>Story</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => setShowQR(true)} activeOpacity={0.75} style={{ flex: 1, alignItems: 'center', gap: 5 }}>
                 <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
                   <Icon name="grid" size={20} color={colors.textSecondary} />
                 </View>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: colors.textTertiary }}>QR Code</Text>
+                <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold, color: colors.textTertiary }}>QR Code</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => nav.navigate('MyVerificationQueue')} activeOpacity={0.75} style={{ flex: 1, alignItems: 'center', gap: 5 }}>
                 <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
                   <Icon name="shield" size={20} color={colors.textSecondary} />
                 </View>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: colors.textTertiary }}>Vérifs</Text>
+                <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold, color: colors.textTertiary }}>Vérifs</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => nav.navigate('Settings')} activeOpacity={0.75} style={{ flex: 1, alignItems: 'center', gap: 5 }}>
                 <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
                   <Icon name="more-horizontal" size={20} color={colors.textSecondary} />
                 </View>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: colors.textTertiary }}>Plus</Text>
+                <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold, color: colors.textTertiary }}>Plus</Text>
               </TouchableOpacity>
             </View>
 
@@ -330,7 +368,7 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                   activeOpacity={0.8}
                 >
                   <Icon name="calendar" size={13} color="#E0389A" />
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#E0389A' }}>Créer un événement</Text>
+                  <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: '#E0389A' }}>Créer un événement</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: 10, borderWidth: 1, borderColor: '#7B3FF2' + '60', backgroundColor: '#7B3FF2' + '10' }}
@@ -338,7 +376,7 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                   activeOpacity={0.8}
                 >
                   <Icon name="music" size={13} color="#7B3FF2" />
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#7B3FF2' }}>Créer un concert</Text>
+                  <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: '#7B3FF2' }}>Créer un concert</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -365,7 +403,7 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                 <View style={s.aboutRow}>
                   <Icon name="map-pin" size={16} color={colors.textTertiary} />
                   <Text style={[s.aboutText, { color: colors.textPrimary }]}>
-                    Habite à <Text style={{ fontWeight: '700' }}>{user.location}</Text>
+                    Habite à <Text style={{ fontWeight: FontWeight.bold }}>{user.location}</Text>
                   </Text>
                 </View>
               ) : null}
@@ -378,13 +416,13 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
               <View style={s.aboutRow}>
                 <Icon name="calendar" size={16} color={colors.textTertiary} />
                 <Text style={[s.aboutText, { color: colors.textPrimary }]}>
-                  Membre depuis <Text style={{ fontWeight: '700' }}>{memberSince}</Text>
+                  Membre depuis <Text style={{ fontWeight: FontWeight.bold }}>{memberSince}</Text>
                 </Text>
               </View>
               {user?.is_verified && (
                 <View style={s.aboutRow}>
                   <Icon name="check-circle" size={16} color={colors.accentGreen} />
-                  <Text style={[s.aboutText, { color: colors.accentGreen, fontWeight: '600' }]}>
+                  <Text style={[s.aboutText, { color: colors.accentGreen, fontWeight: FontWeight.semiBold }]}>
                     Compte vérifié
                   </Text>
                 </View>
@@ -393,12 +431,12 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
               <TouchableOpacity style={s.aboutRow} onPress={() => nav.navigate('Referral')} activeOpacity={0.7}>
                 <Icon name="gift" size={16} color={colors.primary} />
                 <View style={{ flex: 1 }}>
-                  <Text style={[s.aboutText, { color: colors.textPrimary, fontWeight: '600' }]}>
+                  <Text style={[s.aboutText, { color: colors.textPrimary, fontWeight: FontWeight.semiBold }]}>
                     Parrainage
                   </Text>
                   {user?.referral_code ? (
-                    <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 1 }}>
-                      Code : <Text style={{ color: colors.primary, fontWeight: '800', letterSpacing: 1.5 }}>{user.referral_code}</Text>
+                    <Text style={{ fontSize: FontSize.xsPlus, color: colors.textTertiary, marginTop: 1 }}>
+                      Code : <Text style={{ color: colors.primary, fontWeight: FontWeight.extraBold, letterSpacing: 1.5 }}>{user.referral_code}</Text>
                     </Text>
                   ) : null}
                 </View>
@@ -419,15 +457,15 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
               >
                 <Icon name="at-sign" size={16} color={colors.primary} />
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 10, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.8 }}>Gofolyx ID</Text>
-                  <Text style={{ fontSize: 15, fontWeight: '900', color: user?.gofolyx_id ? colors.primary : colors.textTertiary, letterSpacing: 2 }}>
+                  <Text style={{ fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.8 }}>Gofolyx ID</Text>
+                  <Text style={{ fontSize: FontSize.basePlus, fontWeight: FontWeight.black, color: user?.gofolyx_id ? colors.primary : colors.textTertiary, letterSpacing: 2 }}>
                     {user?.gofolyx_id ?? 'En cours de génération...'}
                   </Text>
                 </View>
                 {user?.gofolyx_id ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primary + '22', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
                     <Icon name="copy" size={13} color={colors.primary} />
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Copier</Text>
+                    <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, color: colors.primary }}>Copier</Text>
                   </View>
                 ) : null}
               </TouchableOpacity>
@@ -449,7 +487,7 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                     style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderBottomWidth: 2, borderBottomColor: active ? colors.primary : 'transparent' }}
                   >
                     <Icon name={tab === 'posts' ? 'grid' : 'play-circle'} size={15} color={active ? colors.primary : colors.textTertiary} />
-                    <Text style={{ fontSize: 12, fontWeight: '600', color: active ? colors.primary : colors.textTertiary, marginTop: 3 }}>
+                    <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, color: active ? colors.primary : colors.textTertiary, marginTop: 3 }}>
                       {tab === 'posts' ? `Posts (${myPosts.length})` : `Reels (${myReels.length})`}
                     </Text>
                   </TouchableOpacity>
@@ -461,7 +499,7 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                 style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderBottomWidth: 2, borderBottomColor: 'transparent' }}
               >
                 <Icon name="image" size={15} color={colors.textTertiary} />
-                <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textTertiary, marginTop: 3 }}>
+                <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, color: colors.textTertiary, marginTop: 3 }}>
                   Galerie
                 </Text>
               </TouchableOpacity>
@@ -473,7 +511,7 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                 {myPosts.length === 0 ? (
                   <View style={{ alignItems: 'center', paddingVertical: 24, gap: 8 }}>
                     <Icon name="edit-3" size={28} color={colors.textTertiary} />
-                    <Text style={{ fontSize: 13, color: colors.textTertiary }}>Aucun post publié</Text>
+                    <Text style={{ fontSize: FontSize.smPlus, color: colors.textTertiary }}>Aucun post publié</Text>
                   </View>
                 ) : myPosts.slice(0, 6).map(post => {
                   // Même résolution que PostDetailScreen/UserPostsScreen : une image
@@ -496,10 +534,10 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                         </View>
                       )}
                       <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 13, fontWeight: '600', color: colors.textPrimary }} numberOfLines={thumb ? 2 : 3}>
+                        <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold, color: colors.textPrimary }} numberOfLines={thumb ? 2 : 3}>
                           {p.body || p.content || 'Post'}
                         </Text>
-                        <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 2 }}>
+                        <Text style={{ fontSize: FontSize.xsPlus, color: colors.textTertiary, marginTop: 2 }}>
                           {new Date(p.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
                         </Text>
                       </View>
@@ -519,7 +557,7 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                     onPress={() => nav.navigate('UserPosts', { userId: user!.id })}
                     style={{ alignItems: 'center', paddingVertical: 10 }}
                   >
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>Voir tout</Text>
+                    <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, color: colors.primary }}>Voir tout</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -531,7 +569,7 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                 {myReels.length === 0 ? (
                   <View style={{ alignItems: 'center', paddingVertical: 24, gap: 8 }}>
                     <Icon name="play-circle" size={28} color={colors.textTertiary} />
-                    <Text style={{ fontSize: 13, color: colors.textTertiary }}>Aucun reel publié</Text>
+                    <Text style={{ fontSize: FontSize.smPlus, color: colors.textTertiary }}>Aucun reel publié</Text>
                   </View>
                 ) : (
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
@@ -551,7 +589,7 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                         )}
                         <View style={{ position: 'absolute', bottom: 4, left: 4, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                           <Icon name="eye" size={10} color="#fff" />
-                          <Text style={{ fontSize: 10, color: '#fff', fontWeight: '700' }}>{reel.view_count ?? 0}</Text>
+                          <Text style={{ fontSize: FontSize.xs, color: '#fff', fontWeight: FontWeight.bold }}>{reel.view_count ?? 0}</Text>
                         </View>
                         <TouchableOpacity
                           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -614,6 +652,32 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
         </ScrollView>
       )}
 
+      {/* Bouton flottant "remonter + rafraîchir" — apparaît au scroll, jamais
+          rendu tant qu'il n'a pas été affiché au moins une fois (pointerEvents
+          évite qu'il intercepte les taps une fois invisible). */}
+      {showScrollTop && (
+        <Animated.View
+          pointerEvents="box-none"
+          style={[
+            st.scrollTopWrap,
+            {
+              opacity: scrollTopAnim,
+              transform: [{
+                scale: scrollTopAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }),
+              }],
+            },
+          ]}
+        >
+          <TouchableOpacity
+            onPress={handleScrollTopPress}
+            activeOpacity={0.85}
+            style={[st.scrollTopBtn, { backgroundColor: colors.primary }]}
+          >
+            <Icon name="chevrons-up" size={22} color="#fff" />
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+
       {/* Menu "..." — éditer/supprimer sur mes posts/reels */}
       <Modal transparent animationType="slide" visible={!!menuTarget} onRequestClose={() => setMenuTarget(null)}>
         <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
@@ -631,7 +695,7 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                 }}
               >
                 <Icon name="edit-2" size={17} color={colors.textPrimary} />
-                <Text style={{ fontSize: 15, fontWeight: '600', color: colors.textPrimary }}>Modifier</Text>
+                <Text style={{ fontSize: FontSize.basePlus, fontWeight: FontWeight.semiBold, color: colors.textPrimary }}>Modifier</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity
@@ -645,7 +709,7 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
               }}
             >
               <Icon name="trash-2" size={17} color="#EF4444" />
-              <Text style={{ fontSize: 15, fontWeight: '600', color: '#EF4444' }}>Supprimer</Text>
+              <Text style={{ fontSize: FontSize.basePlus, fontWeight: FontWeight.semiBold, color: '#EF4444' }}>Supprimer</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -657,13 +721,13 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
           style={{ flex: 1, justifyContent: 'flex-end' }}>
           <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setEditingPost(null)} />
           <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 }}>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 12 }}>Modifier le post</Text>
+            <Text style={{ fontSize: FontSize.md, fontWeight: FontWeight.bold, color: colors.textPrimary, marginBottom: 12 }}>Modifier le post</Text>
             <TextInput
               value={editBody}
               onChangeText={setEditBody}
               multiline
               autoFocus
-              style={{ minHeight: 100, fontSize: 14, color: colors.textPrimary, textAlignVertical: 'top', backgroundColor: colors.surfaceElevated, borderRadius: 12, padding: 12 }}
+              style={{ minHeight: 100, fontSize: FontSize.base, color: colors.textPrimary, textAlignVertical: 'top', backgroundColor: colors.surfaceElevated, borderRadius: 12, padding: 12 }}
               placeholderTextColor={colors.textTertiary}
             />
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
@@ -671,7 +735,7 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                 style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 12, backgroundColor: colors.surfaceElevated }}
                 onPress={() => setEditingPost(null)}
               >
-                <Text style={{ fontSize: 14, fontWeight: '700', color: colors.textPrimary }}>Annuler</Text>
+                <Text style={{ fontSize: FontSize.base, fontWeight: FontWeight.bold, color: colors.textPrimary }}>Annuler</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 12, backgroundColor: colors.primary, opacity: editSaving || !editBody.trim() ? 0.6 : 1 }}
@@ -679,7 +743,7 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                 disabled={editSaving || !editBody.trim()}
               >
                 {editSaving ? <ActivityIndicator color="#fff" size="small" /> : (
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>Enregistrer</Text>
+                  <Text style={{ fontSize: FontSize.base, fontWeight: FontWeight.bold, color: '#fff' }}>Enregistrer</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -733,3 +797,24 @@ const CreationCard: React.FC<{
     </TouchableOpacity>
   );
 };
+
+// ── Bouton flottant "remonter + rafraîchir" ───────────────────────────────────
+const st = StyleSheet.create({
+  scrollTopWrap: {
+    position: 'absolute',
+    right: 18,
+    bottom: 28,
+  },
+  scrollTopBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+});

@@ -13,6 +13,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import Svg, { Path } from 'react-native-svg';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { Input, PhoneInput, DEFAULT_COUNTRY } from '../../components/common';
 import type { Country } from '../../components/common';
@@ -100,7 +101,7 @@ const pw = StyleSheet.create({
   wrap:  { flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 8 },
   bars:  { flex: 1, flexDirection: 'row', gap: 4 },
   bar:   { flex: 1, height: 4, borderRadius: 2 },
-  label: { fontSize: 12, fontWeight: '600', minWidth: 58, textAlign: 'right' },
+  label: { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, minWidth: 58, textAlign: 'right' },
 });
 
 // ── Step 1 ────────────────────────────────────────────────────────────────────
@@ -150,7 +151,7 @@ const Step1: React.FC<{
         <TouchableOpacity onPress={() => setShowDatePicker(true)} activeOpacity={0.7}
           style={[s.dateField, { backgroundColor: colors.surfaceElevated, borderColor: errors.dateOfBirth ? colors.error : colors.border }]}>
           <Icon name="calendar" size={16} color={colors.textTertiary} />
-          <Text style={{ flex: 1, fontSize: 14, color: data.dateOfBirth ? colors.textPrimary : colors.textTertiary }}>
+          <Text style={{ flex: 1, fontSize: FontSize.base, color: data.dateOfBirth ? colors.textPrimary : colors.textTertiary }}>
             {data.dateOfBirth
               ? new Date(data.dateOfBirth).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
               : 'Sélectionner une date'}
@@ -192,7 +193,7 @@ const Step1: React.FC<{
                 }]}
                 activeOpacity={0.7}
               >
-                <Text style={{ fontSize: 12, fontWeight: '600', color: selected ? '#fff' : colors.textPrimary }}>
+                <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, color: selected ? '#fff' : colors.textPrimary }}>
                   {opt.label}
                 </Text>
               </TouchableOpacity>
@@ -395,9 +396,9 @@ const Step3: React.FC<{
 
       <Animated.Text entering={FadeInDown.delay(320).duration(350)} style={[s.cgu, { color: colors.textTertiary }]}>
         En vous inscrivant, vous acceptez nos{' '}
-        <Text style={{ color: colors.primary, fontWeight: '600' }}>CGU</Text>
+        <Text style={{ color: colors.primary, fontWeight: FontWeight.semiBold }}>CGU</Text>
         {' '}et notre{' '}
-        <Text style={{ color: colors.primary, fontWeight: '600' }}>Politique de confidentialité</Text>.
+        <Text style={{ color: colors.primary, fontWeight: FontWeight.semiBold }}>Politique de confidentialité</Text>.
       </Animated.Text>
 
       <Animated.View entering={FadeInDown.delay(380).springify()} style={{ marginTop: 20 }}>
@@ -612,29 +613,29 @@ const s = StyleSheet.create({
   heroCircle2: { position: 'absolute', width: 100, height: 100, borderRadius: 50, bottom: 20, left: -20 },
   backBtn:     { position: 'absolute', left: 20, width: 40, height: 40, alignItems: 'center', justifyContent: 'center', zIndex: 10 },
   heroContent: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 30 },
-  heroTitle:   { fontSize: 28, fontWeight: '800', color: '#fff', letterSpacing: 0.3 },
-  heroSub:     { fontSize: 13, color: 'rgba(255,255,255,0.80)', marginTop: 6, fontWeight: '400' },
+  heroTitle:   { fontSize: FontSize['3xl'], fontWeight: FontWeight.extraBold, color: '#fff', letterSpacing: 0.3 },
+  heroSub:     { fontSize: FontSize.smPlus, color: 'rgba(255,255,255,0.80)', marginTop: 6, fontWeight: FontWeight.regular },
 
   // Form
   stepWrap:     {},
   togglePill:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20, borderWidth: 1 },
-  toggleText:   { fontSize: 11, fontWeight: '700' },
+  toggleText:   { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold },
   switchLink:   { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
-  switchLinkText:{ fontSize: 13, fontWeight: '600' },
-  stepTitle:    { fontSize: 24, fontWeight: '800', marginBottom: 6, lineHeight: 32 },
-  stepSubtitle: { fontSize: 14, marginBottom: 22, lineHeight: 21 },
-  cgu:          { fontSize: 12, lineHeight: 18, marginTop: 14, textAlign: 'center' },
+  switchLinkText:{ fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
+  stepTitle:    { fontSize: FontSize['2xl'], fontWeight: FontWeight.extraBold, marginBottom: 6, lineHeight: 32 },
+  stepSubtitle: { fontSize: FontSize.base, marginBottom: 22, lineHeight: 21 },
+  cgu:          { fontSize: FontSize.sm, lineHeight: 18, marginTop: 14, textAlign: 'center' },
 
-  fieldLabel: { fontSize: 12, fontWeight: '600', marginBottom: 6 },
-  fieldError: { fontSize: 12, marginTop: 4, fontWeight: '500' },
+  fieldLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, marginBottom: 6 },
+  fieldError: { fontSize: FontSize.sm, marginTop: 4, fontWeight: FontWeight.medium },
   dateField:  { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, height: 48 },
   genderChip: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, alignItems: 'center' },
 
   submitBtn:     { height: 52, borderRadius: 28, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 10 },
-  submitBtnText: { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 0.3 },
+  submitBtnText: { color: '#fff', fontSize: FontSize.md, fontWeight: FontWeight.extraBold, letterSpacing: 0.3 },
 
-  globalError: { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, marginTop: 12, fontSize: 13, fontWeight: '500' },
+  globalError: { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, marginTop: 12, fontSize: FontSize.smPlus, fontWeight: FontWeight.medium },
   loginRow:    { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 28 },
-  loginLabel:  { fontSize: 14 },
-  loginLink:   { fontSize: 14, fontWeight: '700' },
+  loginLabel:  { fontSize: FontSize.base },
+  loginLink:   { fontSize: FontSize.base, fontWeight: FontWeight.bold },
 });
