@@ -160,6 +160,15 @@ const CACHE_PRELOAD_WINDOW_WIFI = 2;
 // avant de lancer un 2e flux réseau complet en parallèle.
 const CACHE_STAGGER_DELAY_MS = 1_500;
 
+// Hash déterministe simple (djb2) — jamais Math.random() : sert à dériver une
+// position "aléatoire" mais reproductible (même seed → même résultat), pour
+// le mélange des pubs dans le flux Reels (voir feedWithAds).
+function hashCode(str: string): number {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) >>> 0;
+  return h;
+}
+
 // ─── ReelsScreen ─────────────────────────────────────────────────────────────
 
 // Durée de vie max d'une pub Reels déjà chargée dans un slot avant revalidation
@@ -291,6 +300,18 @@ export const ReelsScreen: React.FC = () => {
   const [adSlots, setAdSlots] = useState<Map<number, AdData0>>(new Map());
   const adSlotsRef = useRef(adSlots);
   adSlotsRef.current = adSlots;
+  // Position FIGÉE (index dans feedWithAds) de chaque slotIdx, calculée UNE
+  // SEULE FOIS — la toute première fois que ce slot apparaît dans adSlots —
+  // puis jamais recalculée, même quand `reels` grandit (pagination infinie).
+  // Comme Facebook : la pub est mélangée dans le flux (pas en fin de liste),
+  // mais sa position ne bouge plus jamais une fois affichée à l'utilisateur.
+  // Si on recalculait à chaque changement de `reels`/`adSlots`, une pub déjà
+  // vue à la position 5 pourrait se retrouver à la position 8 après un
+  // nouveau chargement de page — exactement le bug de décalage déjà corrigé
+  // une fois dans cette session (toRenderedIndex, feedWithAds en fin de
+  // liste). Bornée à reels.length AU MOMENT DE LA CRÉATION du slot (jamais
+  // au-delà), donc toujours dans une zone de reels déjà chargés.
+  const adSlotPositionsRef = useRef<Map<number, number>>(new Map());
   const servedAdIdsRef = useRef<Set<string>>(new Set());
   const loadingAdSlotsRef = useRef<Set<number>>(new Set());
   // reelAdRef — reflète juste "au moins une ad a déjà été chargée" (utilisé par
@@ -453,11 +474,22 @@ export const ReelsScreen: React.FC = () => {
   const scrollLockTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => { reelsRef.current = reels; }, [reels]);
   useEffect(() => { hasMoreRef.current = hasMore; }, [hasMore]);
-  // toRenderedIndex — les pubs sont désormais toujours ajoutées À LA SUITE des
-  // reels dans feedWithAds (jamais glissées au milieu), donc l'index d'un reel
-  // dans `reels` est toujours identique à son index dans la liste rendue.
-  // Gardé comme simple passe-plat pour ne pas toucher tous les appelants.
-  const toRenderedIndex = useCallback((idx: number) => idx, []);
+  // toRenderedIndex — convertit un index dans `reels` (liste pure) vers son
+  // index réel dans feedWithAds (liste mélangée avec pubs, cf. feedWithAds
+  // plus bas) : compte combien de pubs ont une position FIGÉE
+  // (adSlotPositionsRef, peuplé par feedWithAds) strictement avant/à cet
+  // index, et décale d'autant. Nécessaire pour toute navigation ciblée vers
+  // un reel précis (deep link, retour sur l'écran, tap depuis le feed) — sans
+  // cette conversion, on scrollerait vers le mauvais écran dès qu'une pub
+  // précède le reel visé.
+  const toRenderedIndex = useCallback((idx: number) => {
+    let shift = 0;
+    adSlots.forEach((_ad, slotIdx) => {
+      const pos = adSlotPositionsRef.current.get(slotIdx);
+      if (pos !== undefined && pos <= idx + shift) shift++;
+    });
+    return idx + shift;
+  }, [adSlots]);
 
   // Quand la liste change, tenter de résoudre pendingTarget si onLayout l'a manqué
   useEffect(() => {
@@ -466,11 +498,15 @@ export const ReelsScreen: React.FC = () => {
     const idx = reels.findIndex(r => r.id === target.id);
     if (idx < 0) return; // pas encore là — attendre le prochain update
     pendingTargetRef.current = null;
-    // Offset basé sur l'index dans la liste RENDUE (avec pubs) — sinon on scrolle
-    // vers le mauvais item dès qu'une pub précède le reel cible.
+    // scrollIdx (index dans feedWithAds, PAS idx qui est un index dans reels
+    // seul) partout ici — currentIndex doit toujours représenter la position
+    // réelle dans la liste RENDUE (avec pubs mélangées), c'est ce que compare
+    // renderVideoSlide (index === currentIndex) pour savoir quel slide est
+    // actif. Utiliser `idx` ferait pointer currentIndex sur le mauvais écran
+    // dès qu'une pub précède le reel cible.
     const scrollIdx = toRenderedIndex(idx);
-    currentIdxRef.current = idx;
-    setCurrentIndex(idx);
+    currentIdxRef.current = scrollIdx;
+    setCurrentIndex(scrollIdx);
     isScrollingRef.current = true;
     if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
     scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 600);
@@ -564,10 +600,18 @@ export const ReelsScreen: React.FC = () => {
       lastLoadedAtRef.current = Date.now();
 
       if (!silent) {
-        // CAS FOOTER — reset complet, index 0
+        // CAS FOOTER — reset complet, index 0. adSlots/adSlotPositionsRef
+        // réinitialisés avec `reels` : une position figée pour l'ANCIEN reels
+        // (avant ce reset) n'a plus de sens une fois `reels` entièrement
+        // remplacé — sans ce reset, une pub pourrait réapparaître à une
+        // position qui ne correspond plus à rien de cohérent dans la nouvelle
+        // liste.
         currentIdxRef.current = 0;
         setCurrentIndex(0);
         setReels(filtered);
+        setAdSlots(new Map());
+        adSlotPositionsRef.current = new Map();
+        servedAdIdsRef.current = new Set();
         viewedReelsRef.current = new Set();
       } else {
         // CAS FEED — enrichir la liste sans toucher à l'index ni au scroll
@@ -773,9 +817,12 @@ export const ReelsScreen: React.FC = () => {
     closeSearch();
     const idx = reelsRef.current.findIndex(x => x.id === r.id);
     if (idx >= 0) {
-      currentIdxRef.current = idx;
-      setCurrentIndex(idx);
-      setTimeout(() => listRef.current?.scrollToIndex({ index: idx, animated: false }), 50);
+      // scrollIdx (index dans feedWithAds) — jamais idx (index dans reels
+      // seul), voir toRenderedIndex.
+      const scrollIdx = toRenderedIndex(idx);
+      currentIdxRef.current = scrollIdx;
+      setCurrentIndex(scrollIdx);
+      setTimeout(() => listRef.current?.scrollToIndex({ index: scrollIdx, animated: false }), 50);
       return;
     }
     // Les reels tendance (getTrendingReels) n'ont pas hls_url/mp4_url/author
@@ -786,16 +833,20 @@ export const ReelsScreen: React.FC = () => {
       try { full = await reelService.getById(r.id); } catch { /* joue r tel quel, best-effort */ }
     }
     setReels(prev => [full, ...prev.filter(x => x.id !== full.id)]);
-    currentIdxRef.current = 0;
-    setCurrentIndex(0);
+    // toRenderedIndex(0) : le reel injecté en tête de `reels` peut se
+    // retrouver à un index > 0 dans feedWithAds si une pub a sa position
+    // figée à 0 — jamais supposer que index 0 dans reels == index 0 rendu.
+    const scrollIdx = toRenderedIndex(0);
+    currentIdxRef.current = scrollIdx;
+    setCurrentIndex(scrollIdx);
     // Sans ce scroll, le reel est bien injecté en tête de `reels` mais la FlatList
     // reste visuellement à la position de scroll où l'utilisateur était avant
     // d'ouvrir la recherche — currentIndex changeait déjà côté état React, mais
     // rien ne faisait bouger l'écran affiché (c'était le bug : le reel choisi
     // n'apparaissait jamais). setTimeout laisse le nouvel item être rendu par la
     // FlatList (après le setReels ci-dessus) avant de tenter le scroll vers lui.
-    setTimeout(() => listRef.current?.scrollToOffset({ offset: 0, animated: false }), 50);
-  }, [closeSearch]);
+    setTimeout(() => listRef.current?.scrollToOffset({ offset: SCREEN_H * scrollIdx, animated: false }), 50);
+  }, [closeSearch, toRenderedIndex, SCREEN_H]);
 
   // ── BackHandler : retour depuis "mes reels" → feed au lieu de quitter ─────
   useEffect(() => {
@@ -843,26 +894,30 @@ export const ReelsScreen: React.FC = () => {
 
       const existingIdx = reelsRef.current.findIndex(r => r.id === targetId);
       if (existingIdx >= 0) {
-        // Reel déjà dans la liste → scroll direct, mais l'offset doit se baser sur
-        // l'index dans la liste RENDUE (avec pubs), pas sur l'index dans reels seul.
+        // Reel déjà dans la liste → scroll direct ; currentIndex doit refléter
+        // la position dans la liste RENDUE (avec pubs), jamais l'index dans
+        // reels seul — voir le commentaire détaillé de toRenderedIndex.
         const scrollIdx = toRenderedIndex(existingIdx);
-        currentIdxRef.current = existingIdx;
-        setCurrentIndex(existingIdx);
+        currentIdxRef.current = scrollIdx;
+        setCurrentIndex(scrollIdx);
         isScrollingRef.current = true;
         if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
         scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 1200);
         listRef.current?.scrollToOffset({ offset: SCREEN_H * scrollIdx, animated: false });
       } else if (targetReel?.hls_url || targetReel?.mp4_url) {
-        // Reel absent mais on a l'objet → injecter en tête
+        // Reel absent mais on a l'objet → injecter en tête. toRenderedIndex(0) :
+        // peut se retrouver à un index > 0 dans feedWithAds si une pub a sa
+        // position figée à 0 — jamais supposer index 0 rendu == index 0 reels.
         const injected = [targetReel, ...reelsRef.current.filter(r => r.id !== targetId)];
         reelsRef.current = injected;
         setReels(injected);
-        currentIdxRef.current = 0;
-        setCurrentIndex(0);
+        const scrollIdx = toRenderedIndex(0);
+        currentIdxRef.current = scrollIdx;
+        setCurrentIndex(scrollIdx);
         isScrollingRef.current = true;
         if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
         scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 1200);
-        listRef.current?.scrollToOffset({ offset: 0, animated: false });
+        listRef.current?.scrollToOffset({ offset: SCREEN_H * scrollIdx, animated: false });
       } else {
         // Pas d'objet reel — charger en background
         pendingTargetRef.current = { id: targetId };
@@ -1025,7 +1080,9 @@ export const ReelsScreen: React.FC = () => {
   // ── Navigation reel suivant ───────────────────────────────────────────────
   const goNextReel = useCallback(() => {
     const next = currentIdxRef.current + 1;
-    if (next < reelsRef.current.length) {
+    // feedWithAdsRef (pas reelsRef) : sinon impossible d'avancer vers un index
+    // au-delà des reels purs, donc vers une pub mélangée dans le flux.
+    if (next < feedWithAdsRef.current.length) {
       currentIdxRef.current = next;
       setCurrentIndex(next);
       setTimeout(() => listRef.current?.scrollToIndex({ index: next, animated: true }), 0);
@@ -1043,7 +1100,11 @@ export const ReelsScreen: React.FC = () => {
       return;
     }
     const idx = Math.round(offsetY / SCREEN_H);
-    const bounded = Math.max(0, Math.min(idx, reelsRef.current.length - 1));
+    // feedWithAdsRef (pas reelsRef) : bounded est un index dans la liste
+    // RENDUE (avec pubs mélangées), jamais dans reels seul — sinon on ne
+    // pourrait jamais atteindre/détecter l'arrêt sur une pub positionnée
+    // au-delà de reels.length.
+    const bounded = Math.max(0, Math.min(idx, feedWithAdsRef.current.length - 1));
     if (bounded === currentIdxRef.current) return;
 
     try { activePlayerRef.current?.pause(); } catch {}
@@ -1052,31 +1113,72 @@ export const ReelsScreen: React.FC = () => {
     setCurrentIndex(bounded);
 
     sendViewForCurrent();
-    const cur = reelsRef.current[bounded];
-    if (cur) currentReelRef.current = { id: cur.id, startTime: Date.now() };
+    // item à cet index peut être une pub (_isAd) — currentReelRef ne doit
+    // suivre que de vrais reels, jamais une entrée pub.
+    const item = feedWithAdsRef.current[bounded] as any;
+    if (item && !item._isAd) currentReelRef.current = { id: item.id, startTime: Date.now() };
 
-    if (bounded >= reelsRef.current.length - 3) loadMoreRef.current();
+    // Déclenche le chargement de la page suivante en approchant de la fin des
+    // reels RÉELLEMENT chargés (pubs mélangées exclues du calcul — sur une
+    // pub, on ne sait pas "combien de reels restent" par position, donc on
+    // déclenche par prudence : un appel loadMore en trop est sans risque,
+    // loadMore est déjà protégé contre les doublons via isLoadingMoreRef).
+    const reelIdx = item && !item._isAd ? reelsRef.current.findIndex(r => r.id === item.id) : -1;
+    const nearEnd = item?._isAd || (reelIdx >= 0 && reelIdx >= reelsRef.current.length - 3);
+    if (nearEnd) loadMoreRef.current();
   }, [SCREEN_H, sendViewForCurrent]);
 
   // ── Callbacks stables ─────────────────────────────────────────────────────
   const onAuthorPress = useCallback((userId: string) => nav.navigate('UserProfile', { userId }), [nav]);
 
-  // Plus aucun calcul de position d'insertion (avant : entrelacée tous les
-  // AD_INTERVAL reels via (i+1) % AD_INTERVAL, nécessitant toRenderedIndex
-  // pour retrouver l'index d'un reel une fois des pubs glissées au milieu).
-  // Cette re-computation était la source des bugs de navigation ciblée
-  // ("clique sur un reel, un autre s'ouvre") et de décalage d'index. Les pubs
-  // chargées sont maintenant simplement ajoutées À LA SUITE des reels reçus,
-  // jamais glissées entre deux reels existants — leur nombre reste dérivé de
-  // la taille du lot (une pub toutes les AD_INTERVAL reels).
+  // Position MÉLANGÉE dans le flux (comme Facebook), mais FIGÉE une seule
+  // fois par slot (voir adSlotPositionsRef) — jamais recalculée après coup.
+  // Avant ce fix : entrelacée tous les AD_INTERVAL reels via (i+1) %
+  // AD_INTERVAL, recalculé à CHAQUE changement de reels/adSlots — la position
+  // d'une pub déjà affichée pouvait donc changer d'un render à l'autre,
+  // source des bugs de navigation ciblée ("clique sur un reel, un autre
+  // s'ouvre") et de décalage d'index (d'où le passage temporaire à "toujours
+  // en fin de liste"). Ici, chaque slot calcule sa position une seule fois
+  // (hash déterministe de ad.id+slotIdx, jamais Math.random — un même slot
+  // retombe toujours sur la même position), bornée à la taille de `reels` au
+  // moment de sa création, puis cette position est figée pour toujours dans
+  // adSlotPositionsRef : un nouveau chargement de reels ne peut plus jamais
+  // déplacer une pub déjà positionnée, seulement en ajouter de nouvelles dans
+  // la zone fraîchement chargée.
   const feedWithAds = useMemo(() => {
     if (userMode || adSlots.size === 0) return reels;
-    const ads: { _isAd: true; id: string; ad: AdData0 }[] = [];
+
     adSlots.forEach((ad, slotIdx) => {
-      ads.push({ _isAd: true, id: `ad-${ad.id}-${slotIdx}`, ad });
+      if (adSlotPositionsRef.current.has(slotIdx)) return;
+      const h = hashCode(`${ad.id}:${slotIdx}`);
+      // +1 : autorise la toute dernière position (après le dernier reel actuel),
+      // jamais au-delà — reels.length reflète ici la taille au moment précis où
+      // ce slot est vu pour la première fois, jamais une valeur future.
+      const pos = reels.length > 0 ? h % (reels.length + 1) : 0;
+      adSlotPositionsRef.current.set(slotIdx, pos);
     });
-    return [...reels, ...ads];
+
+    const withAds = [...reels];
+    const toInsert = Array.from(adSlots.entries())
+      .map(([slotIdx, ad]) => ({ ad, slotIdx, pos: adSlotPositionsRef.current.get(slotIdx)! }))
+      // Décroissant : chaque insert() ne doit jamais décaler l'index d'une
+      // insertion déjà faite dans cette même passe (même technique que
+      // InjectionPlanner.maybe_inject_ads côté backend).
+      .sort((a, b) => b.pos - a.pos);
+    for (const { ad, slotIdx, pos } of toInsert) {
+      withAds.splice(pos, 0, { _isAd: true, id: `ad-${ad.id}-${slotIdx}`, ad } as any);
+    }
+    return withAds;
   }, [reels, adSlots, userMode]);
+
+  // Lu par les callbacks figés en useCallback([]) (goNextReel, onScrollUpdate)
+  // qui ne peuvent pas dépendre de feedWithAds sans changer de référence à
+  // chaque nouvelle pub chargée — toujours à jour via ce ref. Remplace les
+  // anciennes bornes sur reelsRef.current.length, qui empêchaient d'avancer
+  // vers un index au-delà des reels purs (donc vers une pub mélangée dans le
+  // flux, ou même simplement groupée en fin de liste avant ce fix).
+  const feedWithAdsRef = useRef(feedWithAds);
+  feedWithAdsRef.current = feedWithAds;
 
   // Le slide courant est-il une pub ? AdSlide affiche déjà son propre bandeau
   // "ANNONCE" / "Passer" à cette hauteur — le header global (retour + icônes)
@@ -1108,13 +1210,15 @@ export const ReelsScreen: React.FC = () => {
   // actuellement regardé ni ses voisins immédiats (PRELOAD_WINDOW), pour ne
   // jamais changer une pub sous les yeux de l'utilisateur (même règle que le
   // cache vidéo : aucune bascule de contenu en pleine vue, uniquement avant
-  // qu'un slot ne devienne pertinent). Un slot pub occupe l'index
-  // reels.length + slotIdx dans feedWithAds (toujours en fin de liste).
+  // qu'un slot ne devienne pertinent). La position RENDUE d'un slot pub est
+  // lue depuis adSlotPositionsRef (figée par feedWithAds), jamais recalculée
+  // ici — les pubs sont mélangées dans le flux, pas forcément en fin de liste.
   useEffect(() => {
     if (userMode) return;
     const timer = setInterval(() => {
       adSlotsRef.current.forEach((_, slotIdx) => {
-        const renderedIndex = reels.length + slotIdx;
+        const renderedIndex = adSlotPositionsRef.current.get(slotIdx);
+        if (renderedIndex === undefined) return;
         if (Math.abs(renderedIndex - currentIndex) <= PRELOAD_WINDOW) return;
         if (loadingAdSlotsRef.current.has(slotIdx)) return;
         setAdSlots(prev => {
@@ -1491,27 +1595,30 @@ export const ReelsScreen: React.FC = () => {
           const idx  = list.findIndex(r => r.id === target.id);
 
           if (idx >= 0) {
-            // Reel trouvé — scroll direct avec verrou. Offset basé sur l'index dans
-            // la liste RENDUE (avec pubs), sinon on scrolle vers le mauvais item dès
-            // qu'une pub précède le reel cible.
+            // Reel trouvé — scroll direct avec verrou. currentIndex doit
+            // refléter la position dans la liste RENDUE (avec pubs), jamais
+            // l'index dans reels seul — voir toRenderedIndex.
             const scrollIdx = toRenderedIndex(idx);
-            currentIdxRef.current = idx;
-            setCurrentIndex(idx);
+            currentIdxRef.current = scrollIdx;
+            setCurrentIndex(scrollIdx);
             isScrollingRef.current = true;
             if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
             scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 600);
             listRef.current?.scrollToOffset({ offset: SCREEN_H * scrollIdx, animated: false });
           } else if (target.reel?.hls_url || target.reel?.mp4_url) {
-            // Reel pas encore chargé — injecter en tête et afficher
+            // Reel pas encore chargé — injecter en tête et afficher.
+            // toRenderedIndex(0) : peut se retrouver à un index > 0 dans
+            // feedWithAds si une pub a sa position figée à 0.
             const injected = [target.reel, ...list.filter(r => r.id !== target.id)];
             reelsRef.current = injected;
             setReels(injected);
-            currentIdxRef.current = 0;
-            setCurrentIndex(0);
+            const scrollIdx = toRenderedIndex(0);
+            currentIdxRef.current = scrollIdx;
+            setCurrentIndex(scrollIdx);
             isScrollingRef.current = true;
             if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
             scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 600);
-            listRef.current?.scrollToOffset({ offset: 0, animated: false });
+            listRef.current?.scrollToOffset({ offset: SCREEN_H * scrollIdx, animated: false });
           }
         }}
         renderItem={renderVideoSlide}
