@@ -4,6 +4,13 @@
     <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
         <!-- Customize your theme here. -->
         <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
+        <!-- Fond de la fenêtre dès sa création (avant même le premier rendu JS) —
+             sans ça Android retombe sur la couleur par défaut du thème parent, qui
+             varie selon les skins constructeur (teinte brunâtre observée sur
+             certains launchers) et crée un flash visible entre le splash natif et
+             l'affichage de SplashScreen.tsx. Alignée sur NAV_THEME_LIGHT.background
+             (RootNavigator.tsx) pour qu'il n'y ait aucune transition de couleur. -->
+        <item name="android:windowBackground">@color/window_background</item>
     </style>
 
 </resources>

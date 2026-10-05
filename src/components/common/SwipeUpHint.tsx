@@ -121,9 +121,16 @@ export const SwipeUpHint: React.FC<Props> = ({ dismiss, onDone }) => {
 };
 
 const styles = StyleSheet.create({
+  // Même emplacement que GiftHoldHint (top: 38%, zone neutre de la vidéo, sans
+  // chevaucher ni le header ni les contrôles bas) — les deux hints ne sont
+  // jamais affichés en même temps (GiftHoldHint reste suppressed tant que
+  // celui-ci n'est pas done, cf. ReelsScreen/swipeHintDone), donc partager la
+  // position ne crée aucun conflit visuel ; au contraire, un seul et même
+  // emplacement pour "apprendre le geste suivant" est plus cohérent pour
+  // l'utilisateur que deux zones différentes de l'écran.
   container: {
     position: 'absolute',
-    bottom: 150,
+    top: '38%',
     alignSelf: 'center',
     alignItems: 'center',
   },

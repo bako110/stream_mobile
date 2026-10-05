@@ -98,17 +98,20 @@ function getInitials(name?: string | null): string {
 }
 
 // ── Styles badges (déclarés ici pour être disponibles avant FeedHeaderBadges) ─
+// Agrandi (14→18px, bordure/texte suivent) : à la taille précédente, le badge
+// se distinguait à peine de l'icône à côté (19px) — trop petit pour un compteur
+// que l'utilisateur doit repérer au premier coup d'œil dans le header.
 const badgeS = StyleSheet.create({
   badge: {
-    position: 'absolute', top: -5, right: -7,
-    minWidth: 14, height: 14, borderRadius: 7,
+    position: 'absolute', top: -6, right: -8,
+    minWidth: 18, height: 18, borderRadius: 9,
     backgroundColor: '#7B3FF2',
     alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: 3,
-    borderWidth: 1.5,
+    paddingHorizontal: 4,
+    borderWidth: 2,
     borderColor: '#000',
   },
-  badgeText: { color: '#fff', fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold },
+  badgeText: { color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.extraBold },
 });
 
 
@@ -126,13 +129,19 @@ const AdCard: React.FC<{
   onPress: (id: string, url: string) => void;
   onOpenFullscreen: (ad: AdData) => void;
 }> = React.memo(({ ad, colors, settled = false, searchOverlay = false, onImpression, onPress, onOpenFullscreen }) => {
+  // Impression envoyée au montage UNIQUEMENT dans l'overlay recherche (ScrollView
+  // non virtualisé : tout ce qui est monté est déjà visible ou à portée immédiate
+  // de scroll). Dans le flux principal (FlatList virtualisée), une carte peut être
+  // montée par la fenêtre de rendu AVANT d'être réellement visible à l'écran — le
+  // tracking y est fait par le parent via onFeedViewableChanged (vraie viewability,
+  // même principe que ReelsScreen/AdSlide avec `isActive`), jamais ici.
   const firedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (ad?.id && firedRef.current !== ad.id) {
+    if (searchOverlay && ad?.id && firedRef.current !== ad.id) {
       firedRef.current = ad.id;
       onImpression(ad.id);
     }
-  }, [ad?.id, onImpression]);
+  }, [searchOverlay, ad?.id, onImpression]);
 
   const creativeUri = ad.creative_url || ad.thumbnail_url;
   const isVideo = adIsVideo(ad);
@@ -785,11 +794,28 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   // timers en cours, gérés dans onFeedViewableChanged / handleFeedScroll.
   const SETTLE_MS = 450;
   const [settledAdSlots, setSettledAdSlots] = useState<Set<string>>(new Set());
+  // Lu par renderItem via ref (jamais settledAdSlots directement dans ses deps
+  // useCallback) — sinon renderItem change de RÉFÉRENCE à chaque settle (toutes
+  // les ~450ms tant qu'une pub est visible), et FlatList re-render TOUTES ses
+  // cellules montées à chaque changement de référence de renderItem (pas que la
+  // carte pub concernée) → clignotement/tremblement visible pendant le scroll.
+  // extraData reste nécessaire pour déclencher la réconciliation (React.memo sur
+  // AdCard filtre ensuite pour ne vraiment re-render que la cellule concernée).
+  const settledAdSlotsRef = useRef(settledAdSlots);
+  settledAdSlotsRef.current = settledAdSlots;
   const settleTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const clearSettleTimers = useCallback(() => {
     Object.values(settleTimersRef.current).forEach(clearTimeout);
     settleTimersRef.current = {};
   }, []);
+  // Impression envoyée UNE SEULE FOIS par pub, dès qu'elle devient réellement
+  // visible à l'écran (cf. onFeedViewableChanged) — jamais au montage du
+  // composant AdCard, qui peut précéder la visibilité réelle dans une FlatList
+  // virtualisée (même principe que ReelsScreen/AdSlide avec `isActive`).
+  const firedAdImpressionsRef = useRef<Set<string>>(new Set());
+  // Ref stable vers handleAdImpression (même raison que loadMoreFeedRef juste en
+  // dessous) — synchronisée juste après sa définition.
+  const handleAdImpressionRef = useRef<(adId: string) => void>(() => {});
   // Ref stable vers loadMoreFeed — onFeedViewableChanged est figé au montage (useRef().current,
   // imposé par onViewableItemsChanged qui n'accepte pas de callback changeant de référence),
   // donc on ne peut pas appeler loadMoreFeed directement dedans (sa référence change à chaque
@@ -972,6 +998,18 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     const visibleAdSlots = new Set<string>(
       viewableItems.filter(v => v.item?.kind === 'ad').map(v => v.item.id as string),
     );
+
+    // Impression — déclenchée ici (vraie visibilité), jamais au montage de
+    // AdCard. item.id (slot) == ad.id (cf. InjectionPlanner côté serveur, l'id
+    // de l'entrée est l'uuid brut de la campagne), donc utilisable directement.
+    viewableItems.forEach(v => {
+      if (v.item?.kind !== 'ad') return;
+      const adId = v.item.id as string;
+      if (firedAdImpressionsRef.current.has(adId)) return;
+      firedAdImpressionsRef.current.add(adId);
+      handleAdImpressionRef.current(adId);
+    });
+
     for (const slotId of Object.keys(settleTimersRef.current)) {
       if (!visibleAdSlots.has(slotId)) {
         clearTimeout(settleTimersRef.current[slotId]);
@@ -1380,7 +1418,18 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         // du data pour les rangées, updated_at pour posts/events) ; si identique,
         // on garde `prev` À L'IDENTIQUE (même référence → zéro re-render de cellule).
         if (silent) {
+          // "ad" exclu de la signature par CONTENU : InjectionPlanner.refresh_ad_slots
+          // (backend) retire une pub fraîche à chaque page servie, y compris sur un
+          // simple refresh silencieux de focus — son `id` (= id de la campagne tirée)
+          // change donc souvent d'un retour à l'autre même quand rien d'autre n'a
+          // changé. Comme la signature globale est un seul `.join(',')`, ce changement
+          // à lui seul invalidait TOUTE la comparaison et remplaçait `items` en entier
+          // (nouvelle référence → re-render de toute la liste, pas juste la carte pub),
+          // d'où le feed qui "recalcule"/bouge au retour. Le GABARIT d'une AdCard est
+          // identique quel que soit le contenu de la pub (même hauteur), donc seule sa
+          // PRÉSENCE à cette position compte pour la signature — jamais son id interne.
           const sig = (arr: FeedItem[]) => arr.map(i => {
+            if (i.kind === 'ad') return 'ad';
             if (i.kind === 'reel_row' || i.kind === 'suggestions' || i.kind === 'communities') {
               const d = (i.data ?? []) as any[];
               return `${i.kind}:${i.id}:${d.map(x => x?.id ?? '').join('|')}`;
@@ -1388,7 +1437,14 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
             const u = (i.data as any)?.updated_at ?? (i.data as any)?.created_at ?? '';
             return `${i.kind}:${i.id}:${u}`;
           }).join(',');
-          setItems(prev => (sig(prev) === sig(filtered) ? prev : filtered));
+          setItems(prev => {
+            if (sig(prev) !== sig(filtered)) return filtered;
+            // Structure identique (mêmes positions/types) — ne remplacer QUE les
+            // entrées "ad" par leur version fraîche (nouveau contenu à afficher au
+            // prochain scroll dessus), en gardant la RÉFÉRENCE de toutes les autres
+            // entrées à l'identique (zéro re-render des cellules non-pub).
+            return prev.map((p, idx) => (p.kind === 'ad' ? filtered[idx] : p));
+          });
         } else {
           setItems(filtered);
         }
@@ -1877,6 +1933,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   const handleAdImpression = useCallback((adId: string) => {
     apiClient.post(`/api/v1/ads/${adId}/impression`).catch(() => {});
   }, []);
+  useEffect(() => { handleAdImpressionRef.current = handleAdImpression; }, [handleAdImpression]);
 
   const handleAdPress = useCallback((adId: string, url: string) => {
     apiClient.post(`/api/v1/ads/${adId}/click`).catch(() => {});
@@ -1897,7 +1954,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         <AdCard
           ad={ad}
           colors={colors}
-          settled={settledAdSlots.has(item.id)}
+          settled={settledAdSlotsRef.current.has(item.id)}
           onImpression={handleAdImpression}
           onPress={handleAdPress}
           onOpenFullscreen={setFullscreenAd}
@@ -1971,7 +2028,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         onHide={() => setItems(prev => prev.filter(i => !(i.kind === item.kind && i.id === item.id)))}
       />
     );
-  }, [colors, currentUser?.id, followingSet, handleToggleFollow, handlePostDeleted, openComments, nav, load, filter, settledAdSlots, handleAdImpression, handleAdPress]);
+  }, [colors, currentUser?.id, followingSet, handleToggleFollow, handlePostDeleted, openComments, nav, load, filter, handleAdImpression, handleAdPress]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 

@@ -25,6 +25,7 @@ import { DownloadToast } from '../components/common/DownloadToast';
 import { cleanupImageCache } from '../services/imageCacheService';
 import { cleanup as cleanupVideoCache } from '../services/videoCacheService';
 import { cleanup as cleanupReelVideoCache } from '../services/reelVideoCacheService';
+import { startReelsPrefetch } from '../services/reelsPrefetchService';
 
 
 type AppState = 'splash' | 'onboarding' | 'auth' | 'completeProfile' | 'main';
@@ -66,6 +67,92 @@ export const RootNavigator: React.FC = () => {
   const [sessionKey, setSessionKey] = useState(0);
   const pendingUrlRef = useRef<string | null>(null);
 
+  // Résolution de session (token stocké + vérification réseau getMe/refresh) ET
+  // animation de SplashScreen tournent maintenant EN PARALLÈLE au lieu de
+  // s'enchaîner : avant, cette résolution ne démarrait qu'au onFinish de
+  // l'animation (~1.9s), laissant un écran vide supplémentaire pendant l'appel
+  // réseau juste après la disparition du splash. Ici, dès le montage, on
+  // calcule le prochain état ("onboarding" | "auth" | "main" + blockedInfo) et
+  // on le stocke sans l'appliquer — seul onFinish (fin réelle de l'animation)
+  // déclenche la transition visuelle, mais le résultat est déjà prêt la
+  // plupart du temps (la vérif réseau est largement plus courte que ~1.9s).
+  const resolvedNextStateRef = useRef<{ state: AppState; blocked?: { reason?: string; contact?: string } } | null>(null);
+  const splashAnimDoneRef = useRef(false);
+
+  const resolveSession = async (): Promise<{ state: AppState; blocked?: { reason?: string; contact?: string } }> => {
+    const onboardingDone = storage.getBoolean(STORAGE_KEYS.ONBOARDING_DONE);
+    if (!onboardingDone) return { state: 'onboarding' };
+
+    accountsService.migrateIfNeeded();
+
+    let forcedAuthBlocked: { reason?: string; contact?: string } | undefined;
+    const token = authService.loadStoredToken(
+      async () => {
+        const net = await NetInfo.fetch();
+        if (!net.isConnected || !net.isInternetReachable) return;
+        authService._clearTokens();
+      },
+      (reason, contact) => {
+        authService._clearTokens();
+        forcedAuthBlocked = { reason, contact };
+      },
+    );
+
+    if (!token || forcedAuthBlocked) {
+      return { state: 'auth', blocked: forcedAuthBlocked };
+    }
+
+    try {
+      await authService.getMe(true);
+      return { state: 'main' };
+    } catch (err) {
+      const isNetworkError = err instanceof ApiError && err.status === 0;
+      if (isNetworkError) return { state: 'main' };
+      try {
+        await authService.refresh();
+        return { state: 'main' };
+      } catch (refreshErr) {
+        const isRefreshNetworkError = refreshErr instanceof ApiError && (refreshErr as ApiError).status === 0;
+        if (isRefreshNetworkError) return { state: 'main' };
+        authService._clearTokens();
+        return { state: 'auth' };
+      }
+    }
+  };
+
+  const applyResolvedState = (resolved: { state: AppState; blocked?: { reason?: string; contact?: string } }) => {
+    if (resolved.blocked) setBlockedInfo(resolved.blocked);
+    setAppState(resolved.state);
+    if (resolved.state === 'main') {
+      // Lancé tout de suite (pas de setTimeout) : la liste des reels + le
+      // téléchargement de la 1ère vidéo doivent démarrer le plus tôt possible,
+      // pendant que l'utilisateur est encore sur Feed — avant les cleanups de
+      // cache ci-dessous, pour ne jamais risquer de nettoyer ce qu'on vient de
+      // précharger. ReelsScreen consomme ce résultat à son premier montage
+      // (voir reelsPrefetchService) au lieu de refetcher depuis zéro.
+      startReelsPrefetch();
+      setTimeout(() => {
+        setupFCM().catch((e) => console.warn('[FCM] setupFCM splash error:', e?.message ?? e));
+      }, 500);
+      setTimeout(() => {
+        cleanupImageCache().catch(() => {});
+        cleanupVideoCache().catch(() => {});
+        cleanupReelVideoCache().catch(() => {});
+      }, 1000);
+      navigatePendingUrl();
+    }
+  };
+
+  // Démarre la résolution dès le montage (en parallèle de l'animation du
+  // splash) — si l'animation est déjà finie quand la résolution arrive (cas
+  // rare : réseau très lent), on applique immédiatement.
+  useEffect(() => {
+    resolveSession().then((resolved) => {
+      resolvedNextStateRef.current = resolved;
+      if (splashAnimDoneRef.current) applyResolvedState(resolved);
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Capturer le deep link reçu avant que l'app soit prête
   useEffect(() => {
     Linking.getInitialURL().then(url => {
@@ -86,75 +173,15 @@ export const RootNavigator: React.FC = () => {
     setTimeout(() => Linking.openURL(url).catch(() => {}), 500);
   };
 
-  const handleSplashDone = async () => {
-    const onboardingDone = storage.getBoolean(STORAGE_KEYS.ONBOARDING_DONE);
-    if (!onboardingDone) {
-      setAppState('onboarding');
-      return;
-    }
-
-    accountsService.migrateIfNeeded();
-
-    const token = authService.loadStoredToken(
-      async () => {
-        // 401 recu pendant une coupure réseau → ignorer, le token est peut-être encore valide
-        const net = await NetInfo.fetch();
-        if (!net.isConnected || !net.isInternetReachable) return;
-        authService._clearTokens();
-        setAppState('auth');
-      },
-      (reason, contact) => {
-        authService._clearTokens();
-        setBlockedInfo({ reason, contact });
-        setAppState('auth');
-      },
-    );
-
-    if (!token) {
-      setAppState('auth');
-      return;
-    }
-
-    const enterMain = () => {
-      setAppState('main');
-      setTimeout(() => {
-        setupFCM().catch((e) => console.warn('[FCM] setupFCM splash error:', e?.message ?? e));
-      }, 500);
-      setTimeout(() => {
-        cleanupImageCache().catch(() => {});
-        cleanupVideoCache().catch(() => {});
-        cleanupReelVideoCache().catch(() => {});
-      }, 1000);
-      navigatePendingUrl();
-    };
-
-    // Verifier que la session est toujours valide (token ou refresh token ok)
-    try {
-      await authService.getMe(true);
-      enterMain();
-    } catch (err) {
-      // Erreur réseau (offline) → on laisse entrer avec le token stocké
-      const isNetworkError = err instanceof ApiError && err.status === 0;
-      if (isNetworkError) {
-        enterMain();
-        return;
-      }
-      // Vraie erreur HTTP (401, etc.) → tenter le refresh
-      try {
-        await authService.refresh();
-        enterMain();
-      } catch (refreshErr) {
-        // Refresh aussi échoue en réseau → laisser entrer quand même
-        const isRefreshNetworkError = refreshErr instanceof ApiError && (refreshErr as ApiError).status === 0;
-        if (isRefreshNetworkError) {
-          enterMain();
-          return;
-        }
-        // Session vraiment expirée → déconnexion
-        authService._clearTokens();
-        setAppState('auth');
-      }
-    }
+  // Appelé à la fin RÉELLE de l'animation de SplashScreen (onFinish) — la
+  // résolution de session tourne déjà depuis le montage (cf. useEffect
+  // resolveSession ci-dessus) ; la plupart du temps son résultat est déjà
+  // disponible ici (vérif réseau << ~1.9s d'animation), donc la transition est
+  // immédiate. Sinon (réseau lent), on applique dès que resolveSession() se
+  // termine, cf. le .then() dans ce même useEffect.
+  const handleSplashDone = () => {
+    splashAnimDoneRef.current = true;
+    if (resolvedNextStateRef.current) applyResolvedState(resolvedNextStateRef.current);
   };
 
   const handleOnboardingDone = () => {
@@ -168,6 +195,7 @@ export const RootNavigator: React.FC = () => {
       return;
     }
     setAppState('main');
+    startReelsPrefetch();
     setTimeout(() => {
       setupFCM().catch((e) => console.warn('[FCM] setupFCM login error:', e?.message ?? e));
     }, 500);

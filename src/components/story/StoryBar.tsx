@@ -32,7 +32,7 @@ const CARD_W   = StoryCardToken.w;      // 84
 const RADIUS   = StoryCardToken.radius; // 12
 const CARD_GAP = StoryCardToken.gap;    // 8
 const BAR_V_PAD = 6;    // marge haut/bas minimale de la barre
-const CARD_H = 124;     // hauteur de carte — la barre ne garde qu'une mince
+const CARD_H = 148;     // hauteur de carte — la barre ne garde qu'une mince
                         // respiration autour (BAR_V_PAD de chaque côté)
 
 // Même palette que web/MediaPlaceholder — gradient déterministe depuis le nom
@@ -217,35 +217,47 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
               </TouchableOpacity>
             </LinearGradient>
           ) : (
-            // Pas encore de story : carte "Ajouter" — fond neutre sobre (plus de
-            // dégradé de marque plaqué ici, réservé aux vrais accents/signaux),
-            // avatar centré avec + superposé, grande initiale.
-            <View style={[s.cardBorderWrap, { padding: 0 }]}>
+            // Pas encore de story : carte "Ajouter" — même liseré de bordure que les
+            // autres cartes (cardBorderWrap SANS padding:0, sinon le contour externe
+            // disparaît et l'arrondi du coin se perd visuellement) + fond en dégradé
+            // de MARQUE (brandGrad, violet→magenta — jamais colors.backgroundSecondary/
+            // surface : ces tokens sont quasi blancs en light (#E8E7F4/#FFFFFF), ce qui
+            // rendait l'avatar/texte blancs illisibles sur fond clair).
+            <View style={[s.cardBorderWrap, { backgroundColor: colors.border ?? '#ccc' }]}>
               <TouchableOpacity activeOpacity={0.85} style={s.card} onPress={() => setCreatorOpen(true)}>
-                <View style={[s.cardBg, { backgroundColor: colors.backgroundSecondary ?? '#e8e8e8' }]} />
+                <LinearGradient
+                  colors={brandGrad}
+                  start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
+                  style={s.cardBg}
+                />
 
                 <View style={s.addCardBody}>
                   <View style={s.addCardAvatarWrap}>
                     <View style={s.addCardAvatarInner}>
                       {currentUser?.avatar_url
                         ? <CachedImage uri={currentUser.avatar_url} style={s.cardAvatar} />
-                        : <View style={[s.cardAvatarFallback, { backgroundColor: colors.primary ?? '#7B3FF2' }]}>
+                        // Fond blanc translucide (pas colors.primary) : le fond de la
+                        // carte est déjà le dégradé de marque (brandGrad, part de
+                        // colors.primary) — un fallback de la même teinte s'y fondrait
+                        // et perdrait tout contour visible.
+                        : <View style={[s.cardAvatarFallback, { backgroundColor: 'rgba(255,255,255,0.25)' }]}>
                             <Text style={s.cardAvatarInitial}>{initials}</Text>
                           </View>
                       }
                     </View>
+                    {/* Bouton + en blanc plein (pas colors.primary, déjà la couleur du
+                        fond en dégradé) — icône sombre pour rester visible dessus. */}
                     <TouchableOpacity
-                      style={[s.addBtnOnAvatar, { backgroundColor: colors.primary ?? '#7B3FF2', borderColor: colors.surface ?? '#fff' }]}
+                      style={[s.addBtnOnAvatar, { backgroundColor: '#fff', borderColor: 'rgba(255,255,255,0.9)' }]}
                       onPress={() => setCreatorOpen(true)}
                       hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                     >
-                      <Icon name="plus" size={11} color="#fff" />
+                      <Icon name="plus" size={12} color={colors.primary ?? '#7B3FF2'} />
                     </TouchableOpacity>
                   </View>
-                  <Text style={[s.addCardInitial, { color: colors.textTertiary ?? 'rgba(255,255,255,0.85)' }]} numberOfLines={1}>{initials}</Text>
                 </View>
 
-                <Text style={[s.cardLabelAbs, { color: colors.textPrimary ?? '#fff', textShadowColor: 'transparent' }]} numberOfLines={1}>Ajouter</Text>
+                <Text style={s.cardLabelAbs} numberOfLines={1}>Ma story</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -377,7 +389,8 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
           initialGroupIndex={viewerGroup}
           currentUserId={currentUser?.id}
           onClose={() => { setViewerOpen(false); load(false); }}
-          onNavigateToChat={onNavigateToChat}        />
+          onNavigateToChat={onNavigateToChat}
+        />
       )}
 
       <StoryCreator
@@ -509,7 +522,7 @@ const s = StyleSheet.create({
   },
   addCardAvatarWrap: { position: 'relative' },
   addCardAvatarInner: {
-    width: 34, height: 34, borderRadius: 17,
+    width: 44, height: 44, borderRadius: 22,
     overflow: 'hidden',
     borderWidth: 2, borderColor: 'rgba(255,255,255,0.55)',
   },
@@ -518,11 +531,6 @@ const s = StyleSheet.create({
     width: 16, height: 16, borderRadius: 8,
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 2,
-  },
-  addCardInitial: {
-    fontSize: 30,
-    fontWeight: '800',
-    color: 'rgba(255,255,255,0.85)',
   },
 
   // ── Caption story texte (centré dans la carte) ───────────────────────────────

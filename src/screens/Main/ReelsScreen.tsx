@@ -5,7 +5,7 @@ import { useFocusEffect, useRoute } from '@react-navigation/native';
 import {
   View, Text, StyleSheet, FlatList, Dimensions,
   TouchableOpacity, ActivityIndicator, StatusBar, Image,
-  Platform, Modal, TextInput,
+  Platform, Modal, TextInput, RefreshControl,
   KeyboardAvoidingView, Keyboard, AppState, Linking, BackHandler,
 } from 'react-native';
 import Animated, {
@@ -51,6 +51,7 @@ import Sound from 'react-native-sound';
 import { BackButton } from '../../components/common';
 import { getLogo } from '../../assets';
 import * as reelVideoCache from '../../services/reelVideoCacheService';
+import { consumeReelsPrefetch } from '../../services/reelsPrefetchService';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
@@ -160,6 +161,16 @@ const CACHE_PRELOAD_WINDOW_WIFI = 2;
 const CACHE_STAGGER_DELAY_MS = 1_500;
 
 // ─── ReelsScreen ─────────────────────────────────────────────────────────────
+
+// Durée de vie max d'une pub Reels déjà chargée dans un slot avant revalidation
+// silencieuse — contrairement au Feed principal (refresh_ad_slots côté backend,
+// réappliqué à chaque page servie), une pub Reels chargée une fois dans adSlots
+// n'était jusqu'ici JAMAIS revérifiée : une campagne dont le budget s'épuise ou
+// qui est mise en pause pendant la session restait affichée indéfiniment tant que
+// l'utilisateur ne quittait pas l'écran. Voir l'effet de revalidation périodique
+// plus bas — ne touche jamais un slot proche de currentIndex (jamais la pub
+// actuellement regardée ni ses voisins immédiats).
+const AD_SLOT_REVALIDATE_MS = 3 * 60 * 1000;
 
 // Feed reels avec pub injectee toutes les AD_INTERVAL reels — voir feedWithAds
 // et toRenderedIndex (conversion d'index reels → index liste rendue).
@@ -338,6 +349,7 @@ export const ReelsScreen: React.FC = () => {
   const [editSaving,    setEditSaving]    = useState(false);
   const [fullEditReel,  setFullEditReel]  = useState<Reel | null>(null); // édition effets visuels
   const [loading,       setLoading]       = useState(seedReel.length === 0 && !params.initialReelId);
+  const [refreshing,    setRefreshing]    = useState(false);
   const [hasMore,       setHasMore]       = useState(true);
   const [tab,           setTab]           = useState<'feed' | 'mine'>('feed');
   const [myId,          setMyId]          = useState<string | null>(null);
@@ -591,6 +603,17 @@ export const ReelsScreen: React.FC = () => {
       if (mountedRef.current) setLoading(false);
     }
   }, []); // pas de dépendances sur params — targetId passé en argument
+
+  // Pull-to-refresh — uniquement possible tout en haut du 1er reel (RefreshControl
+  // de RN ne se déclenche que si l'utilisateur continue de tirer après l'offset 0,
+  // donc aucun conflit avec le swipe vertical normal entre reels). silent=false +
+  // forceRefresh=true : même reset complet (index 0, nouvelle liste) qu'un premier
+  // chargement, mais en bypassant le cache serveur du pool comme un vrai refresh
+  // explicite (cf. load(), refresh=!silent || forceRefresh).
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    load(false, true).finally(() => { if (mountedRef.current) setRefreshing(false); });
+  }, [load]);
 
   // ── Load more ─────────────────────────────────────────────────────────────
   const loadMore = useCallback(async () => {
@@ -848,8 +871,39 @@ export const ReelsScreen: React.FC = () => {
     } else {
       // CAS FOOTER — navigation normale
       if (!didFocusOnceRef.current) {
-        // Premier montage : rien ne joue encore, le fetch est prioritaire et immédiat.
-        load(false);
+        // Premier montage : si RootNavigator a déjà préchargé la 1ère page (et
+        // commencé à télécharger la 1ère vidéo) dès l'entrée en session — voir
+        // reelsPrefetchService, démarré pendant que l'utilisateur était encore
+        // sur Feed — on réutilise ce résultat au lieu de refetcher depuis zéro :
+        // la liste est déjà là, la vidéo déjà en cours/fin de téléchargement.
+        const prefetched = userMode ? null : consumeReelsPrefetch();
+        if (prefetched) {
+          const filtered = (prefetched.items ?? []).filter((r: Reel) => (!!r.hls_url || !!r.mp4_url));
+          setHasMore(prefetched.has_more);
+          lastLoadedAtRef.current = Date.now();
+          currentIdxRef.current = 0;
+          setCurrentIndex(0);
+          setReels(filtered);
+          viewedReelsRef.current = new Set();
+          setLoading(false);
+          loadAdForSlot(0);
+          // Même suite que load() : myId/avatar/mes-reels en parallèle, sans
+          // bloquer l'affichage (voir load() plus haut pour la version complète).
+          authService.getMe().then(me => {
+            if (!mountedRef.current) return;
+            setMyId(String(me.id));
+            setMyAvatar(me.avatar_url ?? null);
+            const label = me.display_name || me.first_name || me.username || 'M';
+            setMyInitial(label[0].toUpperCase());
+            userService.getUserReels(String(me.id))
+              .then(mine => { if (mountedRef.current) setMyReels(Array.isArray(mine) ? mine : []); })
+              .catch(() => {});
+          }).catch(() => {});
+        } else {
+          // Rien de préchargé (prefetch pas encore terminé, ou raté) — fetch
+          // normal, prioritaire et immédiat.
+          load(false);
+        }
       } else {
         // Tout retour sur l'onglet (changement d'onglet, ou reprise après
         // arrière-plan) : le reel affiché à l'écran ne doit JAMAIS être
@@ -1049,6 +1103,36 @@ export const ReelsScreen: React.FC = () => {
       }
     }
   }, [reels.length, userMode, loadAdForSlot]);
+
+  // Revalidation périodique des slots pub déjà chargés — jamais le slot
+  // actuellement regardé ni ses voisins immédiats (PRELOAD_WINDOW), pour ne
+  // jamais changer une pub sous les yeux de l'utilisateur (même règle que le
+  // cache vidéo : aucune bascule de contenu en pleine vue, uniquement avant
+  // qu'un slot ne devienne pertinent). Un slot pub occupe l'index
+  // reels.length + slotIdx dans feedWithAds (toujours en fin de liste).
+  useEffect(() => {
+    if (userMode) return;
+    const timer = setInterval(() => {
+      adSlotsRef.current.forEach((_, slotIdx) => {
+        const renderedIndex = reels.length + slotIdx;
+        if (Math.abs(renderedIndex - currentIndex) <= PRELOAD_WINDOW) return;
+        if (loadingAdSlotsRef.current.has(slotIdx)) return;
+        setAdSlots(prev => {
+          if (!prev.has(slotIdx)) return prev;
+          const next = new Map(prev);
+          next.delete(slotIdx);
+          return next;
+        });
+        // adSlotsRef (lu par loadAdForSlot) n'est resynchronisé qu'au rendu
+        // suivant de ce composant, pas de façon synchrone ici — un appel
+        // immédiat verrait donc encore l'ancien ref et refuserait de recharger
+        // (adSlotsRef.current.has(slotIdx) === true). setTimeout(0) laisse le
+        // rendu déclenché par setAdSlots ci-dessus se produire d'abord.
+        setTimeout(() => loadAdForSlot(slotIdx), 0);
+      });
+    }, AD_SLOT_REVALIDATE_MS);
+    return () => clearInterval(timer);
+  }, [userMode, reels.length, currentIndex, loadAdForSlot]);
 
   const renderVideoSlide = useCallback(({ item, index }: { item: any; index: number }) => {
     if (item._isAd) {
@@ -1365,6 +1449,20 @@ export const ReelsScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
         disableIntervalMomentum
+        // Glisser vers le bas tout en haut du 1er reel → rafraîchit le feed. Ne
+        // se déclenche jamais pendant un swipe normal entre reels (RN exige
+        // d'être déjà à l'offset 0 et de continuer à tirer) — aucun conflit
+        // avec le pager vertical. Masqué en mode profil (userMode) et pendant
+        // la recherche, comme le reste des interactions de cette liste.
+        refreshControl={!userMode && !searchOpen ? (
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#fff"
+            colors={['#7B3FF2']}
+            progressBackgroundColor="#1a1a2e"
+          />
+        ) : undefined}
         // Ancre le reel visible quand `feedWithAds` change AU-DESSUS de la position
         // courante — c'était la cause du "l'écran glisse au hasard" au retour sur
         // Reels : une pub qui finit de charger (loadAdForSlot) est insérée dans

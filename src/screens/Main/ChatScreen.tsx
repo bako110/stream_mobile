@@ -140,6 +140,24 @@ export const ChatScreen: React.FC = () => {
   const partnerRecordingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Accusés de lecture désactivés par MOI (Paramètres > Confidentialité des
+  // messages) → je ne dois plus voir non plus ceux des autres (texte déjà
+  // affiché dans cet écran de réglages, jamais implémenté jusqu'ici : la pref
+  // se sauvegardait en base sans aucun effet, ni à l'émission ni à la
+  // réception). true par défaut le temps du chargement — jamais de flash
+  // "accusé masqué puis affiché" si le réglage par défaut (true) s'applique.
+  const [showsReadReceipts, setShowsReadReceipts] = useState(true);
+  // Lu par le handler WS (défini dans un useEffect dont les deps n'incluent pas
+  // showsReadReceipts, pour ne pas recréer le listener à chaque changement) —
+  // toujours à jour via ce ref, jamais la valeur figée au montage du handler.
+  const showsReadReceiptsRef = useRef(true);
+  showsReadReceiptsRef.current = showsReadReceipts;
+  useEffect(() => {
+    userService.getPrivacy()
+      .then(p => setShowsReadReceipts(p.privacy_read_receipts ?? true))
+      .catch(() => {});
+  }, []);
+
   // Audio playback — instance et etat partages (survit a la navigation, pilotable
   // depuis la barre flottante ActiveVoiceBar une fois l'ecran quitte).
   const { activeVoice, playVoice } = useActiveVoice();
@@ -235,7 +253,10 @@ export const ChatScreen: React.FC = () => {
             messageService.markRead(partnerId).catch(() => {});
           }
         }
-      } else if (payload.type === 'read' && payload.partner_id === partnerId) {
+      } else if (payload.type === 'read' && payload.partner_id === partnerId && showsReadReceiptsRef.current) {
+        // showsReadReceipts : si J'AI désactivé mes accusés de lecture, je ne
+        // vois plus non plus ceux du partenaire (effet miroir déjà annoncé
+        // dans SettingsMessagesPrivacyScreen, jamais appliqué avant ce fix).
         setMessages(prev => prev.map(m => m.sender_id === myIdRef.current ? { ...m, read: true } : m));
       } else if (payload.type === 'message_edited') {
         setMessages(prev => prev.map(m =>

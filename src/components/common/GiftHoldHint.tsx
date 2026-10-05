@@ -98,6 +98,9 @@ export const GiftHoldHint: React.FC<Props> = ({ dismiss, suppressed }) => {
 };
 
 const styles = StyleSheet.create({
+  // Même emplacement que SwipeUpHint (top: 38%) — voir son commentaire pour le
+  // raisonnement. Jamais affichés ensemble (suppressed tant que SwipeUpHint
+  // n'est pas done), donc partager la position est sans risque.
   container: {
     position: 'absolute',
     top: '38%',

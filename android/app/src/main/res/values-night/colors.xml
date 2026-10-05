@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Fond de fenêtre en sombre — cf. styles.xml AppTheme.windowBackground,
+         aligné sur NAV_THEME_DARK.background (RootNavigator.tsx) -->
+    <color name="window_background">#0D0D1A</color>
+</resources>

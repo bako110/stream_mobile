@@ -4,4 +4,7 @@
     <color name="ic_launcher_background">#FFFFFF</color>
     <!-- Couleur d'accent des notifications -->
     <color name="notification_color">#7B3FF2</color>
+    <!-- Fond de fenêtre en clair — cf. styles.xml AppTheme.windowBackground,
+         aligné sur NAV_THEME_LIGHT.background (RootNavigator.tsx) -->
+    <color name="window_background">#FFFFFF</color>
 </resources>
