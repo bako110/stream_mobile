@@ -56,10 +56,53 @@ export interface AdCreate {
   ends_at?:          string;
 }
 
+export interface AdsPage {
+  items: Ad[];
+  page:  number;
+  limit: number;
+  total: number;
+}
+
+// Totaux agrégés sur TOUTES les campagnes de l'annonceur (pas seulement la page
+// chargée à l'écran) — alimente les KPIs globaux, indépendants du scroll.
+export interface AdsStats {
+  total_count:      number;
+  active_count:     number;
+  budget_eur:       number;
+  spent_eur:        number;
+  impressions:      number;
+  clicks:           number;
+  ctr_pct:          number;
+  gogold_debited:   number;
+  gogold_spent:     number;
+  gogold_remaining: number;
+}
+
+const EMPTY_STATS: AdsStats = {
+  total_count: 0, active_count: 0, budget_eur: 0, spent_eur: 0,
+  impressions: 0, clicks: 0, ctr_pct: 0,
+  gogold_debited: 0, gogold_spent: 0, gogold_remaining: 0,
+};
+
 export const adService = {
-  async getMine(): Promise<Ad[]> {
-    const res = await apiClient.get<Ad[]>(Endpoints.ads.mine);
-    return Array.isArray(res.data) ? res.data : [];
+  async getMine(page = 1, limit = 20): Promise<AdsPage> {
+    const res = await apiClient.get<AdsPage>(`${Endpoints.ads.mine}?page=${page}&limit=${limit}`);
+    const data = res.data;
+    return {
+      items: Array.isArray(data?.items) ? data.items : [],
+      page:  data?.page  ?? page,
+      limit: data?.limit ?? limit,
+      total: data?.total ?? 0,
+    };
+  },
+
+  async getStats(): Promise<AdsStats> {
+    try {
+      const res = await apiClient.get<AdsStats>(Endpoints.ads.mineStats);
+      return { ...EMPTY_STATS, ...res.data };
+    } catch {
+      return EMPTY_STATS;
+    }
   },
 
   async getById(id: string): Promise<Ad> {

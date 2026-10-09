@@ -1,7 +1,7 @@
 /**
  * AdsScreen — Dashboard annonceur.
  */
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, RefreshControl, StatusBar,
@@ -14,8 +14,10 @@ import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
-import { adService, type Ad } from '../../services/adService';
+import { adService, type Ad, type AdsStats } from '../../services/adService';
 import { toastService, showConfirm } from '../../services';
+
+const ADS_PAGE_LIMIT = 20;
 
 // 1 € = 100 GoGold
 const EUR_TO_COINS = 100;
@@ -204,30 +206,60 @@ export const AdsScreen: React.FC = () => {
   const nav = useNavigation<any>();
   const insets = useSafeAreaInsets();
 
-  const [ads,        setAds]        = useState<Ad[]>([]);
-  const [loading,    setLoading]    = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [ads,         setAds]         = useState<Ad[]>([]);
+  const [stats,       setStats]       = useState<AdsStats | null>(null);
+  const [loading,     setLoading]     = useState(true);
+  const [refreshing,  setRefreshing]  = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore,     setHasMore]     = useState(true);
+  const pageRef = useRef(1);
 
   const load = useCallback(async () => {
-    try { setAds(await adService.getMine()); }
-    catch { setAds([]); }
+    try {
+      pageRef.current = 1;
+      const [res, statsRes] = await Promise.all([
+        adService.getMine(1, ADS_PAGE_LIMIT),
+        adService.getStats(),
+      ]);
+      setAds(res.items);
+      setHasMore(res.items.length < res.total);
+      setStats(statsRes);
+    }
+    catch { setAds([]); setHasMore(false); }
     finally { setLoading(false); setRefreshing(false); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  const totalBudget      = ads.reduce((s, a) => s + a.budget_eur, 0);
-  const totalSpent       = ads.reduce((s, a) => s + a.spent_eur, 0);
-  const totalImpressions = ads.reduce((s, a) => s + a.impressions, 0);
-  const totalClicks      = ads.reduce((s, a) => s + a.clicks, 0);
-  const globalCtr        = totalImpressions > 0 ? (totalClicks / totalImpressions * 100).toFixed(2) : '0.00';
-  const activeCount      = ads.filter(a => a.status === 'active').length;
+  const loadMore = useCallback(() => {
+    if (loadingMore || !hasMore || loading) return;
+    setLoadingMore(true);
+    const nextPage = pageRef.current + 1;
+    adService.getMine(nextPage, ADS_PAGE_LIMIT)
+      .then(res => {
+        pageRef.current = nextPage;
+        setAds(prev => {
+          const merged = [...prev, ...res.items];
+          setHasMore(merged.length < res.total);
+          return merged;
+        });
+      })
+      .catch(() => setHasMore(false))
+      .finally(() => setLoadingMore(false));
+  }, [loadingMore, hasMore, loading]);
 
-  // Budget total en GoGold : somme des gogold_debited si disponibles, sinon eur2coins(budget_eur)
-  const totalBudgetGoGold = ads.reduce((s, a) =>
-    s + (a.gogold_debited != null ? a.gogold_debited : eur2coins(a.budget_eur)), 0);
+  // Totaux sur TOUTES les campagnes (endpoint dédié /ads/mine/stats), pas seulement
+  // celles déjà chargées à l'écran — restent exacts quel que soit l'état du scroll.
+  const totalBudget      = stats?.budget_eur ?? 0;
+  const totalSpent       = stats?.spent_eur ?? 0;
+  const totalImpressions = stats?.impressions ?? 0;
+  const globalCtr        = (stats?.ctr_pct ?? 0).toFixed(2);
+  const activeCount      = stats?.active_count ?? 0;
+  const totalBudgetGoGold = stats?.gogold_debited ?? 0;
 
-  // Impressions restantes estimées sur les campagnes actives/en pause
+  // Impressions restantes estimées sur les campagnes actives/en pause DÉJÀ
+  // CHARGÉES — reste une estimation locale (pas d'agrégat backend pour ce calcul
+  // spécifique par CPM individuel), moins critique qu'un vrai total financier.
   const estimatedRemainingImpressions = ads
     .filter(a => a.status === 'active' || a.status === 'paused')
     .reduce((s, a) => {
@@ -291,7 +323,7 @@ export const AdsScreen: React.FC = () => {
       <View style={{ flexDirection: 'row', gap: 8 }}>
         {[
           { lbl: 'Budget total',  val: `${totalBudgetGoGold.toLocaleString('fr-FR')} c`,      sub: <PriceWithLocal amountEur={totalBudget} style={{ fontSize: FontSize['2xs'], color: colors.primary + 'AA', fontWeight: FontWeight.semiBold }} /> },
-          { lbl: 'Dépensé',       val: `${eur2coins(totalSpent).toLocaleString('fr-FR')} c`, sub: <PriceWithLocal amountEur={totalSpent} style={{ fontSize: FontSize['2xs'], color: colors.primary + 'AA', fontWeight: FontWeight.semiBold }} /> },
+          { lbl: 'Dépensé',       val: `${(stats?.gogold_spent ?? 0).toLocaleString('fr-FR')} c`, sub: <PriceWithLocal amountEur={totalSpent} style={{ fontSize: FontSize['2xs'], color: colors.primary + 'AA', fontWeight: FontWeight.semiBold }} /> },
           { lbl: 'Impressions',   val: totalImpressions.toLocaleString('fr-FR'),              sub: 'vues réelles' as React.ReactNode },
           { lbl: 'CTR moyen',     val: `${globalCtr}%`,                                       sub: 'taux clic' as React.ReactNode },
         ].map(g => (
@@ -380,6 +412,9 @@ export const AdsScreen: React.FC = () => {
             <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }}
               colors={[colors.primary]} tintColor={colors.primary} />
           }
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.primary} style={{ marginVertical: 16 }} /> : null}
           ListHeaderComponent={
             <View>
               <HowItWorks colors={colors} />

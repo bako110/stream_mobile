@@ -1,15 +1,13 @@
 /**
- * AdCTA — l'appel à l'action éditorial + son système d'apparition, partagé par
- * Feed / overlay recherche. (Reels a son propre bouton CTA compact, sur la
- * même ligne que le nom de l'annonceur — voir AdSlide dans ReelsScreen.tsx.)
+ * AdCTA — bouton(s) d'appel à l'action, partagé par Feed / overlay recherche.
+ * (Reels a son propre bouton CTA compact, sur la même ligne que le nom de
+ * l'annonceur — voir AdSlide dans ReelsScreen.tsx.)
  *
- * Principe (direction « premium éditorial ») :
- *  1. au repos : discret — lien texte.
- *  2. `activated` passe à true → entrée chorégraphiée : le repos se replie, le
- *     CTA « riche » se déplie (crossfade), une accroche (shine + pulsation
- *     discrète) revient toutes les ~4.8s — assez rare pour rester confiant,
- *     jamais agressif.
- *  3. stable : ne réagit qu'au tap (scale 0.97).
+ * Le(s) bouton(s) sont affichés directement dès le montage, sans état "repos"
+ * intermédiaire (ex-lien discret "Découvrir {annonceur}") — l'action doit être
+ * visible et actionnable immédiatement, pas après un délai. Une accroche
+ * (shine + pulsation discrète) revient toutes les ~4.8s sur le premier bouton,
+ * assez rare pour rester confiant, jamais agressif.
  *
  * Bouton — ombre portée par un wrapper dédié (jamais le conteneur qui clippe
  * le shine, une ombre RN est coupée par overflow:hidden sur iOS).
@@ -38,7 +36,7 @@ interface Props {
 // qu'un rappel fréquent qui donne une impression de sollicitation.
 const SHINE_PAUSE_MS = 4800;
 
-export const AdCTA: React.FC<Props> = ({ ad, context, activated, onPress }) => {
+export const AdCTA: React.FC<Props> = ({ ad, context, onPress }) => {
   const { theme } = useTheme();
   const { colors } = theme;
 
@@ -56,8 +54,6 @@ export const AdCTA: React.FC<Props> = ({ ad, context, activated, onPress }) => {
     );
   }
 
-  // Progression du morphing repos → riche (0 = repos, 1 = riche).
-  const morph = useSharedValue(0);
   // Balayage du shine (0 → 1, une passe).
   const shine = useSharedValue(0);
   // Pulsation douce du bouton, synchronisée avec le shine (même cycle) — renforce
@@ -95,22 +91,14 @@ export const AdCTA: React.FC<Props> = ({ ad, context, activated, onPress }) => {
       false,
     );
 
+  // Démarre dès le montage — le bouton est visible et actionnable immédiatement,
+  // l'accroche shine/pulse n'est qu'une animation d'appel, pas une condition
+  // d'apparition.
   useEffect(() => {
-    if (!activated) return;
-    morph.value = withTiming(1, { duration: 220, easing: Easing.out(Easing.cubic) });
     shine.value = withDelay(120, repeatingShine(520, Easing.out(Easing.quad)));
     pulse.value = withDelay(120, repeatingPulse(520));
-  }, [activated, morph, shine, pulse]);
+  }, [shine, pulse]);
 
-  const restStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(morph.value, [0, 0.6], [1, 0]),
-    height: interpolate(morph.value, [0, 1], [1, 0]) === 0 ? 0 : undefined,
-    transform: [{ translateY: interpolate(morph.value, [0, 1], [0, -4]) }],
-  }));
-  const richStyle = useAnimatedStyle(() => ({
-    opacity: morph.value,
-    transform: [{ translateY: interpolate(morph.value, [0, 1], [6, 0]) }],
-  }));
   const shineStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: interpolate(shine.value, [0, 1], [88, -60]) }],
     opacity: shine.value > 0 && shine.value < 1 ? 1 : 0,
@@ -124,50 +112,35 @@ export const AdCTA: React.FC<Props> = ({ ad, context, activated, onPress }) => {
 
   return (
     <View style={[s.feedWrap, { borderTopColor: colors.divider }]}>
-      {/* repos : lien texte */}
-      <Animated.View style={[s.linkInner, restStyle]} pointerEvents={activated ? 'none' : 'auto'}>
-        <Pressable style={s.linkRowNoBorder} onPress={onPress}>
-          <Text style={[s.link, { color: colors.primary }]} numberOfLines={1}>Découvrir {label}</Text>
-        </Pressable>
-      </Animated.View>
-
-      {/* riche : sous-titre + bouton sombre */}
-      <Animated.View style={[s.feedRich, richStyle]} pointerEvents={activated ? 'auto' : 'none'}>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={[s.feedSub, { color: colors.textSecondary }]} numberOfLines={1}>
-            {ad.description || 'En savoir plus'}
-          </Text>
-        </View>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          {buttons.map((btn, i) => {
-            const IconComp = btn.iconSet === 'mci' ? MCIcon : Icon;
-            const bg = btn.action === 'whatsapp' ? '#25D366' : colors.textPrimary;
-            const fg = btn.action === 'whatsapp' ? '#fff' : colors.background;
-            const handlePress = () => { onPress(); runAdButton(btn, ad); };
-            // Shine/pulse (accroche animée) réservés au premier bouton — deux
-            // boutons qui scintillent en même temps serait trop chargé visuellement.
-            return i === 0 ? (
-              <Animated.View key={btn.action} style={[btnStyle, s.btnShadowWrap, { shadowColor: bg }]}>
-                <Pressable
-                  style={[s.btnDarkSolid, { backgroundColor: bg }]}
-                  onPress={handlePress} onPressIn={onIn} onPressOut={onOut}
-                >
-                  <Animated.View style={[s.shine, shineStyle]} pointerEvents="none" />
-                  <Text style={[s.btnDarkTxt, { color: fg }]}>{btn.text}</Text>
-                  <IconComp name={btn.icon} size={13} color={fg} />
-                </Pressable>
-              </Animated.View>
-            ) : (
-              <View key={btn.action} style={[s.btnShadowWrap, { shadowColor: bg }]}>
-                <Pressable style={[s.btnDarkSolid, { backgroundColor: bg }]} onPress={handlePress}>
-                  <Text style={[s.btnDarkTxt, { color: fg }]}>{btn.text}</Text>
-                  <IconComp name={btn.icon} size={13} color={fg} />
-                </Pressable>
-              </View>
-            );
-          })}
-        </View>
-      </Animated.View>
+      <View style={{ flexDirection: 'row', gap: 8, flex: 1 }}>
+        {buttons.map((btn, i) => {
+          const IconComp = btn.iconSet === 'mci' ? MCIcon : Icon;
+          const bg = btn.action === 'whatsapp' ? '#25D366' : colors.textPrimary;
+          const fg = btn.action === 'whatsapp' ? '#fff' : colors.background;
+          const handlePress = () => { onPress(); runAdButton(btn, ad); };
+          // Shine/pulse (accroche animée) réservés au premier bouton — deux
+          // boutons qui scintillent en même temps serait trop chargé visuellement.
+          return i === 0 ? (
+            <Animated.View key={btn.action} style={[btnStyle, s.btnShadowWrap, { flex: 1, shadowColor: bg }]}>
+              <Pressable
+                style={[s.btnDarkSolid, s.btnFull, { backgroundColor: bg }]}
+                onPress={handlePress} onPressIn={onIn} onPressOut={onOut}
+              >
+                <Animated.View style={[s.shine, shineStyle]} pointerEvents="none" />
+                <Text style={[s.btnDarkTxt, { color: fg }]}>{btn.text}</Text>
+                <IconComp name={btn.icon} size={13} color={fg} />
+              </Pressable>
+            </Animated.View>
+          ) : (
+            <View key={btn.action} style={[s.btnShadowWrap, { flex: 1, shadowColor: bg }]}>
+              <Pressable style={[s.btnDarkSolid, s.btnFull, { backgroundColor: bg }]} onPress={handlePress}>
+                <Text style={[s.btnDarkTxt, { color: fg }]}>{btn.text}</Text>
+                <IconComp name={btn.icon} size={13} color={fg} />
+              </Pressable>
+            </View>
+          );
+        })}
+      </View>
     </View>
   );
 };
@@ -177,10 +150,7 @@ const s = StyleSheet.create({
   linkRow:        { flexDirection: 'row', alignItems: 'center', gap: 6, marginHorizontal: 14, marginBottom: 13, paddingTop: 11, borderTopWidth: StyleSheet.hairlineWidth },
   linkRowNoBorder:{ flexDirection: 'row', alignItems: 'center', gap: 6 },
 
-  feedWrap: { marginHorizontal: 14, marginBottom: 14, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, minHeight: 56, justifyContent: 'center' },
-  linkInner: { overflow: 'hidden' },
-  feedRich: { flexDirection: 'row', alignItems: 'center', gap: 12, position: 'absolute', left: 0, right: 0, top: 12, bottom: 0 },
-  feedSub:  { fontSize: 11.5, marginTop: 2 },
+  feedWrap: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 14, marginBottom: 14, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, minHeight: 56 },
   // L'ombre est portée par ce wrapper (pas de overflow:hidden ici — une ombre
   // RN est coupée par overflow:hidden sur son propre conteneur sur iOS).
   btnShadowWrap: {
@@ -189,9 +159,12 @@ const s = StyleSheet.create({
   },
   // Coins doux + overflow:hidden ici uniquement, pour clipper le shine au borderRadius.
   btnDarkSolid: {
-    position: 'relative', overflow: 'hidden', flexDirection: 'row', alignItems: 'center', gap: 7,
+    position: 'relative', overflow: 'hidden', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
     paddingHorizontal: 17, paddingVertical: 11, borderRadius: 13,
   },
+  // Bouton qui remplit toute la largeur de son wrapper flex:1 (1 ou 2 boutons
+  // se partagent la ligne à parts égales, plus de sous-titre à côté).
+  btnFull: { width: '100%' },
   btnDarkTxt: { fontSize: 12.5, fontWeight: '700', letterSpacing: 0.1 },
   shine: { position: 'absolute', top: 0, bottom: 0, left: '88%', width: '36%', backgroundColor: 'rgba(255,255,255,0.4)', transform: [{ skewX: '-18deg' }] },
 });
