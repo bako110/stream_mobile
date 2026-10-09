@@ -17,12 +17,13 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Animated, {
   useSharedValue, useAnimatedStyle, withTiming, withDelay, withSpring,
   withRepeat, withSequence, Easing, interpolate,
 } from 'react-native-reanimated';
 import { useTheme } from '../../hooks/useTheme';
-import { adAdvertiserLabel, adCtaLabel, type AdData } from './types';
+import { adAdvertiserLabel, adContactButtons, runAdButton, type AdData } from './types';
 
 type Context = 'feed' | 'search-overlay';
 
@@ -41,7 +42,7 @@ export const AdCTA: React.FC<Props> = ({ ad, context, activated, onPress }) => {
   const { theme } = useTheme();
   const { colors } = theme;
 
-  const { text: ctaText, icon: ctaIcon } = adCtaLabel(ad);
+  const buttons = adContactButtons(ad);
   const label = adAdvertiserLabel(ad);
 
   // ── search-overlay : jamais de bouton, juste un lien texte, pas d'anim propre ──
@@ -137,16 +138,35 @@ export const AdCTA: React.FC<Props> = ({ ad, context, activated, onPress }) => {
             {ad.description || 'En savoir plus'}
           </Text>
         </View>
-        <Animated.View style={[btnStyle, s.btnShadowWrap, { shadowColor: colors.textPrimary }]}>
-          <Pressable
-            style={[s.btnDarkSolid, { backgroundColor: colors.textPrimary }]}
-            onPress={onPress} onPressIn={onIn} onPressOut={onOut}
-          >
-            <Animated.View style={[s.shine, shineStyle]} pointerEvents="none" />
-            <Text style={[s.btnDarkTxt, { color: colors.background }]}>{ctaText}</Text>
-            <Icon name={ctaIcon} size={13} color={colors.background} />
-          </Pressable>
-        </Animated.View>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {buttons.map((btn, i) => {
+            const IconComp = btn.iconSet === 'mci' ? MCIcon : Icon;
+            const bg = btn.action === 'whatsapp' ? '#25D366' : colors.textPrimary;
+            const fg = btn.action === 'whatsapp' ? '#fff' : colors.background;
+            const handlePress = () => { onPress(); runAdButton(btn, ad); };
+            // Shine/pulse (accroche animée) réservés au premier bouton — deux
+            // boutons qui scintillent en même temps serait trop chargé visuellement.
+            return i === 0 ? (
+              <Animated.View key={btn.action} style={[btnStyle, s.btnShadowWrap, { shadowColor: bg }]}>
+                <Pressable
+                  style={[s.btnDarkSolid, { backgroundColor: bg }]}
+                  onPress={handlePress} onPressIn={onIn} onPressOut={onOut}
+                >
+                  <Animated.View style={[s.shine, shineStyle]} pointerEvents="none" />
+                  <Text style={[s.btnDarkTxt, { color: fg }]}>{btn.text}</Text>
+                  <IconComp name={btn.icon} size={13} color={fg} />
+                </Pressable>
+              </Animated.View>
+            ) : (
+              <View key={btn.action} style={[s.btnShadowWrap, { shadowColor: bg }]}>
+                <Pressable style={[s.btnDarkSolid, { backgroundColor: bg }]} onPress={handlePress}>
+                  <Text style={[s.btnDarkTxt, { color: fg }]}>{btn.text}</Text>
+                  <IconComp name={btn.icon} size={13} color={fg} />
+                </Pressable>
+              </View>
+            );
+          })}
+        </View>
       </Animated.View>
     </View>
   );

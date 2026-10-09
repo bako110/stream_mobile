@@ -683,6 +683,12 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
 
     onCreated(); resetAndClose();
     storyUploadState.setUploading(true);
+    // Retour immédiat — sans ça, fermer l'écran de création donne l'impression
+    // que rien ne se passe pendant tout l'upload (vidéos longues en particulier),
+    // le seul indice restant étant un petit spinner discret sur la story bar.
+    if (_mode === 'video') {
+      toastService.info('Publication en cours', 'Ta vidéo est en cours d\'envoi...');
+    }
     (async () => {
       try {
         let media_url: string|undefined, media_type: StoryMediaType = 'image';
@@ -740,7 +746,16 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
   };
 
   const currentOpt = MODE_OPTIONS.find(o => o.key === mode) ?? MODE_OPTIONS[0];
-  const canPublish = mode !== 'text' || caption.trim().length > 0;
+  // Un média manquant (localUri/audioUri null) plantait la publication
+  // (doUploadImage/doUploadVideo/doUploadAudio appelés avec un uri forcé
+  // non-null qui ne l'était pas) — validé explicitement par mode plutôt que
+  // de ne couvrir que le cas 'text'.
+  const canPublish =
+    mode === 'text'  ? caption.trim().length > 0 || !!audioUri :
+    mode === 'image' ? !!localUri :
+    mode === 'video' ? !!localUri :
+    mode === 'voice' ? !!audioUri :
+    false;
 
   // ─────────────────────────────────────────────────────────────────────────
   // RENDER

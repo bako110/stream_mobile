@@ -53,11 +53,17 @@ export const PageHeader: React.FC<{ title: string; onBack: () => void }> = ({ ti
   const { theme } = useTheme();
   const { colors } = theme;
   const insets = useSafeAreaInsets();
+  // Header — carte flottante (même design que le reste de l'app).
+  // paddingTop (status bar) isolé sur un wrapper externe transparent — le
+  // mélanger au style de la carte ferait apparaître un coin visible sous
+  // la status bar.
   return (
-    <View style={[sh.header, { borderBottomColor: colors.divider, backgroundColor: colors.background, paddingTop: insets.top + 14 }]}>
-      <BackButton onPress={onBack} />
-      <Text style={[sh.title, { color: colors.textPrimary }]}>{title}</Text>
-      <View style={{ width: 40 }} />
+    <View style={{ paddingTop: insets.top + 14 }}>
+      <View style={[sh.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+        <BackButton onPress={onBack} />
+        <Text style={[sh.title, { color: colors.textPrimary }]}>{title}</Text>
+        <View style={{ width: 40 }} />
+      </View>
     </View>
   );
 };
@@ -66,7 +72,12 @@ const sh = StyleSheet.create({
   row:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, paddingHorizontal: 14 },
   iconWrap:{ width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   card:    { borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
-  header:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
-  backBtn: { width: 44, alignItems: 'flex-start' },
+  header:  {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 14,
+    marginHorizontal: 10, marginBottom: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
   title:   { fontSize: 17, fontWeight: '700', flex: 1, textAlign: 'center' },
 });

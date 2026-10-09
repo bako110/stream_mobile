@@ -262,17 +262,19 @@ const WalletTransactionsScreen: React.FC = () => {
     <View style={s.container}>
       {statusBar}
 
-      <View style={[s.header, { paddingTop: insets.top + 10 }]}>
-        <BackButton onPress={() => navigation.goBack()} />
-        <Text style={[s.headerTitle, { flex: 1, textAlign: 'center' }]}>Transactions</Text>
-        <View style={{ width: 40 }} />
+      <View style={{ paddingTop: insets.top + 10 }}>
+        <View style={[s.header, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <BackButton onPress={() => navigation.goBack()} />
+          <Text style={[s.headerTitle, { flex: 1, textAlign: 'center' }]}>Transactions</Text>
+          <View style={{ width: 40 }} />
+        </View>
       </View>
 
       {/* Filtre par type */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 8, paddingHorizontal: 20, paddingBottom: 12 }}
+        contentContainerStyle={{ gap: 8, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 12 }}
         style={{ flexGrow: 0 }}
       >
         {TX_FILTERS.map(f => {
@@ -371,8 +373,12 @@ const styles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingBottom: 12,
-    backgroundColor: colors.background,
+    paddingVertical: 12,
+    marginHorizontal: 10,
+    borderRadius: 24,
+    borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
   },
   headerTitle: {
     fontSize: 20,

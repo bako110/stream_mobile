@@ -200,10 +200,13 @@ export const ChatScreen: React.FC = () => {
   const [isBlocked,       setIsBlocked]       = useState(false);
   const [requestStatus,   setRequestStatus]   = useState<ConversationRequestStatus>('none');
   const [requestActionLoading, setRequestActionLoading] = useState(false);
-  // Tant que le vrai statut (bloqué / demande en attente / accepté) n'est pas
-  // connu, on ne montre ni le composer ni les bandeaux — évite le flash où le
-  // champ de saisie apparaît puis disparaît une fois la réponse API reçue.
-  const [statusReady, setStatusReady] = useState(false);
+  // Plus de vérification réseau précoce à l'ouverture (voir commentaire plus
+  // bas, à l'ancien emplacement du useEffect getRequestStatus) — le composer
+  // s'affiche immédiatement, optimiste. statusReady reste utilisé par le JSX
+  // (bandeaux pending_incoming/pending_outgoing/blocked) mais démarre déjà à
+  // true ; il n'est repassé à false que si un événement temps réel ou une
+  // tentative d'envoi révèle un vrai statut non-"none" à afficher.
+  const [statusReady, setStatusReady] = useState(true);
 
   const [replyingTo,        setReplyingTo]        = useState<Message | null>(null);
   const [pinnedMessages,    setPinnedMessages]    = useState<Message[]>([]);
@@ -295,8 +298,10 @@ export const ChatScreen: React.FC = () => {
         setIsBlocked(true);
       } else if (payload.type === 'error' && payload.detail === 'conversation_blocked') {
         setRequestStatus('blocked');
+        toastService.error('Conversation bloquée', 'Vous ne pouvez plus envoyer de message à cette personne.');
       } else if (payload.type === 'error' && payload.detail === 'pending_limit') {
         setRequestStatus('pending_outgoing');
+        toastService.warning('En attente', 'Patientez que la personne accepte votre demande avant d\'envoyer d\'autres messages.');
       } else if (payload.type === 'conversation_accepted' && payload.user_id === partnerId) {
         setRequestStatus('accepted');
       } else if (payload.type === 'conversation_blocked' && payload.user_id === partnerId) {
@@ -346,15 +351,13 @@ export const ChatScreen: React.FC = () => {
     }).catch(() => {});
   }, []);
 
-  // Connaître à l'avance le statut de la demande de conversation — évite de
-  // laisser taper un message qui échouera silencieusement à l'envoi
-  useEffect(() => {
-    setStatusReady(false);
-    messageService.getRequestStatus(partnerId)
-      .then(r => setRequestStatus(r.status))
-      .catch(() => {})
-      .finally(() => setStatusReady(true));
-  }, [partnerId]);
+  // Le statut de la demande de conversation n'est plus vérifié par avance à
+  // l'ouverture — ça ralentissait l'apparition de la barre de saisie à chaque
+  // clic sur une conversation (squelette de chargement le temps de l'appel
+  // réseau). La barre de saisie s'affiche désormais immédiatement ; le vrai
+  // statut (bloqué / en attente d'acceptation) n'est révélé que si l'envoi
+  // échoue réellement, via l'alerte dans send() et le listener WebSocket
+  // ci-dessus (conversation_blocked / pending_limit).
 
   const loadMessages = useCallback(async (p = 1) => {
     try {
@@ -463,8 +466,15 @@ export const ChatScreen: React.FC = () => {
       const code = (e?.data as any)?.detail?.code;
       if (code === 'conversation_blocked') {
         setRequestStatus('blocked');
+        toastService.error('Conversation bloquée', 'Vous ne pouvez plus envoyer de message à cette personne.');
       } else if (code === 'pending_limit') {
+        // Limite anti-spam atteinte (déjà envoyé le(s) message(s) autorisé(s)
+        // avant acceptation) — le message n'est PAS parti, mais rien n'en
+        // informait l'utilisateur jusqu'ici (juste retiré silencieusement de
+        // la liste), ce qui donnait l'impression d'un envoi perdu.
         setRequestStatus('pending_outgoing');
+        toastService.warning('En attente', 'Patientez que la personne accepte votre demande avant d\'envoyer d\'autres messages.');
+        setText(content);
       } else if (e?.status === 403) {
         setIsBlocked(true);
       } else {
@@ -953,6 +963,7 @@ export const ChatScreen: React.FC = () => {
       case 'voice': {
         const duration = item.attachment_meta?.duration ?? 0;
         const isPlaying = playingId === item.id && !!activeVoice?.isPlaying;
+        const dl = getDl(item.id);
         return (
           <View style={styles.voiceBubble}>
             <TouchableOpacity
@@ -993,6 +1004,23 @@ export const ChatScreen: React.FC = () => {
                 {isPlaying ? formatDuration(playProgress) : `${Math.ceil(duration)}s`}
               </Text>
             </View>
+            {/* Bouton télécharger — uniquement pour les vocaux reçus, comme le
+                bouton download déjà présent sur les images/vidéos. */}
+            {!mine && !dl.localUri && !dl.downloading && (
+              <TouchableOpacity
+                onPress={() => item.attachment_url && startDl(item.id, item.attachment_url, false)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={styles.voiceDlBtn}
+              >
+                <Icon name="download" size={15} color={colors.primary} />
+              </TouchableOpacity>
+            )}
+            {!mine && dl.downloading && (
+              <Text style={[styles.voiceDlPct, { color: colors.primary }]}>{dl.progress}%</Text>
+            )}
+            {!mine && dl.localUri && (
+              <Icon name="check-circle" size={14} color={colors.primary} style={{ marginLeft: 2 }} />
+            )}
           </View>
         );
       }
@@ -1398,64 +1426,66 @@ export const ChatScreen: React.FC = () => {
         translucent
       />
 
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.surface, paddingTop: STATUS_H + 8, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity onPress={() => nav.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Icon name="arrow-left" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+      {/* Header — carte flottante */}
+      <View style={{ paddingTop: STATUS_H + 8 }}>
+        <View style={[styles.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <TouchableOpacity onPress={() => nav.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Icon name="arrow-left" size={22} color={colors.textPrimary} />
+          </TouchableOpacity>
 
-        {/* Avatar cliquable */}
-        <TouchableOpacity onPress={handleViewProfile} activeOpacity={0.8} style={styles.headerAvatarWrap}>
-          <AvatarWithBadge
-            avatarUrl={partnerAvatarUrl}
-            initials={partnerName?.[0]?.toUpperCase() ?? '?'}
-            size={38}
-            accentColor={colors.primary}
-            isOnline={partnerLive ? undefined : partnerOnline}
-            isLive={partnerLive}
-          />
-        </TouchableOpacity>
+          {/* Avatar cliquable */}
+          <TouchableOpacity onPress={handleViewProfile} activeOpacity={0.8} style={styles.headerAvatarWrap}>
+            <AvatarWithBadge
+              avatarUrl={partnerAvatarUrl}
+              initials={partnerName?.[0]?.toUpperCase() ?? '?'}
+              size={38}
+              accentColor={colors.primary}
+              isOnline={partnerLive ? undefined : partnerOnline}
+              isLive={partnerLive}
+            />
+          </TouchableOpacity>
 
-        {/* Nom + statut */}
-        <TouchableOpacity style={styles.headerInfo} onPress={handleViewProfile} activeOpacity={0.7}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-            <Text style={[styles.headerName, { color: colors.textPrimary }]} numberOfLines={1}>
-              {partnerName}
+          {/* Nom + statut */}
+          <TouchableOpacity style={styles.headerInfo} onPress={handleViewProfile} activeOpacity={0.7}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <Text style={[styles.headerName, { color: colors.textPrimary }]} numberOfLines={1}>
+                {partnerName}
+              </Text>
+              {/* Rappel permanent que la conversation est chiffrée — tap pour
+                  les détails. TouchableOpacity séparé (onStartShouldSetResponder
+                  capture le tap avant qu'il ne remonte au parent) pour ne pas
+                  déclencher aussi handleViewProfile. */}
+              <TouchableOpacity
+                hitSlop={{ top: 10, bottom: 10, left: 6, right: 10 }}
+                onPress={e => { e.stopPropagation(); setShowE2EEInfo(true); }}
+              >
+                <Icon name="lock" size={11} color={colors.textTertiary} />
+              </TouchableOpacity>
+            </View>
+            <Text style={[styles.headerSub, { color: partnerOnline ? '#36D9A0' : colors.textTertiary }]}>
+              {partnerOnline ? 'en ligne' : formatLastSeen(partnerLastSeen)}
             </Text>
-            {/* Rappel permanent que la conversation est chiffrée — tap pour
-                les détails. TouchableOpacity séparé (onStartShouldSetResponder
-                capture le tap avant qu'il ne remonte au parent) pour ne pas
-                déclencher aussi handleViewProfile. */}
-            <TouchableOpacity
-              hitSlop={{ top: 10, bottom: 10, left: 6, right: 10 }}
-              onPress={e => { e.stopPropagation(); setShowE2EEInfo(true); }}
-            >
-              <Icon name="lock" size={11} color={colors.textTertiary} />
-            </TouchableOpacity>
-          </View>
-          <Text style={[styles.headerSub, { color: partnerOnline ? '#36D9A0' : colors.textTertiary }]}>
-            {partnerOnline ? 'en ligne' : formatLastSeen(partnerLastSeen)}
-          </Text>
-        </TouchableOpacity>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.callBtn}
-          onPress={() => {
-            if (showSearch) { setShowSearch(false); setSearchQuery(''); setSearchResults([]); }
-            else setShowSearch(true);
-          }}
-        >
-          <Icon name={showSearch ? 'x' : 'search'} size={19} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.moreBtn}
-          onPress={() => nav.navigate('ConversationDetails', {
-            partnerId, partnerName, avatarUrl: partnerAvatarUrl,
-            isOnline: partnerOnline, lastSeen: partnerLastSeen,
-          })}
-        >
-          <Icon name="info" size={20} color={colors.textPrimary} />
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.callBtn}
+            onPress={() => {
+              if (showSearch) { setShowSearch(false); setSearchQuery(''); setSearchResults([]); }
+              else setShowSearch(true);
+            }}
+          >
+            <Icon name={showSearch ? 'x' : 'search'} size={19} color={colors.textPrimary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.moreBtn}
+            onPress={() => nav.navigate('ConversationDetails', {
+              partnerId, partnerName, avatarUrl: partnerAvatarUrl,
+              isOnline: partnerOnline, lastSeen: partnerLastSeen,
+            })}
+          >
+            <Icon name="info" size={20} color={colors.textPrimary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Bandeau messages épinglés */}
@@ -2248,9 +2278,11 @@ const styles = StyleSheet.create({
     flexDirection:  'row',
     alignItems:     'center',
     paddingHorizontal: Spacing[4],
-    paddingBottom:  Spacing[3],
+    paddingVertical:  Spacing[3],
     gap: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginHorizontal: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
   },
   callBtn:    { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   moreBtn:    { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
@@ -2325,6 +2357,8 @@ const styles = StyleSheet.create({
   voiceDuration: { fontSize: FontSize.xsPlus },
   waveform:    { flexDirection: 'row', alignItems: 'center', height: 20, borderRadius: 4, gap: 1.5, paddingHorizontal: 4 },
   waveBar:     { width: 2.5, borderRadius: 2 },
+  voiceDlBtn:  { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
+  voiceDlPct:  { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, minWidth: 26, textAlign: 'center' },
 
   // Image / Vidéo — pleine largeur de la bulle
   imageBubble:    { width: SCREEN_W * 0.62, height: SCREEN_W * 0.52 },

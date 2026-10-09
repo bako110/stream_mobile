@@ -1780,11 +1780,10 @@ export const CommunityChatScreen: React.FC = () => {
         translucent
       />
 
-      {/* ── Header ── */}
-      <LinearGradient
-        colors={[colors.surface, colors.surface]}
-        style={[S.header, { paddingTop: STATUS_H + 8, borderBottomColor: colors.divider }]}
-      >
+      {/* ── Header — carte flottante (LinearGradient à 2 couleurs identiques
+          remplacé par un View simple, c'était un fond plat déguisé) ── */}
+      <View style={{ paddingTop: STATUS_H + 8 }}>
+      <View style={[S.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
         <BackButton onPress={() => nav.goBack()} />
 
         <TouchableOpacity
@@ -1854,7 +1853,8 @@ export const CommunityChatScreen: React.FC = () => {
             </View>
           </TouchableOpacity>
         </View>
-      </LinearGradient>
+      </View>
+      </View>
 
       {/* ── Menu des sections (déroulé sous le header depuis le bouton ⋯) ── */}
       {showSectionsMenu && (
@@ -2748,7 +2748,12 @@ const S = StyleSheet.create({
   root: { flex: 1 },
 
   // Header
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  header: {
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 12,
+    marginHorizontal: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
   headerAvatar: { width: 38, height: 38, borderRadius: 12, overflow: 'hidden', position: 'relative' },
   headerAvatarDot: { position: 'absolute', bottom: 0, right: 0, width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: '#fff' },
   headerTitle: { fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold, letterSpacing: -0.3 },

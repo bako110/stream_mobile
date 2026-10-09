@@ -33,7 +33,8 @@ const getInitials = (name: string | null | undefined) =>
   (name ?? '?').split(' ').map(n => n[0] ?? '').join('').slice(0, 2).toUpperCase() || '?';
 
 export const AttendeesScreen: React.FC<Props> = ({ eventId, eventTitle, onBack, onScan }) => {
-  const { theme: { colors } } = useTheme();
+  const { theme } = useTheme();
+  const { colors } = theme;
   const insets = useSafeAreaInsets();
 
   const [attendees,  setAttendees]  = useState<EventAttendee[]>([]);
@@ -161,38 +162,40 @@ export const AttendeesScreen: React.FC<Props> = ({ eventId, eventTitle, onBack, 
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+      <StatusBar translucent backgroundColor="transparent" barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
 
-      {/* Header */}
-      <LinearGradient
-        colors={[colors.gradientStart, colors.gradientEnd]}
-        style={[at.header, { paddingTop: insets.top + 16 }]}
-      >
-        <BackButton onPress={onBack} transparent />
-        <View style={{ flex: 1, marginLeft: 12 }}>
-          <Text style={at.headerTitle} numberOfLines={1}>Inscrits</Text>
-          <Text style={at.headerSub} numberOfLines={1}>{eventTitle}</Text>
-        </View>
-        {onScan && (
+      {/* Header — carte flottante (même design que le reste de l'app).
+          paddingTop (status bar) isolé sur un wrapper externe transparent —
+          le mélanger au style de la carte ferait apparaître un coin visible
+          sous la status bar. */}
+      <View style={{ paddingTop: insets.top + 8 }}>
+        <View style={[at.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={onBack} />
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text style={[at.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>Inscrits</Text>
+            <Text style={[at.headerSub, { color: colors.textTertiary }]} numberOfLines={1}>{eventTitle}</Text>
+          </View>
+          {onScan && (
+            <TouchableOpacity
+              onPress={onScan}
+              style={[at.exportBtn, { backgroundColor: colors.backgroundSecondary, marginRight: 8 }]}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Icon name="camera" size={20} color={colors.textPrimary} />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
-            onPress={onScan}
-            style={[at.exportBtn, { marginRight: 8 }]}
+            onPress={handleExportPdf}
+            disabled={exporting}
+            style={[at.exportBtn, { backgroundColor: colors.backgroundSecondary, opacity: exporting ? 0.6 : 1 }]}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Icon name="camera" size={20} color="#fff" />
+            {exporting
+              ? <ActivityIndicator size="small" color={colors.textPrimary} />
+              : <Icon name="download" size={20} color={colors.textPrimary} />}
           </TouchableOpacity>
-        )}
-        <TouchableOpacity
-          onPress={handleExportPdf}
-          disabled={exporting}
-          style={[at.exportBtn, { opacity: exporting ? 0.6 : 1 }]}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          {exporting
-            ? <ActivityIndicator size="small" color="#fff" />
-            : <Icon name="download" size={20} color="#fff" />}
-        </TouchableOpacity>
-      </LinearGradient>
+        </View>
+      </View>
 
       {/* Stats */}
       <View style={[at.statsRow, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
@@ -285,10 +288,16 @@ export const AttendeesScreen: React.FC<Props> = ({ eventId, eventTitle, onBack, 
 };
 
 const at = StyleSheet.create({
-  header:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 16 },
-  exportBtn:   { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: '800', color: '#fff' },
-  headerSub:   { fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 1 },
+  header: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 16, paddingVertical: 16,
+    marginHorizontal: 10, marginBottom: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
+  exportBtn:   { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: 18, fontWeight: '800' },
+  headerSub:   { fontSize: 12, marginTop: 1 },
 
   statsRow:    { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
   statItem:    { flex: 1, alignItems: 'center', gap: 3 },

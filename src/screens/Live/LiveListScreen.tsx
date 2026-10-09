@@ -198,10 +198,12 @@ export const LiveListScreen: React.FC = () => {
     return (
       <View style={[st.root, { backgroundColor: colors.background }]}>
         <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
-        <View style={[st.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 12 }]}>
-          <BackButton onPress={() => nav.goBack()} />
-          <Text style={[st.headerTitle, { color: colors.textPrimary }]}>En direct</Text>
-          <View style={{ width: 38 }} />
+        <View style={{ paddingTop: insets.top + 12 }}>
+          <View style={[st.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+            <BackButton onPress={() => nav.goBack()} />
+            <Text style={[st.headerTitle, { color: colors.textPrimary }]}>En direct</Text>
+            <View style={{ width: 38 }} />
+          </View>
         </View>
         <SkeletonLiveList />
       </View>
@@ -212,14 +214,19 @@ export const LiveListScreen: React.FC = () => {
     <View style={[st.root, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
 
-      {/* Header */}
-      <View style={[st.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 12 }]}>
-        <BackButton onPress={() => nav.goBack()} />
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Icon name="radio" size={20} color="#EF4444" />
-          <Text style={[st.headerTitle, { color: colors.textPrimary }]}>En direct</Text>
+      {/* Header — carte flottante (même design que le reste de l'app).
+          paddingTop (status bar) isolé sur un wrapper externe transparent —
+          le mélanger au style de la carte ferait apparaître un coin visible
+          sous la status bar. */}
+      <View style={{ paddingTop: insets.top + 12 }}>
+        <View style={[st.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => nav.goBack()} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Icon name="radio" size={20} color="#EF4444" />
+            <Text style={[st.headerTitle, { color: colors.textPrimary }]}>En direct</Text>
+          </View>
+          <View style={{ width: 38 }} />
         </View>
-        <View style={{ width: 38 }} />
       </View>
 
       <FlatList
@@ -302,7 +309,14 @@ const st = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginHorizontal: 10,
+    borderRadius: 24,
+    borderWidth: 1,
+    shadowColor: '#5B45B5',
+    shadowOpacity: 0.10,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 8,
   },
   headerTitle: { fontSize: 18, fontWeight: '800' },
 

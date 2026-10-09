@@ -592,48 +592,55 @@ export const FilmsScreen: React.FC = () => {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
 
-      {/* ── HEADER FIXE : retour + tabs + filtre ── */}
-      <View style={{ backgroundColor: colors.background, paddingTop: insets.top + 8, paddingHorizontal: H_PAD, paddingBottom: hasActiveFilter ? 6 : 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <BackButton onPress={() => navigation.goBack()} />
-        <View style={{ flex: 1 }}>
-          <TabSelector tab={tab} onChange={t => { setTab(t); setGenre(''); setCountry(''); }} colors={colors} />
+      {/* ── HEADER FIXE : retour + tabs + filtre — carte flottante (même
+          design que le reste de l'app). paddingTop (status bar) isolé sur
+          un wrapper externe transparent — le mélanger au style de la carte
+          ferait apparaître un coin visible sous la status bar. ── */}
+      <View style={{ paddingTop: insets.top + 8 }}>
+      <View style={[filt.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+        <View style={{ paddingHorizontal: H_PAD, paddingBottom: hasActiveFilter ? 6 : 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <BackButton onPress={() => navigation.goBack()} />
+          <View style={{ flex: 1 }}>
+            <TabSelector tab={tab} onChange={t => { setTab(t); setGenre(''); setCountry(''); }} colors={colors} />
+          </View>
+          <TouchableOpacity
+            onPress={openFilter}
+            activeOpacity={0.75}
+            style={[filt.filterBtn, {
+              backgroundColor: hasActiveFilter ? colors.primary : colors.backgroundSecondary,
+              borderColor: hasActiveFilter ? colors.primary : colors.border,
+            }]}
+          >
+            <Icon name="sliders" size={16} color={hasActiveFilter ? '#fff' : colors.textSecondary} />
+            {hasActiveFilter && <View style={filt.filterDot} />}
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          onPress={openFilter}
-          activeOpacity={0.75}
-          style={[filt.filterBtn, {
-            backgroundColor: hasActiveFilter ? colors.primary : colors.backgroundSecondary,
-            borderColor: hasActiveFilter ? colors.primary : colors.border,
-          }]}
-        >
-          <Icon name="sliders" size={16} color={hasActiveFilter ? '#fff' : colors.textSecondary} />
-          {hasActiveFilter && <View style={filt.filterDot} />}
-        </TouchableOpacity>
-      </View>
 
-      {/* Chips filtres actifs */}
-      {hasActiveFilter && (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: H_PAD, paddingBottom: 10, backgroundColor: colors.background }}>
-          {genre ? (
-            <View style={[filt.activeChip, { borderColor: colors.primary, backgroundColor: colors.primary + '18' }]}>
-              <Icon name="tag" size={10} color={colors.primary} />
-              <Text style={[filt.activeChipTxt, { color: colors.primary }]}>{genre}</Text>
-              <TouchableOpacity onPress={() => setGenre('')} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-                <Icon name="x" size={10} color={colors.primary} />
-              </TouchableOpacity>
-            </View>
-          ) : null}
-          {country ? (
-            <View style={[filt.activeChip, { borderColor: colors.primary, backgroundColor: colors.primary + '18' }]}>
-              <Icon name="map-pin" size={10} color={colors.primary} />
-              <Text style={[filt.activeChipTxt, { color: colors.primary }]}>{country}</Text>
-              <TouchableOpacity onPress={() => setCountry('')} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-                <Icon name="x" size={10} color={colors.primary} />
-              </TouchableOpacity>
-            </View>
-          ) : null}
-        </View>
-      )}
+        {/* Chips filtres actifs */}
+        {hasActiveFilter && (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: H_PAD, paddingBottom: 10 }}>
+            {genre ? (
+              <View style={[filt.activeChip, { borderColor: colors.primary, backgroundColor: colors.primary + '18' }]}>
+                <Icon name="tag" size={10} color={colors.primary} />
+                <Text style={[filt.activeChipTxt, { color: colors.primary }]}>{genre}</Text>
+                <TouchableOpacity onPress={() => setGenre('')} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
+                  <Icon name="x" size={10} color={colors.primary} />
+                </TouchableOpacity>
+              </View>
+            ) : null}
+            {country ? (
+              <View style={[filt.activeChip, { borderColor: colors.primary, backgroundColor: colors.primary + '18' }]}>
+                <Icon name="map-pin" size={10} color={colors.primary} />
+                <Text style={[filt.activeChipTxt, { color: colors.primary }]}>{country}</Text>
+                <TouchableOpacity onPress={() => setCountry('')} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
+                  <Icon name="x" size={10} color={colors.primary} />
+                </TouchableOpacity>
+              </View>
+            ) : null}
+          </View>
+        )}
+      </View>
+      </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -805,6 +812,17 @@ const ss = StyleSheet.create({
 });
 
 const filt = StyleSheet.create({
+  header:       {
+    marginHorizontal: 10,
+    marginBottom: 10,
+    borderRadius: 24,
+    borderWidth: 1,
+    shadowColor: '#5B45B5',
+    shadowOpacity: 0.10,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 8,
+  },
   filterBtn:    { width: 40, height: 40, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
   filterDot:    { position: 'absolute', top: 7, right: 7, width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
   activeChip:   { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },

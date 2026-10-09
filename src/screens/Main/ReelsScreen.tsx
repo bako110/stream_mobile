@@ -33,6 +33,7 @@ import { useMediaDownload } from '../../hooks/useMediaDownload';
 import { RichText } from '../../components/common/RichText';
 import { openPhoneMenu } from '../../utils/phoneMenu';
 import { storage } from '../../utils/storage';
+import { getPlaybackPrefs } from '../../hooks/usePlaybackPrefs';
 import { STORAGE_KEYS } from '../../utils/constants';
 import { apiClient, Endpoints } from '../../api';
 import { reelService, socialService, authService, searchService, toastService, showConfirm } from '../../services';
@@ -42,7 +43,7 @@ import {
   CommentsBottomSheet, VerifiedBadge, ReportModal, GofolyxLoader, ShareBottomSheet,
   HeartRain, AvatarWithBadge, SwipeUpHint, GiftHoldHint,
 } from '../../components/common';
-import { AdvertiserRow, adIsVideo, adIsPhone, adCtaLabel } from '../../components/ads';
+import { AdvertiserRow, adIsVideo, adIsPhone, adCtaLabel, adHasContact, adContactButtons, runAdButton } from '../../components/ads';
 import { GiftPickerModal } from '../../components/wallet/GiftPickerModal';
 import type { Reel, ReactionType } from '../../types';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
@@ -1634,9 +1635,19 @@ export const ReelsScreen: React.FC = () => {
           les deux tutos ne doivent jamais se superposer à l'écran. */}
       <SwipeUpHint dismiss={currentIndex > 0} onDone={() => setSwipeHintDone(true)} />
 
-      {/* Gradient haut — assure lisibilité du header sur toute vidéo */}
+      {/* Gradient haut — assure lisibilité du header sur toute vidéo.
+          4 stops (pas 2) : opacité basse CONSTANTE de 0 à insets.top (deux
+          stops identiques à 0.12, pas une simple interpolation vers le stop
+          suivant) — un dégradé à 2 points entre 0 et le pic à insets.top
+          grimpait déjà progressivement vers 0.55 PENDANT toute la zone status
+          bar (le point de départ et le point d'arrivée d'un même segment
+          s'interpolent continûment, ce qui rendait la zone status bar presque
+          aussi sombre que le header juste en dessous). Ici, l'opacité reste
+          plate à 0.12 jusqu'à insets.top, PUIS grimpe à 0.55 juste après —
+          montée nette, pas progressive sur la zone système. */}
       <LinearGradient
-        colors={['rgba(0,0,0,0.55)', 'rgba(0,0,0,0.0)']}
+        colors={['rgba(0,0,0,0.12)', 'rgba(0,0,0,0.12)', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.0)']}
+        locations={[0, insets.top / (insets.top + 80), (insets.top + 20) / (insets.top + 80), 1]}
         style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insets.top + 80, zIndex: 9 }}
         pointerEvents="none"
       />
@@ -1883,6 +1894,9 @@ interface AdData {
   cta_url?: string;
   creative_url?: string;
   thumbnail_url?: string;
+  contact_phone?: string | null;
+  contact_call?: boolean;
+  contact_whatsapp?: boolean;
   advertiser_id?: string;
   advertiser_name?: string;
   advertiser_logo?: string;
@@ -1928,13 +1942,10 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
   }, [isActive, ad.id]);
 
   const rawCta = (ad.cta_url ?? '').trim();
-  const phone  = adIsPhone(rawCta);
-  const { text: ctaText, icon: ctaIcon } = adCtaLabel(ad);
-  const handleCta = () => {
+  const ctaButtons = adContactButtons(ad);
+  const handleCtaButton = (btn: ReturnType<typeof adContactButtons>[number]) => {
     apiClient.post(`/api/v1/ads/${ad.id}/click`, {}).catch(() => {});
-    if (!rawCta) return;
-    if (phone) { openPhoneMenu(rawCta.replace(/^tel:/i, '')); return; }
-    Linking.openURL(rawCta).catch(() => {});
+    runAdButton(btn, ad);
   };
 
   // Shine périodique sur le bouton CTA — même effet que AdCTA (Feed/Recherche),
@@ -2031,14 +2042,27 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
           <View style={{ flex: 1, minWidth: 0 }}>
             <AdvertiserRow ad={ad} variant="dark" onPressAdvertiser={onAuthorPress} />
           </View>
-          {rawCta ? (
-            <Animated.View style={adSlideS.ctaShadowWrap}>
-              <TouchableOpacity style={adSlideS.ctaPill} onPress={handleCta} activeOpacity={0.85}>
-                <Animated.View style={[adSlideS.ctaShine, ctaShineStyle]} pointerEvents="none" />
-                <Text style={adSlideS.ctaPillTxt} numberOfLines={1}>{ctaText}</Text>
-                <Icon name={ctaIcon} size={12} color="#0E0D1F" />
-              </TouchableOpacity>
-            </Animated.View>
+          {ctaButtons.length > 0 ? (
+            <View style={{ flexDirection: 'row', gap: 6 }}>
+              {ctaButtons.map((btn, i) => {
+                const PillIcon = btn.iconSet === 'mci' ? MCIcon : Icon;
+                const pillBg = btn.action === 'whatsapp' ? '#25D366' : '#fff';
+                const pillFg = btn.action === 'whatsapp' ? '#fff' : '#0E0D1F';
+                return (
+                  <Animated.View key={btn.action} style={i === 0 ? adSlideS.ctaShadowWrap : undefined}>
+                    <TouchableOpacity
+                      style={[adSlideS.ctaPill, { backgroundColor: pillBg }]}
+                      onPress={() => handleCtaButton(btn)}
+                      activeOpacity={0.85}
+                    >
+                      {i === 0 && <Animated.View style={[adSlideS.ctaShine, ctaShineStyle]} pointerEvents="none" />}
+                      <Text style={[adSlideS.ctaPillTxt, { color: pillFg }]} numberOfLines={1}>{btn.text}</Text>
+                      <PillIcon name={btn.icon} size={12} color={pillFg} />
+                    </TouchableOpacity>
+                  </Animated.View>
+                );
+              })}
+            </View>
           ) : null}
         </View>
         {ad.description ? (
@@ -2082,6 +2106,9 @@ interface SearchAdCardData {
   cta_url?: string;
   creative_url?: string;
   thumbnail_url?: string;
+  contact_phone?: string | null;
+  contact_call?: boolean;
+  contact_whatsapp?: boolean;
 }
 
 const SearchAdCard: React.FC<{ ad: SearchAdCardData; onOpenFullscreen: (ad: SearchAdCardData) => void }> = memo(({ ad, onOpenFullscreen }) => {
@@ -2095,7 +2122,13 @@ const SearchAdCard: React.FC<{ ad: SearchAdCardData; onOpenFullscreen: (ad: Sear
 
   const rawCta  = (ad.cta_url ?? '').trim();
   const isPhone = adIsPhone(rawCta);
-  const searchAdCta = adCtaLabel(ad);
+  const hasContact = adHasContact(ad);
+  // Carte entière cliquable (pas de bouton par canal ici, place trop réduite dans
+  // la grille) : priorité WhatsApp si les deux canaux sont cochés — le label reflète
+  // exactement l'action qui sera déclenchée au tap.
+  const searchAdButtons = adContactButtons(ad);
+  const searchAdButton = searchAdButtons.find(b => b.action === 'whatsapp') ?? searchAdButtons[0];
+  const searchAdCta = searchAdButton ?? adCtaLabel(ad);
 
   // Le créatif peut être une vidéo ou une image — même détection que AdSlide
   // (feed plein écran). Avant ce fix, une pub vidéo tentait de s'afficher via
@@ -2110,6 +2143,7 @@ const SearchAdCard: React.FC<{ ad: SearchAdCardData; onOpenFullscreen: (ad: Sear
   const handlePress = () => {
     apiClient.post(`/api/v1/ads/${ad.id}/click`, {}).catch(() => {});
     if (isVideo) { onOpenFullscreen(ad); return; }
+    if (hasContact && searchAdButton) { runAdButton(searchAdButton, ad); return; }
     if (!rawCta) return;
     if (isPhone) { openPhoneMenu(rawCta.replace(/^tel:/i, '')); return; }
     Linking.openURL(rawCta).catch(() => {});
@@ -2162,9 +2196,13 @@ const SearchAdCard: React.FC<{ ad: SearchAdCardData; onOpenFullscreen: (ad: Sear
       <View style={s.searchCardInfo}>
         <Text style={s.searchCardAuthor} numberOfLines={1}>{ad.title}</Text>
         {ad.description ? <Text style={s.searchCardCaption} numberOfLines={2}>{ad.description}</Text> : null}
-        {rawCta ? (
+        {(rawCta || hasContact) ? (
           <View style={s.searchAdCtaRow}>
-            <Icon name={isPhone ? 'phone' : searchAdCta.icon === 'download' ? 'download' : 'globe'} size={10} color="#fff" />
+            {'iconSet' in searchAdCta && searchAdCta.iconSet === 'mci' ? (
+              <MCIcon name={searchAdCta.icon} size={10} color="#fff" />
+            ) : (
+              <Icon name={isPhone || ('action' in searchAdCta && searchAdCta.action === 'call') ? 'phone' : searchAdCta.icon === 'download' ? 'download' : 'globe'} size={10} color="#fff" />
+            )}
             <Text style={s.searchAdCtaText} numberOfLines={1}>{searchAdCta.text}</Text>
           </View>
         ) : null}
@@ -2457,7 +2495,13 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         }
       : networkQuality === 'slow' || networkQuality === 'unknown'
       ? {
-          minBufferMs: 1_500,
+          // minBufferMs DOIT être >= bufferForPlaybackAfterRebufferMs — ExoPlayer
+          // lève IllegalArgumentException sinon ("minBufferMs cannot be less
+          // than bufferForPlaybackAfterRebufferMs"), crash natif immédiat dès
+          // l'initialisation du player. Avant ce fix : 1_500 < 2_500, crash
+          // systématique hors wifi sur réseau 'slow'/'unknown' (confirmé par
+          // logcat : IllegalArgumentException dans HybridVideoPlayer.initializePlayer).
+          minBufferMs: 2_500,
           maxBufferMs: 10_000,
           bufferForPlaybackMs: 1_000,
           bufferForPlaybackAfterRebufferMs: 2_500,
@@ -2819,6 +2863,18 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   useEffect(() => {
     if (!networkUri) return;
     if (playTimerRef.current) clearTimeout(playTimerRef.current);
+
+    // Préférence "Lecture automatique" (Réglages > Lecture) : si désactivée,
+    // un reel qui devient actif pour la 1ère fois (arrivée par scroll) démarre
+    // en pause au lieu de se lancer seul — l'utilisateur doit taper pour lire,
+    // exactement comme s'il avait tapé pause lui-même. Ne s'applique qu'à la
+    // toute première activation (everPlayedRef encore faux) : un replay après
+    // fin de lecture ou un retour sur un reel déjà lancé manuellement ne doit
+    // pas se re-figer.
+    if (isActive && !everPlayedRef.current && !pausedRef.current && !getPlaybackPrefs().autoplay) {
+      pausedRef.current = true;
+      if (mountedRef.current) setPaused(true);
+    }
 
     if (isActive && !pausedRef.current) {
       // La vérification du cache disque (hasCachedFile) se fait PENDANT le

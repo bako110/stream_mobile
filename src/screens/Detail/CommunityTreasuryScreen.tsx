@@ -78,21 +78,26 @@ export const CommunityTreasuryScreen: React.FC = () => {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
-      {/* Header */}
-      <View style={[st.header, { paddingTop: insets.top + 8, borderBottomColor: colors.divider, backgroundColor: colors.surface }]}>
-        <BackButton onPress={() => nav.goBack()} />
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: colors.textPrimary, fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold }}>Trésorerie</Text>
-          <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus }}>{communityName}</Text>
+      {/* Header — carte flottante (même design que le reste de l'app).
+          paddingTop (status bar) isolé sur un wrapper externe transparent —
+          le mélanger au style de la carte ferait apparaître un coin visible
+          sous la status bar. */}
+      <View style={{ paddingTop: insets.top + 8 }}>
+        <View style={[st.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => nav.goBack()} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: colors.textPrimary, fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold }}>Trésorerie</Text>
+            <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus }}>{communityName}</Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => nav.navigate('CommunityFund', { communityId, communityName, myRole: 'admin' })}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
+              backgroundColor: '#7B3FF215', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 }}
+          >
+            <Icon name="dollar-sign" size={13} color="#7B3FF2" />
+            <Text style={{ color: '#7B3FF2', fontWeight: FontWeight.bold, fontSize: FontSize.sm }}>Cotisations</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          onPress={() => nav.navigate('CommunityFund', { communityId, communityName, myRole: 'admin' })}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
-            backgroundColor: '#7B3FF215', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 }}
-        >
-          <Icon name="dollar-sign" size={13} color="#7B3FF2" />
-          <Text style={{ color: '#7B3FF2', fontWeight: FontWeight.bold, fontSize: FontSize.sm }}>Cotisations</Text>
-        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -222,7 +227,13 @@ export const CommunityTreasuryScreen: React.FC = () => {
 };
 
 const st = StyleSheet.create({
-  header:  { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  header:  {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 16, paddingBottom: 12,
+    marginHorizontal: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
   txRow:   { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   txIcon:  { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
 });

@@ -14,6 +14,9 @@ export interface Ad {
   cta_url:          string | null;
   creative_url:     string | null;
   thumbnail_url:    string | null;
+  contact_phone?:   string | null;
+  contact_call?:    boolean;
+  contact_whatsapp?: boolean;
   format:           AdFormat;
   placement:        AdPlacement;
   status:           AdStatus;
@@ -41,6 +44,9 @@ export interface AdCreate {
   cta_url?:          string;
   creative_url?:     string;
   thumbnail_url?:    string;
+  contact_phone?:    string;
+  contact_call?:     boolean;
+  contact_whatsapp?: boolean;
   format?:           AdFormat;
   placement?:        AdPlacement;
   budget_eur:        number;

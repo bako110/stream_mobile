@@ -219,10 +219,16 @@ export const CreatorAnalyticsScreen: React.FC = () => {
     <View style={[s.root, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
 
-      <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 12 }]}>
-        <BackButton onPress={() => nav.goBack()} />
-        <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Statistiques</Text>
-        <View style={{ width: 38 }} />
+      {/* Header — carte flottante (même design que le reste de l'app).
+          paddingTop (status bar) isolé sur un wrapper externe transparent —
+          le mélanger au style de la carte ferait apparaître un coin visible
+          sous la status bar. */}
+      <View style={{ paddingTop: insets.top + 12 }}>
+        <View style={[s.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => nav.goBack()} />
+          <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Statistiques</Text>
+          <View style={{ width: 38 }} />
+        </View>
       </View>
 
       <FlatList
@@ -266,7 +272,13 @@ export const CreatorAnalyticsScreen: React.FC = () => {
 
 const s = StyleSheet.create({
   root:        { flex: 1 },
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 14, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+  header:       {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingBottom: 14, paddingHorizontal: 16,
+    marginHorizontal: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
   headerTitle:  { fontSize: 18, fontWeight: '800' },
 
   periodRow:    { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 16 },

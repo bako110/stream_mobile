@@ -173,19 +173,24 @@ export const ActivityScreen: React.FC = () => {
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
-      {/* ── Header ── */}
-      <LinearGradient
-        colors={[colors.surface, colors.background]}
-        style={[s.header, { paddingTop: insets.top + 12 }]}
-      >
-        <BackButton onPress={() => nav.goBack()} />
-        <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Activité</Text>
-        {unreadCount > 0 && (
-          <View style={[s.unreadBadge, { backgroundColor: colors.primary }]}>
-            <Text style={s.unreadBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
-          </View>
-        )}
-      </LinearGradient>
+      {/* ── Header — carte flottante (même design que le reste de l'app).
+          paddingTop (status bar) isolé sur un wrapper externe transparent —
+          le mélanger au style de la carte ferait apparaître un coin visible
+          sous la status bar. ── */}
+      <View style={{ paddingTop: insets.top + 12 }}>
+        <LinearGradient
+          colors={[colors.surface, colors.background]}
+          style={[s.header, { borderColor: colors.divider }]}
+        >
+          <BackButton onPress={() => nav.goBack()} />
+          <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Activité</Text>
+          {unreadCount > 0 && (
+            <View style={[s.unreadBadge, { backgroundColor: colors.primary }]}>
+              <Text style={s.unreadBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+            </View>
+          )}
+        </LinearGradient>
+      </View>
 
       {/* ── Onglets ── */}
       <View style={[s.tabs, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
@@ -371,6 +376,9 @@ const s = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 20, paddingBottom: 12, gap: 10,
+    marginHorizontal: 10, marginBottom: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
   },
   headerTitle: { fontSize: 26, fontWeight: '800', flex: 1 },
   unreadBadge: {

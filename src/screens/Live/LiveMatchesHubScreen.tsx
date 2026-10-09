@@ -27,10 +27,12 @@ export const LiveMatchesHubScreen: React.FC = () => {
     <View style={[st.root, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
 
-      <View style={[st.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 14 }]}>
-        <BackButton onPress={() => nav.goBack()} />
-        <Text style={[st.headerTitle, { color: colors.textPrimary }]}>Live Matchs</Text>
-        <View style={{ width: 38 }} />
+      <View style={{ paddingTop: insets.top + 8 }}>
+        <View style={[st.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => nav.goBack()} />
+          <Text style={[st.headerTitle, { color: colors.textPrimary }]}>Live Matchs</Text>
+          <View style={{ width: 38 }} />
+        </View>
       </View>
 
       <View style={st.body}>
@@ -65,7 +67,13 @@ export const LiveMatchesHubScreen: React.FC = () => {
 
 const st = StyleSheet.create({
   root: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 14, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 14, paddingHorizontal: 16,
+    marginHorizontal: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
   headerTitle: { fontSize: 18, fontWeight: '800' },
   body: { flex: 1, padding: 16, gap: 16 },
   cardWrap: { flex: 1 },

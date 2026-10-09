@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
-  Image, StyleSheet, StatusBar, Platform,
+  Image, StyleSheet, StatusBar, Modal,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -59,6 +59,7 @@ export const FavoritesScreen: React.FC = () => {
   const [tab, setTab]       = useState<Tab>('events');
   const [data, setData]     = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showTabsSheet, setShowTabsSheet] = useState(false);
 
   const tabRef = useRef(tab);
   tabRef.current = tab;
@@ -143,42 +144,66 @@ export const FavoritesScreen: React.FC = () => {
         barStyle={theme.isDark ? 'light-content' : 'dark-content'}
       />
 
-      {/* Cale de status bar — bande opaque derrière la barre système, couleur du
-          header, pour que l'icône batterie/heure reste lisible en scroll. */}
-      <View style={{ height: insets.top, backgroundColor: colors.surface }} />
-
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: Platform.OS === 'android' ? 8 : 6, backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-        <BackButton onPress={() => nav.goBack()} />
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Favoris</Text>
-        <View style={{ width: 38 }} />
+      {/* Header — carte flottante (même design que le reste de l'app).
+          paddingTop (status bar) isolé sur un wrapper externe transparent —
+          le mélanger au style de la carte ferait apparaître un coin visible
+          sous la status bar. */}
+      <View style={{ paddingTop: insets.top + 8 }}>
+        <View style={[styles.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => nav.goBack()} />
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{currentTab.label}</Text>
+          <TouchableOpacity
+            onPress={() => setShowTabsSheet(true)}
+            style={styles.menuBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Icon name="more-vertical" size={20} color={colors.textPrimary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Onglets */}
-      <View style={[styles.tabsWrap, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-        <FlatList
-          data={TABS}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyExtractor={t => t.key}
-          contentContainerStyle={styles.tabsList}
-          renderItem={({ item: t }) => {
-            const active = tab === t.key;
-            return (
-              <TouchableOpacity
-                style={[styles.tabBtn, active && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
-                onPress={() => setTab(t.key)}
-                activeOpacity={0.7}
-              >
-                <Icon name={t.icon} size={14} color={active ? colors.primary : colors.textTertiary} />
-                <Text style={[styles.tabLabel, { color: active ? colors.primary : colors.textTertiary, fontWeight: active ? '700' : '400' }]}>
-                  {t.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          }}
-        />
-      </View>
+      {/* Bottom sheet — catégories en liste verticale, ouvert via l'icône
+          "..." du header (remplace les onglets fixes sous le header). */}
+      <Modal
+        visible={showTabsSheet}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowTabsSheet(false)}
+      >
+        <TouchableOpacity
+          style={styles.sheetOverlay}
+          activeOpacity={1}
+          onPress={() => setShowTabsSheet(false)}
+        >
+          <TouchableOpacity activeOpacity={1} style={[styles.sheet, { backgroundColor: colors.surface }]}>
+            <View style={[styles.sheetHandle, { backgroundColor: colors.divider }]} />
+            <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>Catégories</Text>
+            <FlatList
+              data={TABS}
+              keyExtractor={t => t.key}
+              contentContainerStyle={styles.sheetTabsList}
+              renderItem={({ item: t }) => {
+                const active = tab === t.key;
+                return (
+                  <TouchableOpacity
+                    style={[
+                      styles.sheetTabBtn,
+                      { backgroundColor: active ? colors.primary + '18' : colors.backgroundSecondary, borderColor: active ? colors.primary : colors.divider },
+                    ]}
+                    onPress={() => { setTab(t.key); setShowTabsSheet(false); }}
+                    activeOpacity={0.8}
+                  >
+                    <Icon name={t.icon} size={18} color={active ? colors.primary : colors.textSecondary} />
+                    <Text style={[styles.sheetTabLabel, { color: active ? colors.primary : colors.textPrimary, fontWeight: active ? '700' : '600' }]}>
+                      {t.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Liste */}
       {loading ? (
@@ -250,13 +275,23 @@ export const FavoritesScreen: React.FC = () => {
 const styles = StyleSheet.create({
   root:         { flex: 1 },
 
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  header:       {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 12,
+    marginHorizontal: 10, marginBottom: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
   headerTitle:  { fontSize: 17, fontWeight: '700' },
+  menuBtn:      { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
 
-  tabsWrap:     { borderBottomWidth: StyleSheet.hairlineWidth },
-  tabsList:     { paddingHorizontal: 8 },
-  tabBtn:       { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 12 },
-  tabLabel:     { fontSize: 13 },
+  // Bottom sheet — catégories en liste verticale
+  sheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  sheet:        { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 10, paddingBottom: 28 },
+  sheetHandle:  { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 14 },
+  sheetTitle:   { fontSize: 16, fontWeight: '800', paddingHorizontal: 20, marginBottom: 12 },
+  sheetTabsList:{ paddingHorizontal: 16, gap: 8 },
+  sheetTabBtn:  { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, borderWidth: 1 },
+  sheetTabLabel:{ fontSize: 15 },
 
   list:         { padding: 16, gap: 10 },
 

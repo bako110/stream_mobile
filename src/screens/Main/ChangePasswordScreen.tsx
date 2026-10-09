@@ -83,13 +83,15 @@ export const ChangePasswordScreen: React.FC<Props> = ({ navigation }) => {
         backgroundColor="transparent"
         barStyle={theme.isDark ? 'light-content' : 'dark-content'}
       />
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === 'android' ? 8 : 6), backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-        <BackButton onPress={() => {
-          if (step === 2) { setStep(1); } else { navigation.goBack(); }
-        }} />
-        <Text style={[styles.title, { color: colors.textPrimary }]}>Changer le mot de passe</Text>
-        <View style={{ width: 40 }} />
+      {/* Header — carte flottante */}
+      <View style={{ paddingTop: insets.top + (Platform.OS === 'android' ? 8 : 6) }}>
+        <View style={[styles.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => {
+            if (step === 2) { setStep(1); } else { navigation.goBack(); }
+          }} />
+          <Text style={[styles.title, { color: colors.textPrimary }]}>Changer le mot de passe</Text>
+          <View style={{ width: 40 }} />
+        </View>
       </View>
 
       {/* Indicateur d'étapes */}
@@ -272,8 +274,11 @@ const styles = StyleSheet.create({
   root:   { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingBottom: 14,
-    paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginHorizontal: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
   },
   title:   { fontSize: 17, fontWeight: '800' },
 

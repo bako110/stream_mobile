@@ -75,10 +75,12 @@ export const ContentAnalyticsListScreen: React.FC = () => {
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
-      <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 12 }]}>
-        <BackButton onPress={() => nav.goBack()} />
-        <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Tous mes contenus</Text>
-        <View style={{ width: 38 }} />
+      <View style={{ paddingTop: insets.top + 12 }}>
+        <View style={[s.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => nav.goBack()} />
+          <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Tous mes contenus</Text>
+          <View style={{ width: 38 }} />
+        </View>
       </View>
 
       {loading ? (
@@ -115,7 +117,13 @@ export const ContentAnalyticsListScreen: React.FC = () => {
 
 const s = StyleSheet.create({
   root:        { flex: 1 },
-  header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 14, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+  header:      {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 14, paddingHorizontal: 16,
+    marginHorizontal: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
   headerTitle: { fontSize: 18, fontWeight: '800' },
   emptyWrap:   { alignItems: 'center', gap: 10, paddingVertical: 60 },
   emptyText:   { fontSize: 13, fontWeight: '600' },

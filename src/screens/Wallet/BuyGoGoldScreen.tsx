@@ -153,10 +153,12 @@ const BuyGoGoldScreen: React.FC = () => {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
-      <View style={[s.header, { paddingTop: insets.top + 12 }]}>
-        <BackButton onPress={() => navigation.goBack()} />
-        <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Acheter des GoGold</Text>
-        <View style={{ width: 40 }} />
+      <View style={{ paddingTop: insets.top + 12 }}>
+        <View style={[s.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => navigation.goBack()} />
+          <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Acheter des GoGold</Text>
+          <View style={{ width: 40 }} />
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
@@ -273,7 +275,12 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingBottom: 12,
+    paddingVertical: 12,
+    marginHorizontal: 10,
+    borderRadius: 24,
+    borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
   },
   headerTitle: {
     flex: 1,

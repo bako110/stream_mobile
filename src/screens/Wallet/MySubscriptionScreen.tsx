@@ -106,10 +106,12 @@ export default function MySubscriptionScreen() {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       {/* Header */}
-      <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 16 }]}>
-        <BackButton onPress={() => nav.goBack()} />
-        <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Mon abonnement</Text>
-        <View style={{ width: 38 }} />
+      <View style={{ paddingTop: insets.top + 16 }}>
+        <View style={[s.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => nav.goBack()} />
+          <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Mon abonnement</Text>
+          <View style={{ width: 38 }} />
+        </View>
       </View>
 
       <ScrollView
@@ -271,7 +273,13 @@ export default function MySubscriptionScreen() {
 }
 
 const s = StyleSheet.create({
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+  header:       {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 16, paddingHorizontal: 16,
+    marginHorizontal: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
   backBtn:      { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   headerTitle:  { fontSize: FontSize.mdPlus, fontWeight: FontWeight.bold },
   scroll:       { padding: 16 },

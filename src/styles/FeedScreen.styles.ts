@@ -15,15 +15,26 @@ export const feedStyles = StyleSheet.create({
   // paddingTop est fourni dynamiquement par insets.top (safe-area) dans le JSX —
   // ne PAS ajouter de valeur fixe ici (double comptage → header trop bas sur les
   // appareils à encoche).
+  // Tailles (hauteur, paddings) inchangées — seul le design reprend la
+  // référence : carte flottante blanche avec bordure légère + ombre violette,
+  // au lieu d'un bloc plein collé en haut de l'écran.
   header: {
+    marginHorizontal: 10,
     paddingHorizontal: Spacing[4],
     paddingBottom: 0,
+    borderRadius: 24,
+    borderWidth: 1,
+    shadowColor: '#5B45B5',
+    shadowOpacity: 0.10,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 8,
   },
   headerRow: {
     flexDirection:  'row',
     alignItems:     'center',
     justifyContent: 'space-between',
-    minHeight:      37,
+    minHeight:      50,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -33,6 +44,8 @@ export const feedStyles = StyleSheet.create({
     overflow:      'hidden',
     flexShrink:    1,
   },
+  // Tailles d'origine de FeedScreen conservées — seul le design (couleurs,
+  // formes des éléments autour) reprend la référence, pas le gabarit.
   avatar: {
     width: 31, height: 31, borderRadius: 16,
   },
@@ -55,6 +68,9 @@ export const feedStyles = StyleSheet.create({
   },
 
   // ── Pills sous le header (Mes amis · Favoris · Direct) ────────────────────
+  // Hauteur d'origine conservée (34) — radius porté à 17 (moitié de la
+  // hauteur, pilule complète) au lieu de 10 (coins arrondis modérés),
+  // cf. référence.
   headerPills: {
     flexDirection: 'row',
     gap: 7,
@@ -68,8 +84,7 @@ export const feedStyles = StyleSheet.create({
     justifyContent: 'center',
     gap: 5,
     height: 34,
-    borderRadius: 10,
-    borderWidth: 1,
+    borderRadius: 17,
   },
   // Variante navigable : contenu à gauche, chevron collé à droite (indique un
   // tap qui ouvre un écran).
@@ -79,8 +94,7 @@ export const feedStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     height: 34,
-    borderRadius: 10,
-    borderWidth: 1,
+    borderRadius: 17,
     paddingHorizontal: 9,
   },
   headerPillNavInner: {

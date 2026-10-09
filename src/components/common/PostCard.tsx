@@ -530,10 +530,15 @@ const PostCardInner: React.FC<PostCardProps> = ({
 
       {/* ── Aperçu lien — métadonnées OG (titre + image + domaine), style
           Facebook. L'URL a déjà été retirée du texte ci-dessus (displayBody)
-          quand elle en était le seul contenu, pour ne pas l'afficher 2×. ──── */}
+          quand elle en était le seul contenu, pour ne pas l'afficher 2×. Le
+          lien reste TOUJOURS affiché (titre/description/domaine) ; seule
+          l'image OG est masquée (hideImage) si le post a déjà son propre
+          média (hasMedia) — l'utilisateur a choisi une image/vidéo, pas
+          besoin d'en afficher une 2e en plus, mais le lien lui-même doit
+          toujours se charger. */}
       {post.link_url ? (
         <View style={{ paddingHorizontal: FeedCardLayout.padH, paddingBottom: 10 }}>
-          <LinkPreviewCard url={post.link_url} />
+          <LinkPreviewCard url={post.link_url} hideImage={hasMedia} />
         </View>
       ) : null}
 

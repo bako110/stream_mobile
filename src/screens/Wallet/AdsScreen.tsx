@@ -4,7 +4,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  ActivityIndicator, RefreshControl,
+  ActivityIndicator, RefreshControl, StatusBar,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -124,11 +124,12 @@ const AdCard: React.FC<{
               <Icon name={item.status === 'active' ? 'pause' : 'play'} size={15} color={colors.textSecondary} />
             </TouchableOpacity>
           )}
-          {item.status === 'draft' && (
-            <TouchableOpacity onPress={onDelete} style={s.iconBtn}>
-              <Icon name="trash-2" size={15} color="#EF4444" />
-            </TouchableOpacity>
-          )}
+          {/* Suppression possible quel que soit le statut — même une campagne encore
+              active/en pause peut être supprimée directement, pas besoin de l'arrêter
+              d'abord (le budget restant est remboursé côté backend). */}
+          <TouchableOpacity onPress={onDelete} style={s.iconBtn}>
+            <Icon name="trash-2" size={15} color="#EF4444" />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -197,7 +198,8 @@ const AdCard: React.FC<{
 
 // ── Screen ─────────────────────────────────────────────────────────────────────
 export const AdsScreen: React.FC = () => {
-  const { theme: { colors } } = useTheme();
+  const { theme } = useTheme();
+  const { colors } = theme;
   const ACCENT = colors.primary;
   const nav = useNavigation<any>();
   const insets = useSafeAreaInsets();
@@ -235,14 +237,12 @@ export const AdsScreen: React.FC = () => {
     }, 0);
 
   const handleDelete = (ad: Ad) => {
-    if (ad.status === 'active' || ad.status === 'paused') {
-      toastService.warning('Impossible', 'Arrêtez la campagne avant de la supprimer.');
-      return;
-    }
-    const isDraft    = ad.status === 'draft';
-    const isArchived = ad.status === 'ended' || ad.status === 'rejected';
+    const isDraft  = ad.status === 'draft';
+    const isActive = ad.status === 'active' || ad.status === 'paused';
     const msg = isDraft
       ? `Supprimer le brouillon "${ad.title}" ?`
+      : isActive
+      ? `Supprimer la campagne "${ad.title}" ? Elle s'arrêtera immédiatement et le budget restant sera remboursé en GoGold. L'historique (impressions, clics) sera perdu.`
       : `Supprimer la campagne terminée "${ad.title}" ? L'historique (impressions, clics) sera perdu.`;
     showConfirm('Supprimer', msg, [
       { text: 'Annuler', style: 'cancel' },
@@ -321,24 +321,26 @@ export const AdsScreen: React.FC = () => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Header */}
-      <View style={{
-        paddingTop: insets.top + 8, paddingHorizontal: 16, paddingBottom: 12,
-        backgroundColor: colors.background, flexDirection: 'row', alignItems: 'center', gap: 12,
-        borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider,
-      }}>
-        <BackButton onPress={() => nav.goBack()} />
-        <View style={{ flex: 1 }}>
-          <Text style={[s.title, { color: colors.textPrimary }]}>Mes publicités</Text>
-          <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus, marginTop: 1 }}>100 GoGold = 1 € de budget pub</Text>
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
+      {/* Header — carte flottante (même design que le reste de l'app).
+          paddingTop (status bar) isolé sur un wrapper externe transparent —
+          le mélanger au style de la carte ferait apparaître un coin visible
+          sous la status bar. */}
+      <View style={{ paddingTop: insets.top + 8 }}>
+        <View style={[s.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => nav.goBack()} />
+          <View style={{ flex: 1 }}>
+            <Text style={[s.title, { color: colors.textPrimary }]}>Mes publicités</Text>
+            <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus, marginTop: 1 }}>100 GoGold = 1 € de budget pub</Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => nav.navigate('CreateAd', { ad: null })}
+            style={[s.createBtn, { backgroundColor: colors.primary }]}
+          >
+            <Icon name="plus" size={15} color="#fff" />
+            <Text style={s.createTxt}>Créer</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          onPress={() => nav.navigate('CreateAd', { ad: null })}
-          style={[s.createBtn, { backgroundColor: colors.primary }]}
-        >
-          <Icon name="plus" size={15} color="#fff" />
-          <Text style={s.createTxt}>Créer</Text>
-        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -410,6 +412,13 @@ export const AdsScreen: React.FC = () => {
 };
 
 const s = StyleSheet.create({
+  header:       {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 16, paddingBottom: 12,
+    marginHorizontal: 10, marginBottom: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
   title:        { fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold },
   createBtn:    { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20 },
   createTxt:    { color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.smPlus },

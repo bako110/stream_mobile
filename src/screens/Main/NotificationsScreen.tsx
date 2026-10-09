@@ -1,18 +1,18 @@
 ﻿import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
-  StyleSheet, RefreshControl, Image, Linking,
+  StyleSheet, RefreshControl, Image, Linking, Modal,
 } from 'react-native';
 import Animated, {
   useAnimatedStyle, useSharedValue,
   withTiming, runOnJS, withSpring, interpolate, Extrapolation,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
+import { FontSize, FontWeight } from '../../theme';
 import { SkeletonFeed, BackButton } from '../../components/common';
 import { showConfirm } from '../../services';
 import { notificationService, NotifItem } from '../../services/notificationService';
@@ -108,6 +108,7 @@ export const NotificationsScreen: React.FC = () => {
   const [filter,      setFilter]      = useState<'all' | 'unread'>('all');
   const [selectMode,  setSelectMode]  = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showActionsSheet, setShowActionsSheet] = useState(false);
   const loadingMore = useRef(false);
 
   const load = useCallback(async (p = 1, refresh = false) => {
@@ -310,44 +311,37 @@ export const NotificationsScreen: React.FC = () => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Header */}
-      <LinearGradient colors={[colors.surface, colors.background]} style={[s.header, { paddingTop: insets.top + 12 }]}>
-        {/* Ligne 1 : retour + titre + badge */}
+      {/* Header — carte flottante (même design que le reste de l'app).
+          paddingTop (status bar) isolé sur un wrapper externe transparent —
+          le mélanger au style de la carte ferait apparaître un coin visible
+          sous la status bar. */}
+      <View style={{ paddingTop: insets.top + 8 }}>
+      <View style={[s.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+        {/* Ligne 1 : retour + titre + badge + menu actions (à droite, même ligne) */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <BackButton onPress={() => nav.goBack()} />
-          <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Notifications</Text>
+          <Text style={[s.headerTitle, { color: colors.textPrimary, flex: 1 }]}>Notifications</Text>
           {unreadCount > 0 && !selectMode && (
             <View style={[s.unreadBadge, { backgroundColor: colors.primary }]}>
               <Text style={s.unreadBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
             </View>
           )}
+          {!selectMode && (unreadCount > 0 || items.length > 0) && (
+            <TouchableOpacity
+              onPress={() => setShowActionsSheet(true)}
+              style={s.menuBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Icon name="more-vertical" size={20} color={colors.textPrimary} />
+            </TouchableOpacity>
+          )}
         </View>
 
-        {/* Ligne 2 : actions */}
-        {!selectMode ? (
-          (unreadCount > 0 || items.length > 0) && (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-              {unreadCount > 0 && (
-                <TouchableOpacity onPress={markAllRead} style={[s.readAllBtn, { borderColor: colors.border }]}>
-                  <Icon name="check" size={14} color={colors.primary} />
-                  <Text style={[s.readAllText, { color: colors.primary }]}>Tout lire</Text>
-                </TouchableOpacity>
-              )}
-              {items.length > 0 && (
-                <>
-                  <TouchableOpacity onPress={deleteAll} style={[s.readAllBtn, { borderColor: '#FF3B30' }]}>
-                    <Icon name="trash-2" size={14} color="#FF3B30" />
-                    <Text style={[s.readAllText, { color: '#FF3B30' }]}>Tout supprimer</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setSelectMode(true)} style={[s.readAllBtn, { borderColor: colors.border }]}>
-                    <Icon name="check-square" size={14} color={colors.textSecondary} />
-                    <Text style={[s.readAllText, { color: colors.textSecondary }]}>Selectionner</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-            </View>
-          )
-        ) : (
+        {/* Ligne 2 : actions — uniquement en mode sélection active, feedback
+            d'état immédiat nécessaire pendant qu'on sélectionne. Les actions
+            du mode normal (Tout lire / Tout supprimer / Sélectionner) sont
+            maintenant dans le bottom sheet ouvert via l'icône "..." ci-dessus. */}
+        {selectMode && (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
             <TouchableOpacity onPress={toggleSelectAll} style={[s.readAllBtn, { borderColor: colors.primary }]}>
               <Icon name={allSelected ? 'check-square' : 'square'} size={14} color={colors.primary} />
@@ -367,10 +361,57 @@ export const NotificationsScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
         )}
-      </LinearGradient>
+      </View>
+      </View>
+
+      {/* Bottom sheet — actions du mode normal (Tout lire / Tout supprimer /
+          Sélectionner), ouvert via l'icône "..." du header. */}
+      <Modal
+        visible={showActionsSheet}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowActionsSheet(false)}
+      >
+        <TouchableOpacity
+          style={s.sheetOverlay}
+          activeOpacity={1}
+          onPress={() => setShowActionsSheet(false)}
+        >
+          <TouchableOpacity activeOpacity={1} style={[s.sheet, { backgroundColor: colors.surface }]}>
+            <View style={[s.sheetHandle, { backgroundColor: colors.divider }]} />
+            {unreadCount > 0 && (
+              <TouchableOpacity
+                style={s.sheetItem}
+                onPress={() => { setShowActionsSheet(false); markAllRead(); }}
+              >
+                <Icon name="check" size={18} color={colors.primary} />
+                <Text style={[s.sheetItemText, { color: colors.textPrimary }]}>Tout lire</Text>
+              </TouchableOpacity>
+            )}
+            {items.length > 0 && (
+              <>
+                <TouchableOpacity
+                  style={s.sheetItem}
+                  onPress={() => { setShowActionsSheet(false); deleteAll(); }}
+                >
+                  <Icon name="trash-2" size={18} color="#FF3B30" />
+                  <Text style={[s.sheetItemText, { color: '#FF3B30' }]}>Tout supprimer</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={s.sheetItem}
+                  onPress={() => { setShowActionsSheet(false); setSelectMode(true); }}
+                >
+                  <Icon name="check-square" size={18} color={colors.textSecondary} />
+                  <Text style={[s.sheetItemText, { color: colors.textPrimary }]}>Sélectionner</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Filtres */}
-      <View style={[s.tabs, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+      <View style={[s.tabs, { backgroundColor: colors.surface, borderBottomColor: colors.divider, marginTop: 10 }]}>
         {(['all', 'unread'] as const).map(f => {
           const active = filter === f;
           return (
@@ -598,12 +639,12 @@ const NotifCard: React.FC<CardProps> = React.memo(({ item, colors, fontSize, sel
                   hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                   style={{ alignSelf: 'flex-start' }}
                 >
-                  <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '700', marginTop: 1 }}>
+                  <Text style={{ fontSize: FontSize.xsPlus, color: colors.primary, fontWeight: FontWeight.bold, marginTop: 1 }}>
                     {expanded ? 'Voir moins' : 'Voir plus'}
                   </Text>
                 </TouchableOpacity>
               )}
-              <Text style={{ fontSize: 10, color: colors.textTertiary, marginTop: 2 }}>
+              <Text style={{ fontSize: FontSize.xs, color: colors.textTertiary, marginTop: 2 }}>
                 {timeAgo(item.created_at)}
               </Text>
             </View>
@@ -635,16 +676,27 @@ const NotifCard: React.FC<CardProps> = React.memo(({ item, colors, fontSize, sel
 const s = StyleSheet.create({
   header: {
     flexDirection: 'column',
-    paddingHorizontal: 16, paddingBottom: 12,
+    paddingHorizontal: 16, paddingVertical: 12,
+    marginHorizontal: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
   },
-  headerTitle:  { fontSize: 26, fontWeight: '800' },
+  headerTitle:  { fontSize: FontSize['2xl'], fontWeight: FontWeight.extraBold },
   unreadBadge:  { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 },
-  unreadBadgeText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  unreadBadgeText: { color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.bold },
+  menuBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
+
+  // Bottom sheet — actions du mode normal
+  sheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 28, paddingTop: 10 },
+  sheetHandle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 10 },
+  sheetItem: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 16 },
+  sheetItemText: { fontSize: FontSize.md, fontWeight: FontWeight.semiBold },
   readAllBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, borderWidth: 1,
   },
-  readAllText: { fontSize: 12, fontWeight: '600' },
+  readAllText: { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
 
   tabs: {
     flexDirection: 'row',
@@ -654,14 +706,14 @@ const s = StyleSheet.create({
     flex: 1, alignItems: 'center', paddingVertical: 13,
     borderBottomWidth: 2, borderBottomColor: 'transparent',
   },
-  tabText: { fontSize: 13, fontWeight: '600' },
+  tabText: { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
 
   swipeHint: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     marginBottom: 10, paddingHorizontal: 12, paddingVertical: 7,
     borderRadius: 10,
   },
-  swipeHintText: { fontSize: 12 },
+  swipeHintText: { fontSize: FontSize.sm },
 
   checkbox: {
     width: 22, height: 22, borderRadius: 11,
@@ -692,17 +744,17 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 11, paddingVertical: 7, borderRadius: 16,
   },
-  updateBtnText: { color: '#fff', fontSize: 11.5, fontWeight: '700' },
+  updateBtnText: { color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold },
 
   deleteBack: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end',
     gap: 6, borderRadius: 16,
     backgroundColor: '#EF4444', paddingRight: 20,
   },
-  deleteBackText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  deleteBackText: { color: '#fff', fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
 
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingTop: 80, paddingHorizontal: 40 },
   emptyIconWrap: { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center' },
-  emptyTitle: { fontSize: 18, fontWeight: '700' },
-  emptyText:  { fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  emptyTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold },
+  emptyText:  { fontSize: FontSize.base, textAlign: 'center', lineHeight: 20 },
 });

@@ -75,12 +75,19 @@ export const AiAnalysisStatusScreen: React.FC<Props> = ({ contentType, contentId
   const label = CONTENT_LABEL[contentType];
 
   return (
-    <View style={[s.root, { backgroundColor: colors.backgroundSecondary, paddingTop: insets.top }]}>
+    <View style={[s.root, { backgroundColor: colors.backgroundSecondary }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.surface} />
-      <View style={[s.topBar, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-        <BackButton onPress={onBack} />
-        <Text style={[s.topTitle, { color: colors.textPrimary }]}>Vérification automatique</Text>
-        <View style={{ width: 38 }} />
+
+      {/* Header — carte flottante (même design que le reste de l'app).
+          paddingTop (status bar) isolé sur un wrapper externe transparent —
+          le mélanger au style de la carte ferait apparaître un coin visible
+          sous la status bar. */}
+      <View style={{ paddingTop: insets.top + 8 }}>
+        <View style={[s.topBar, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={onBack} />
+          <Text style={[s.topTitle, { color: colors.textPrimary }]}>Vérification automatique</Text>
+          <View style={{ width: 38 }} />
+        </View>
       </View>
 
       <View style={s.content}>
@@ -142,7 +149,10 @@ const s = StyleSheet.create({
   root: { flex: 1 },
   topBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 12, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 12, paddingVertical: 12,
+    marginHorizontal: 10, marginBottom: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
   },
   topTitle: { fontSize: 16, fontWeight: '700' },
   content: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 12 },

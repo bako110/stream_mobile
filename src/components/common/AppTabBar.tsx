@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState, memo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform, useWindowDimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import Animated, {
-  useAnimatedStyle, withSpring, withTiming, useSharedValue,
+  useAnimatedStyle, withTiming, useSharedValue,
   interpolate,
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
@@ -37,18 +37,14 @@ export const AppTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, nav
   const { colors } = theme;
   const insets = useSafeAreaInsets();
   const [createOpen, setCreateOpen] = useState(false);
-  // Zoom d'accessibilité système — au-delà d'un certain agrandissement, les 4
-  // libellés + le bouton Créer central n'ont plus la place de tenir sur la
-  // largeur de la barre : masque les textes, garde uniquement les icônes.
-  const { fontScale } = useWindowDimensions();
-  const showLabels = fontScale < 1.15;
 
   const focusedRoute = state.routes[state.index];
   const focusedOptions = descriptors[focusedRoute.key]?.options as any;
   const hideTabBar = focusedOptions?.tabBarStyle?.display === 'none' || focusedOptions?.tabBarVisible === false;
   // Sur Reels, la vidéo occupe tout l'écran (plein écran réel, voir SCREEN_H
-  // dans ReelsScreen.tsx) — la tab bar flotte donc en overlay transparent
-  // par-dessus au lieu de réserver sa propre hauteur opaque en bas.
+  // dans ReelsScreen.tsx) — même pilule flottante que le reste de l'app,
+  // mais fond dégradé transparent (pas colors.surface opaque) pour ne jamais
+  // masquer complètement la vidéo derrière.
   const isReelsScreen = focusedRoute.name === 'Reels';
 
   // Le menu "+" restait ouvert indéfiniment si on changeait d'onglet ou
@@ -63,6 +59,9 @@ export const AppTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, nav
   const bottomPad = Platform.OS === 'android'
     ? Math.max(insets.bottom, 12)
     : insets.bottom;
+  // Hauteur d'origine conservée (TAB_BAR_HEIGHT + bottomPad) — seul le DESIGN
+  // (pilule détachée des bords, radius, ombre colorée) reprend la référence,
+  // pas le gabarit.
   const barHeight = TAB_BAR_HEIGHT + bottomPad;
 
   const navigateToCreate = (screen: string) => {
@@ -71,71 +70,58 @@ export const AppTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, nav
   };
 
   return (
-    <>
-      <View style={[
-        styles.container,
-        isReelsScreen
-          ? { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: 'transparent', borderTopWidth: 0, height: barHeight, paddingBottom: bottomPad }
-          : { backgroundColor: colors.surface, borderTopColor: colors.divider, height: barHeight, paddingBottom: bottomPad },
-      ]}>
-        {isReelsScreen ? (
-          <>
-            {/* Dégradé sombre (bas → haut) plutôt qu'un fond opaque — garantit
-                la lisibilité des icônes blanches quel que soit le contenu de
-                la vidéo derrière, sans jamais masquer complètement l'image.
-                Renforcé (0.75 au lieu de 0.7) pour que toute la zone du
-                footer se perçoive comme un espace distinct, pas juste les
-                icônes individuellement. */}
-            <LinearGradient
-              colors={['rgba(0,0,0,0.75)', 'rgba(0,0,0,0.0)']}
-              start={{ x: 0, y: 1 }}
-              end={{ x: 0, y: 0 }}
-              style={StyleSheet.absoluteFill}
-              pointerEvents="none"
+    <View style={[
+      styles.container,
+      isReelsScreen
+        ? {
+            backgroundColor: 'transparent',
+            height: barHeight, bottom: Math.max(bottomPad - 8, 4),
+            shadowOpacity: 0, elevation: 0,
+          }
+        : { backgroundColor: colors.surface, height: barHeight, bottom: Math.max(bottomPad - 8, 4) },
+    ]}>
+      {isReelsScreen ? (
+        /* Dégradé sombre (bas → haut) plutôt qu'un fond opaque — garantit la
+           lisibilité des icônes blanches quel que soit le contenu de la vidéo
+           derrière, sans jamais masquer complètement l'image. Même forme
+           pilule que le reste de l'app (radius hérité de styles.container) —
+           seul le fond reste transparent/dégradé au lieu d'opaque. */
+        <LinearGradient
+          colors={['rgba(0,0,0,0.75)', 'rgba(0,0,0,0.0)']}
+          start={{ x: 0, y: 1 }}
+          end={{ x: 0, y: 0 }}
+          style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
+          pointerEvents="none"
+        />
+      ) : null}
+
+      {TABS.map((tab, index) => {
+        const route     = state.routes.find(r => r.name === tab.name);
+        const isFocused = !!route && state.routes[state.index]?.name === tab.name;
+
+        return (
+          <React.Fragment key={tab.name}>
+            <TabItem
+              config={tab}
+              routeKey={route?.key}
+              isFocused={isFocused}
+              navigation={navigation}
+              activeColor={isReelsScreen ? '#fff' : colors.primary}
+              inactiveColor={isReelsScreen ? 'rgba(255,255,255,0.6)' : colors.textTertiary}
             />
-            {/* Fine ligne de séparation en haut de la zone — marque clairement
-                où commence le footer, sans être une bordure opaque. */}
-            <View pointerEvents="none" style={styles.reelsTopBorder} />
-          </>
-        ) : (
-          <LinearGradient
-            colors={[colors.primary + '30', colors.gradientEnd + '15', 'transparent']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.topLine}
-            pointerEvents="none"
-          />
-        )}
-
-        {TABS.map((tab, index) => {
-          const route     = state.routes.find(r => r.name === tab.name);
-          const isFocused = !!route && state.routes[state.index]?.name === tab.name;
-
-          return (
-            <React.Fragment key={tab.name}>
-              <TabItem
-                config={tab}
-                routeKey={route?.key}
-                isFocused={isFocused}
-                navigation={navigation}
-                activeColor={isReelsScreen ? '#fff' : colors.primary}
-                inactiveColor={isReelsScreen ? 'rgba(255,255,255,0.6)' : colors.textTertiary}
-                showLabel={showLabels}
+            {/* Bouton Créer — entre Communautés (index 1) et Reels (index 2) */}
+            {index === 1 && (
+              <CreateTabButton
+                open={createOpen}
+                onToggle={() => setCreateOpen(o => !o)}
+                onSelect={navigateToCreate}
+                colors={colors}
               />
-              {/* Bouton Créer — entre Communautés (index 1) et Reels (index 2) */}
-              {index === 1 && (
-                <CreateTabButton
-                  open={createOpen}
-                  onToggle={() => setCreateOpen(o => !o)}
-                  onSelect={navigateToCreate}
-                  colors={colors}
-                />
-              )}
-            </React.Fragment>
-          );
-        })}
-      </View>
-    </>
+            )}
+          </React.Fragment>
+        );
+      })}
+    </View>
   );
 };
 
@@ -213,23 +199,12 @@ interface TabItemProps {
   activeColor:    string;
   inactiveColor:  string;
   badge?:         number;
-  showLabel:      boolean;
 }
 
 const TabItem: React.FC<TabItemProps> = memo(({
   config, routeKey, isFocused, navigation,
-  activeColor, inactiveColor, badge, showLabel,
+  activeColor, inactiveColor, badge,
 }) => {
-  const progress = useSharedValue(isFocused ? 1 : 0);
-
-  useEffect(() => {
-    progress.value = withSpring(isFocused ? 1 : 0, { damping: 15, stiffness: 180 });
-  }, [isFocused]);
-
-  const iconStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: interpolate(progress.value, [0, 1], [0, -2]) }],
-  }));
-
   const onPress = useCallback(() => {
     const event = navigation.emit({
       type: 'tabPress',
@@ -251,50 +226,38 @@ const TabItem: React.FC<TabItemProps> = memo(({
   return (
     <TouchableOpacity onPress={onPress} style={styles.tab} activeOpacity={0.75}>
       <View style={styles.iconSlot}>
-        <Animated.View style={iconStyle}>
-          <Icon name={config.icon} size={16} color={isFocused ? activeColor : inactiveColor} />
-          {!!badge && badge > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
-            </View>
-          )}
-        </Animated.View>
+        <Icon name={config.icon} size={16} color={isFocused ? activeColor : inactiveColor} />
+        {!!badge && badge > 0 && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
+          </View>
+        )}
       </View>
 
-      {showLabel && (
-        <Text style={[styles.label, { color: isFocused ? activeColor : inactiveColor, fontWeight: isFocused ? '700' : '500' }]}>
-          {config.label}
-        </Text>
-      )}
+      <Text style={[styles.label, { color: isFocused ? activeColor : inactiveColor, fontWeight: isFocused ? '700' : '500' }]}>
+        {config.label}
+      </Text>
     </TouchableOpacity>
   );
 });
 
 const styles = StyleSheet.create({
+  // container : la pilule flottante elle-même, positionnée en absolute
+  // (left/right: 8, cf. référence) — détachée des bords de l'écran. Hauteur
+  // fournie dynamiquement dans le JSX (TAB_BAR_HEIGHT + bottomPad, taille
+  // d'origine) — seul le design (radius, ombre colorée) reprend la référence.
   container: {
+    position:       'absolute',
+    left:           8,
+    right:          8,
     flexDirection:  'row',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    elevation:      12,
-    shadowColor:    '#000',
-    shadowOffset:   { width: 0, height: -3 },
-    shadowOpacity:  0.08,
-    shadowRadius:   8,
+    alignItems:     'center',
+    justifyContent: 'space-around',
+    borderRadius:   24,
   },
-  topLine: {
-    position: 'absolute',
-    top:      0,
-    left:     0,
-    right:    0,
-    height:   2,
-  },
-  reelsTopBorder: {
-    position:        'absolute',
-    top:             0,
-    left:            0,
-    right:           0,
-    height:          StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-  },
+  // flex:1 d'origine conservé (pas la largeur fixe de la référence) — seul le
+  // design du container (pilule flottante) change, pas les proportions des
+  // items.
   tab: {
     flex:           1,
     alignItems:     'center',
@@ -309,8 +272,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   label: {
-    fontSize:      9.5,
-    letterSpacing: 0.2,
+    marginTop:     1,
+    fontSize:      11,
   },
   badge: {
     position: 'absolute', top: -6, right: -10,
@@ -331,8 +294,10 @@ const styles = StyleSheet.create({
   createBtnTouchable: {
     alignItems:     'center',
     justifyContent: 'center',
-    marginTop:      -8, // le bouton dépasse légèrement au-dessus de la barre
+    marginTop:      -8, // dépasse légèrement au-dessus de la barre
   },
+  // Taille d'origine conservée (32x32) — seul le design (forme/ombre/couleur)
+  // reprend la référence, pas la taille.
   createBtn: {
     width:          32,
     height:         32,
@@ -340,11 +305,6 @@ const styles = StyleSheet.create({
     borderWidth:    3,      // liseré de la couleur de la barre → détache le bouton du fond
     alignItems:     'center',
     justifyContent: 'center',
-    shadowColor:    '#000',
-    shadowOpacity:  0.18,
-    shadowRadius:   8,
-    shadowOffset:   { width: 0, height: 3 },
-    elevation:      6,
   },
   createMenu: {
     position:     'absolute',

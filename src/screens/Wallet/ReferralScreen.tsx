@@ -87,11 +87,16 @@ export const ReferralScreen: React.FC = () => {
     <View style={[s.root, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
 
-      {/* Header */}
-      <View style={[s.header, { backgroundColor: colors.surface, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider, paddingTop: insets.top + 16 }]}>
-        <BackButton onPress={() => navigation.goBack()} />
-        <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Parrainage</Text>
-        <View style={{ width: 40 }} />
+      {/* Header — carte flottante (même design que le reste de l'app).
+          paddingTop (status bar) isolé sur un wrapper externe transparent —
+          le mélanger au style de la carte ferait apparaître un coin visible
+          sous la status bar. */}
+      <View style={{ paddingTop: insets.top + 16 }}>
+        <View style={[s.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => navigation.goBack()} />
+          <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Parrainage</Text>
+          <View style={{ width: 40 }} />
+        </View>
       </View>
 
       {loading ? (
@@ -251,8 +256,13 @@ export const ReferralScreen: React.FC = () => {
 const s = StyleSheet.create({
   root:         { flex: 1 },
   center:       { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, paddingHorizontal: 16 },
-  backBtn:      { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  header:       {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingBottom: 16, paddingHorizontal: 16,
+    marginHorizontal: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
   headerTitle:  { fontSize: FontSize.lg, fontWeight: FontWeight.bold },
   scroll:       { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 40, gap: 16 },
 

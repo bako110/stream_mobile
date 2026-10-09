@@ -150,14 +150,20 @@ export const CommunityStatsScreen: React.FC<Props> = ({ route }) => {
   // ─── Header ────────────────────────────────────────────────────────────────
 
   const renderHeader = () => (
-    <LinearGradient colors={[colors.surface, colors.background]} style={[styles.header, { paddingTop: insets.top + 10 }]}>
-      <BackButton onPress={() => nav.goBack()} />
-      <View style={styles.headerCenter}>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Statistiques</Text>
-        <Text style={[styles.headerSub, { color: colors.textSecondary }]} numberOfLines={1}>{communityName}</Text>
-      </View>
-      <View style={styles.headerBtn} />
-    </LinearGradient>
+    // Header — carte flottante (même design que le reste de l'app).
+    // paddingTop (status bar) isolé sur un wrapper externe transparent — le
+    // mélanger au style de la carte ferait apparaître un coin visible sous
+    // la status bar.
+    <View style={{ paddingTop: insets.top + 10 }}>
+      <LinearGradient colors={[colors.surface, colors.background]} style={[styles.header, { borderColor: colors.divider }]}>
+        <BackButton onPress={() => nav.goBack()} />
+        <View style={styles.headerCenter}>
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Statistiques</Text>
+          <Text style={[styles.headerSub, { color: colors.textSecondary }]} numberOfLines={1}>{communityName}</Text>
+        </View>
+        <View style={styles.headerBtn} />
+      </LinearGradient>
+    </View>
   );
 
   // ─── Sélecteur période ──────────────────────────────────────────────────────
@@ -532,7 +538,12 @@ export const CommunityStatsScreen: React.FC<Props> = ({ route }) => {
 const styles = StyleSheet.create({
   root: { flex: 1 },
 
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 16, elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.28, shadowRadius: 8 },
+  header: {
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 16,
+    marginHorizontal: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
   headerBtn: { width: 38, height: 38, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   headerCenter: { flex: 1, alignItems: 'center', paddingHorizontal: 8 },
   headerTitle: { fontSize: FontSize.mdPlus, fontWeight: FontWeight.bold, letterSpacing: 0.2 },

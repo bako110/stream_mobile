@@ -4,7 +4,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, Image, RefreshControl,
-  StyleSheet, StatusBar, Platform, Dimensions, ActivityIndicator,
+  StyleSheet, StatusBar, Dimensions, ActivityIndicator,
 } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
@@ -12,6 +12,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { liveService, type LiveStream } from '../../services/liveService';
@@ -27,6 +28,7 @@ export const SimpleLiveListScreen: React.FC = () => {
   const { colors } = theme;
   const nav = useNavigation<Nav>();
   const { currentUser } = useUser();
+  const insets = useSafeAreaInsets();
 
   const [lives, setLives] = useState<LiveStream[]>([]);
   const [loading, setLoading] = useState(true);
@@ -151,22 +153,27 @@ export const SimpleLiveListScreen: React.FC = () => {
 
   return (
     <View style={[st.root, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
 
-      {/* Header */}
-      <View style={[st.header, { backgroundColor: colors.surface }]}>
-        <BackButton onPress={() => nav.goBack()} />
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <View style={st.headerDot} />
-          <Text style={[st.headerTitle, { color: colors.textPrimary }]}>Lives</Text>
+      {/* Header — carte flottante (même design que le reste de l'app).
+          paddingTop (status bar) isolé sur un wrapper externe transparent —
+          le mélanger au style de la carte ferait apparaître un coin visible
+          sous la status bar. */}
+      <View style={{ paddingTop: insets.top + 8 }}>
+        <View style={[st.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => nav.goBack()} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={st.headerDot} />
+            <Text style={[st.headerTitle, { color: colors.textPrimary }]}>Lives</Text>
+          </View>
+          <TouchableOpacity
+            style={st.goLiveBtn}
+            onPress={() => nav.navigate('GoLive')}
+          >
+            <Icon name="radio" size={14} color="#fff" />
+            <Text style={st.goLiveBtnText}>Go Live</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          style={st.goLiveBtn}
-          onPress={() => nav.navigate('GoLive')}
-        >
-          <Icon name="radio" size={14} color="#fff" />
-          <Text style={st.goLiveBtnText}>Go Live</Text>
-        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -217,8 +224,15 @@ const st = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? 44 : 56,
     paddingBottom: 12,
+    marginHorizontal: 10,
+    borderRadius: 24,
+    borderWidth: 1,
+    shadowColor: '#5B45B5',
+    shadowOpacity: 0.10,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 8,
   },
 headerTitle: { fontSize: 18, fontWeight: '800' },
   headerDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#F0365A' },

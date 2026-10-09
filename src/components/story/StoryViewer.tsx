@@ -3,7 +3,7 @@ import {
   View, Text, Image, TouchableOpacity, Dimensions,
   StatusBar, StyleSheet, Animated, PanResponder,
   TouchableWithoutFeedback, TextInput, Modal, Platform,
-  FlatList, ActivityIndicator, Easing, Linking,
+  FlatList, ActivityIndicator, Easing, Linking, BackHandler,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,7 +30,7 @@ import Reanimated, {
   interpolate as rInterpolate, FadeInUp as RFadeInUp, cancelAnimation as cancelRAnimation,
 } from 'react-native-reanimated';
 import { Gesture as RGesture, GestureDetector as RGestureDetector, GestureHandlerRootView as RGHRootView } from 'react-native-gesture-handler';
-import { AdvertiserRow as AdAdvertiserRow, AdFullscreenPlayer, adIsVideo as adIsVideoFn, adIsPhone as adIsPhoneFn, adCtaLabel } from '../ads';
+import { AdvertiserRow as AdAdvertiserRow, AdFullscreenPlayer, adIsVideo as adIsVideoFn, adIsPhone as adIsPhoneFn, adCtaLabel, adHasContact as adHasContactFn, adContactButtons as adContactButtonsFn, runAdButton as runAdButtonFn } from '../ads';
 import { openPhoneMenu as openAdPhoneMenu } from '../../utils/phoneMenu';
 import { FontSize, FontWeight } from '../../theme';
 
@@ -335,6 +335,7 @@ const MusicWidget: React.FC<{ audioUrl?: string | null; audioName?: string | nul
 interface AdInfo {
   id: string; title: string; description?: string; cta_text?: string; cta_url?: string;
   creative_url?: string; thumbnail_url?: string;
+  contact_phone?: string | null; contact_call?: boolean; contact_whatsapp?: boolean;
   advertiser_id?: string; advertiser_name?: string; advertiser_logo?: string;
 }
 
@@ -357,6 +358,18 @@ const StoryAdSlide: React.FC<{
     setFullscreenOpen(false);
     onResumeTimer?.();
   }, [onResumeTimer]);
+
+  // Bouton retour physique Android — géré auparavant par le Modal.onRequestClose
+  // du slide pub, perdu depuis le retrait de ce Modal (fix du crash d'imbrication,
+  // voir plus bas). Priorité au lecteur plein écran s'il est ouvert.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (fullscreenOpen) { closeFullscreen(); return true; }
+      onClose();
+      return true;
+    });
+    return () => sub.remove();
+  }, [fullscreenOpen, closeFullscreen, onClose]);
 
   // ── reanimated : progression 5 s, entrée du contenu, rebond de la poignée ──
   const prog = useRSharedValue(0);
@@ -418,13 +431,16 @@ const StoryAdSlide: React.FC<{
   }));
 
   const rawCta = (ad.cta_url ?? '').trim();
-  const phone = adIsPhoneFn(rawCta);
-  const storyAdCta = adCtaLabel(ad);
+  // Poignée swipe-up unique (pas de place pour 2 boutons côte à côte ici) :
+  // priorité WhatsApp si les deux canaux sont cochés, le texte reflète l'action
+  // exacte qui sera déclenchée (même principe que la carte pub de la grille
+  // recherche dans ReelsScreen.tsx).
+  const storyAdButtons = adContactButtonsFn(ad);
+  const storyAdButton = storyAdButtons.find(b => b.action === 'whatsapp') ?? storyAdButtons[0];
+  const storyAdCta = storyAdButton ?? adCtaLabel(ad);
   const openCta = () => {
     apiClient.post(`/api/v1/ads/${ad.id}/click`).catch(() => {});
-    if (!rawCta) { onSkip(); return; }
-    if (phone) { openAdPhoneMenu(rawCta.replace(/^tel:/i, '')); onSkip(); return; }
-    Linking.openURL(rawCta).catch(() => {});
+    if (storyAdButton) { runAdButtonFn(storyAdButton, ad); onSkip(); return; }
     onSkip();
   };
 
@@ -445,9 +461,14 @@ const StoryAdSlide: React.FC<{
     .onEnd(() => onSkip());
   const slideGesture = RGesture.Race(pan, tapNext);
 
+  // Pas de <Modal> englobant ici — StoryAdSlide est déjà affiché à l'intérieur
+  // du <Modal> racine du viewer de stories (StoryViewer, plus bas dans ce même
+  // fichier). Un second <Modal> natif imbriqué dans un premier provoque un
+  // crash natif Android à l'ouverture du lecteur plein écran (AdFullscreenPlayer,
+  // lui-même dans un <Modal>) — "ça plante et ça sort" au clic sur la pub.
   return (
-    <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
-      <RGHRootView style={{ flex: 1 }}>
+    <>
+      <RGHRootView style={{ flex: 1, position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
       <View style={{ width: W, height: H, backgroundColor: '#000' }}>
         <StatusBar hidden translucent />
 
@@ -530,9 +551,14 @@ const StoryAdSlide: React.FC<{
               ]}
             />
             <Icon name="chevron-up" size={20} color="rgba(255,255,255,0.85)" />
-            <Text style={{ color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.bold, letterSpacing: 0.3, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 }}>
-              {storyAdCta.text}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              {'iconSet' in storyAdCta && storyAdCta.iconSet === 'mci' && (
+                <MaterialIcon name={storyAdCta.icon} size={13} color="#25D366" />
+              )}
+              <Text style={{ color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.bold, letterSpacing: 0.3, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 }}>
+                {storyAdCta.text}
+              </Text>
+            </View>
             <View style={{ width: 40, height: 3.5, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.45)' }} />
           </TouchableOpacity>
         </Reanimated.View>
@@ -541,11 +567,13 @@ const StoryAdSlide: React.FC<{
 
       {/* Lecteur plein écran dédié — même pattern que le Feed (AdFullscreenPlayer) :
           jamais de lecture inline dans le slide story, seul un tap explicite sur
-          le bouton play ouvre ce lecteur avec son + CTA. */}
+          le bouton play ouvre ce lecteur avec son + CTA. Seul et unique <Modal>
+          natif de ce composant (plus d'imbrication — voir le commentaire en haut
+          de la fonction). */}
       <Modal visible={fullscreenOpen} animationType="slide" onRequestClose={closeFullscreen} statusBarTranslucent>
         {fullscreenOpen && <AdFullscreenPlayer ad={ad} onClose={closeFullscreen} />}
       </Modal>
-    </Modal>
+    </>
   );
 };
 
@@ -660,7 +688,7 @@ export const StoryViewer: React.FC<Props> = ({
   const [groupIdx,    setGroupIdx]    = useState(initialGroupIndex);
   const [storyIdx,    setStoryIdx]    = useState(initialStoryIndex ?? 0);
   const [paused,      setPaused]      = useState(false);
-  type StoryAdInfo = { id: string; title: string; description?: string; cta_text?: string; cta_url?: string; creative_url?: string; thumbnail_url?: string; advertiser_id?: string; advertiser_name?: string; advertiser_logo?: string };
+  type StoryAdInfo = { id: string; title: string; description?: string; cta_text?: string; cta_url?: string; creative_url?: string; thumbnail_url?: string; contact_phone?: string | null; contact_call?: boolean; contact_whatsapp?: boolean; advertiser_id?: string; advertiser_name?: string; advertiser_logo?: string };
   // Une ad par TRANSITION entre groupes (clé = groupIdx qu'on quitte), pas une ad unique
   // réutilisée à chaque changement de créateur — avant, la même pub apparaissait à
   // chaque transition, quel que soit le nombre de stories vues.

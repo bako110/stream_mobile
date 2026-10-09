@@ -1,7 +1,8 @@
 ﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, Image,
-  ActivityIndicator, StatusBar, Dimensions,
+  ActivityIndicator, StatusBar, Dimensions, Modal, TextInput,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -200,6 +201,9 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
   const [shareOpen,     setShareOpen]     = useState(false);
   const [menuOpen,      setMenuOpen]      = useState(false);
   const [downloading,   setDownloading]   = useState(false);
+  const [editingPost,   setEditingPost]   = useState(false);
+  const [editBody,      setEditBody]      = useState('');
+  const [editSaving,    setEditSaving]    = useState(false);
   const { download: startDl } = useMediaDownload();
   const [authorPosts,   setAuthorPosts]   = useState<Post[]>([]);
   const [authorPage,    setAuthorPage]    = useState(1);
@@ -312,6 +316,25 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
     toastService.info('Signaler', 'Ce post a été signalé. Merci pour ton retour.');
   }, []);
 
+  // Édition rapide du texte — même pattern que ProfileScreen (modal bas d'écran,
+  // postService.update sur le body uniquement, pas de média).
+  const handleEdit = useCallback(() => {
+    setMenuOpen(false);
+    setEditBody(post?.body ?? '');
+    setEditingPost(true);
+  }, [post]);
+
+  const handleSaveEditPost = useCallback(async () => {
+    if (!post || !editBody.trim()) return;
+    setEditSaving(true);
+    try {
+      await postService.update(post.id, { body: editBody.trim() });
+      setPost(prev => prev ? { ...prev, body: editBody.trim() } as Post : prev);
+      setEditingPost(false);
+    } catch { toastService.error('Erreur', 'Impossible de modifier.'); }
+    finally { setEditSaving(false); }
+  }, [post, editBody]);
+
   const handleDownloadAll = useCallback(async () => {
     setMenuOpen(false);
     const imageUrls = post?.image_urls?.length
@@ -349,12 +372,18 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
   // ── Loading skeleton ───────────────────────────────────────────────────────
   if (loading) {
     return (
-      <View style={[s.root, { backgroundColor: colors.backgroundSecondary, paddingTop: insets.top }]}>
+      <View style={[s.root, { backgroundColor: colors.backgroundSecondary }]}>
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.surface} />
-        <View style={[s.topBar, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-          <BackButton onPress={onBack} />
-          <Text style={[s.topTitle, { color: colors.textPrimary }]}>Publication</Text>
-          <View style={[s.topBtn, { backgroundColor: 'transparent' }]} />
+        {/* Header — carte flottante (même design que le reste de l'app).
+            paddingTop (status bar) isolé sur un wrapper externe transparent —
+            le mélanger au style de la carte ferait apparaître un coin visible
+            sous la status bar. */}
+        <View style={{ paddingTop: insets.top + 8 }}>
+          <View style={[s.topBar, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+            <BackButton onPress={onBack} />
+            <Text style={[s.topTitle, { color: colors.textPrimary }]}>Publication</Text>
+            <View style={[s.topBtn, { backgroundColor: 'transparent' }]} />
+          </View>
         </View>
         <View style={{ flex: 1, backgroundColor: colors.surface }}>
           <SkeletonPostDetail />
@@ -546,10 +575,17 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
               </TouchableOpacity>
               <View style={[s.ctxSep, { backgroundColor: colors.divider }]} />
               {isOwn ? (
-                <TouchableOpacity style={s.ctxItem} onPress={() => { setMenuOpen(false); handleDelete(); }}>
-                  <Icon name="trash-2" size={15} color="#EF4444" />
-                  <Text style={[s.ctxTxt, { color: '#EF4444' }]}>Supprimer</Text>
-                </TouchableOpacity>
+                <>
+                  <TouchableOpacity style={s.ctxItem} onPress={handleEdit}>
+                    <Icon name="edit-2" size={15} color={colors.textSecondary} />
+                    <Text style={[s.ctxTxt, { color: colors.textSecondary }]}>Modifier</Text>
+                  </TouchableOpacity>
+                  <View style={[s.ctxSep, { backgroundColor: colors.divider }]} />
+                  <TouchableOpacity style={s.ctxItem} onPress={() => { setMenuOpen(false); handleDelete(); }}>
+                    <Icon name="trash-2" size={15} color="#EF4444" />
+                    <Text style={[s.ctxTxt, { color: '#EF4444' }]}>Supprimer</Text>
+                  </TouchableOpacity>
+                </>
               ) : (
                 <TouchableOpacity style={s.ctxItem} onPress={handleReport}>
                   <Icon name="flag" size={15} color={colors.textSecondary} />
@@ -596,10 +632,17 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
           );
         })()}
 
-        {/* Aperçu lien — métadonnées OG (image + titre + domaine) */}
+        {/* Aperçu lien — métadonnées OG (image + titre + domaine). Le lien
+            reste TOUJOURS affiché ; seule l'image OG est masquée si le post a
+            déjà son propre média (image ou vidéo) — même règle que PostCard
+            (feed), pour ne jamais avoir deux images empilées sur un même
+            post, sans jamais cacher le lien lui-même. */}
         {post.link_url ? (
           <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
-            <LinkPreviewCard url={post.link_url} />
+            <LinkPreviewCard
+              url={post.link_url}
+              hideImage={allUrls.length > 0 || !!(post.hls_url ?? post.video_url)}
+            />
           </View>
         ) : null}
 
@@ -716,20 +759,25 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
   );
 
   return (
-    <View style={[s.root, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+    <View style={[s.root, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
 
-      {/* Top bar */}
-      <View style={[s.topBar, { backgroundColor: colors.background, borderBottomColor: 'transparent' }]}>
-        <BackButton onPress={onBack} />
-        <Text style={[s.topTitle, { color: colors.textPrimary }]}>Publication</Text>
-        <TouchableOpacity
-          onPress={handleShare}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          style={s.topBtn}
-        >
-          <MCIcon name="share-outline" size={22} color={colors.primary} />
-        </TouchableOpacity>
+      {/* Top bar — carte flottante (même design que le reste de l'app).
+          paddingTop (status bar) isolé sur un wrapper externe transparent —
+          le mélanger au style de la carte ferait apparaître un coin visible
+          sous la status bar. */}
+      <View style={{ paddingTop: insets.top + 8 }}>
+        <View style={[s.topBar, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={onBack} />
+          <Text style={[s.topTitle, { color: colors.textPrimary }]}>Publication</Text>
+          <TouchableOpacity
+            onPress={handleShare}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={s.topBtn}
+          >
+            <MCIcon name="share-outline" size={22} color={colors.primary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <FlatList
@@ -791,6 +839,42 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
         />
       )}
 
+      {/* Édition rapide d'un post (texte) — même pattern que ProfileScreen */}
+      <Modal visible={editingPost} transparent animationType="slide" onRequestClose={() => setEditingPost(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setEditingPost(false)} />
+          <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 }}>
+            <Text style={{ fontSize: FontSize.md, fontWeight: FontWeight.bold, color: colors.textPrimary, marginBottom: 12 }}>Modifier le post</Text>
+            <TextInput
+              value={editBody}
+              onChangeText={setEditBody}
+              multiline
+              autoFocus
+              style={{ minHeight: 100, fontSize: FontSize.base, color: colors.textPrimary, textAlignVertical: 'top', backgroundColor: colors.surfaceElevated, borderRadius: 12, padding: 12 }}
+              placeholderTextColor={colors.textTertiary}
+            />
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+              <TouchableOpacity
+                style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 12, backgroundColor: colors.surfaceElevated }}
+                onPress={() => setEditingPost(false)}
+              >
+                <Text style={{ fontSize: FontSize.base, fontWeight: FontWeight.bold, color: colors.textPrimary }}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 12, backgroundColor: colors.primary, opacity: editSaving || !editBody.trim() ? 0.6 : 1 }}
+                onPress={handleSaveEditPost}
+                disabled={editSaving || !editBody.trim()}
+              >
+                {editSaving ? <ActivityIndicator color="#fff" size="small" /> : (
+                  <Text style={{ fontSize: FontSize.base, fontWeight: FontWeight.bold, color: '#fff' }}>Enregistrer</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
     </View>
   );
 };
@@ -799,11 +883,13 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
 const s = StyleSheet.create({
   root: { flex: 1 },
 
-  // Top bar — transparent, icone partage violet à droite
+  // Top bar — carte flottante, icone partage violet à droite
   topBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingVertical: 10,
-    borderBottomWidth: 0,
+    marginHorizontal: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
   },
   topBtn: { padding: 4 },
   topTitle: { fontSize: FontSize.mdPlus, fontWeight: FontWeight.bold },

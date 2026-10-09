@@ -295,22 +295,24 @@ export default function CommunityMembersScreen({ route }: Props) {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
-      {/* Header */}
-      <LinearGradient
-        colors={[colors.surface, colors.surface]}
-        style={[st.header, { paddingTop: insets.top + 8, borderBottomColor: colors.divider }]}
-      >
-        <BackButton onPress={() => navigation.goBack()} />
-        <View style={{ flex: 1, alignItems: 'center' }}>
-          <Text style={{ color: colors.textPrimary, fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold }}>
-            Membres · {members.length}
-          </Text>
-          <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus, marginTop: 1 }} numberOfLines={1}>
-            {communityName}
-          </Text>
+      {/* Header — carte flottante (même design que le reste de l'app).
+          paddingTop (status bar) isolé sur un wrapper externe transparent —
+          le mélanger au style de la carte ferait apparaître un coin visible
+          sous la status bar. */}
+      <View style={{ paddingTop: insets.top + 8 }}>
+        <View style={[st.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => navigation.goBack()} />
+          <View style={{ flex: 1, alignItems: 'center' }}>
+            <Text style={{ color: colors.textPrimary, fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold }}>
+              Membres · {members.length}
+            </Text>
+            <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus, marginTop: 1 }} numberOfLines={1}>
+              {communityName}
+            </Text>
+          </View>
+          <View style={{ width: 40 }} />
         </View>
-        <View style={{ width: 40 }} />
-      </LinearGradient>
+      </View>
 
       {/* Search */}
       <View style={[st.searchBar, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
@@ -413,7 +415,13 @@ export default function CommunityMembersScreen({ route }: Props) {
 }
 
 const st = StyleSheet.create({
-  header:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  header:     {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 16, paddingBottom: 12,
+    marginHorizontal: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
   searchBar:  { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginTop: 12, marginBottom: 2, borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10 },
   filterPill: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
   card:       { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, borderRadius: 14, borderWidth: 1, padding: 12 },

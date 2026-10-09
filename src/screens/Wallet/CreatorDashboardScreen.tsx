@@ -232,10 +232,12 @@ const CreatorDashboardScreen: React.FC = () => {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + 12 }]}>
-        <BackButton onPress={() => navigation.goBack()} />
-        <Text style={s.headerTitle}>Monétisation</Text>
-        <View style={{ width: 40 }} />
+      <View style={{ paddingTop: insets.top + 12 }}>
+        <View style={s.header}>
+          <BackButton onPress={() => navigation.goBack()} />
+          <Text style={s.headerTitle}>Monétisation</Text>
+          <View style={{ width: 40 }} />
+        </View>
       </View>
 
       <ScrollView
@@ -483,7 +485,14 @@ const styles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingBottom: 12,
+    paddingVertical: 12,
+    backgroundColor: colors.surface,
+    borderColor: colors.divider,
+    marginHorizontal: 10,
+    borderRadius: 24,
+    borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
   },
   backBtn: {
     width: 40,
@@ -504,6 +513,7 @@ const styles = (colors: any) => StyleSheet.create({
   },
   scroll: {
     paddingHorizontal: 20,
+    paddingTop: 10,
     paddingBottom: 40,
     gap: 12,
   },

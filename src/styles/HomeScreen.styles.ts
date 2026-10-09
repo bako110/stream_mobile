@@ -7,17 +7,22 @@ export const homeStyles = StyleSheet.create({
   root: { flex: 1 },
 
   // ── Header ──────────────────────────────────────────────────────────────────
+  headerWrap: {
+    paddingTop: STATUS_H + 8,
+  },
   header: {
     paddingHorizontal: Spacing[4],
-    paddingTop:        STATUS_H + 6,
-    paddingBottom:     Spacing[3],
+    paddingVertical:   Spacing[3],
     gap:               10,
     zIndex:            10,
-    shadowColor:       '#000',
-    shadowOffset:      { width: 0, height: 1 },
-    shadowOpacity:     0.06,
-    shadowRadius:      4,
-    elevation:         3,
+    marginHorizontal:  10,
+    borderRadius:      24,
+    borderWidth:        1,
+    shadowColor:       '#5B45B5',
+    shadowOffset:      { width: 0, height: 5 },
+    shadowOpacity:     0.10,
+    shadowRadius:      14,
+    elevation:         8,
   },
   headerRow: {
     flexDirection:  'row',

@@ -5,14 +5,22 @@ import Animated, {
   withTiming, Easing, runOnJS,
 } from 'react-native-reanimated';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { storage } from '../../utils/storage';
 
 const AUTO_HIDE_MS = 5500;
 const ACCENT = '#4F8CFF';
+const STORAGE_KEY = 'reels_gift_hint_last_shown_date';
 
-// Variable de module (pas MMKV) — remise à false à chaque redémarrage de
-// l'app : contrairement au hint swipe (vu une seule fois, pour toujours), le
-// hint cadeau doit réapparaître une fois par SESSION.
-let shownThisSession = false;
+// Date du jour au format YYYY-MM-DD (fuseau local) — comparée au dernier
+// affichage stocké en MMKV pour limiter le hint à une fois par JOUR civil,
+// pas une fois par session/ouverture d'app (ce qui le faisait réapparaître à
+// chaque relance, plusieurs fois par jour).
+const todayKey = (): string => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+const alreadyShownToday = (): boolean => storage.getItem(STORAGE_KEY) === todayKey();
 
 interface Props {
   /** Le parent doit passer true dès que l'utilisateur a fait le vrai geste
@@ -24,12 +32,12 @@ interface Props {
 }
 
 // Overlay pédagogique "appuyez et maintenez pour envoyer un cadeau" (halo
-// circulaire pulsant + icône de main, façon TikTok) affiché une fois par
-// session app (contrairement au hint swipe, vu une seule fois à vie), jamais
+// circulaire pulsant + icône de main, façon TikTok) affiché une fois par JOUR
+// civil (contrairement au hint swipe, vu une seule fois à vie), jamais
 // bloquant (pointerEvents="none"), et qui s'efface dès que l'utilisateur fait
 // le vrai geste ou après un délai de sécurité si personne ne le fait.
 export const GiftHoldHint: React.FC<Props> = ({ dismiss, suppressed }) => {
-  const [everShown, setEverShown] = useState(() => !shownThisSession);
+  const [everShown, setEverShown] = useState(() => !alreadyShownToday());
   const opacity = useSharedValue(0);
   const pulse = useSharedValue(0);
 
@@ -57,7 +65,7 @@ export const GiftHoldHint: React.FC<Props> = ({ dismiss, suppressed }) => {
   }, [dismiss]);
 
   const hide = () => {
-    shownThisSession = true;
+    storage.setItem(STORAGE_KEY, todayKey());
     opacity.value = withTiming(0, { duration: 200 }, (finished) => {
       if (finished) runOnJS(setEverShown)(false);
     });

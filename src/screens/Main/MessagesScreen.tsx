@@ -275,8 +275,12 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
         translucent
       />
 
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.surface, paddingTop: STATUS_H + 8 }]}>
+      {/* Header — carte flottante (même design que le reste de l'app).
+          paddingTop (status bar) isolé sur un wrapper externe transparent —
+          le mélanger au style de la carte ferait apparaître un coin visible
+          sous la status bar. */}
+      <View style={{ paddingTop: STATUS_H + 8 }}>
+      <View style={[styles.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
         <View style={styles.headerRow}>
           {convSelectMode ? (
             // ── Mode sélection conversations ──
@@ -374,6 +378,7 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
             onNavigateToChat={onStoryNavigateToChat}
           />
         )}
+      </View>
       </View>
 
       {/* Liste des conversations */}
@@ -567,7 +572,12 @@ const sst = StyleSheet.create({
 const styles = StyleSheet.create({
   root: { flex: 1 },
 
-  header: { paddingHorizontal: Spacing[4], paddingBottom: Spacing[3], gap: 10 },
+  header: {
+    paddingHorizontal: Spacing[4], paddingBottom: Spacing[3], paddingTop: Spacing[3], gap: 10,
+    marginHorizontal: 10, marginBottom: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   iconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   headerCenter: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, justifyContent: 'center' },

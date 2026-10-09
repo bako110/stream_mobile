@@ -640,8 +640,12 @@ export const SeriesScreen: React.FC = () => {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
 
-      {/* ── HEADER FIXE ─────────────────────────────────────────────────── */}
-      <View style={[hdr.wrap, { paddingTop: insets.top + 6, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+      {/* ── HEADER FIXE — carte flottante (même design que le reste de
+          l'app). paddingTop (status bar) isolé sur un wrapper externe
+          transparent — le mélanger au style de la carte ferait apparaître
+          un coin visible sous la status bar. ── */}
+      <View style={{ paddingTop: insets.top + 6 }}>
+      <View style={[hdr.wrap, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
         {/* Ligne 1 : back + titre TV pill + compteur */}
         <View style={hdr.row1}>
           <BackButton onPress={() => navigation.goBack()} />
@@ -716,6 +720,7 @@ export const SeriesScreen: React.FC = () => {
             ) : null}
           </View>
         )}
+      </View>
       </View>
 
       {/* ── MODAL FILTRES ── */}
@@ -1006,7 +1011,18 @@ const ms = StyleSheet.create({
 });
 
 const hdr = StyleSheet.create({
-  wrap:          { borderBottomWidth: StyleSheet.hairlineWidth, paddingBottom: 0 },
+  wrap:          {
+    paddingBottom: 0,
+    marginHorizontal: 10,
+    marginBottom: 10,
+    borderRadius: 24,
+    borderWidth: 1,
+    shadowColor: '#5B45B5',
+    shadowOpacity: 0.10,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 8,
+  },
   row1:          { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: H_PAD, paddingBottom: 10 },
   title:         { fontSize: FontSize['2xl'], fontWeight: FontWeight.black, letterSpacing: -0.5 },
   tvPill:        { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },

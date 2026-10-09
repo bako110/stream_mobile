@@ -86,6 +86,7 @@ export const ConcertsScreen: React.FC = () => {
     <View style={[s.root, { backgroundColor: colors.background }]}>
       <AppHeader
         title="Mes Concerts"
+        onBack={() => (nav as any).goBack()}
         rightIcon={searchVisible ? 'x' : 'search'}
         onRightPress={handleToggleSearch}
       />

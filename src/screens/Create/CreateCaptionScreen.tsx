@@ -13,6 +13,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { MentionInput } from '../../components/common/MentionInput';
+import { CONTENT_CATEGORIES } from '../../components/common/CategorySelector';
 import { DarkColors } from '../../theme/colors';
 
 interface Props {
@@ -20,12 +21,14 @@ interface Props {
   isPhoto: boolean;
   caption: string;
   onCaptionChange: (text: string, mentionIds: string[]) => void;
+  category: string | null;
+  onCategoryChange: (value: string | null) => void;
   onBack: () => void;
   onNext: () => void;
 }
 
 export const CreateCaptionScreen: React.FC<Props> = ({
-  thumbnailUri, isPhoto, caption, onCaptionChange, onBack, onNext,
+  thumbnailUri, isPhoto, caption, onCaptionChange, category, onCategoryChange, onBack, onNext,
 }) => {
   const insets = useSafeAreaInsets();
 
@@ -91,6 +94,27 @@ export const CreateCaptionScreen: React.FC<Props> = ({
           <Text style={s.charCount}>{caption.length}/300</Text>
         </Animated.View>
 
+        {/* ══ CATÉGORIE — optionnel, aide le fil "pour toi" à mieux cerner ce
+            reel (cf. CategorySelector.tsx) ══ */}
+        <Animated.View entering={FadeInDown.duration(320).delay(220)} style={s.categorySection}>
+          <Text style={s.categoryLabel}>Catégorie (optionnel)</Text>
+          <View style={s.categoryRow}>
+            {CONTENT_CATEGORIES.map(cat => {
+              const active = category === cat.value;
+              return (
+                <TouchableOpacity
+                  key={cat.value}
+                  onPress={() => onCategoryChange(active ? null : cat.value)}
+                  style={[s.categoryChip, active && s.categoryChipActive]}
+                >
+                  <Text style={s.categoryEmoji}>{cat.emoji}</Text>
+                  <Text style={[s.categoryChipTxt, active && s.categoryChipTxtActive]}>{cat.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </Animated.View>
+
         {/* ══ CTA ══ */}
         <View style={[s.footer, { paddingBottom: Math.max(insets.bottom, 16) + 8 }]}>
           <TouchableOpacity onPress={onNext} activeOpacity={0.88} style={s.nextBtnWrap}>
@@ -137,6 +161,19 @@ const s = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 4,
   },
   charCount: { fontSize: 11, color: 'rgba(255,255,255,0.4)', textAlign: 'right', marginTop: 6 },
+
+  categorySection: { marginHorizontal: 20, marginTop: 18, gap: 10 },
+  categoryLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)' },
+  categoryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  categoryChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    borderWidth: 1, borderRadius: 18, paddingHorizontal: 12, paddingVertical: 7,
+    backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.14)',
+  },
+  categoryChipActive: { backgroundColor: 'rgba(192,38,212,0.22)', borderColor: '#C026D3' },
+  categoryEmoji: { fontSize: 13 },
+  categoryChipTxt: { color: 'rgba(255,255,255,0.65)', fontWeight: '700', fontSize: 12 },
+  categoryChipTxtActive: { color: '#fff' },
 
   footer: { paddingHorizontal: 20, paddingTop: 12, alignItems: 'center', gap: 10 },
   nextBtnWrap: { width: '100%', borderRadius: 28, overflow: 'hidden', shadowColor: '#7B3FF2', shadowOpacity: 0.4, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 8 },

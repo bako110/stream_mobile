@@ -911,16 +911,22 @@ export const CommunitiesScreen: React.FC = () => {
     <View style={[S.root, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
 
-      {/* ── Header dynamique — même système clair/sombre que le reste de
-          l'app (colors.surface, pas de dégradé de marque) : la bannière
-          rétrécit progressivement avec le scroll (interpolée sur scrollY,
-          pas de saut), jusqu'à un état compact où seuls le titre + la
-          recherche restent, collés en haut. ── */}
-      <View style={[S.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+      {/* ── Header dynamique — carte flottante (même design que le reste de
+          l'app) : la bannière rétrécit progressivement avec le scroll
+          (interpolée sur scrollY, pas de saut), jusqu'à un état compact où
+          seuls le titre + la recherche restent. paddingTop (status bar)
+          isolé sur un wrapper externe transparent — le mélanger au style de
+          la carte ferait apparaître un coin visible sous la status bar. ── */}
+      <View style={{ paddingTop: insets.top + 6 }}>
+      <View style={[S.header, { borderColor: colors.divider }]}>
+      {/* Clip interne séparé de la View qui porte l'ombre — appliquer
+          overflow:hidden directement sur S.header couperait aussi l'ombre
+          portée (dessinée hors des bords de la View sur iOS). */}
+      <View style={{ borderRadius: 24, overflow: 'hidden', backgroundColor: colors.surface }}>
         <Animated.View style={{ height: animatedBannerHeight, overflow: 'hidden', backgroundColor: colors.surface }}>
           <View style={[S.banner]}>
             {/* Une seule ligne : retour → titre + stats → badge groupe. */}
-            <View style={[S.bannerTopRow, { paddingTop: insets.top + 6 }]}>
+            <View style={[S.bannerTopRow, { paddingTop: 6 }]}>
               <TouchableOpacity
                 onPress={() => nav.goBack()}
                 style={[S.backBtn, { backgroundColor: colors.backgroundSecondary }]}
@@ -1007,6 +1013,8 @@ export const CommunitiesScreen: React.FC = () => {
             </TouchableOpacity>
           )}
         </View>
+      </View>
+      </View>
       </View>
 
       {/* ── Corps ── */}
@@ -1173,8 +1181,17 @@ export const CommunitiesScreen: React.FC = () => {
 const S = StyleSheet.create({
   root: { flex: 1 },
 
-  // Header
-  header: { borderBottomWidth: StyleSheet.hairlineWidth },
+  // Header — carte flottante (même design que le reste de l'app)
+  header: {
+    marginHorizontal: 10,
+    borderRadius: 24,
+    borderWidth: 1,
+    shadowColor: '#5B45B5',
+    shadowOpacity: 0.10,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 8,
+  },
 
   // Bannière — même fond que le reste de l'app (colors.surface, passé en
   // style inline), pas de dégradé de marque. La ligne retour/titre/badge

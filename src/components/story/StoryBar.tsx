@@ -11,6 +11,7 @@ import { VerifiedBadge, CachedImage } from '../common';
 import { storyService, getViewedStories } from '../../services/storyService';
 import { storyUploadState } from '../../services/storyUploadState';
 import { networkService } from '../../services/networkService';
+import { cacheInBackground } from '../../services/videoCacheService';
 import { useWs } from '../../context/WebSocketContext';
 import type { Story } from '../../types/story';
 import type { StoryGroup } from '../../types/story';
@@ -34,6 +35,9 @@ const CARD_GAP = StoryCardToken.gap;    // 8
 const BAR_V_PAD = 6;    // marge haut/bas minimale de la barre
 const CARD_H = 148;     // hauteur de carte — la barre ne garde qu'une mince
                         // respiration autour (BAR_V_PAD de chaque côté)
+// "Ma story" (carte "Ajouter") élargie par rapport aux autres — plus de présence
+// en première position de la barre, seule cette carte est concernée.
+const ADD_CARD_W = CARD_W + 20;
 
 // Même palette que web/MediaPlaceholder — gradient déterministe depuis le nom
 const PALETTES: [string, string, string][] = [
@@ -97,6 +101,25 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
           else if (st.media_url && st.media_type === 'image') Image.prefetch(st.media_url).catch(() => {});
         });
       });
+
+      // Préchargement du contenu RÉEL (pas juste la miniature) des toutes
+      // premières stories non vues — auparavant StoryViewer ne commençait à
+      // précharger qu'une fois déjà ouvert sur la 1ère story, donc le tout
+      // premier clic sur la barre attendait encore le réseau. Limité aux 2
+      // premiers groupes non vus, 1 story chacun (la plus récente), et aux
+      // vidéos SEULEMENT en wifi (coût data sinon) — les images utilisent déjà
+      // Image.prefetch ci-dessus pour leur thumbnail, suffisant pour un
+      // affichage quasi instantané de l'image elle-même.
+      const unseenGroups = data.filter(g => g.has_unseen).slice(0, 2);
+      if (onWifi) {
+        unseenGroups.forEach(g => {
+          const first = g.stories[0];
+          const videoUrl = first?.mp4_url ?? first?.media_url;
+          if (first?.media_type === 'video' && videoUrl) {
+            cacheInBackground(videoUrl).catch(() => {});
+          }
+        });
+      }
     } catch (e) {
       __DEV__ && console.error('[StoryBar] getFeed error:', e);
     } finally { setLoading(false); }
@@ -223,12 +246,12 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
             // de MARQUE (brandGrad, violet→magenta — jamais colors.backgroundSecondary/
             // surface : ces tokens sont quasi blancs en light (#E8E7F4/#FFFFFF), ce qui
             // rendait l'avatar/texte blancs illisibles sur fond clair).
-            <View style={[s.cardBorderWrap, { backgroundColor: colors.border ?? '#ccc' }]}>
-              <TouchableOpacity activeOpacity={0.85} style={s.card} onPress={() => setCreatorOpen(true)}>
+            <View style={[s.cardBorderWrap, { width: ADD_CARD_W + 2, backgroundColor: colors.border ?? '#ccc' }]}>
+              <TouchableOpacity activeOpacity={0.85} style={[s.card, { width: ADD_CARD_W }]} onPress={() => setCreatorOpen(true)}>
                 <LinearGradient
                   colors={brandGrad}
                   start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
-                  style={s.cardBg}
+                  style={[s.cardBg, { width: ADD_CARD_W, opacity: 0.55 }]}
                 />
 
                 <View style={s.addCardBody}>
@@ -322,19 +345,33 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
                   />
                 )}
 
-                {/* Mini avatar haut gauche + pastille "non vu" discrète (remplace
-                    l'ancien cadre plein contour saturé — indicateur plus sobre) */}
+                {/* Mini avatar haut gauche — anneau complet en dégradé violet si non
+                    vu (comme le web), bordure grise unie sinon. Remplace la pastille
+                    discrète d'une version précédente, pour revenir au même indicateur
+                    que l'app web. */}
                 <View style={s.cardAvatarWrap}>
-                  <View style={s.cardMiniAvatarInner}>
-                    {user.avatar_url
-                      ? <CachedImage uri={user.avatar_url} style={[s.cardAvatar, seen && { opacity: 0.7 }]} />
-                      : <View style={[s.cardAvatarFallback, { backgroundColor: seen ? '#aaa' : '#302B63' }]}>
-                          <Text style={s.cardAvatarInitial}>{name[0]?.toUpperCase()}</Text>
-                        </View>
-                    }
-                  </View>
-                  {!seen && (
-                    <View style={[s.unseenDot, { backgroundColor: colors.primary ?? '#7B3FF2', borderColor: colors.surface ?? '#fff' }]} />
+                  {!seen ? (
+                    <LinearGradient colors={['#7B3FF2', '#5B2EC4']} style={s.cardMiniAvatarRing}>
+                      <View style={s.cardMiniAvatarInner}>
+                        {user.avatar_url
+                          ? <CachedImage uri={user.avatar_url} style={s.cardAvatar} />
+                          : <View style={[s.cardAvatarFallback, { backgroundColor: '#302B63' }]}>
+                              <Text style={s.cardAvatarInitial}>{name[0]?.toUpperCase()}</Text>
+                            </View>
+                        }
+                      </View>
+                    </LinearGradient>
+                  ) : (
+                    <View style={[s.cardMiniAvatarRing, { backgroundColor: 'rgba(255,255,255,0.4)' }]}>
+                      <View style={s.cardMiniAvatarInner}>
+                        {user.avatar_url
+                          ? <CachedImage uri={user.avatar_url} style={[s.cardAvatar, { opacity: 0.7 }]} />
+                          : <View style={[s.cardAvatarFallback, { backgroundColor: '#aaa' }]}>
+                              <Text style={s.cardAvatarInitial}>{name[0]?.toUpperCase()}</Text>
+                            </View>
+                        }
+                      </View>
+                    </View>
                   )}
                 </View>
 
@@ -474,24 +511,23 @@ const s = StyleSheet.create({
     borderWidth:  1.5,
     borderColor:  '#fff',
   },
+  // Anneau complet autour du mini-avatar — dégradé violet si non vu, gris
+  // translucide sinon (même pattern que l'app web).
+  cardMiniAvatarRing: {
+    width:          32,
+    height:         32,
+    borderRadius:   16,
+    padding:        2,
+    alignItems:     'center',
+    justifyContent: 'center',
+  },
   cardMiniAvatarInner: {
     width:        28,
     height:       28,
     borderRadius: 14,
     overflow:     'hidden',
-    borderWidth:  2,
-    borderColor:  '#fff',
-  },
-  // Pastille "non vu" — petit point discret sur le coin de l'avatar plutôt
-  // qu'un cadre saturé autour de toute la carte.
-  unseenDot: {
-    position:     'absolute',
-    top:          -1,
-    right:        -1,
-    width:        9,
-    height:       9,
-    borderRadius: 4.5,
     borderWidth:  1.5,
+    borderColor:  '#fff',
   },
   cardAvatar: { width: '100%', height: '100%' },
   cardAvatarFallback: {

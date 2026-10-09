@@ -15,11 +15,10 @@ import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useTheme } from '../../hooks/useTheme';
-import { BackButton } from '../../components/common/AppHeader';
+import { AppHeader } from '../../components/common/AppHeader';
 import { CachedImage, GofolyxLoader } from '../../components/common';
 import { searchService } from '../../services/searchService';
 import { FontSize, FontWeight } from '../../theme';
@@ -35,7 +34,6 @@ const SEARCH_PAGE_LIMIT = 20;
 export const SearchScreen: React.FC<Props> = ({ route, navigation }) => {
   const { theme } = useTheme();
   const { colors } = theme;
-  const insets = useSafeAreaInsets();
 
   const initialQuery = route?.params?.query ?? '';
   const [query,     setQuery]     = useState(initialQuery);
@@ -119,30 +117,32 @@ export const SearchScreen: React.FC<Props> = ({ route, navigation }) => {
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + 8, borderBottomColor: colors.divider }]}>
-        <BackButton onPress={() => navigation.goBack()} />
-        <View style={[s.searchBar, { backgroundColor: colors.backgroundSecondary, borderColor: colors.primary + '55' }]}>
-          <Icon name="search" size={14} color={colors.primary} />
-          <TextInput
-            ref={inputRef}
-            autoFocus
-            placeholder="Rechercher..."
-            placeholderTextColor={colors.textDisabled}
-            style={{ flex: 1, fontSize: FontSize.base, color: colors.textPrimary, padding: 0, marginLeft: 8 }}
-            returnKeyType="search"
-            value={query}
-            onChangeText={(text) => { setQuery(text); runSearch(text); }}
-            onSubmitEditing={() => runSearch(query)}
-          />
-          {searching && <ActivityIndicator size="small" color={colors.primary} />}
-          {query.length > 0 && !searching && (
-            <TouchableOpacity onPress={() => { setQuery(''); setResults(null); }}>
-              <Icon name="x-circle" size={14} color={colors.textTertiary} />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
+      {/* Header — composant partagé AppHeader (même carte flottante que le reste de l'app) */}
+      <AppHeader
+        onBack={() => navigation.goBack()}
+        centerContent={
+          <View style={[s.searchBar, { backgroundColor: colors.backgroundSecondary, borderColor: colors.primary + '55' }]}>
+            <Icon name="search" size={14} color={colors.primary} />
+            <TextInput
+              ref={inputRef}
+              autoFocus
+              placeholder="Rechercher..."
+              placeholderTextColor={colors.textDisabled}
+              style={{ flex: 1, fontSize: FontSize.base, color: colors.textPrimary, padding: 0, marginLeft: 8 }}
+              returnKeyType="search"
+              value={query}
+              onChangeText={(text) => { setQuery(text); runSearch(text); }}
+              onSubmitEditing={() => runSearch(query)}
+            />
+            {searching && <ActivityIndicator size="small" color={colors.primary} />}
+            {query.length > 0 && !searching && (
+              <TouchableOpacity onPress={() => { setQuery(''); setResults(null); }}>
+                <Icon name="x-circle" size={14} color={colors.textTertiary} />
+              </TouchableOpacity>
+            )}
+          </View>
+        }
+      />
 
       {/* Résultats */}
       {!query.trim() && !results ? (
@@ -236,11 +236,6 @@ export const SearchScreen: React.FC<Props> = ({ route, navigation }) => {
 
 const s = StyleSheet.create({
   root: { flex: 1 },
-  header: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 12, paddingBottom: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
   searchBar: {
     flex: 1, flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 12, height: 38,

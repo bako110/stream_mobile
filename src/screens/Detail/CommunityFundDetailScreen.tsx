@@ -170,23 +170,28 @@ export const CommunityFundDetailScreen: React.FC = () => {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
-      {/* Header */}
-      <View style={[st.header, { paddingTop: insets.top + 8, borderBottomColor: colors.divider, backgroundColor: colors.surface }]}>
-        <BackButton onPress={() => nav.goBack()} />
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: colors.textPrimary, fontSize: FontSize.md, fontWeight: FontWeight.extraBold }} numberOfLines={1}>
-            {cotisation.title}
-          </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 1 }}>
-            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: statusColor }} />
-            <Text style={{ color: statusColor, fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold }}>{statusLabel}</Text>
+      {/* Header — carte flottante (même design que le reste de l'app).
+          paddingTop (status bar) isolé sur un wrapper externe transparent —
+          le mélanger au style de la carte ferait apparaître un coin visible
+          sous la status bar. */}
+      <View style={{ paddingTop: insets.top + 8 }}>
+        <View style={[st.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => nav.goBack()} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: colors.textPrimary, fontSize: FontSize.md, fontWeight: FontWeight.extraBold }} numberOfLines={1}>
+              {cotisation.title}
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 1 }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: statusColor }} />
+              <Text style={{ color: statusColor, fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold }}>{statusLabel}</Text>
+            </View>
           </View>
+          {isAdmin && (
+            <TouchableOpacity onPress={handleExport} style={{ padding: 8 }}>
+              <Icon name="download" size={20} color={colors.textPrimary} />
+            </TouchableOpacity>
+          )}
         </View>
-        {isAdmin && (
-          <TouchableOpacity onPress={handleExport} style={{ padding: 8 }}>
-            <Icon name="download" size={20} color={colors.textPrimary} />
-          </TouchableOpacity>
-        )}
       </View>
 
       <FlatList
@@ -424,7 +429,13 @@ export const CommunityFundDetailScreen: React.FC = () => {
 };
 
 const st = StyleSheet.create({
-  header:        { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  header:        {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 16, paddingBottom: 12,
+    marginHorizontal: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
   progressCard:  { borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
   progressTrack: { height: 8, borderRadius: 4, overflow: 'hidden' },
   progressFill:  { height: 8, borderRadius: 4 },

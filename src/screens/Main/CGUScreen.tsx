@@ -249,11 +249,13 @@ export const CGUScreen: React.FC<Props> = ({ onBack }) => {
         barStyle={theme.isDark ? 'light-content' : 'dark-content'}
       />
 
-      {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + (Platform.OS === 'android' ? 8 : 6), backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-        <BackButton onPress={onBack} />
-        <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Conditions d'utilisation</Text>
-        <View style={{ width: 40 }} />
+      {/* Header — carte flottante */}
+      <View style={{ paddingTop: insets.top + (Platform.OS === 'android' ? 8 : 6) }}>
+        <View style={[s.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={onBack} />
+          <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Conditions d'utilisation</Text>
+          <View style={{ width: 40 }} />
+        </View>
       </View>
 
       <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
@@ -333,8 +335,10 @@ const s = StyleSheet.create({
   root:     { flex: 1 },
   header:   {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingBottom: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 16, paddingVertical: 14,
+    marginHorizontal: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
   },
   headerTitle:  { fontSize: 17, fontWeight: '800', flex: 1, textAlign: 'center' },
   scroll:       { padding: 16, paddingBottom: 56, gap: 14 },

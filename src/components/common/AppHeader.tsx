@@ -40,6 +40,7 @@ interface AppHeaderProps {
   rightIcon?:      string;
   onRightPress?:   () => void;
   rightContent?:   React.ReactNode;
+  centerContent?:  React.ReactNode;
   badgeCount?:     number;
 }
 
@@ -50,13 +51,13 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   rightIcon,
   onRightPress,
   rightContent,
+  centerContent,
   badgeCount,
 }) => {
   const { theme, isDark } = useTheme();
   const { colors, borderRadius, fontSize, fontWeight } = theme;
 
-  const isHome        = variant === 'home';
-  const isTransparent = variant === 'transparent';
+  const isHome = variant === 'home';
 
   return (
     <>
@@ -66,12 +67,13 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         translucent
       />
 
+      <View style={styles.outerWrap}>
       <View
         style={[
           styles.container,
           {
-            backgroundColor: isTransparent ? 'transparent' : colors.surface,
-            borderBottomColor: isTransparent ? 'transparent' : colors.divider,
+            backgroundColor: colors.surface,
+            borderColor: colors.divider,
           },
         ]}
       >
@@ -79,7 +81,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         {isHome && (
           <LinearGradient
             colors={[colors.primary + '12', 'transparent']}
-            style={StyleSheet.absoluteFill}
+            style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
             pointerEvents="none"
           />
         )}
@@ -101,7 +103,9 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           </View>
 
           {/* Centre */}
-          {isHome ? (
+          {centerContent ? (
+            <View style={styles.centerWrap}>{centerContent}</View>
+          ) : isHome ? (
             <View style={styles.greetWrap}>
               <Text style={[styles.greetHi, { color: colors.textSecondary, fontSize: fontSize.xs }]}>
                 Bienvenue sur
@@ -142,18 +146,33 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           </View>
         </View>
       </View>
+      </View>
     </>
   );
 };
 
 // Seule la structure — aucune valeur de couleur/typo ici
 const styles = StyleSheet.create({
+  // outerWrap : isole le paddingTop (status bar) du style visuel de la carte —
+  // les mélanger ferait apparaître la zone status bar comme faisant partie de
+  // la carte arrondie, avec un coin visible sous la status bar (cf. FeedScreen).
+  outerWrap: {
+    paddingTop: STATUS_BAR_HEIGHT,
+    zIndex:     100,
+  },
+  // container : carte flottante (même design que FeedScreen) — hauteur et
+  // paddings internes inchangés, seuls fond/bordure/radius/ombre reprennent
+  // la référence.
   container: {
-    width:            '100%',
-    paddingTop:       STATUS_BAR_HEIGHT,
     height:           HEADER_HEIGHT,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    zIndex:           100,
+    marginHorizontal: 10,
+    borderRadius:     24,
+    borderWidth:      1,
+    shadowColor:      '#5B45B5',
+    shadowOpacity:    0.10,
+    shadowRadius:     14,
+    shadowOffset:     { width: 0, height: 5 },
+    elevation:        8,
   },
   inner: {
     flex:             1,
@@ -184,6 +203,9 @@ const styles = StyleSheet.create({
   greetWrap: {
     flex:       1,
     alignItems: 'center',
+  },
+  centerWrap: {
+    flex: 1,
   },
   greetHi: {
     letterSpacing: 0.5,

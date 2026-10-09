@@ -146,12 +146,14 @@ export const MyVerificationQueueScreen: React.FC = () => {
   };
 
   return (
-    <View style={[s.root, { backgroundColor: colors.backgroundSecondary, paddingTop: insets.top }]}>
+    <View style={[s.root, { backgroundColor: colors.backgroundSecondary }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.surface} />
-      <View style={[s.topBar, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-        <BackButton onPress={() => nav.goBack()} />
-        <Text style={[s.topTitle, { color: colors.textPrimary }]}>Vérifications</Text>
-        <View style={{ width: 38 }} />
+      <View style={{ paddingTop: insets.top + 8 }}>
+        <View style={[s.topBar, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => nav.goBack()} />
+          <Text style={[s.topTitle, { color: colors.textPrimary }]}>Vérifications</Text>
+          <View style={{ width: 38 }} />
+        </View>
       </View>
 
       {loading ? (
@@ -182,7 +184,10 @@ const s = StyleSheet.create({
   root: { flex: 1 },
   topBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 12, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 12, paddingVertical: 12,
+    marginHorizontal: 10, marginBottom: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
   },
   topTitle: { fontSize: 16, fontWeight: '700' },
   card: { borderRadius: 18, overflow: 'hidden', borderLeftWidth: 3 },

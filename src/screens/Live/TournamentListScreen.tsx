@@ -257,12 +257,14 @@ export const TournamentListScreen: React.FC = () => {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 12 }]}>
-        <BackButton onPress={() => nav.goBack()} />
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Tournois ouverts</Text>
-        <TouchableOpacity onPress={() => setShowCreate(true)} style={styles.createBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Icon name="plus" size={22} color={colors.primary} />
-        </TouchableOpacity>
+      <View style={{ paddingTop: insets.top + 8 }}>
+        <View style={[styles.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => nav.goBack()} />
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Tournois ouverts</Text>
+          <TouchableOpacity onPress={() => setShowCreate(true)} style={styles.createBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Icon name="plus" size={22} color={colors.primary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {loading ? (
@@ -374,7 +376,13 @@ export const TournamentListScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 16, paddingHorizontal: 16,
+    marginHorizontal: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
   headerTitle: { fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold, letterSpacing: -0.2 },
   createBtn: { width: 40, height: 40, borderRadius: RR.pill, alignItems: 'center', justifyContent: 'center' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingTop: 60 },

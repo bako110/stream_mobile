@@ -182,11 +182,16 @@ export const AdminVerificationScreen: React.FC = () => {
         backgroundColor="transparent"
         barStyle={theme.isDark ? 'light-content' : 'dark-content'}
       />
-      {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + (Platform.OS === 'android' ? 8 : 6), backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-        <BackButton onPress={() => nav.goBack()} />
-        <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Vérification des communautés</Text>
-        <View style={{ width: 40 }} />
+      {/* Header — carte flottante (même design que le reste de l'app).
+          paddingTop (status bar) isolé sur un wrapper externe transparent —
+          le mélanger au style de la carte ferait apparaître un coin visible
+          sous la status bar. */}
+      <View style={{ paddingTop: insets.top + (Platform.OS === 'android' ? 8 : 6) }}>
+        <View style={[s.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => nav.goBack()} />
+          <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Vérification des communautés</Text>
+          <View style={{ width: 40 }} />
+        </View>
       </View>
 
       {/* Filtres */}
@@ -290,7 +295,10 @@ const s = StyleSheet.create({
   root: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 1,
+    paddingHorizontal: 16, paddingVertical: 14,
+    marginHorizontal: 10, marginBottom: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
   },
 headerTitle: { fontSize: 16, fontWeight: '800', flex: 1, textAlign: 'center' },
 

@@ -197,19 +197,21 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
       style={{ flex: 1, backgroundColor: colors.background }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {/* ══ HEADER ══ */}
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 12 }]}>
-        <BackButton onPress={() => navigation.goBack()} />
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Modifier le profil</Text>
-        <TouchableOpacity onPress={handleSave} disabled={saving} style={styles.saveBtnWrap} activeOpacity={0.85}>
-          <LinearGradient
-            colors={saving ? [colors.textDisabled, colors.textDisabled] : [colors.gradientStart, colors.gradientEnd]}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={styles.saveBtn}
-          >
-            {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnTxt}>Enregistrer</Text>}
-          </LinearGradient>
-        </TouchableOpacity>
+      {/* ══ HEADER — carte flottante ══ */}
+      <View style={{ paddingTop: insets.top + 8 }}>
+        <View style={[styles.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => navigation.goBack()} />
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Modifier le profil</Text>
+          <TouchableOpacity onPress={handleSave} disabled={saving} style={styles.saveBtnWrap} activeOpacity={0.85}>
+            <LinearGradient
+              colors={saving ? [colors.textDisabled, colors.textDisabled] : [colors.gradientStart, colors.gradientEnd]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={styles.saveBtn}
+            >
+              {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnTxt}>Enregistrer</Text>}
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {loading ? (
@@ -440,7 +442,10 @@ const FieldInput: React.FC<Omit<FieldProps, 'label' | 'style'> & { multiline?: b
 const styles = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth, gap: 10,
+    paddingHorizontal: 16, paddingVertical: 12, gap: 10,
+    marginHorizontal: 10, marginBottom: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
   },
   headerTitle: { flex: 1, fontSize: 17, fontWeight: '800' },
   saveBtnWrap: { borderRadius: 20, overflow: 'hidden' },

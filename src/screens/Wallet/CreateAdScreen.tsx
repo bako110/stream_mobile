@@ -59,6 +59,11 @@ export const CreateAdScreen: React.FC = () => {
   const [description,  setDescription]  = useState(existingAd?.description ?? '');
   const [ctaText,      setCtaText]      = useState(existingAd?.cta_text ?? 'En savoir plus');
   const [ctaUrl,       setCtaUrl]       = useState(existingAd?.cta_url ?? '');
+  // Contact direct — numéro unique, utilisable pour l'appel et/ou WhatsApp. Pas
+  // exclusif l'un de l'autre : les deux peuvent être cochés en même temps.
+  const [contactPhone,    setContactPhone]    = useState(existingAd?.contact_phone ?? '');
+  const [contactCall,     setContactCall]     = useState(existingAd?.contact_call ?? false);
+  const [contactWhatsapp, setContactWhatsapp] = useState(existingAd?.contact_whatsapp ?? false);
   const [creativeUrl,  setCreativeUrl]  = useState(existingAd?.creative_url ?? '');
   const [placement,    setPlacement]    = useState<AdPlacement>(existingAd?.placement ?? 'feed');
   const [format,       setFormat]       = useState<AdFormat>(existingAd?.format ?? 'native');
@@ -218,6 +223,15 @@ export const CreateAdScreen: React.FC = () => {
       toastService.error('Erreur', 'Indique un lien (http:// ou https://) ou un numéro de téléphone valide.');
       return;
     }
+    const contactPhoneTrimmed = contactPhone.trim();
+    if ((contactCall || contactWhatsapp) && !contactPhoneTrimmed) {
+      toastService.error('Erreur', 'Indique un numéro de téléphone pour le contact direct.');
+      return;
+    }
+    if (contactPhoneTrimmed && !/^[+()\d\s.-]{6,}$/.test(contactPhoneTrimmed)) {
+      toastService.error('Erreur', 'Numéro de téléphone invalide.');
+      return;
+    }
 
     // Vérifier solde avant création
     const goGoldRequired = Math.ceil(budget * 100); // 1 € = 100 GoGold
@@ -236,6 +250,9 @@ export const CreateAdScreen: React.FC = () => {
         description:  description.trim() || undefined,
         cta_text:     ctaText.trim() || undefined,
         cta_url:      ctaUrl.trim() || undefined,
+        contact_phone:    contactPhoneTrimmed || undefined,
+        contact_call:     contactCall,
+        contact_whatsapp: contactWhatsapp,
         creative_url: creativeUrl.trim() || undefined,
         // Pour une vidéo, creative_url pointe vers le flux HLS (.m3u8) — sans
         // thumbnail_url, rien n'est affichable avant que le lecteur charge le
@@ -274,18 +291,20 @@ export const CreateAdScreen: React.FC = () => {
       {saving && <GofolyxLoader variant="bar" color={colors.primary} />}
 
       {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + 8, borderBottomColor: colors.divider }]}>
-        <BackButton onPress={() => nav.goBack()} />
-        <Text style={[s.headerTitle, { color: colors.textPrimary }]}>
-          {isEdit ? 'Modifier la pub' : 'Créer une pub'}
-        </Text>
-        <TouchableOpacity
-          onPress={handleSave}
-          disabled={saving}
-          style={[s.saveBtn, { backgroundColor: saving ? colors.border : '#7B3FF2' }]}
-        >
-          <Text style={s.saveTxt}>{saving ? '...' : (isEdit ? 'Modifier' : 'Créer')}</Text>
-        </TouchableOpacity>
+      <View style={{ paddingTop: insets.top + 8 }}>
+        <View style={[s.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => nav.goBack()} />
+          <Text style={[s.headerTitle, { color: colors.textPrimary }]}>
+            {isEdit ? 'Modifier la pub' : 'Créer une pub'}
+          </Text>
+          <TouchableOpacity
+            onPress={handleSave}
+            disabled={saving}
+            style={[s.saveBtn, { backgroundColor: saving ? colors.border : '#7B3FF2' }]}
+          >
+            <Text style={s.saveTxt}>{saving ? '...' : (isEdit ? 'Modifier' : 'Créer')}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -434,6 +453,38 @@ export const CreateAdScreen: React.FC = () => {
           />
         </Field>
 
+        {/* Contact direct — numéro unique, utilisable pour l'appel et/ou WhatsApp
+            (les deux peuvent être cochés en même temps, pas exclusif). */}
+        <Field label="Contact direct (optionnel)" textColor={colors.textSecondary}>
+          <TextInput
+            style={[s.input, { backgroundColor: colors.backgroundSecondary, color: colors.textPrimary, borderColor: colors.divider }]}
+            value={contactPhone}
+            onChangeText={setContactPhone}
+            placeholder="+226 70 00 00 00"
+            placeholderTextColor={colors.textTertiary}
+            autoCapitalize="none"
+            keyboardType="phone-pad"
+          />
+          <View style={{ flexDirection: 'row', gap: 20, marginTop: 10 }}>
+            <TouchableOpacity
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}
+              onPress={() => setContactCall(v => !v)}
+            >
+              <Icon name={contactCall ? 'check-square' : 'square'} size={19} color={contactCall ? '#7B3FF2' : colors.textTertiary} />
+              <Icon name="phone" size={14} color={colors.textSecondary} />
+              <Text style={{ color: colors.textPrimary, fontSize: FontSize.smPlus }}>Appel direct</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}
+              onPress={() => setContactWhatsapp(v => !v)}
+            >
+              <Icon name={contactWhatsapp ? 'check-square' : 'square'} size={19} color={contactWhatsapp ? '#25D366' : colors.textTertiary} />
+              <Icon name="message-circle" size={14} color={colors.textSecondary} />
+              <Text style={{ color: colors.textPrimary, fontSize: FontSize.smPlus }}>WhatsApp</Text>
+            </TouchableOpacity>
+          </View>
+        </Field>
+
         {/* Placement */}
         <Field label="Emplacement" textColor={colors.textSecondary}>
           <View style={s.chips}>
@@ -523,7 +574,12 @@ export const CreateAdScreen: React.FC = () => {
 };
 
 const s = StyleSheet.create({
-  header:       { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1 },
+  header:       {
+    flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12,
+    marginHorizontal: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
   headerTitle:  { flex: 1, fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold },
   saveBtn:      { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, minWidth: 70, alignItems: 'center' },
   saveTxt:      { color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.base },

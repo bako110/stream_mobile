@@ -7,6 +7,7 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, StatusBar, Activity
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { BackButton } from '../../components/common';
 import { revenueService } from '../../services/revenueService';
@@ -33,6 +34,7 @@ export const RevenueContentListScreen: React.FC = () => {
   const { colors } = theme;
   const nav = useNavigation<Nav>();
   const route = useRoute<any>();
+  const insets = useSafeAreaInsets();
 
   const [period, setPeriod] = useState<Period>(route.params?.period ?? 'all');
   const [items, setItems] = useState<RevenueContentItem[]>([]);
@@ -70,10 +72,12 @@ export const RevenueContentListScreen: React.FC = () => {
     <View style={[s.root, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
 
-      <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-        <BackButton onPress={() => nav.goBack()} />
-        <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Revenus par reel</Text>
-        <View style={{ width: 38 }} />
+      <View style={{ paddingTop: insets.top }}>
+        <View style={[s.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => nav.goBack()} />
+          <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Revenus par reel</Text>
+          <View style={{ width: 38 }} />
+        </View>
       </View>
 
       <View style={s.periodRow}>
@@ -127,7 +131,13 @@ export const RevenueContentListScreen: React.FC = () => {
 
 const s = StyleSheet.create({
   root:        { flex: 1 },
-  header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 14, paddingTop: 12, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+  header:      {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingTop: 12, paddingBottom: 14, paddingHorizontal: 16,
+    marginHorizontal: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
   headerTitle: { fontSize: 18, fontWeight: '800' },
 
   periodRow:  { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 12 },

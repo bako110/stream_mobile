@@ -174,8 +174,10 @@ const WalletScreen: React.FC = () => {
     return (
       <View style={s.container}>
         {statusBar}
-        <View style={[s.header, { paddingTop: headerPadTop }]}>
-          <Text style={s.headerTitle}>Mon Portefeuille</Text>
+        <View style={{ paddingTop: headerPadTop }}>
+          <View style={[s.header, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={s.headerTitle}>Mon Portefeuille</Text>
+          </View>
         </View>
         <WalletSkeleton />
       </View>
@@ -201,12 +203,14 @@ const WalletScreen: React.FC = () => {
       {statusBar}
 
       {/* Header */}
-      <View style={[s.header, { paddingTop: headerPadTop }]}>
-        <BackButton onPress={() => navigation.goBack()} />
-        <Text style={[s.headerTitle, { flex: 1, textAlign: 'center' }]}>Mon Portefeuille</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('SettingsWallet')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Icon name="settings" size={22} color={colors.textSecondary} />
-        </TouchableOpacity>
+      <View style={{ paddingTop: headerPadTop }}>
+        <View style={[s.header, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <BackButton onPress={() => navigation.goBack()} />
+          <Text style={[s.headerTitle, { flex: 1, textAlign: 'center' }]}>Mon Portefeuille</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('SettingsWallet')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Icon name="settings" size={22} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -307,9 +311,12 @@ const styles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: IS_SMALL ? 14 : 20,
-    // paddingTop fourni dynamiquement (insets.top + marge) dans le JSX
-    paddingBottom: IS_SMALL ? 8 : 12,
-    backgroundColor: colors.background,
+    paddingVertical: IS_SMALL ? 8 : 12,
+    marginHorizontal: 10,
+    borderRadius: 24,
+    borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
   },
   headerTitle: {
     fontSize: IS_SMALL ? 18 : 22,
@@ -319,6 +326,7 @@ const styles = (colors: any) => StyleSheet.create({
   },
   scroll: {
     paddingHorizontal: IS_SMALL ? 12 : 20,
+    paddingTop: 10,
     paddingBottom: 40,
     gap: IS_SMALL ? 12 : 16,
   },

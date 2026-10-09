@@ -318,18 +318,23 @@ export const CommunityChannelsScreen: React.FC = () => {
   return (
     <View style={[S.root, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
-      {/* Header */}
-      <View style={[S.header, { backgroundColor: colors.surface, paddingTop: insets.top + 8, borderBottomColor: colors.divider }]}>
-        <BackButton onPress={() => nav.goBack()} />
-        <View style={{ flex: 1 }}>
-          <Text style={[S.headerTitle, { color: colors.textPrimary }]}>Canaux</Text>
-          <Text style={[S.headerSub, { color: colors.textTertiary }]}>{communityName}</Text>
+      {/* Header — carte flottante (même design que le reste de l'app).
+          paddingTop (status bar) isolé sur un wrapper externe transparent —
+          le mélanger au style de la carte ferait apparaître un coin visible
+          sous la status bar. */}
+      <View style={{ paddingTop: insets.top + 8 }}>
+        <View style={[S.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => nav.goBack()} />
+          <View style={{ flex: 1 }}>
+            <Text style={[S.headerTitle, { color: colors.textPrimary }]}>Canaux</Text>
+            <Text style={[S.headerSub, { color: colors.textTertiary }]}>{communityName}</Text>
+          </View>
+          {canManage && (
+            <TouchableOpacity onPress={openCreate} style={[S.addBtn, { backgroundColor: colors.primary }]}>
+              <Icon name="plus" size={18} color="#fff" />
+            </TouchableOpacity>
+          )}
         </View>
-        {canManage && (
-          <TouchableOpacity onPress={openCreate} style={[S.addBtn, { backgroundColor: colors.primary }]}>
-            <Icon name="plus" size={18} color="#fff" />
-          </TouchableOpacity>
-        )}
       </View>
 
       {/* Liste */}
@@ -624,7 +629,12 @@ export const CommunityChannelsScreen: React.FC = () => {
 
 const S = StyleSheet.create({
   root:   { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth, gap: 12 },
+  header: {
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 14, gap: 12,
+    marginHorizontal: 10, marginBottom: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
   headerTitle: { fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold },
   headerSub:   { fontSize: FontSize.sm, marginTop: 1 },
   addBtn:      { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },

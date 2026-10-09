@@ -239,11 +239,13 @@ export const MyStoriesScreen: React.FC<Props> = ({ navigation }) => {
         backgroundColor="transparent"
         barStyle={theme.isDark ? 'light-content' : 'dark-content'}
       />
-      {/* ── Header ── */}
-      <View style={[s.header, { paddingTop: insets.top + (Platform.OS === 'android' ? 8 : 6), backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <BackButton onPress={() => navigation.goBack()} />
-        <Text style={[s.title, { color: colors.textPrimary }]}>Mon statut</Text>
-        <View style={{ width: 40 }} />
+      {/* ── Header — carte flottante ── */}
+      <View style={{ paddingTop: insets.top + 8 }}>
+        <View style={[s.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => navigation.goBack()} />
+          <Text style={[s.title, { color: colors.textPrimary }]}>Mon statut</Text>
+          <View style={{ width: 40 }} />
+        </View>
       </View>
 
       {/* ── Liste ── */}
@@ -353,8 +355,10 @@ const s = StyleSheet.create({
   root: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingBottom: 14, paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 14, paddingHorizontal: 16,
+    marginHorizontal: 10, marginBottom: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
   },
   title: { fontSize: 20, fontWeight: '700' },
 

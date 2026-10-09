@@ -180,26 +180,27 @@ export const CommunityJoinRequestsScreen: React.FC<Props> = ({ route }) => {
     <View style={[s.root, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
 
-      {/* Header */}
-      <View style={[s.header, {
-        paddingTop: insets.top + 8,
-        backgroundColor: colors.surface,
-        borderBottomColor: colors.divider,
-      }]}>
-        <BackButton onPress={() => nav.goBack()} />
-        <View style={{ flex: 1 }}>
-          <Text style={[s.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-            Demandes d'adhésion
-          </Text>
-          <Text style={[s.headerSub, { color: colors.textTertiary }]} numberOfLines={1}>
-            {communityName}
-          </Text>
-        </View>
-        {!loading && (
-          <View style={[s.badge, { backgroundColor: colors.primary + '22' }]}>
-            <Text style={[s.badgeTxt, { color: colors.primary }]}>{requests.length}</Text>
+      {/* Header — carte flottante (même design que le reste de l'app).
+          paddingTop (status bar) isolé sur un wrapper externe transparent —
+          le mélanger au style de la carte ferait apparaître un coin visible
+          sous la status bar. */}
+      <View style={{ paddingTop: insets.top + 8 }}>
+        <View style={[s.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => nav.goBack()} />
+          <View style={{ flex: 1 }}>
+            <Text style={[s.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+              Demandes d'adhésion
+            </Text>
+            <Text style={[s.headerSub, { color: colors.textTertiary }]} numberOfLines={1}>
+              {communityName}
+            </Text>
           </View>
-        )}
+          {!loading && (
+            <View style={[s.badge, { backgroundColor: colors.primary + '22' }]}>
+              <Text style={[s.badgeTxt, { color: colors.primary }]}>{requests.length}</Text>
+            </View>
+          )}
+        </View>
       </View>
 
       {loading ? (
@@ -318,7 +319,14 @@ const styles = (colors: any) => StyleSheet.create({
     gap: 10,
     paddingHorizontal: 16,
     paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginHorizontal: 10,
+    borderRadius: 24,
+    borderWidth: 1,
+    shadowColor: '#5B45B5',
+    shadowOpacity: 0.10,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 8,
   },
   headerTitle: { fontSize: FontSize.md, fontWeight: FontWeight.bold },
   headerSub: { fontSize: FontSize.sm, marginTop: 1 },

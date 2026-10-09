@@ -964,17 +964,19 @@ export default function BoostScreen() {
     <View style={[s.root, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-      {/* Header */}
-      <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 16 }]}>
-        <BackButton onPress={() => navigation.goBack()} />
-        <View style={{ flex: 1 }}>
-          <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Booster</Text>
-          <Text style={[s.headerSub, { color: colors.textTertiary }]}>Abonnes · Reels · Posts · Events · Live</Text>
+      {/* Header — carte flottante (paddingTop isolé sur un wrapper externe transparent) */}
+      <View style={{ paddingTop: insets.top + 16 }}>
+        <View style={[s.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => navigation.goBack()} />
+          <View style={{ flex: 1 }}>
+            <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Booster</Text>
+            <Text style={[s.headerSub, { color: colors.textTertiary }]}>Abonnes · Reels · Posts · Events · Live</Text>
+          </View>
+          <TouchableOpacity onPress={() => navigation.navigate('BuyGoGold')} style={[s.balancePill, { backgroundColor: colors.backgroundSecondary }]}>
+            <Icon name="zap" size={12} color="#FFD700" />
+            <Text style={s.balanceText}>{balance.toLocaleString('fr-FR')}</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity onPress={() => navigation.navigate('BuyGoGold')} style={[s.balancePill, { backgroundColor: colors.backgroundSecondary }]}>
-          <Icon name="zap" size={12} color="#FFD700" />
-          <Text style={s.balanceText}>{balance.toLocaleString('fr-FR')}</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Tabs */}
@@ -1444,7 +1446,12 @@ const cp = StyleSheet.create({
 
 const s = StyleSheet.create({
   root:        { flex: 1 },
-  header:      { flexDirection: 'row', alignItems: 'center', paddingBottom: 16, paddingHorizontal: 16, gap: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  header:      {
+    flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 16, gap: 12,
+    marginHorizontal: 10, marginBottom: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
   headerTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.extraBold },
   headerSub:   { fontSize: FontSize.xsPlus, marginTop: 2 },
   balancePill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },

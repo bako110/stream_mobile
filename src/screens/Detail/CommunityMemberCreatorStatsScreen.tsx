@@ -140,20 +140,25 @@ export function CommunityMemberCreatorStatsScreen({ route }: Props) {
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <StatusBar barStyle="light-content" backgroundColor={colors.background} />
 
-      {/* Header */}
-      <Animated.View style={[
-        styles.header,
-        { paddingTop: insets.top + 6, borderBottomColor: colors.border, backgroundColor: colors.surface, opacity: headerAnim },
-      ]}>
-        <BackButton onPress={() => nav.goBack()} />
-        <View style={styles.headerCenter}>
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Statistiques créateur</Text>
-          <Text style={[styles.headerSub, { color: colors.textTertiary }]} numberOfLines={1}>
-            {memberName}
-          </Text>
-        </View>
-        <View style={{ width: 40 }} />
-      </Animated.View>
+      {/* Header — carte flottante (même design que le reste de l'app).
+          paddingTop (status bar) isolé sur un wrapper externe transparent —
+          le mélanger au style de la carte ferait apparaître un coin visible
+          sous la status bar. */}
+      <View style={{ paddingTop: insets.top + 6 }}>
+        <Animated.View style={[
+          styles.header,
+          { borderColor: colors.border, backgroundColor: colors.surface, opacity: headerAnim },
+        ]}>
+          <BackButton onPress={() => nav.goBack()} />
+          <View style={styles.headerCenter}>
+            <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Statistiques créateur</Text>
+            <Text style={[styles.headerSub, { color: colors.textTertiary }]} numberOfLines={1}>
+              {memberName}
+            </Text>
+          </View>
+          <View style={{ width: 40 }} />
+        </Animated.View>
+      </View>
 
       {error || !stats ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
@@ -325,7 +330,10 @@ const styles = StyleSheet.create({
 
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingBottom: 13, borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 16, paddingBottom: 13,
+    marginHorizontal: 10, marginBottom: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
   },
 headerCenter: { flex: 1, alignItems: 'center', gap: 2 },
   headerTitle: { fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold, letterSpacing: 0.2 },

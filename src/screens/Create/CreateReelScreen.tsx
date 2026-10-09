@@ -50,7 +50,7 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
 
   const [step,              setStep]              = useState<Step>(isRemoteSource ? 'camera' : sourceReelUrl ? 'edit' : 'camera');
   const [caption,           setCaption]           = useState('');
-  const [category]                                = useState<string | null>(null);
+  const [category,          setCategory]          = useState<string | null>(null);
   const [captionMentionIds, setCaptionMentionIds] = useState<string[]>([]);
   const [videoUri,          setVideoUri]          = useState<string | null>(isRemoteSource ? null : sourceReelUrl ?? null);
   const [videoThumb,        setVideoThumb]        = useState<string | null>(null);
@@ -410,6 +410,8 @@ export const CreateReelScreen: React.FC<Props> = ({ onBack, sourceReelId, source
           isPhoto={isPhotoReel}
           caption={caption}
           onCaptionChange={handleCaptionChange}
+          category={category}
+          onCategoryChange={setCategory}
           onBack={() => setStep('edit')}
           onNext={() => { if (!isTrimming) setStep('recap'); }}
         />

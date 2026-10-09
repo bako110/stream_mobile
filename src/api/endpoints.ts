@@ -54,6 +54,7 @@ export const Endpoints = {
     adminVerify: (id: string) => `${V1}/users/${id}/verify`,
     privacy:        `${V1}/users/me/privacy`,
     playback:       `${V1}/users/me/playback`,
+    feedPreferences: `${V1}/users/me/feed-preferences`,
     // Admin
     matchContacts:  `${V1}/users/match-contacts`,
     contactsSync:   `${V1}/users/contacts/sync`,

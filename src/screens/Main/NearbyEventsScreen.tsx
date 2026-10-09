@@ -241,49 +241,51 @@ export const NearbyEventsScreen: React.FC = () => {
       <StatusBar translucent backgroundColor="transparent" barStyle={colors.background === '#FFFFFF' ? 'dark-content' : 'light-content'} />
 
       {/* ── Header ───────────────────────────────────────────────────── */}
-      <View style={[st.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: Platform.OS === 'ios' ? 56 : 44 }]}>
-        <View style={st.headerContent}>
-          <BackButton onPress={() => nav.goBack()} />
+      <View style={{ paddingTop: Platform.OS === 'ios' ? 56 : 44 }}>
+        <View style={[st.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <View style={st.headerContent}>
+            <BackButton onPress={() => nav.goBack()} />
 
-          <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={[st.headerTitle, { color: colors.textPrimary }]}>Près de toi</Text>
-            <Text style={[st.headerSub, { color: colors.textTertiary }]}>
-              {location
-                ? loading
-                  ? 'Recherche en cours...'
-                  : `${events.length} événement${events.length > 1 ? 's' : ''} · ${radius} km`
-                : 'Localisation non disponible'}
-            </Text>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={[st.headerTitle, { color: colors.textPrimary }]}>Près de toi</Text>
+              <Text style={[st.headerSub, { color: colors.textTertiary }]}>
+                {location
+                  ? loading
+                    ? 'Recherche en cours...'
+                    : `${events.length} événement${events.length > 1 ? 's' : ''} · ${radius} km`
+                  : 'Localisation non disponible'}
+              </Text>
+            </View>
+
+            {!loading && events.length > 0 && (
+              <View style={[st.statPill, { backgroundColor: colors.primary + '18' }]}>
+                <Icon name="map-pin" size={11} color={colors.primary} />
+                <Text style={[st.statPillText, { color: colors.primary }]}>{events.length}</Text>
+              </View>
+            )}
           </View>
 
-          {!loading && events.length > 0 && (
-            <View style={[st.statPill, { backgroundColor: colors.primary + '18' }]}>
-              <Icon name="map-pin" size={11} color={colors.primary} />
-              <Text style={[st.statPillText, { color: colors.primary }]}>{events.length}</Text>
-            </View>
-          )}
+          {/* Sélecteur rayon */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.radiusRow}>
+            <Text style={[st.radiusLabelTxt, { color: colors.textTertiary }]}>Rayon</Text>
+            {RADII.map(r => (
+              <TouchableOpacity
+                key={r}
+                onPress={() => setRadius(r)}
+                style={[
+                  st.radiusChip,
+                  radius === r
+                    ? { backgroundColor: colors.primary, borderColor: colors.primary }
+                    : { backgroundColor: colors.backgroundSecondary, borderColor: colors.border },
+                ]}
+              >
+                <Text style={[st.radiusChipText, { color: radius === r ? '#fff' : colors.textSecondary }]}>
+                  {r} km
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
-
-        {/* Sélecteur rayon */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.radiusRow}>
-          <Text style={[st.radiusLabelTxt, { color: colors.textTertiary }]}>Rayon</Text>
-          {RADII.map(r => (
-            <TouchableOpacity
-              key={r}
-              onPress={() => setRadius(r)}
-              style={[
-                st.radiusChip,
-                radius === r
-                  ? { backgroundColor: colors.primary, borderColor: colors.primary }
-                  : { backgroundColor: colors.backgroundSecondary, borderColor: colors.border },
-              ]}
-            >
-              <Text style={[st.radiusChipText, { color: radius === r ? '#fff' : colors.textSecondary }]}>
-                {r} km
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
       </View>
 
       {/* ── Contenu ──────────────────────────────────────────────────── */}
@@ -347,7 +349,12 @@ export const NearbyEventsScreen: React.FC = () => {
 
 const st = StyleSheet.create({
   // Header
-  header:        { paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  header:        {
+    paddingHorizontal: 16, paddingVertical: 12,
+    marginHorizontal: 10, marginBottom: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
   headerContent: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   backBtn:       { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   headerTitle:   { fontSize: FontSize.lg, fontWeight: FontWeight.black, letterSpacing: -0.3 },

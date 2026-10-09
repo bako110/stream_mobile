@@ -853,7 +853,8 @@ const Header: React.FC<HeaderProps> = ({
   const greeting    = hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
 
   return (
-    <View style={[s.header, { backgroundColor: colors.surface }]}>
+    <View style={s.headerWrap}>
+      <View style={[s.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
       {/* Ligne 1 : avatar gauche + logo centre + icônes droite */}
       <View style={s.headerRow}>
         {/* Avatar + salutation */}
@@ -930,6 +931,7 @@ const Header: React.FC<HeaderProps> = ({
           </TouchableOpacity>
         )}
       </TouchableOpacity>
+      </View>
     </View>
   );
 };

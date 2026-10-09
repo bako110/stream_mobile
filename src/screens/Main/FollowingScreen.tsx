@@ -247,11 +247,16 @@ export const FollowingScreen: React.FC = () => {
         barStyle={theme.isDark ? 'light-content' : 'dark-content'}
       />
 
-      {/* Header */}
-      <View style={[st.header, { paddingTop: insets.top + (Platform.OS === 'android' ? 8 : 6), backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-        <BackButton onPress={() => nav.goBack()} />
-        <Text style={[st.title, { color: colors.textPrimary }]}>Réseau</Text>
-        <View style={{ width: 40 }} />
+      {/* Header — carte flottante (même design que le reste de l'app).
+          paddingTop (status bar) isolé sur un wrapper externe transparent —
+          le mélanger au style de la carte ferait apparaître un coin visible
+          sous la status bar. */}
+      <View style={{ paddingTop: insets.top + (Platform.OS === 'android' ? 8 : 6) }}>
+        <View style={[st.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => nav.goBack()} />
+          <Text style={[st.title, { color: colors.textPrimary }]}>Réseau</Text>
+          <View style={{ width: 40 }} />
+        </View>
       </View>
 
       {/* Onglets */}
@@ -315,7 +320,9 @@ const st = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingBottom: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginHorizontal: 10, marginBottom: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
   },
   title:   { fontSize: 18, fontWeight: '700' },
 

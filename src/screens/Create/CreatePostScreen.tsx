@@ -323,32 +323,37 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
 
   return (
     <KeyboardAvoidingView
-      style={[s.root, { backgroundColor: colors.background, paddingTop: insets.top }]}
+      style={[s.root, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
 
-      {/* Header */}
-      <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
-        <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Icon name="x" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Créer un post</Text>
-        <TouchableOpacity onPress={handlePost} disabled={!canPost || posting} activeOpacity={0.85}>
-          {(canPost && !posting) ? (
-            <LinearGradient
-              colors={[colors.primary, colors.primary + 'CC']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={s.publishBtn}
-            >
-              <Text style={s.publishBtnText}>Publier</Text>
-            </LinearGradient>
-          ) : (
-            <View style={[s.publishBtn, { backgroundColor: colors.primary + '33' }]}>
-              <Text style={[s.publishBtnText, { color: colors.primary + '99' }]}>Publier</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+      {/* Header — carte flottante (même design que le reste de l'app).
+          paddingTop (status bar) isolé sur un wrapper externe transparent —
+          le mélanger au style de la carte ferait apparaître un coin visible
+          sous la status bar. */}
+      <View style={{ paddingTop: insets.top + 8 }}>
+        <View style={[s.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Icon name="x" size={22} color={colors.textPrimary} />
+          </TouchableOpacity>
+          <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Créer un post</Text>
+          <TouchableOpacity onPress={handlePost} disabled={!canPost || posting} activeOpacity={0.85}>
+            {(canPost && !posting) ? (
+              <LinearGradient
+                colors={[colors.primary, colors.primary + 'CC']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={s.publishBtn}
+              >
+                <Text style={s.publishBtnText}>Publier</Text>
+              </LinearGradient>
+            ) : (
+              <View style={[s.publishBtn, { backgroundColor: colors.primary + '33' }]}>
+                <Text style={[s.publishBtnText, { color: colors.primary + '99' }]}>Publier</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
 
@@ -569,7 +574,13 @@ const HALF_H = GRID_H / 2 - 1;
 
 const s = StyleSheet.create({
   root:           { flex: 1 },
-  header:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 12,
+    marginHorizontal: 10, marginBottom: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
   headerTitle:    { fontSize: FontSize.mdPlus, fontWeight: FontWeight.bold },
   publishBtn:     { paddingHorizontal: 18, paddingVertical: 7, borderRadius: 20 },
   publishBtnText: { color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.base },

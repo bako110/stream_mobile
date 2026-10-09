@@ -139,58 +139,61 @@ export const CommunitiesDiscoverScreen: React.FC = () => {
   return (
     <View style={[S.root, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
-      <View style={[S.header, { backgroundColor: colors.surface, paddingTop: insets.top + 10, borderBottomColor: colors.divider }]}>
-        <View style={S.headerRow}>
-          <BackButton onPress={() => nav.goBack()} />
-          <Text style={[S.headerTitle, { color: colors.textPrimary }]}>Découvrir</Text>
-          <View style={{ width: 36 }} />
-        </View>
+      {/* Header — carte flottante */}
+      <View style={{ paddingTop: insets.top + 10 }}>
+        <View style={[S.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <View style={S.headerRow}>
+            <BackButton onPress={() => nav.goBack()} />
+            <Text style={[S.headerTitle, { color: colors.textPrimary }]}>Découvrir</Text>
+            <View style={{ width: 36 }} />
+          </View>
 
-        <View style={[S.searchWrap, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
-          <Icon name="search" size={15} color={colors.primary} />
-          <TextInput
-            style={[S.searchInput, { color: colors.textPrimary }]}
-            placeholder="Rechercher une communauté…"
-            placeholderTextColor={colors.textTertiary}
-            value={query}
-            onChangeText={setQuery}
-            returnKeyType="search"
-            autoFocus={!route.params?.initialCategory}
-          />
-          {query.length > 0 && (
-            <TouchableOpacity onPress={() => setQuery('')} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-              <Icon name="x" size={14} color={colors.textTertiary} />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={S.chipsScroll} contentContainerStyle={S.chipsRow}>
-          <TouchableOpacity
-            onPress={() => setActiveCategory(null)}
-            style={[S.chip, {
-              backgroundColor: !activeCategory ? colors.primary : colors.backgroundSecondary,
-              borderColor: !activeCategory ? colors.primary : colors.divider,
-            }]}
-          >
-            <Text style={{ color: !activeCategory ? '#fff' : colors.textSecondary, fontWeight: FontWeight.bold, fontSize: FontSize.sm }}>Toutes</Text>
-          </TouchableOpacity>
-          {CONTENT_CATEGORIES.filter(c => c.value !== 'autre').map(cat => {
-            const active = activeCategory === cat.value;
-            return (
-              <TouchableOpacity
-                key={cat.value}
-                onPress={() => setActiveCategory(active ? null : cat.value)}
-                style={[S.chip, {
-                  backgroundColor: active ? colors.primary : colors.backgroundSecondary,
-                  borderColor: active ? colors.primary : colors.divider,
-                }]}
-              >
-                <CategoryIcon value={cat.value} size={13} color={active ? '#fff' : colors.textSecondary} />
-                <Text style={{ color: active ? '#fff' : colors.textSecondary, fontWeight: FontWeight.bold, fontSize: FontSize.sm }}>{cat.label}</Text>
+          <View style={[S.searchWrap, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
+            <Icon name="search" size={15} color={colors.primary} />
+            <TextInput
+              style={[S.searchInput, { color: colors.textPrimary }]}
+              placeholder="Rechercher une communauté…"
+              placeholderTextColor={colors.textTertiary}
+              value={query}
+              onChangeText={setQuery}
+              returnKeyType="search"
+              autoFocus={!route.params?.initialCategory}
+            />
+            {query.length > 0 && (
+              <TouchableOpacity onPress={() => setQuery('')} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                <Icon name="x" size={14} color={colors.textTertiary} />
               </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+            )}
+          </View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={S.chipsScroll} contentContainerStyle={S.chipsRow}>
+            <TouchableOpacity
+              onPress={() => setActiveCategory(null)}
+              style={[S.chip, {
+                backgroundColor: !activeCategory ? colors.primary : colors.backgroundSecondary,
+                borderColor: !activeCategory ? colors.primary : colors.divider,
+              }]}
+            >
+              <Text style={{ color: !activeCategory ? '#fff' : colors.textSecondary, fontWeight: FontWeight.bold, fontSize: FontSize.sm }}>Toutes</Text>
+            </TouchableOpacity>
+            {CONTENT_CATEGORIES.filter(c => c.value !== 'autre').map(cat => {
+              const active = activeCategory === cat.value;
+              return (
+                <TouchableOpacity
+                  key={cat.value}
+                  onPress={() => setActiveCategory(active ? null : cat.value)}
+                  style={[S.chip, {
+                    backgroundColor: active ? colors.primary : colors.backgroundSecondary,
+                    borderColor: active ? colors.primary : colors.divider,
+                  }]}
+                >
+                  <CategoryIcon value={cat.value} size={13} color={active ? '#fff' : colors.textSecondary} />
+                  <Text style={{ color: active ? '#fff' : colors.textSecondary, fontWeight: FontWeight.bold, fontSize: FontSize.sm }}>{cat.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
       </View>
 
       {loading && all.length === 0 ? (
@@ -250,7 +253,11 @@ export const CommunitiesDiscoverScreen: React.FC = () => {
 
 const S = StyleSheet.create({
   root: { flex: 1 },
-  header: { borderBottomWidth: StyleSheet.hairlineWidth },
+  header: {
+    marginHorizontal: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
   headerRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 18, paddingBottom: 14,

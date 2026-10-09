@@ -49,16 +49,18 @@ export const StoryViewersScreen: React.FC = () => {
         backgroundColor="transparent"
         barStyle={theme.isDark ? 'light-content' : 'dark-content'}
       />
-      {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + (Platform.OS === 'android' ? 8 : 6), borderBottomColor: colors.divider, backgroundColor: colors.background }]}>
-        <BackButton onPress={() => nav.goBack()} />
-        <View style={s.headerCenter}>
-          <Icon name="eye" size={18} color={colors.primary} />
-          <Text style={[s.headerTitle, { color: colors.textPrimary }]}>
-            {viewCount} {viewCount === 1 ? 'vue' : 'vues'}
-          </Text>
+      {/* Header — carte flottante */}
+      <View style={{ paddingTop: insets.top + 8 }}>
+        <View style={[s.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => nav.goBack()} />
+          <View style={s.headerCenter}>
+            <Icon name="eye" size={18} color={colors.primary} />
+            <Text style={[s.headerTitle, { color: colors.textPrimary }]}>
+              {viewCount} {viewCount === 1 ? 'vue' : 'vues'}
+            </Text>
+          </View>
+          <View style={{ width: 40 }} />
         </View>
-        <View style={{ width: 40 }} />
       </View>
 
       {loading ? (
@@ -113,8 +115,10 @@ const s = StyleSheet.create({
   root: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingBottom: 14, paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 14, paddingHorizontal: 16,
+    marginHorizontal: 10, marginBottom: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
   },
   headerCenter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headerTitle: { fontSize: 18, fontWeight: '700' },

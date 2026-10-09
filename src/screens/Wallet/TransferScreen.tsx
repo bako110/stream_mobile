@@ -120,14 +120,16 @@ export default function TransferScreen() {
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + 16 }]}>
-        <BackButton onPress={() => navigation.goBack()} />
-        <Text style={[s.title, { color: colors.textPrimary }]}>Transférer des GoGold</Text>
-        {balance !== null && (
-          <View style={[s.balancePill, { backgroundColor: colors.surface }]}>
-            <Text style={s.balanceText}>{balance} 🪙</Text>
-          </View>
-        )}
+      <View style={{ paddingTop: insets.top + 16 }}>
+        <View style={[s.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => navigation.goBack()} />
+          <Text style={[s.title, { color: colors.textPrimary }]}>Transférer des GoGold</Text>
+          {balance !== null && (
+            <View style={[s.balancePill, { backgroundColor: colors.background }]}>
+              <Text style={s.balanceText}>{balance} 🪙</Text>
+            </View>
+          )}
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
@@ -259,12 +261,17 @@ export default function TransferScreen() {
 
 const s = StyleSheet.create({
   root:       { flex: 1 },
-  header:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 16, gap: 12 },
+  header:     {
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 16, gap: 12,
+    marginHorizontal: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
   backBtn:    { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   title:      { flex: 1, fontSize: 18, fontWeight: '700' },
   balancePill:{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   balanceText:{ color: '#FFD700', fontWeight: '700', fontSize: 13 },
-  scroll:     { paddingHorizontal: 20, paddingBottom: 48 },
+  scroll:     { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 48 },
   label:      { fontSize: 13, fontWeight: '600', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
   searchBox:  { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 8 },
   searchInput:{ flex: 1, fontSize: 15 },

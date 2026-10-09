@@ -379,12 +379,14 @@ function ContentDetailScreen({ detail, colors, onBack }: {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 16 }]}>
-        <BackButton onPress={onBack} />
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-          {detail.type.charAt(0).toUpperCase() + detail.type.slice(1)} — stats
-        </Text>
-        <View style={{ width: 38 }} />
+      <View style={{ paddingTop: insets.top + 16 }}>
+        <View style={[styles.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={onBack} />
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+            {detail.type.charAt(0).toUpperCase() + detail.type.slice(1)} — stats
+          </Text>
+          <View style={{ width: 38 }} />
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -535,10 +537,12 @@ export function CreatorStatsScreen() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 16 }]}>
-        <BackButton onPress={() => nav.goBack()} />
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Mes statistiques</Text>
-        <View style={{ width: 38 }} />
+      <View style={{ paddingTop: insets.top + 16 }}>
+        <View style={[styles.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => nav.goBack()} />
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Mes statistiques</Text>
+          <View style={{ width: 38 }} />
+        </View>
       </View>
 
       <ScrollView
@@ -670,7 +674,13 @@ const styles = StyleSheet.create({
   errorText:    { fontSize: 14, textAlign: 'center', marginTop: 8 },
   retryBtn:     { marginTop: 8, paddingHorizontal: 24, paddingVertical: 10, backgroundColor: '#7B3FF2', borderRadius: 20 },
   retryTxt:     { color: '#fff', fontWeight: '600' },
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+  header:       {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 16, paddingHorizontal: 16,
+    marginHorizontal: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
   headerTitle:  { fontSize: 17, fontWeight: '700', flex: 1, textAlign: 'center' },
   scroll:       { paddingHorizontal: 16, paddingTop: 16 },
   hero:         { borderRadius: 16, borderWidth: 1, padding: 20, marginBottom: 20 },

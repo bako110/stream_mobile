@@ -10,9 +10,11 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import { FontSize, FontWeight } from '../../theme';
+import { formatDurationSec, formatViewerCount } from '../../utils';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
-import { AppHeader, SkeletonProfile } from '../../components/common';
+import { SkeletonProfile } from '../../components/common';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { userService, eventService, concertService, reelService, postService, toastService, showConfirm } from '../../services';
 import { apiClient, Endpoints } from '../../api';
 import type { User } from '../../types';
@@ -21,6 +23,7 @@ import type { Concert } from '../../types/concert';
 import type { Post } from '../../types/post';
 import type { AppColors } from '../../theme/colors';
 import { profileStyles as s } from '../../styles/ProfileScreen.styles';
+import { TAB_BAR_HEIGHT } from '../../styles';
 import { QRCodeScreen } from '../Auth/QRCodeScreen';
 import { VerifiedBadge } from './SettingsScreen';
 
@@ -37,7 +40,13 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
   const { theme } = useTheme();
   const { colors } = theme;
   const nav = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const { currentUser: user, refreshUser, setCurrentUser } = useUser();
+  // Gap fixe entre les cartes des mini-grilles d'aperçu (flex:1 sur chaque
+  // carte, pas de largeur calculée — avec moins de cartes que de colonnes,
+  // elles s'élargissent pour occuper toute la largeur au lieu de laisser un
+  // vide).
+  const REEL_GAP = 5;
 
   const [loading,    setLoading]    = useState(true);
   const [myEvents,   setMyEvents]   = useState<Event[]>([]);
@@ -45,10 +54,11 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
   const [myReels,    setMyReels]    = useState<any[]>([]);
   const [myPosts,    setMyPosts]    = useState<Post[]>([]);
   const [draftsTab,  setDraftsTab]  = useState<'events' | 'concerts'>('events');
-  const [contentTab, setContentTab] = useState<'posts' | 'reels'>('posts');
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [showQR, setShowQR] = useState(false);
+  // Bottom sheet "Voir le reste de mes contenus" — propose Publications/Reels/Galerie.
+  const [showContentSheet, setShowContentSheet] = useState(false);
 
   // ── Menu "..." (éditer/supprimer) sur mes posts/reels ────────────────────
   const [menuTarget, setMenuTarget] = useState<{ kind: 'post' | 'reel'; id: string } | null>(null);
@@ -208,11 +218,25 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
     <View style={[s.root, { backgroundColor: colors.background }]}>
       <QRCodeScreen visible={showQR} onClose={() => setShowQR(false)} />
 
-      <AppHeader
-        title="Profil"
-        rightIcon="settings"
-        onRightPress={() => nav.navigate('Settings')}
-      />
+      {/* Titre "Profil" + bouton réglages — barre fixe classique (non animée),
+          toujours visible en haut de l'écran. */}
+      <View style={[profileHeaderStyles.container, { height: insets.top + PROFILE_HEADER_CONTENT_HEIGHT, paddingTop: insets.top, backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
+        <View style={profileHeaderStyles.inner}>
+          <View style={profileHeaderStyles.side} />
+          <Text style={[profileHeaderStyles.title, { color: colors.textPrimary }]} numberOfLines={1}>
+            Profil
+          </Text>
+          <View style={[profileHeaderStyles.side, profileHeaderStyles.right]}>
+            <TouchableOpacity
+              onPress={() => nav.navigate('Settings')}
+              style={profileHeaderStyles.iconBtn}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Icon name="settings" size={22} color={colors.textPrimary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
 
       {loading ? (
         <SkeletonProfile />
@@ -220,86 +244,80 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
         <ScrollView
           ref={scrollRef}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={s.scroll}
+          contentContainerStyle={[s.scroll, { paddingBottom: TAB_BAR_HEIGHT + insets.bottom + 48 }]}
           onScroll={handleProfileScroll}
           scrollEventThrottle={16}
         >
 
-          {/* ── HEADER : Bannière + Avatar + Identité + Stats + Actions ── */}
-          <View style={{ backgroundColor: colors.surface }}>
+          {/* ── Hero (bannière + avatar + identité) — défile normalement avec
+              le reste du contenu, dans le flux du ScrollView. ── */}
+          <View style={{ backgroundColor: colors.surface, borderBottomColor: colors.divider, borderBottomWidth: StyleSheet.hairlineWidth }}>
+          <View style={{ height: 150, width: '100%' }}>
+          {user?.banner_url ? (
+            <Image source={{ uri: user.banner_url, cache: 'reload' }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+          ) : (
+            <LinearGradient
+              colors={[colors.gradientStart, colors.gradientEnd]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={{ width: '100%', height: '100%' }}
+            />
+          )}
+          {/* Bouton "Modifier la bannière" en haut à droite */}
+          <TouchableOpacity
+            onPress={onEditProfile}
+            style={{ position: 'absolute', top: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.50)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 }}
+            activeOpacity={0.8}
+          >
+            <Icon name="camera" size={13} color="#fff" />
+            <Text style={{ color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.semiBold }}>Modifier la bannière</Text>
+          </TouchableOpacity>
+        </View>
 
-            {/* Bannière */}
-            <View style={{ height: 150, width: '100%' }}>
-              {user?.banner_url ? (
-                <Image source={{ uri: user.banner_url, cache: 'reload' }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+        <View style={{ paddingHorizontal: 16, marginTop: -44, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingBottom: 12 }}>
+          <TouchableOpacity onPress={onEditProfile} activeOpacity={0.85} style={{ position: 'relative' }}>
+            <View style={{ width: 88, height: 88, borderRadius: 44, borderWidth: 3, borderColor: colors.surface, overflow: 'hidden' }}>
+              {user?.avatar_url ? (
+                <Image source={{ uri: user.avatar_url, cache: 'reload' }} style={{ width: '100%', height: '100%', borderRadius: 44 }} />
               ) : (
                 <LinearGradient
                   colors={[colors.gradientStart, colors.gradientEnd]}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                  style={{ width: '100%', height: '100%' }}
-                />
+                  style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Text style={{ fontSize: FontSize['4xl'], fontWeight: FontWeight.black, color: colors.textOnBrand }}>{initials}</Text>
+                </LinearGradient>
               )}
-              {/* Bouton "Modifier la bannière" en haut à droite */}
-              <TouchableOpacity
-                onPress={onEditProfile}
-                style={{ position: 'absolute', top: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.50)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 }}
-                activeOpacity={0.8}
-              >
-                <Icon name="camera" size={13} color="#fff" />
-                <Text style={{ color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.semiBold }}>Modifier la bannière</Text>
-              </TouchableOpacity>
             </View>
-
-            {/* Zone avatar + bouton "Modifier le profil" */}
-            <View style={{ paddingHorizontal: 16, marginTop: -44, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingBottom: 12 }}>
-              {/* Avatar avec icone crayon */}
-              <TouchableOpacity onPress={onEditProfile} activeOpacity={0.85} style={{ position: 'relative' }}>
-                <View style={{ width: 88, height: 88, borderRadius: 44, borderWidth: 3, borderColor: colors.surface, overflow: 'hidden' }}>
-                  {user?.avatar_url ? (
-                    <Image source={{ uri: user.avatar_url, cache: 'reload' }} style={{ width: '100%', height: '100%', borderRadius: 44 }} />
-                  ) : (
-                    <LinearGradient
-                      colors={[colors.gradientStart, colors.gradientEnd]}
-                      style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
-                    >
-                      <Text style={{ fontSize: FontSize['4xl'], fontWeight: FontWeight.black, color: colors.textOnBrand }}>{initials}</Text>
-                    </LinearGradient>
-                  )}
-                </View>
-                {/* Icone crayon sur l'avatar */}
-                <View style={{ position: 'absolute', bottom: 2, right: 2, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.surface }}>
-                  <Icon name="edit-2" size={10} color="#fff" />
-                </View>
-              </TouchableOpacity>
-
-              {/* Bouton "Modifier le profil" */}
-              <TouchableOpacity
-                onPress={onEditProfile}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 18, paddingVertical: 9, borderRadius: 22, backgroundColor: colors.primary }}
-                activeOpacity={0.8}
-              >
-                <Icon name="edit-2" size={13} color="#fff" />
-                <Text style={{ fontSize: FontSize.base, fontWeight: FontWeight.bold, color: '#fff' }}>Modifier le profil</Text>
-              </TouchableOpacity>
+            <View style={{ position: 'absolute', bottom: 2, right: 2, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.surface }}>
+              <Icon name="edit-2" size={10} color="#fff" />
             </View>
+          </TouchableOpacity>
 
-            {/* Identité : nom + badge verified + username + badge role */}
-            <View style={{ paddingHorizontal: 16, paddingBottom: 16, gap: 4 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={{ fontSize: FontSize.xl, fontWeight: FontWeight.extraBold, color: colors.textPrimary }} numberOfLines={1}>{displayName}</Text>
-                {user?.is_verified && <VerifiedBadge size={18} />}
-              </View>
-              {user?.username && (
-                <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.medium, color: colors.textSecondary }}>@{user.username}</Text>
-              )}
-              {user?.bio ? (
-                <Text style={{ fontSize: FontSize.smPlus, color: colors.textSecondary, lineHeight: 18, marginTop: 4 }} numberOfLines={3}>{user.bio}</Text>
-              ) : null}
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6, alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 14, backgroundColor: colors.primary + '18', borderWidth: 1, borderColor: colors.primary + '40' }}>
-                <Icon name={roleIcon} size={12} color={colors.primary} />
-                <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: colors.primary }}>{roleLabel}</Text>
-              </View>
-            </View>
+          <TouchableOpacity
+            onPress={onEditProfile}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 18, paddingVertical: 9, borderRadius: 22, backgroundColor: colors.primary }}
+            activeOpacity={0.8}
+          >
+            <Icon name="edit-2" size={13} color="#fff" />
+            <Text style={{ fontSize: FontSize.base, fontWeight: FontWeight.bold, color: '#fff' }}>Modifier le profil</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={{ paddingHorizontal: 16, paddingBottom: 16, gap: 4 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={{ fontSize: FontSize.xl, fontWeight: FontWeight.extraBold, color: colors.textPrimary }} numberOfLines={1}>{displayName}</Text>
+            {user?.is_verified && <VerifiedBadge size={18} />}
+          </View>
+          {user?.username && (
+            <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.medium, color: colors.textSecondary }}>@{user.username}</Text>
+          )}
+          {user?.bio ? (
+            <Text style={{ fontSize: FontSize.smPlus, color: colors.textSecondary, lineHeight: 18, marginTop: 4 }} numberOfLines={3}>{user.bio}</Text>
+          ) : null}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6, alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 14, backgroundColor: colors.primary + '18', borderWidth: 1, borderColor: colors.primary + '40' }}>
+            <Icon name={roleIcon} size={12} color={colors.primary} />
+            <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: colors.primary }}>{roleLabel}</Text>
+          </View>
+        </View>
 
             {/* Stats Abonnés / Abonnements — deux cards côte à côte */}
             {user && (
@@ -473,137 +491,366 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
           </View>
 
 
-          {/* ── Publications (Posts / Reels) ──────────────────────────── */}
-          <View style={[s.section, { backgroundColor: colors.surface, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.divider, overflow: 'hidden' }]}>
-            {/* Onglets */}
-            <View style={{ flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}>
-              {(['posts', 'reels'] as const).map(tab => {
-                const active = contentTab === tab;
-                return (
-                  <TouchableOpacity
-                    key={tab}
-                    onPress={() => setContentTab(tab)}
-                    activeOpacity={0.7}
-                    style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderBottomWidth: 2, borderBottomColor: active ? colors.primary : 'transparent' }}
-                  >
-                    <Icon name={tab === 'posts' ? 'grid' : 'play-circle'} size={15} color={active ? colors.primary : colors.textTertiary} />
-                    <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, color: active ? colors.primary : colors.textTertiary, marginTop: 3 }}>
-                      {tab === 'posts' ? `Posts (${myPosts.length})` : `Reels (${myReels.length})`}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-              <TouchableOpacity
-                onPress={() => nav.navigate('UserGallery', { userId: user!.id })}
-                activeOpacity={0.7}
-                style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderBottomWidth: 2, borderBottomColor: 'transparent' }}
-              >
-                <Icon name="image" size={15} color={colors.textTertiary} />
-                <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, color: colors.textTertiary, marginTop: 3 }}>
-                  Galerie
-                </Text>
-              </TouchableOpacity>
-            </View>
+          {/* ── Publications récentes — 4 derniers posts, aperçu direct (plus
+              d'onglets à cliquer). carte flottante (même design que le reste
+              de l'app). overflow:'hidden' isolé sur une View enfant distincte
+              de celle qui porte l'ombre — les mélanger couperait l'ombre
+              portée sur iOS. ──────────────────────────── */}
+          <View style={[s.section, {
+            backgroundColor: colors.surface, borderColor: colors.divider,
+            marginHorizontal: 10, borderRadius: 24, borderWidth: 1,
+            shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+            shadowOffset: { width: 0, height: 5 }, elevation: 8,
+          }]}>
+          <View style={{ borderRadius: 24, overflow: 'hidden', padding: 16, gap: 18 }}>
 
-            {/* Contenu posts */}
-            {contentTab === 'posts' && (
-              <View style={{ padding: 12, gap: 8 }}>
-                {myPosts.length === 0 ? (
-                  <View style={{ alignItems: 'center', paddingVertical: 24, gap: 8 }}>
-                    <Icon name="edit-3" size={28} color={colors.textTertiary} />
-                    <Text style={{ fontSize: FontSize.smPlus, color: colors.textTertiary }}>Aucun post publié</Text>
-                  </View>
-                ) : myPosts.slice(0, 6).map(post => {
-                  // Même résolution que PostDetailScreen/UserPostsScreen : une image
-                  // simple, un tableau d'images, ou la vignette d'une vidéo — sinon
-                  // aucune image (post texte pur), pas de carré vide forcé.
-                  const p = post as any;
-                  const thumb = p.image_urls?.[0] ?? p.image_url ?? p.thumbnail_url ?? null;
+            {/* ── Publications récentes — carte vedette (la plus récente) + grille,
+                même langage visuel que la section Reels juste en dessous
+                (carte 4:3 coins 18px, dégradé bas, grille 3 colonnes). Posts
+                d'abord, événements/concerts publiés (recentPublished) en
+                complément jusqu'à 4 si peu de posts — même logique que
+                UserProfileScreen.tsx. Pas de badge durée (pas de vidéo). ── */}
+            <View style={{ gap: 8 }}>
+              <Text style={[s.sectionTitle, { color: colors.textTertiary }]}>PUBLICATIONS RÉCENTES</Text>
+              {(() => {
+                // Même résolution que PostDetailScreen/UserPostsScreen : une image
+                // simple, un tableau d'images, ou la vignette d'une vidéo — sinon
+                // aucune image (post texte pur), pas de carré vide forcé.
+                const pubItems = [
+                  ...myPosts.map(post => {
+                    const p = post as any;
+                    const thumb = p.image_urls?.[0] ?? p.image_url ?? p.thumbnail_url ?? null;
+                    return {
+                      key: `post-${post.id}`,
+                      kind: 'post' as const,
+                      thumb,
+                      caption: p.body || p.content || null,
+                      likes: p.likes_count ?? p.like_count ?? 0,
+                      comments: p.comments_count ?? p.comment_count ?? 0,
+                      onPress: () => nav.navigate('PostDetail', { postId: post.id }),
+                      onMenu: () => setMenuTarget({ kind: 'post', id: post.id }),
+                    };
+                  }),
+                  ...recentPublished.map(pub => {
+                    const isEvent = pub.kind === 'event';
+                    const item = pub.data as any;
+                    return {
+                      key: `${pub.kind}-${item.id}`,
+                      kind: pub.kind,
+                      thumb: item.thumbnail_url ?? item.banner_url ?? null,
+                      caption: item.title ?? null,
+                      likes: item.like_count ?? 0,
+                      comments: item.comment_count ?? 0,
+                      typeIcon: isEvent ? 'calendar' : 'music',
+                      accent: isEvent ? '#E0389A' : '#7B3FF2',
+                      onPress: () => {
+                        if (isEvent) nav.navigate('EventDetail', { eventId: item.id });
+                        else nav.navigate('ConcertDetail', { concertId: item.id });
+                      },
+                      onMenu: null,
+                    };
+                  }),
+                ].slice(0, 4);
+
+                if (pubItems.length === 0) {
                   return (
-                    <TouchableOpacity
-                      key={post.id}
-                      activeOpacity={0.75}
-                      onPress={() => nav.navigate('PostDetail', { postId: post.id })}
-                      style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 12, backgroundColor: colors.surfaceElevated }}
-                    >
-                      {thumb ? (
-                        <Image source={{ uri: thumb }} style={{ width: 46, height: 46, borderRadius: 8 }} />
-                      ) : (
-                        <View style={{ width: 22, alignItems: 'center', justifyContent: 'center' }}>
-                          <Icon name="file-text" size={18} color={colors.primary} />
-                        </View>
-                      )}
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold, color: colors.textPrimary }} numberOfLines={thumb ? 2 : 3}>
-                          {p.body || p.content || 'Post'}
-                        </Text>
-                        <Text style={{ fontSize: FontSize.xsPlus, color: colors.textTertiary, marginTop: 2 }}>
-                          {new Date(p.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-                        </Text>
-                      </View>
-                      <TouchableOpacity
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        onPress={() => setMenuTarget({ kind: 'post', id: post.id })}
-                        style={{ padding: 4 }}
-                      >
-                        <Icon name="more-vertical" size={16} color={colors.textTertiary} />
-                      </TouchableOpacity>
-                    </TouchableOpacity>
+                    <View style={{ alignItems: 'center', paddingVertical: 24, gap: 8 }}>
+                      <Icon name="edit-3" size={28} color={colors.textTertiary} />
+                      <Text style={{ fontSize: FontSize.smPlus, color: colors.textTertiary }}>Aucun post publié</Text>
+                    </View>
                   );
-                })}
-                {myPosts.length > 6 && (
-                  <TouchableOpacity
-                    activeOpacity={0.75}
-                    onPress={() => nav.navigate('UserPosts', { userId: user!.id })}
-                    style={{ alignItems: 'center', paddingVertical: 10 }}
-                  >
-                    <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, color: colors.primary }}>Voir tout</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
+                }
 
-            {/* Contenu reels — grille 3 colonnes */}
-            {contentTab === 'reels' && (
-              <View style={{ padding: 8 }}>
-                {myReels.length === 0 ? (
-                  <View style={{ alignItems: 'center', paddingVertical: 24, gap: 8 }}>
-                    <Icon name="play-circle" size={28} color={colors.textTertiary} />
-                    <Text style={{ fontSize: FontSize.smPlus, color: colors.textTertiary }}>Aucun reel publié</Text>
-                  </View>
-                ) : (
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
-                    {myReels.slice(0, 9).map(reel => (
-                      <TouchableOpacity
-                        key={reel.id}
-                        activeOpacity={0.8}
-                        onPress={() => nav.navigate('UserReels', { userId: user!.id, initialReelId: reel.id, initialReels: myReels })}
-                        style={{ width: '31.5%', aspectRatio: 9 / 16, borderRadius: 8, overflow: 'hidden', backgroundColor: colors.surfaceElevated }}
-                      >
-                        {reel.thumbnail_url ? (
-                          <Image source={{ uri: reel.thumbnail_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                        ) : (
-                          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                            <Icon name="play" size={24} color={colors.textTertiary} />
-                          </View>
-                        )}
-                        <View style={{ position: 'absolute', bottom: 4, left: 4, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                          <Icon name="eye" size={10} color="#fff" />
-                          <Text style={{ fontSize: FontSize.xs, color: '#fff', fontWeight: FontWeight.bold }}>{reel.view_count ?? 0}</Text>
+                const featured = pubItems[0] as any;
+                const rest = pubItems.slice(1, 4) as any[];
+                // Post texte pur (pas d'image) : pas de dégradé, texte posé
+                // directement sur fond neutre — un dégradé sur fond uni n'apporte
+                // rien et le texte s'y lirait moins bien qu'en pleine carte.
+                const featuredIsTextOnlyPost = featured.kind === 'post' && !featured.thumb;
+
+                return (
+                  <>
+                    {/* Carte vedette — publication la plus récente */}
+                    <TouchableOpacity
+                      activeOpacity={0.9}
+                      onPress={featured.onPress}
+                      style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: 18, overflow: 'hidden', backgroundColor: colors.surfaceElevated, marginBottom: 4 }}
+                    >
+                      {featured.thumb ? (
+                        <Image source={{ uri: featured.thumb }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                      ) : featuredIsTextOnlyPost ? (
+                        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                          <Icon name="file-text" size={28} color={colors.textTertiary} style={{ marginBottom: 10 }} />
+                          <Text style={{ fontSize: FontSize.basePlus, fontWeight: FontWeight.semiBold, color: colors.textPrimary, textAlign: 'center' }} numberOfLines={5}>
+                            {featured.caption || 'Post'}
+                          </Text>
                         </View>
+                      ) : (
+                        <LinearGradient
+                          colors={[featured.accent + 'CC', featured.accent + '66']}
+                          style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+                        >
+                          <Icon name={featured.typeIcon} size={36} color="rgba(255,255,255,0.8)" />
+                        </LinearGradient>
+                      )}
+
+                      {featured.onMenu && (
                         <TouchableOpacity
                           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                          onPress={() => setMenuTarget({ kind: 'reel', id: reel.id })}
-                          style={{ position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' }}
+                          onPress={featured.onMenu}
+                          style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' }}
                         >
-                          <Icon name="more-vertical" size={13} color="#fff" />
+                          <Icon name="more-vertical" size={15} color="#fff" />
                         </TouchableOpacity>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-              </View>
-            )}
+                      )}
+
+                      {!featuredIsTextOnlyPost && (
+                        <LinearGradient
+                          colors={['transparent', 'rgba(0,0,0,0.75)']}
+                          style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 14, paddingTop: 28, paddingBottom: 12, gap: 4 }}
+                        >
+                          {featured.caption ? (
+                            <Text style={{ fontSize: FontSize.base, fontWeight: FontWeight.extraBold, color: '#fff' }} numberOfLines={2}>
+                              {featured.caption}
+                            </Text>
+                          ) : null}
+                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <Icon name="heart" size={12} color="#fff" />
+                              <Text style={{ fontSize: FontSize.xs, color: '#fff', fontWeight: FontWeight.semiBold }}>{formatViewerCount(featured.likes)}</Text>
+                              <Text style={{ fontSize: FontSize.xs, color: 'rgba(255,255,255,0.6)' }}>|</Text>
+                              <Icon name="message-circle" size={12} color="#fff" />
+                              <Text style={{ fontSize: FontSize.xs, color: '#fff', fontWeight: FontWeight.semiBold }}>{formatViewerCount(featured.comments)}</Text>
+                            </View>
+                            {featured.kind === 'post' && (
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.18)' }}>
+                                <Icon name="user" size={10} color="#fff" />
+                                <Text style={{ fontSize: FontSize.xs, color: '#fff', fontWeight: FontWeight.semiBold }}>Moi</Text>
+                              </View>
+                            )}
+                          </View>
+                        </LinearGradient>
+                      )}
+                    </TouchableOpacity>
+
+                    {/* Grille — les 3 publications suivantes. flex:1 (pas une
+                        largeur fixe) — avec moins de 3 éléments, les cartes
+                        s'élargissent pour occuper toute la largeur au lieu de
+                        laisser un vide à droite. */}
+                    {rest.length > 0 && (
+                      <View style={{ flexDirection: 'row' }}>
+                        {rest.map((it, idx) => {
+                          const isTextOnlyPost = it.kind === 'post' && !it.thumb;
+                          return (
+                            <TouchableOpacity
+                              key={it.key}
+                              activeOpacity={0.8}
+                              onPress={it.onPress}
+                              style={{
+                                flex: 1, aspectRatio: 9 / 16, borderRadius: 12,
+                                overflow: 'hidden', backgroundColor: colors.surfaceElevated,
+                                marginRight: idx === rest.length - 1 ? 0 : REEL_GAP,
+                              }}
+                            >
+                              {it.thumb ? (
+                                <Image source={{ uri: it.thumb }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                              ) : isTextOnlyPost ? (
+                                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 8 }}>
+                                  <Icon name="file-text" size={22} color={colors.textTertiary} style={{ marginBottom: 6 }} />
+                                  <Text style={{ fontSize: 10, fontWeight: FontWeight.semiBold, color: colors.textPrimary, textAlign: 'center' }} numberOfLines={3}>
+                                    {it.caption || 'Post'}
+                                  </Text>
+                                </View>
+                              ) : (
+                                <LinearGradient
+                                  colors={[it.accent + 'CC', it.accent + '66']}
+                                  style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+                                >
+                                  <Icon name={it.typeIcon} size={24} color="rgba(255,255,255,0.8)" />
+                                </LinearGradient>
+                              )}
+
+                              {!isTextOnlyPost && (
+                                <LinearGradient
+                                  colors={['transparent', 'rgba(0,0,0,0.7)']}
+                                  style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 6, paddingTop: 16, paddingBottom: 6, gap: 2 }}
+                                >
+                                  {it.caption ? (
+                                    <Text style={{ fontSize: 10, fontWeight: FontWeight.bold, color: '#fff' }} numberOfLines={1}>
+                                      {it.caption}
+                                    </Text>
+                                  ) : null}
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                                    <Icon name="heart" size={9} color="#fff" />
+                                    <Text style={{ fontSize: 9, color: '#fff', fontWeight: FontWeight.bold }}>{formatViewerCount(it.likes)}</Text>
+                                    <Icon name="message-circle" size={9} color="#fff" style={{ marginLeft: 4 }} />
+                                    <Text style={{ fontSize: 9, color: '#fff', fontWeight: FontWeight.bold }}>{formatViewerCount(it.comments)}</Text>
+                                  </View>
+                                </LinearGradient>
+                              )}
+
+                              {it.onMenu && (
+                                <TouchableOpacity
+                                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                  onPress={it.onMenu}
+                                  style={{ position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' }}
+                                >
+                                  <Icon name="more-vertical" size={13} color="#fff" />
+                                </TouchableOpacity>
+                              )}
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    )}
+                  </>
+                );
+              })()}
+            </View>
+
+            {/* ── Reels récents — carte vedette (le plus récent) + grille ── */}
+            <View style={{ gap: 8 }}>
+              <Text style={[s.sectionTitle, { color: colors.textTertiary }]}>REELS RÉCENTS</Text>
+              {myReels.length === 0 ? (
+                <View style={{ alignItems: 'center', paddingVertical: 24, gap: 8 }}>
+                  <Icon name="play-circle" size={28} color={colors.textTertiary} />
+                  <Text style={{ fontSize: FontSize.smPlus, color: colors.textTertiary }}>Aucun reel publié</Text>
+                </View>
+              ) : (
+                <>
+                  {/* Carte vedette — reel le plus récent */}
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() => nav.navigate('UserReels', { userId: user!.id, initialReelId: myReels[0].id, initialReels: myReels })}
+                    style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: 18, overflow: 'hidden', backgroundColor: colors.surfaceElevated, marginBottom: 4 }}
+                  >
+                    {myReels[0].thumbnail_url ? (
+                      <Image source={{ uri: myReels[0].thumbnail_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                    ) : (
+                      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                        <Icon name="play" size={32} color={colors.textTertiary} />
+                      </View>
+                    )}
+
+                    {myReels[0].duration_sec != null && (
+                      <View style={{ position: 'absolute', top: 10, left: 10, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.55)' }}>
+                        <Icon name="play" size={10} color="#fff" />
+                        <Text style={{ fontSize: FontSize.xs, color: '#fff', fontWeight: FontWeight.bold }}>{formatDurationSec(myReels[0].duration_sec)}</Text>
+                      </View>
+                    )}
+
+                    <TouchableOpacity
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      onPress={() => setMenuTarget({ kind: 'reel', id: myReels[0].id })}
+                      style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <Icon name="more-vertical" size={15} color="#fff" />
+                    </TouchableOpacity>
+
+                    <LinearGradient
+                      colors={['transparent', 'rgba(0,0,0,0.75)']}
+                      style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 14, paddingTop: 28, paddingBottom: 12, gap: 4 }}
+                    >
+                      {myReels[0].caption ? (
+                        <Text style={{ fontSize: FontSize.base, fontWeight: FontWeight.extraBold, color: '#fff' }} numberOfLines={2}>
+                          {myReels[0].caption}
+                        </Text>
+                      ) : null}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Icon name="eye" size={12} color="#fff" />
+                          <Text style={{ fontSize: FontSize.xs, color: '#fff', fontWeight: FontWeight.semiBold }}>{formatViewerCount(myReels[0].view_count ?? 0)}</Text>
+                          <Text style={{ fontSize: FontSize.xs, color: 'rgba(255,255,255,0.6)' }}>|</Text>
+                          <Icon name="heart" size={12} color="#fff" />
+                          <Text style={{ fontSize: FontSize.xs, color: '#fff', fontWeight: FontWeight.semiBold }}>{formatViewerCount(myReels[0].likes_count ?? 0)}</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.18)' }}>
+                          <Icon name="user" size={10} color="#fff" />
+                          <Text style={{ fontSize: FontSize.xs, color: '#fff', fontWeight: FontWeight.semiBold }}>Moi</Text>
+                        </View>
+                      </View>
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  {/* Grille — les 3 reels suivants. flex:1 (pas une largeur
+                      fixe) — avec moins de 3 éléments, les cartes s'élargissent
+                      pour occuper toute la largeur au lieu de laisser un vide. */}
+                  {myReels.length > 1 && (
+                    <View style={{ flexDirection: 'row' }}>
+                      {myReels.slice(1, 4).map((reel, idx, arr) => (
+                        <TouchableOpacity
+                          key={reel.id}
+                          activeOpacity={0.8}
+                          onPress={() => nav.navigate('UserReels', { userId: user!.id, initialReelId: reel.id, initialReels: myReels })}
+                          style={{
+                            flex: 1, aspectRatio: 9 / 16, borderRadius: 12,
+                            overflow: 'hidden', backgroundColor: colors.surfaceElevated,
+                            marginRight: idx === arr.length - 1 ? 0 : REEL_GAP,
+                          }}
+                        >
+                          {reel.thumbnail_url ? (
+                            <Image source={{ uri: reel.thumbnail_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                          ) : (
+                            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                              <Icon name="play" size={24} color={colors.textTertiary} />
+                            </View>
+                          )}
+
+                          {reel.duration_sec != null && (
+                            <View style={{ position: 'absolute', top: 6, left: 6, flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.55)' }}>
+                              <Icon name="play" size={8} color="#fff" />
+                              <Text style={{ fontSize: 9, color: '#fff', fontWeight: FontWeight.bold }}>{formatDurationSec(reel.duration_sec)}</Text>
+                            </View>
+                          )}
+
+                          <LinearGradient
+                            colors={['transparent', 'rgba(0,0,0,0.7)']}
+                            style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 6, paddingTop: 16, paddingBottom: 6, gap: 2 }}
+                          >
+                            {reel.caption ? (
+                              <Text style={{ fontSize: 10, fontWeight: FontWeight.bold, color: '#fff' }} numberOfLines={1}>
+                                {reel.caption}
+                              </Text>
+                            ) : null}
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                              <Icon name="eye" size={9} color="#fff" />
+                              <Text style={{ fontSize: 9, color: '#fff', fontWeight: FontWeight.bold }}>{formatViewerCount(reel.view_count ?? 0)}</Text>
+                              <Icon name="heart" size={9} color="#fff" style={{ marginLeft: 4 }} />
+                              <Text style={{ fontSize: 9, color: '#fff', fontWeight: FontWeight.bold }}>{formatViewerCount(reel.likes_count ?? 0)}</Text>
+                            </View>
+                          </LinearGradient>
+
+                          <TouchableOpacity
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            onPress={() => setMenuTarget({ kind: 'reel', id: reel.id })}
+                            style={{ position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' }}
+                          >
+                            <Icon name="more-vertical" size={13} color="#fff" />
+                          </TouchableOpacity>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </>
+              )}
+            </View>
+
+            {/* ── Bouton "Voir le reste de mes contenus" — ouvre le bottom sheet ── */}
+            <TouchableOpacity
+              onPress={() => setShowContentSheet(true)}
+              activeOpacity={0.85}
+              style={{
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+                paddingVertical: 13, borderRadius: 14,
+                backgroundColor: colors.primary + '14', borderWidth: 1, borderColor: colors.primary + '40',
+              }}
+            >
+              <Icon name="layers" size={16} color={colors.primary} />
+              <Text style={{ fontSize: FontSize.basePlus, fontWeight: FontWeight.bold, color: colors.primary }}>
+                Voir le reste de mes contenus
+              </Text>
+            </TouchableOpacity>
+          </View>
           </View>
 
           {/* ── Mes créations / Brouillons (artistes) ─────────────────── */}
@@ -654,13 +901,16 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
 
       {/* Bouton flottant "remonter + rafraîchir" — apparaît au scroll, jamais
           rendu tant qu'il n'a pas été affiché au moins une fois (pointerEvents
-          évite qu'il intercepte les taps une fois invisible). */}
+          évite qu'il intercepte les taps une fois invisible). Positionné
+          au-dessus du footer (TAB_BAR_HEIGHT + insets.bottom + 16), jamais
+          masqué par la tab bar. */}
       {showScrollTop && (
         <Animated.View
           pointerEvents="box-none"
           style={[
             st.scrollTopWrap,
             {
+              bottom: TAB_BAR_HEIGHT + insets.bottom + 16,
               opacity: scrollTopAnim,
               transform: [{
                 scale: scrollTopAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }),
@@ -677,6 +927,47 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
           </TouchableOpacity>
         </Animated.View>
       )}
+
+      {/* ── Bottom sheet "Voir le reste de mes contenus" — glisse depuis le
+          bas, propose Publications / Reels / Galerie. Au choix, ferme le
+          sheet et navigue vers l'écran paginé correspondant. ── */}
+      <Modal transparent animationType="slide" visible={showContentSheet} onRequestClose={() => setShowContentSheet(false)}>
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
+          activeOpacity={1}
+          onPress={() => setShowContentSheet(false)}
+        >
+          <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingBottom: insets.bottom + 20, paddingTop: 10 }}>
+            <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: colors.divider, alignSelf: 'center', marginBottom: 14 }} />
+            <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 1, paddingHorizontal: 20, marginBottom: 6 }}>
+              Que souhaitez-vous voir ?
+            </Text>
+            {([
+              { key: 'posts',  label: 'Publications', icon: 'grid',        route: 'UserPosts' as const },
+              { key: 'reels',  label: 'Reels',         icon: 'play-circle', route: 'UserReelsGrid' as const },
+              { key: 'gallery', label: 'Galerie',      icon: 'image',       route: 'UserGallery' as const },
+            ]).map(opt => (
+              <TouchableOpacity
+                key={opt.key}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 15 }}
+                activeOpacity={0.7}
+                onPress={() => {
+                  setShowContentSheet(false);
+                  if (user) nav.navigate(opt.route, { userId: user.id });
+                }}
+              >
+                <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: colors.primary + '14', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name={opt.icon} size={19} color={colors.primary} />
+                </View>
+                <Text style={{ flex: 1, fontSize: FontSize.basePlus, fontWeight: FontWeight.semiBold, color: colors.textPrimary }}>
+                  {opt.label}
+                </Text>
+                <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Menu "..." — éditer/supprimer sur mes posts/reels */}
       <Modal transparent animationType="slide" visible={!!menuTarget} onRequestClose={() => setMenuTarget(null)}>
@@ -803,7 +1094,6 @@ const st = StyleSheet.create({
   scrollTopWrap: {
     position: 'absolute',
     right: 18,
-    bottom: 28,
   },
   scrollTopBtn: {
     width: 46,
@@ -816,5 +1106,45 @@ const st = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 5,
+  },
+});
+
+// Header simple (pré-refonte carte flottante) — repris de l'ancien AppHeader,
+// propre à cet écran uniquement. Hauteur compacte (pas HEADER_HEIGHT, conçue
+// pour la carte flottante d'AppHeader.tsx, disproportionnée ici) — laissait
+// un grand espace vide au-dessus du titre.
+const PROFILE_HEADER_CONTENT_HEIGHT = 50;
+const profileHeaderStyles = StyleSheet.create({
+  container: {
+    width: '100%',
+    height: PROFILE_HEADER_CONTENT_HEIGHT,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  inner: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  side: {
+    width: 64,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+  right: {
+    alignItems: 'flex-end',
+  },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 20,
+  },
+  title: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
   },
 });

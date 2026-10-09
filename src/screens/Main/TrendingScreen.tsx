@@ -197,7 +197,7 @@ export const TrendingScreen: React.FC = () => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <AppHeader title="Tendances" variant="default" />
+      <AppHeader title="Tendances" variant="default" onBack={() => nav.goBack()} />
 
       {/* Tabs */}
       <View style={[s.tabBar, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>

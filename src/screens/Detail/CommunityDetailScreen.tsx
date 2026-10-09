@@ -1451,58 +1451,62 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
 
-      {/* ── Header fixe ── */}
-      <View style={[s.header, {
-        paddingTop: insets.top + 8,
-        backgroundColor: colors.surface,
-        borderBottomColor: colors.divider,
-      }]}>
-        <BackButton onPress={() => nav.goBack()} />
-        <Text style={[s.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-          {community.name}
-        </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <TouchableOpacity
-            onPress={() => {
-              if (communitySaved) {
-                setCommunitySaved(false);
-                favoriteService.unsave('community', communityId).catch(() => setCommunitySaved(true));
-              } else if (community) {
-                setCommunitySaved(true);
-                favoriteService.save({
-                  target_type: 'community',
-                  target_id: community.id,
-                  target_title: community.name,
-                  target_subtitle: community.description ?? null,
-                  target_thumbnail: community.avatar_url ?? null,
-                }).catch(() => setCommunitySaved(false));
-              }
-            }}
-            style={s.headerIcon}
-          >
-            <Icon
-              name="bookmark"
-              size={20}
-              color={communitySaved ? colors.primary : colors.textPrimary}
-            />
-          </TouchableOpacity>
-          {(isAdmin || isMod) && (
+      {/* ── Header fixe — carte flottante (même design que le reste de
+          l'app). paddingTop (status bar) isolé sur un wrapper externe
+          transparent — le mélanger au style de la carte ferait apparaître
+          un coin visible sous la status bar. ── */}
+      <View style={{ paddingTop: insets.top + 8 }}>
+        <View style={[s.header, {
+          backgroundColor: colors.surface,
+          borderColor: colors.divider,
+        }]}>
+          <BackButton onPress={() => nav.goBack()} />
+          <Text style={[s.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+            {community.name}
+          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <TouchableOpacity
-              onPress={() => (nav as any).navigate('CommunityInvite', {
-                communityId,
-                communityName: community.name,
-                myRole,
-              })}
+              onPress={() => {
+                if (communitySaved) {
+                  setCommunitySaved(false);
+                  favoriteService.unsave('community', communityId).catch(() => setCommunitySaved(true));
+                } else if (community) {
+                  setCommunitySaved(true);
+                  favoriteService.save({
+                    target_type: 'community',
+                    target_id: community.id,
+                    target_title: community.name,
+                    target_subtitle: community.description ?? null,
+                    target_thumbnail: community.avatar_url ?? null,
+                  }).catch(() => setCommunitySaved(false));
+                }
+              }}
               style={s.headerIcon}
             >
-              <Icon name="user-plus" size={20} color={colors.textPrimary} />
+              <Icon
+                name="bookmark"
+                size={20}
+                color={communitySaved ? colors.primary : colors.textPrimary}
+              />
             </TouchableOpacity>
-          )}
-          {(isAdmin || isMod) && (
-            <TouchableOpacity onPress={openSettings} style={s.headerIcon}>
-              <Icon name="settings" size={20} color={colors.textPrimary} />
-            </TouchableOpacity>
-          )}
+            {(isAdmin || isMod) && (
+              <TouchableOpacity
+                onPress={() => (nav as any).navigate('CommunityInvite', {
+                  communityId,
+                  communityName: community.name,
+                  myRole,
+                })}
+                style={s.headerIcon}
+              >
+                <Icon name="user-plus" size={20} color={colors.textPrimary} />
+              </TouchableOpacity>
+            )}
+            {(isAdmin || isMod) && (
+              <TouchableOpacity onPress={openSettings} style={s.headerIcon}>
+                <Icon name="settings" size={20} color={colors.textPrimary} />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </View>
 
@@ -2332,14 +2336,22 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
 const s = StyleSheet.create({
   root: { flex: 1 },
 
-  // Header
+  // Header — carte flottante (même design que le reste de l'app)
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 14,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
+    paddingVertical: 14,
+    marginHorizontal: 10,
+    marginBottom: 10,
+    borderRadius: 24,
+    borderWidth: 1,
+    shadowColor: '#5B45B5',
+    shadowOpacity: 0.10,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 8,
   },
   headerIcon: { width: 44, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { flex: 1, fontSize: FontSize.lg, fontWeight: FontWeight.bold, textAlign: 'center' },

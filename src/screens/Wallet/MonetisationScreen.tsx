@@ -96,10 +96,12 @@ export function MonetisationScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 16 }]}>
-          <BackButton onPress={() => nav.goBack()} />
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Monetisation</Text>
-          <View style={{ width: 38 }} />
+        <View style={{ paddingTop: insets.top + 16 }}>
+          <View style={[styles.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+            <BackButton onPress={() => nav.goBack()} />
+            <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Monetisation</Text>
+            <View style={{ width: 38 }} />
+          </View>
         </View>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 16 }}>
           <View style={[gateStyles.iconWrap, { backgroundColor: ACCENT + '15' }]}>
@@ -129,10 +131,12 @@ export function MonetisationScreen() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 16 }]}>
-        <BackButton onPress={() => nav.goBack()} />
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Monétisation</Text>
-        <View style={{ width: 38 }} />
+      <View style={{ paddingTop: insets.top + 16 }}>
+        <View style={[styles.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => nav.goBack()} />
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Monétisation</Text>
+          <View style={{ width: 38 }} />
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -184,7 +188,13 @@ const gateStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+  header:       {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 16, paddingHorizontal: 16,
+    marginHorizontal: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
   headerTitle:  { fontSize: 17, fontWeight: '700' },
   scroll:       { padding: 16 },
   section:      { marginBottom: 8 },

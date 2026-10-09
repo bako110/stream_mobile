@@ -20,6 +20,11 @@ const _cache = new Map<string, Preview | null>();
 
 interface Props {
   url: string;
+  /** Masque uniquement l'image OG du lien (titre/description/domaine restent
+   * affichés) — utilisé quand le post a déjà sa propre image/vidéo, pour ne
+   * jamais avoir deux images empilées, sans pour autant cacher le lien
+   * lui-même (qui doit toujours se charger et s'afficher). */
+  hideImage?: boolean;
 }
 
 // Normalise la réponse du backend : le champ image peut arriver sous plusieurs
@@ -64,7 +69,7 @@ function normalizePreview(raw: any, pageUrl: string): Preview {
   };
 }
 
-export const LinkPreviewCard: React.FC<Props> = ({ url }) => {
+export const LinkPreviewCard: React.FC<Props> = ({ url, hideImage }) => {
   const { theme: { colors } } = useTheme();
 
   // undefined = en cours, null = erreur/vide, Preview = données
@@ -102,7 +107,7 @@ export const LinkPreviewCard: React.FC<Props> = ({ url }) => {
     catch { return url; }
   })();
 
-  const showImage = !!preview?.image && imgFail < 2;
+  const showImage = !hideImage && !!preview?.image && imgFail < 2;
 
   // ── Chargement — squelette compact (jamais de grand vide) ──────────────────
   if (preview === undefined) {

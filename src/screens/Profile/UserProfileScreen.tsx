@@ -10,13 +10,15 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
   StyleSheet, ActivityIndicator, FlatList, StatusBar,
-  InteractionManager, useWindowDimensions,
+  InteractionManager, useWindowDimensions, Modal,
   type NativeSyntheticEvent, type NativeScrollEvent,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontSize, FontWeight } from '../../theme';
+import { TAB_BAR_HEIGHT } from '../../styles';
+import { formatDurationSec, formatViewerCount } from '../../utils';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { BackButton, SkeletonUserProfile, VerifiedBadge, PriceWithLocal } from '../../components/common';
@@ -39,8 +41,6 @@ import type { Post } from '../../types/post';
 const FRIEND_GAP    = 10;
 const FRIEND_H_PAD  = 16;
 
-type ContentTab = 'publications' | 'reels' | 'about';
-
 interface Props {
   route: { params: { userId: string } };
   navigation: any;
@@ -61,11 +61,12 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
   // pliable ouvert — sinon les vignettes deviennent démesurées et la grille
   // paraît "mal disposée" sur les grands écrans.
   const PUB_COLS  = Math.max(2, Math.min(4, Math.floor((W - 24) / 200)));
-  // Grille fixe 3 colonnes façon Facebook — un nombre variable selon la largeur
-  // d'écran (jusqu'à 6 avant) rendait les vignettes trop petites et serrées.
-  const REEL_COLS = 3;
   const pubGridCardW  = (W - 24 - 8 * (PUB_COLS - 1)) / PUB_COLS;
-  const reelCardW     = (W - 24 - 5 * (REEL_COLS - 1)) / REEL_COLS;
+  // Gap fixe entre les cartes des mini-grilles d'aperçu (flex:1 sur chaque
+  // carte, pas de largeur calculée — avec moins de cartes que de colonnes,
+  // elles s'élargissent pour occuper toute la largeur au lieu de laisser un
+  // vide).
+  const REEL_GAP = 5;
   const { userId } = route.params;
   const { currentUser } = useUser();
   const { lastPresenceUpdate, liveUserIds } = useWs();
@@ -114,14 +115,17 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
     setScrolledPastBanner(prev => (prev === past ? prev : past));
   }, [insets.top]);
 
-  // Content tabs
-  const [activeTab, setActiveTab] = useState<ContentTab>('publications');
+  // Contenu (publications/reels/galerie/à propos) — aperçus directs (4
+  // derniers éléments), plus d'onglets à cliquer. Bottom sheet "Voir tout son
+  // contenu" pour choisir la catégorie à voir en détail.
   const [userEvents,   setUserEvents]   = useState<Event[]>([]);
   const [userConcerts, setUserConcerts] = useState<Concert[]>([]);
   const [userReels,    setUserReels]    = useState<any[]>([]);
   const [userPosts,    setUserPosts]    = useState<Post[]>([]);
   const [contentLoading, setContentLoading] = useState(false);
   const [friends, setFriends] = useState<UserPublic[]>([]);
+  const [showContentSheet, setShowContentSheet] = useState(false);
+  const [showAboutSheet,   setShowAboutSheet]   = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -349,12 +353,15 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       {bar}
+
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: TAB_BAR_HEIGHT + insets.bottom + 40 }}
         onScroll={onProfileScroll}
         scrollEventThrottle={16}
       >
+        {/* ── Hero (bannière + avatar + identité) — défile normalement avec
+            le reste du contenu, dans le flux du ScrollView. ── */}
         {/* ── Banner ──────────────────────────────────────────────────── */}
         <View style={styles.bannerWrap}>
           <TouchableOpacity
@@ -688,308 +695,321 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
         )}
 
-        {/* ── Onglets contenu ─────────────────────────────────────────── */}
+        {/* ── Aperçus de contenu (Publications / Reels récents) — carte
+            flottante (même design que le reste de l'app). Plus d'onglets à
+            cliquer : chaque catégorie affiche directement ses 4 derniers
+            éléments ; le bouton en bas ouvre le bottom sheet pour voir le
+            reste. overflow:'hidden' isolé sur une View enfant distincte de
+            celle qui porte l'ombre — les mélanger couperait l'ombre portée
+            sur iOS. ─────────────────────────────────────────────── */}
         {!isPrivateProfile && (
-        <View style={[styles.tabBar, { borderBottomColor: colors.divider }]}>
-          {([
-            { key: 'publications' as const, label: 'Publications', icon: 'grid' },
-            { key: 'reels' as const,        label: 'Reels',        icon: 'play-circle' },
-            { key: 'about' as const,        label: 'À propos',     icon: 'info' },
-          ]).map(tab => {
-            const active = activeTab === tab.key;
-            return (
-              <TouchableOpacity
-                key={tab.key}
-                style={[styles.tabItem, active && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
-                onPress={() => setActiveTab(tab.key)}
-                activeOpacity={0.7}
-              >
-                <Icon name={tab.icon} size={18} color={active ? colors.primary : colors.textTertiary} />
-                <Text style={[styles.tabLabel, { color: active ? colors.primary : colors.textTertiary }]}>
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-          <TouchableOpacity
-            style={styles.tabItem}
-            onPress={() => navigation.navigate('UserGallery', { userId })}
-            activeOpacity={0.7}
-          >
-            <Icon name="image" size={18} color={colors.textTertiary} />
-            <Text style={[styles.tabLabel, { color: colors.textTertiary }]}>Galerie</Text>
-          </TouchableOpacity>
-        </View>
-        )}
+        <View style={{
+          marginHorizontal: 10, borderRadius: 24, borderWidth: 1, borderColor: colors.divider,
+          backgroundColor: colors.surface,
+          shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+          shadowOffset: { width: 0, height: 5 }, elevation: 8,
+          marginTop: 18,
+        }}>
+        <View style={{ borderRadius: 24, overflow: 'hidden', padding: 16, gap: 18 }}>
 
-        {/* ── Contenu des onglets ─────────────────────────────────────── */}
-        {!isPrivateProfile && contentLoading ? (
+        {contentLoading ? (
           <View style={{ alignItems: 'center', paddingVertical: 40 }}>
             <ActivityIndicator color={colors.primary} />
           </View>
-        ) : !isPrivateProfile && activeTab === 'publications' ? (
-          <View style={styles.contentSection}>
-            {totalPubs === 0 ? (
-              <View style={styles.emptyContent}>
-                <Icon name="inbox" size={40} color={colors.textTertiary} />
-                <Text style={[styles.emptyText, { color: colors.textTertiary }]}>Aucune publication</Text>
-              </View>
-            ) : (
-              <>
-                {/* ── Posts — grille 3 colonnes ── */}
-                {userPosts.length > 0 && (
-                  <View style={styles.reelsGrid}>
-                    {userPosts.map((post) => {
-                      const p = post as any;
-                      const thumb = p.thumbnail_url ?? p.media_url ?? p.image_url ?? p.image_urls?.[0] ?? p.media?.[0]?.url;
-                      const likes  = p.likes_count  ?? p.like_count  ?? 0;
-                      const cmts   = p.comments_count ?? p.comment_count ?? 0;
-                      return (
+        ) : (
+          <>
+            {/* ── Publications récentes — carte vedette (la plus récente) + grille,
+                même langage visuel que la section Reels (styles contentFeatured*
+                et reelCard/gridOverlay/gridTitleText partagés). Posts d'abord,
+                événements/concerts en complément jusqu'à 4 (logique déjà en
+                place), normalisés en une liste unique pour que l'item 0 devienne
+                la carte vedette. ──────────────────────────── */}
+            <View style={{ gap: 8 }}>
+              <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>PUBLICATIONS RÉCENTES</Text>
+              {totalPubs === 0 ? (
+                <View style={styles.emptyContent}>
+                  <Icon name="inbox" size={32} color={colors.textTertiary} />
+                  <Text style={[styles.emptyText, { color: colors.textTertiary }]}>Aucune publication</Text>
+                </View>
+              ) : (
+                <>
+                  {(() => {
+                    const pubItems = [
+                      ...userPosts.map(post => {
+                        const p = post as any;
+                        const thumb = p.thumbnail_url ?? p.media_url ?? p.image_url ?? p.image_urls?.[0] ?? p.media?.[0]?.url ?? null;
+                        return {
+                          key: `post-${post.id}`,
+                          kind: 'post' as const,
+                          thumb,
+                          caption: p.body || p.content || null,
+                          likes: p.likes_count ?? p.like_count ?? 0,
+                          comments: p.comments_count ?? p.comment_count ?? 0,
+                          onPress: () => navigation.navigate('PostDetail', { postId: post.id }),
+                        };
+                      }),
+                      ...publications.map(pub => {
+                        const isEvent = pub.kind === 'event';
+                        const item = pub.data as any;
+                        return {
+                          key: `${pub.kind}-${item.id}`,
+                          kind: pub.kind,
+                          thumb: item.thumbnail_url ?? item.banner_url ?? null,
+                          caption: item.title ?? null,
+                          likes: item.like_count ?? 0,
+                          comments: item.comment_count ?? 0,
+                          typeIcon: isEvent ? 'calendar' : 'music',
+                          accent: isEvent ? '#E0389A' : '#7B3FF2',
+                          onPress: () => {
+                            if (isEvent) navigation.navigate('EventDetail', { eventId: item.id });
+                            else navigation.navigate('ConcertDetail', { concertId: item.id });
+                          },
+                        };
+                      }),
+                    ].slice(0, 4);
+
+                    const featured = pubItems[0];
+                    const rest = pubItems.slice(1, 4);
+
+                    return (
+                      <>
+                        {/* Carte vedette — publication la plus récente */}
                         <TouchableOpacity
-                          key={`post-${post.id}`}
-                          style={[styles.reelCard, { width: reelCardW, backgroundColor: colors.surfaceElevated }]}
-                          activeOpacity={0.8}
-                          onPress={() => navigation.navigate('PostDetail', { postId: post.id })}
+                          activeOpacity={0.9}
+                          onPress={featured.onPress}
+                          style={[styles.contentFeaturedCard, { backgroundColor: colors.surfaceElevated }]}
                         >
-                          {/* Vignette — carte simple façon Facebook : vraie photo si dispo,
-                              sinon juste une icône neutre (jamais de texte du post écrasé
-                              dedans, illisible à cette taille et incohérent visuellement
-                              avec les vignettes qui ont une vraie photo). Plus de légende
-                              sous la carte non plus — la grille reste une grille d'images. */}
-                          <View style={styles.reelThumbWrap}>
-                            {thumb ? (
-                              <Image source={{ uri: thumb }} style={styles.reelThumb} resizeMode="cover" />
-                            ) : (
-                              <View style={[styles.reelThumb, styles.reelThumbTextWrap, { backgroundColor: colors.backgroundSecondary }]}>
-                                <Icon name="file-text" size={24} color={colors.textTertiary} />
-                              </View>
-                            )}
-                            <View style={styles.gridOverlay}>
+                          {featured.thumb ? (
+                            <Image source={{ uri: featured.thumb }} style={styles.contentFeaturedThumb} resizeMode="cover" />
+                          ) : featured.kind === 'post' ? (
+                            <View style={[styles.contentFeaturedThumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.backgroundSecondary }]}>
+                              <Icon name="file-text" size={32} color={colors.textTertiary} />
+                            </View>
+                          ) : (
+                            <LinearGradient
+                              colors={[(featured as any).accent + 'CC', (featured as any).accent + '66']}
+                              style={[styles.contentFeaturedThumb, { alignItems: 'center', justifyContent: 'center' }]}
+                            >
+                              <Icon name={(featured as any).typeIcon} size={36} color="rgba(255,255,255,0.8)" />
+                            </LinearGradient>
+                          )}
+
+                          <LinearGradient
+                            colors={['transparent', 'rgba(0,0,0,0.75)']}
+                            style={styles.contentFeaturedOverlay}
+                          >
+                            {featured.caption ? (
+                              <Text style={styles.contentFeaturedTitle} numberOfLines={2}>{featured.caption}</Text>
+                            ) : null}
+                            <View style={styles.contentFeaturedStatsRow}>
                               <View style={styles.gridMetaRow}>
-                                <Icon name="heart" size={11} color="#fff" />
-                                <Text style={styles.gridMetaText}>{likes}</Text>
-                                <Icon name="message-circle" size={11} color="#fff" />
-                                <Text style={styles.gridMetaText}>{cmts}</Text>
+                                <Icon name="heart" size={12} color="#fff" />
+                                <Text style={styles.contentFeaturedStatText}>{formatViewerCount(featured.likes)}</Text>
+                                <Text style={styles.contentFeaturedSep}>|</Text>
+                                <Icon name="message-circle" size={12} color="#fff" />
+                                <Text style={styles.contentFeaturedStatText}>{formatViewerCount(featured.comments)}</Text>
                               </View>
+                              {featured.kind === 'post' && (
+                                <View style={styles.contentFeaturedAuthorBadge}>
+                                  <Icon name="user" size={10} color="#fff" />
+                                  <Text style={styles.contentFeaturedStatText} numberOfLines={1}>{isMe ? 'Moi' : displayName}</Text>
+                                </View>
+                              )}
+                            </View>
+                          </LinearGradient>
+                        </TouchableOpacity>
+
+                        {/* Grille — les 3 publications suivantes. flex:1
+                            (pas une largeur fixe) — avec moins de 3
+                            éléments, les cartes s'élargissent pour occuper
+                            toute la largeur au lieu de laisser un vide. */}
+                        {rest.length > 0 && (
+                          <View style={{ flexDirection: 'row', paddingHorizontal: 12 }}>
+                            {rest.map((it: any, idx: number) => (
+                              <TouchableOpacity
+                                key={it.key}
+                                style={[
+                                  styles.reelCard,
+                                  {
+                                    flex: 1,
+                                    backgroundColor: colors.surfaceElevated,
+                                    marginRight: idx === rest.length - 1 ? 0 : REEL_GAP,
+                                  },
+                                ]}
+                                activeOpacity={0.8}
+                                onPress={it.onPress}
+                              >
+                                <View style={styles.reelThumbWrap}>
+                                  {it.thumb ? (
+                                    <Image source={{ uri: it.thumb }} style={styles.reelThumb} resizeMode="cover" />
+                                  ) : it.kind === 'post' ? (
+                                    <View style={[styles.reelThumb, styles.reelThumbTextWrap, { backgroundColor: colors.backgroundSecondary }]}>
+                                      <Icon name="file-text" size={24} color={colors.textTertiary} />
+                                    </View>
+                                  ) : (
+                                    <LinearGradient
+                                      colors={[it.accent + 'CC', it.accent + '66']}
+                                      style={[styles.reelThumb, { alignItems: 'center', justifyContent: 'center' }]}
+                                    >
+                                      <Icon name={it.typeIcon} size={28} color="rgba(255,255,255,0.8)" />
+                                    </LinearGradient>
+                                  )}
+                                  <View style={styles.gridOverlay}>
+                                    {it.caption ? (
+                                      <Text style={styles.gridTitleText} numberOfLines={1}>{it.caption}</Text>
+                                    ) : null}
+                                    <View style={styles.gridMetaRow}>
+                                      <Icon name="heart" size={9} color="#fff" />
+                                      <Text style={styles.gridMetaText}>{it.likes}</Text>
+                                      <Icon name="message-circle" size={9} color="#fff" />
+                                      <Text style={styles.gridMetaText}>{it.comments}</Text>
+                                    </View>
+                                  </View>
+                                </View>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        )}
+                      </>
+                    );
+                  })()}
+                </>
+              )}
+            </View>
+
+            {/* ── Reels récents — carte vedette (le plus récent) + grille ── */}
+            <View style={{ gap: 8 }}>
+              <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>REELS RÉCENTS</Text>
+              {userReels.length === 0 ? (
+                <View style={styles.emptyContent}>
+                  <Icon name="video" size={32} color={colors.textTertiary} />
+                  <Text style={[styles.emptyText, { color: colors.textTertiary }]}>Aucun reel</Text>
+                </View>
+              ) : (
+                <>
+                  {/* Carte vedette — reel le plus récent */}
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() => navigation.navigate('UserReels', { userId, initialReelId: userReels[0].id, initialReels: userReels })}
+                    style={[styles.contentFeaturedCard, { backgroundColor: colors.surfaceElevated }]}
+                  >
+                    {userReels[0].thumbnail_url ? (
+                      <Image source={{ uri: userReels[0].thumbnail_url }} style={styles.contentFeaturedThumb} resizeMode="cover" />
+                    ) : (
+                      <View style={[styles.contentFeaturedThumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.backgroundSecondary }]}>
+                        <Icon name="play" size={32} color={colors.textTertiary} />
+                      </View>
+                    )}
+
+                    {userReels[0].duration_sec != null && (
+                      <View style={styles.contentFeaturedDurationBadge}>
+                        <Icon name="play" size={10} color="#fff" />
+                        <Text style={styles.contentFeaturedDurationText}>{formatDurationSec(userReels[0].duration_sec)}</Text>
+                      </View>
+                    )}
+
+                    <LinearGradient
+                      colors={['transparent', 'rgba(0,0,0,0.75)']}
+                      style={styles.contentFeaturedOverlay}
+                    >
+                      {userReels[0].caption ? (
+                        <Text style={styles.contentFeaturedTitle} numberOfLines={2}>{userReels[0].caption}</Text>
+                      ) : null}
+                      <View style={styles.contentFeaturedStatsRow}>
+                        <View style={styles.gridMetaRow}>
+                          <Icon name="eye" size={12} color="#fff" />
+                          <Text style={styles.contentFeaturedStatText}>{formatViewerCount(userReels[0].view_count ?? 0)}</Text>
+                          <Text style={styles.contentFeaturedSep}>|</Text>
+                          <Icon name="heart" size={12} color="#fff" />
+                          <Text style={styles.contentFeaturedStatText}>{formatViewerCount(userReels[0].likes_count ?? 0)}</Text>
+                        </View>
+                        <View style={styles.contentFeaturedAuthorBadge}>
+                          <Icon name="user" size={10} color="#fff" />
+                          <Text style={styles.contentFeaturedStatText} numberOfLines={1}>{displayName}</Text>
+                        </View>
+                      </View>
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  {/* Grille — les 3 reels suivants. flex:1 (pas une largeur
+                      fixe) — avec moins de 3 éléments, les cartes s'élargissent
+                      pour occuper toute la largeur au lieu de laisser un vide. */}
+                  {userReels.length > 1 && (
+                    <View style={{ flexDirection: 'row', paddingHorizontal: 12 }}>
+                      {userReels.slice(1, 4).map((reel: any, idx: number, arr: any[]) => (
+                        <TouchableOpacity
+                          key={reel.id}
+                          style={[
+                            styles.reelCard,
+                            {
+                              flex: 1,
+                              backgroundColor: colors.surfaceElevated,
+                              marginRight: idx === arr.length - 1 ? 0 : REEL_GAP,
+                            },
+                          ]}
+                          activeOpacity={0.8}
+                          onPress={() => navigation.navigate('UserReels', { userId, initialReelId: reel.id, initialReels: userReels })}
+                        >
+                          {reel.thumbnail_url ? (
+                            <Image source={{ uri: reel.thumbnail_url }} style={styles.reelThumb} resizeMode="cover" />
+                          ) : (
+                            <View style={[styles.reelThumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.backgroundSecondary }]}>
+                              <Icon name="play" size={24} color={colors.textTertiary} />
+                            </View>
+                          )}
+
+                          {reel.duration_sec != null && (
+                            <View style={styles.reelDurationBadge}>
+                              <Icon name="play" size={8} color="#fff" />
+                              <Text style={styles.reelDurationText}>{formatDurationSec(reel.duration_sec)}</Text>
+                            </View>
+                          )}
+
+                          <View style={styles.gridOverlay}>
+                            {reel.caption ? (
+                              <Text style={styles.gridTitleText} numberOfLines={1}>{reel.caption}</Text>
+                            ) : null}
+                            <View style={styles.gridMetaRow}>
+                              <Icon name="eye" size={9} color="#fff" />
+                              <Text style={styles.gridMetaText}>{formatViewerCount(reel.view_count ?? 0)}</Text>
+                              <Icon name="heart" size={9} color="#fff" />
+                              <Text style={styles.gridMetaText}>{formatViewerCount(reel.likes_count ?? 0)}</Text>
                             </View>
                           </View>
                         </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                )}
-
-                {/* ── Événements & Concerts — grille 2 colonnes ── */}
-                {publications.length > 0 && (
-                  <>
-                    {userPosts.length > 0 && (
-                      <View style={[styles.sectionDivider, { backgroundColor: colors.divider }]} />
-                    )}
-                    <View style={styles.pubGrid}>
-                      {publications.map((pub) => {
-                        const isEvent = pub.kind === 'event';
-                        const item = pub.data as any;
-                        const thumbUrl = item.thumbnail_url ?? item.banner_url;
-                        const date = isEvent ? item.starts_at : item.scheduled_at;
-                        const typeIcon = isEvent ? 'calendar' : 'music';
-                        const typeLabel = isEvent ? 'Événement' : 'Concert';
-                        const accent = isEvent ? '#E0389A' : '#7B3FF2';
-                        return (
-                          <TouchableOpacity
-                            key={`${pub.kind}-${item.id}`}
-                            style={[styles.pubGridCard, { width: pubGridCardW, backgroundColor: colors.surfaceElevated }]}
-                            activeOpacity={0.8}
-                            onPress={() => {
-                              if (isEvent) navigation.navigate('EventDetail', { eventId: item.id });
-                              else navigation.navigate('ConcertDetail', { concertId: item.id });
-                            }}
-                          >
-                            {thumbUrl ? (
-                              <Image source={{ uri: thumbUrl }} style={styles.pubGridThumb} resizeMode="cover" />
-                            ) : (
-                              <LinearGradient
-                                colors={[accent + 'CC', accent + '66']}
-                                style={[styles.pubGridThumb, { alignItems: 'center', justifyContent: 'center' }]}
-                              >
-                                <Icon name={typeIcon} size={32} color="rgba(255,255,255,0.8)" />
-                              </LinearGradient>
-                            )}
-                            <View style={styles.pubGridBody}>
-                              <View style={[styles.pubTypeBadge, { backgroundColor: accent + '18' }]}>
-                                <Icon name={typeIcon} size={9} color={accent} />
-                                <Text style={[styles.pubTypeText, { color: accent }]}>{typeLabel}</Text>
-                              </View>
-                              <Text style={[styles.pubGridTitle, { color: colors.textPrimary }]} numberOfLines={2}>
-                                {item.title}
-                              </Text>
-                              {date ? (
-                                <View style={styles.pubMetaItem}>
-                                  <Icon name="calendar" size={10} color={colors.textTertiary} />
-                                  <Text style={[styles.pubMetaText, { color: colors.textTertiary }]}>{formatDate(date)}</Text>
-                                </View>
-                              ) : null}
-                              {(item.venue_city ?? item.location) ? (
-                                <View style={styles.pubMetaItem}>
-                                  <Icon name="map-pin" size={10} color={colors.textTertiary} />
-                                  <Text style={[styles.pubMetaText, { color: colors.textTertiary }]} numberOfLines={1}>
-                                    {item.venue_city ?? item.location}
-                                  </Text>
-                                </View>
-                              ) : null}
-                              {item.ticket_price != null ? (
-                                <View style={styles.pubMetaItem}>
-                                  <Icon name="tag" size={10} color={accent} />
-                                  {item.ticket_price === 0 ? (
-                                    <Text style={[styles.pubMetaText, { color: accent, fontWeight: FontWeight.bold }]}>
-                                      Gratuit
-                                    </Text>
-                                  ) : (
-                                    <PriceWithLocal
-                                      amountEur={item.ticket_price}
-                                      style={[styles.pubMetaText, { color: accent, fontWeight: FontWeight.bold }]}
-                                    />
-                                  )}
-                                </View>
-                              ) : null}
-                            </View>
-                          </TouchableOpacity>
-                        );
-                      })}
+                      ))}
                     </View>
-                  </>
-                )}
-              </>
-            )}
-          </View>
-        ) : !isPrivateProfile && activeTab === 'reels' ? (
-          <View style={styles.contentSection}>
-            {userReels.length === 0 ? (
-              <View style={styles.emptyContent}>
-                <Icon name="video" size={40} color={colors.textTertiary} />
-                <Text style={[styles.emptyText, { color: colors.textTertiary }]}>Aucun reel</Text>
-              </View>
-            ) : (
-              <View style={styles.reelsGrid}>
-                {userReels.map((reel: any) => (
-                  <TouchableOpacity
-                    key={reel.id}
-                    style={[styles.reelCard, { width: reelCardW, backgroundColor: colors.surfaceElevated }]}
-                    activeOpacity={0.8}
-                    onPress={() => navigation.navigate('UserReels', { userId, initialReelId: reel.id, initialReels: userReels })}
-                  >
-                    {reel.thumbnail_url ? (
-                      <Image source={{ uri: reel.thumbnail_url }} style={styles.reelThumb} resizeMode="cover" />
-                    ) : (
-                      <View style={[styles.reelThumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.backgroundSecondary }]}>
-                        <Icon name="play" size={24} color={colors.textTertiary} />
-                      </View>
-                    )}
-                    {/* overlay meta : vues + likes */}
-                    <View style={styles.gridOverlay}>
-                      <View style={styles.gridMetaRow}>
-                        <Icon name="play" size={11} color="#fff" />
-                        <Text style={styles.gridMetaText}>{reel.view_count ?? 0}</Text>
-                        <Icon name="heart" size={11} color="#fff" />
-                        <Text style={styles.gridMetaText}>{reel.likes_count ?? 0}</Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-        ) : !isPrivateProfile ? (
-          /* ── À propos ────────────────────────────────────────────── */
-          <View style={[styles.contentSection, { paddingHorizontal: 20 }]}>
-            <View style={styles.aboutSection}>
-              {profile.first_name || profile.last_name ? (
-                <View style={styles.aboutRow}>
-                  <Icon name="user" size={16} color={colors.textTertiary} />
-                  <Text style={[styles.aboutText, { color: colors.textPrimary }]}>
-                    {[profile.first_name, profile.last_name].filter(Boolean).join(' ')}
-                  </Text>
-                </View>
-              ) : null}
-              {profile.location ? (
-                <View style={styles.aboutRow}>
-                  <Icon name="map-pin" size={16} color={colors.textTertiary} />
-                  <Text style={[styles.aboutText, { color: colors.textPrimary }]}>
-                    Habite à <Text style={{ fontWeight: FontWeight.bold }}>{profile.location}</Text>
-                  </Text>
-                </View>
-              ) : null}
-              {profile.website ? (
-                <View style={styles.aboutRow}>
-                  <Icon name="link" size={16} color={colors.primary} />
-                  <Text style={[styles.aboutText, { color: colors.primary }]}>{profile.website}</Text>
-                </View>
-              ) : null}
-              {profile.phone ? (
-                <TouchableOpacity style={styles.aboutRow} onPress={() => openPhoneMenu(profile.phone!)} activeOpacity={0.7}>
-                  <Icon name="phone" size={16} color={colors.textTertiary} />
-                  <Text style={[styles.aboutText, { color: colors.primary }]}>{profile.phone}</Text>
-                </TouchableOpacity>
-              ) : null}
-              {profile.date_of_birth ? (
-                <View style={styles.aboutRow}>
-                  <Icon name="gift" size={16} color={colors.textTertiary} />
-                  <Text style={[styles.aboutText, { color: colors.textPrimary }]}>
-                    Né(e) le <Text style={{ fontWeight: FontWeight.bold }}>{formatDate(profile.date_of_birth)}</Text>
-                  </Text>
-                </View>
-              ) : null}
-              {profile.gender ? (
-                <View style={styles.aboutRow}>
-                  <Icon name="users" size={16} color={colors.textTertiary} />
-                  <Text style={[styles.aboutText, { color: colors.textPrimary }]}>
-                    {profile.gender === 'male' ? 'Homme' : profile.gender === 'female' ? 'Femme' : profile.gender === 'other' ? 'Autre' : 'Non précisé'}
-                  </Text>
-                </View>
-              ) : null}
-              <View style={styles.aboutRow}>
-                <Icon name="briefcase" size={16} color={colors.textTertiary} />
-                <Text style={[styles.aboutText, { color: colors.textPrimary }]}>
-                  {profile.role === 'artist' ? 'Artiste' : profile.role === 'admin' ? 'Administrateur' : 'Membre'}
-                </Text>
-              </View>
-              {profile.is_verified && (
-                <View style={styles.aboutRow}>
-                  <Icon name="check-circle" size={16} color={colors.accentGreen} />
-                  <Text style={[styles.aboutText, { color: colors.accentGreen, fontWeight: FontWeight.semiBold }]}>Compte vérifié</Text>
-                </View>
-              )}
-              {profile.created_at ? (
-                <View style={styles.aboutRow}>
-                  <Icon name="clock" size={16} color={colors.textTertiary} />
-                  <Text style={[styles.aboutText, { color: colors.textPrimary }]}>
-                    Membre depuis <Text style={{ fontWeight: FontWeight.bold }}>{formatDate(profile.created_at)}</Text>
-                  </Text>
-                </View>
-              ) : null}
-              {profile.bio ? (
-                <View style={[styles.aboutBioBox, { backgroundColor: colors.surfaceElevated }]}>
-                  <Text style={[styles.aboutBioTitle, { color: colors.textTertiary }]}>BIO</Text>
-                  <Text style={[styles.aboutBioText, { color: colors.textPrimary }]}>{profile.bio}</Text>
-                </View>
-              ) : null}
-              {/* Infos masquées par confidentialité */}
-              {!isMe && (!profile.phone || !profile.date_of_birth || !profile.location) && (
-                <View style={[styles.privacyNote, { backgroundColor: colors.surfaceElevated }]}>
-                  <Icon name="lock" size={13} color={colors.textTertiary} />
-                  <Text style={[styles.privacyNoteText, { color: colors.textTertiary }]}>
-                    Certaines informations sont masquées par les paramètres de confidentialité.
-                  </Text>
-                </View>
+                  )}
+                </>
               )}
             </View>
-          </View>
-        ) : null}
+
+            {/* ── Bouton "Voir tout son contenu" — ouvre le bottom sheet ── */}
+            <TouchableOpacity
+              onPress={() => setShowContentSheet(true)}
+              activeOpacity={0.85}
+              style={{
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+                paddingVertical: 13, borderRadius: 14,
+                backgroundColor: colors.primary + '14', borderWidth: 1, borderColor: colors.primary + '40',
+              }}
+            >
+              <Icon name="layers" size={16} color={colors.primary} />
+              <Text style={{ fontSize: FontSize.basePlus, fontWeight: FontWeight.bold, color: colors.primary }}>
+                Voir tout son contenu
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
+        </View>
+        </View>
+        )}
       </ScrollView>
 
-      {/* Cale de status bar — masquée en haut de page (bannière immersive), elle
-          apparaît dès qu'on a défilé au-delà de la bannière : la grille ne
-          "passe" alors plus sous l'heure/la batterie sur les écrans à encoche
-          haute, et les icônes système restent lisibles. */}
+      {/* Cale de status bar — apparaît dès qu'on a défilé au-delà de la
+          bannière : le contenu ne "passe" alors plus sous l'heure/la
+          batterie sur les écrans à encoche haute, et les icônes système
+          restent lisibles. Pilotée par le scroll listener onProfileScroll. */}
       {scrolledPastBanner && (
         <View
           pointerEvents="none"
@@ -1051,6 +1071,158 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
         </View>
       )}
+
+      {/* ── Bottom sheet "Voir tout son contenu" — glisse depuis le bas,
+          propose Publications / Reels / Galerie / À propos. Au choix, ferme
+          le sheet et navigue vers l'écran paginé correspondant (ou ouvre le
+          second bottom sheet "À propos"). ── */}
+      <Modal transparent animationType="slide" visible={showContentSheet} onRequestClose={() => setShowContentSheet(false)}>
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
+          activeOpacity={1}
+          onPress={() => setShowContentSheet(false)}
+        >
+          <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingBottom: insets.bottom + 20, paddingTop: 10 }}>
+            <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: colors.divider, alignSelf: 'center', marginBottom: 14 }} />
+            <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 1, paddingHorizontal: 20, marginBottom: 6 }}>
+              Que souhaitez-vous voir ?
+            </Text>
+            {([
+              { key: 'posts',   label: 'Publications', icon: 'grid' },
+              { key: 'reels',   label: 'Reels',         icon: 'play-circle' },
+              { key: 'gallery', label: 'Galerie',       icon: 'image' },
+              { key: 'about',   label: 'À propos',      icon: 'info' },
+            ] as const).map(opt => (
+              <TouchableOpacity
+                key={opt.key}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 15 }}
+                activeOpacity={0.7}
+                onPress={() => {
+                  setShowContentSheet(false);
+                  if (opt.key === 'posts') navigation.navigate('UserPosts', { userId });
+                  else if (opt.key === 'reels') navigation.navigate('UserReelsGrid', { userId });
+                  else if (opt.key === 'gallery') navigation.navigate('UserGallery', { userId });
+                  else setShowAboutSheet(true);
+                }}
+              >
+                <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: colors.primary + '14', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name={opt.icon} size={19} color={colors.primary} />
+                </View>
+                <Text style={{ flex: 1, fontSize: FontSize.basePlus, fontWeight: FontWeight.semiBold, color: colors.textPrimary }}>
+                  {opt.label}
+                </Text>
+                <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ── Bottom sheet "À propos" — vue scrollable courte (bio, lieu, site,
+          téléphone, date de naissance, genre, rôle), pas besoin d'un écran
+          dédié paginé pour ce contenu. ── */}
+      <Modal transparent animationType="slide" visible={showAboutSheet} onRequestClose={() => setShowAboutSheet(false)}>
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
+          activeOpacity={1}
+          onPress={() => setShowAboutSheet(false)}
+        >
+          <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+          <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingTop: 10, maxHeight: '75%' }}>
+            <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: colors.divider, alignSelf: 'center', marginBottom: 14 }} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 6 }}>
+              <Text style={{ fontSize: FontSize.lg, fontWeight: FontWeight.extraBold, color: colors.textPrimary }}>À propos</Text>
+              <TouchableOpacity onPress={() => setShowAboutSheet(false)} style={{ padding: 4 }}>
+                <Icon name="x" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 24 }}>
+              <View style={styles.aboutSection}>
+                {profile.first_name || profile.last_name ? (
+                  <View style={styles.aboutRow}>
+                    <Icon name="user" size={16} color={colors.textTertiary} />
+                    <Text style={[styles.aboutText, { color: colors.textPrimary }]}>
+                      {[profile.first_name, profile.last_name].filter(Boolean).join(' ')}
+                    </Text>
+                  </View>
+                ) : null}
+                {profile.location ? (
+                  <View style={styles.aboutRow}>
+                    <Icon name="map-pin" size={16} color={colors.textTertiary} />
+                    <Text style={[styles.aboutText, { color: colors.textPrimary }]}>
+                      Habite à <Text style={{ fontWeight: FontWeight.bold }}>{profile.location}</Text>
+                    </Text>
+                  </View>
+                ) : null}
+                {profile.website ? (
+                  <View style={styles.aboutRow}>
+                    <Icon name="link" size={16} color={colors.primary} />
+                    <Text style={[styles.aboutText, { color: colors.primary }]}>{profile.website}</Text>
+                  </View>
+                ) : null}
+                {profile.phone ? (
+                  <TouchableOpacity style={styles.aboutRow} onPress={() => openPhoneMenu(profile.phone!)} activeOpacity={0.7}>
+                    <Icon name="phone" size={16} color={colors.textTertiary} />
+                    <Text style={[styles.aboutText, { color: colors.primary }]}>{profile.phone}</Text>
+                  </TouchableOpacity>
+                ) : null}
+                {profile.date_of_birth ? (
+                  <View style={styles.aboutRow}>
+                    <Icon name="gift" size={16} color={colors.textTertiary} />
+                    <Text style={[styles.aboutText, { color: colors.textPrimary }]}>
+                      Né(e) le <Text style={{ fontWeight: FontWeight.bold }}>{formatDate(profile.date_of_birth)}</Text>
+                    </Text>
+                  </View>
+                ) : null}
+                {profile.gender ? (
+                  <View style={styles.aboutRow}>
+                    <Icon name="users" size={16} color={colors.textTertiary} />
+                    <Text style={[styles.aboutText, { color: colors.textPrimary }]}>
+                      {profile.gender === 'male' ? 'Homme' : profile.gender === 'female' ? 'Femme' : profile.gender === 'other' ? 'Autre' : 'Non précisé'}
+                    </Text>
+                  </View>
+                ) : null}
+                <View style={styles.aboutRow}>
+                  <Icon name="briefcase" size={16} color={colors.textTertiary} />
+                  <Text style={[styles.aboutText, { color: colors.textPrimary }]}>
+                    {profile.role === 'artist' ? 'Artiste' : profile.role === 'admin' ? 'Administrateur' : 'Membre'}
+                  </Text>
+                </View>
+                {profile.is_verified && (
+                  <View style={styles.aboutRow}>
+                    <Icon name="check-circle" size={16} color={colors.accentGreen} />
+                    <Text style={[styles.aboutText, { color: colors.accentGreen, fontWeight: FontWeight.semiBold }]}>Compte vérifié</Text>
+                  </View>
+                )}
+                {profile.created_at ? (
+                  <View style={styles.aboutRow}>
+                    <Icon name="clock" size={16} color={colors.textTertiary} />
+                    <Text style={[styles.aboutText, { color: colors.textPrimary }]}>
+                      Membre depuis <Text style={{ fontWeight: FontWeight.bold }}>{formatDate(profile.created_at)}</Text>
+                    </Text>
+                  </View>
+                ) : null}
+                {profile.bio ? (
+                  <View style={[styles.aboutBioBox, { backgroundColor: colors.surfaceElevated }]}>
+                    <Text style={[styles.aboutBioTitle, { color: colors.textTertiary }]}>BIO</Text>
+                    <Text style={[styles.aboutBioText, { color: colors.textPrimary }]}>{profile.bio}</Text>
+                  </View>
+                ) : null}
+                {/* Infos masquées par confidentialité */}
+                {!isMe && (!profile.phone || !profile.date_of_birth || !profile.location) && (
+                  <View style={[styles.privacyNote, { backgroundColor: colors.surfaceElevated }]}>
+                    <Icon name="lock" size={13} color={colors.textTertiary} />
+                    <Text style={[styles.privacyNoteText, { color: colors.textTertiary }]}>
+                      Certaines informations sont masquées par les paramètres de confidentialité.
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </ScrollView>
+          </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -1149,16 +1321,8 @@ const styles = StyleSheet.create({
   },
   msgBtnLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.bold },
 
-  // ── Tabs ──────────────────────────────────────────────────────────────────
-  tabBar: {
-    flexDirection: 'row', marginTop: 18,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  tabItem: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, paddingVertical: 12,
-  },
-  tabLabel: { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
+  // ── Aperçus de contenu ──────────────────────────────────────────────────
+  sectionTitle: { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, letterSpacing: 1 },
 
   // ── Content ───────────────────────────────────────────────────────────────
   contentSection: { paddingVertical: 12 },
@@ -1188,13 +1352,14 @@ const styles = StyleSheet.create({
   pubMetaText: { fontSize: FontSize.xs },
 
   // Reels / Posts grid
-  reelsGrid: {
-    flexDirection: 'row', flexWrap: 'wrap',
-    paddingHorizontal: 12, gap: 5,
-  },
-  // width retiree — appliquee en inline via reelCardW (useWindowDimensions())
+  // justifyContent: 'space-between' plutôt qu'un gap fixe + largeur calculée
+  // en pixels arrondis — élimine tout résidu d'espace à droite causé par
+  // l'arrondi flottant (3 cartes + 2 gaps ne retombent pas toujours
+  // reelCard : flex:1 appliqué en inline (pas de largeur fixe) — avec moins
+  // de cartes que de colonnes, elles s'élargissent pour occuper toute la
+  // largeur au lieu de laisser un vide.
   reelCard: {
-    borderRadius: 8, overflow: 'hidden', marginBottom: 4,
+    aspectRatio: 9 / 16, borderRadius: 8, overflow: 'hidden',
   },
   reelThumbWrap: { position: 'relative' },
   reelThumb: { width: '100%', aspectRatio: 9 / 16 },
@@ -1204,10 +1369,50 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6, paddingVertical: 5,
     backgroundColor: 'rgba(0,0,0,0.45)',
   },
+  gridTitleText: {
+    color: '#fff', fontSize: 10, fontWeight: FontWeight.bold, marginBottom: 2,
+  },
   gridMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   gridMetaText: {
     color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.bold,
     textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 2, marginRight: 4,
+  },
+  reelDurationBadge: {
+    position: 'absolute', top: 6, left: 6,
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    paddingHorizontal: 6, paddingVertical: 3, borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  reelDurationText: { fontSize: 9, color: '#fff', fontWeight: FontWeight.bold },
+
+  // Carte vedette (contenu le plus récent, pleine largeur) — partagée par
+  // les sections Reels et Publications récentes (même langage visuel).
+  contentFeaturedCard: {
+    width: '100%', aspectRatio: 4 / 3, borderRadius: 18,
+    overflow: 'hidden', marginBottom: 4,
+  },
+  contentFeaturedThumb: { width: '100%', height: '100%' },
+  contentFeaturedDurationBadge: {
+    position: 'absolute', top: 10, left: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  contentFeaturedDurationText: { fontSize: FontSize.xs, color: '#fff', fontWeight: FontWeight.bold },
+  contentFeaturedOverlay: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    paddingHorizontal: 14, paddingTop: 28, paddingBottom: 12, gap: 4,
+  },
+  contentFeaturedTitle: { fontSize: FontSize.base, fontWeight: FontWeight.extraBold, color: '#fff' },
+  contentFeaturedStatsRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  },
+  contentFeaturedStatText: { fontSize: FontSize.xs, color: '#fff', fontWeight: FontWeight.semiBold },
+  contentFeaturedSep: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.6)' },
+  contentFeaturedAuthorBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.18)', maxWidth: 120,
   },
   // About
   aboutSection: { gap: 14, marginTop: 8 },

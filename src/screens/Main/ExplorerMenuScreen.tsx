@@ -32,30 +32,35 @@ export const ExplorerMenuScreen: React.FC<Props> = ({ onLogout }) => {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
 
-      {/* Header */}
-      <View style={[mnu.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 14 }]}>
-        <Text style={[mnu.headerTitle, { color: colors.textPrimary }]}>Explorer</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          {onLogout && (
-            <TouchableOpacity
-              onPress={() => {
-                showConfirm('Se déconnecter', 'Voulez-vous vraiment vous déconnecter ?', [
-                  { text: 'Annuler', style: 'cancel' },
-                  { text: 'Déconnecter', style: 'destructive', onPress: () => {
-                    authService._clearTokens();
-                    onLogout();
-                    authService.logout().catch(() => {});
-                  }},
-                ]);
-              }}
-              style={mnu.closeBtn}
-            >
-              <Icon name="log-out" size={20} color="#EF4444" />
+      {/* Header — carte flottante (même design que le reste de l'app).
+          paddingTop (status bar) isolé sur un wrapper externe transparent —
+          le mélanger au style de la carte ferait apparaître un coin visible
+          sous la status bar. */}
+      <View style={{ paddingTop: insets.top + 8 }}>
+        <View style={[mnu.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <Text style={[mnu.headerTitle, { color: colors.textPrimary }]}>Explorer</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {onLogout && (
+              <TouchableOpacity
+                onPress={() => {
+                  showConfirm('Se déconnecter', 'Voulez-vous vraiment vous déconnecter ?', [
+                    { text: 'Annuler', style: 'cancel' },
+                    { text: 'Déconnecter', style: 'destructive', onPress: () => {
+                      authService._clearTokens();
+                      onLogout();
+                      authService.logout().catch(() => {});
+                    }},
+                  ]);
+                }}
+                style={mnu.closeBtn}
+              >
+                <Icon name="log-out" size={20} color="#EF4444" />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity onPress={() => nav.goBack()} style={mnu.closeBtn}>
+              <Icon name="x" size={22} color={colors.textPrimary} />
             </TouchableOpacity>
-          )}
-          <TouchableOpacity onPress={() => nav.goBack()} style={mnu.closeBtn}>
-            <Icon name="x" size={22} color={colors.textPrimary} />
-          </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -234,7 +239,13 @@ export const ExplorerMenuScreen: React.FC<Props> = ({ onLogout }) => {
 };
 
 const mnu = StyleSheet.create({
-  header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 14,
+    marginHorizontal: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
   headerTitle:   { fontSize: 22, fontWeight: '800' },
   closeBtn:      { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20 },
   profileCard:   { flexDirection: 'row', alignItems: 'center', gap: 12, margin: 16, borderRadius: 16, padding: 14, borderWidth: StyleSheet.hairlineWidth },

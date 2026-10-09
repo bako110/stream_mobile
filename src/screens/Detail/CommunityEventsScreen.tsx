@@ -672,31 +672,36 @@ export function CommunityEventsScreen({ route }: Props) {
         translucent
       />
 
-      {/* Header */}
-      <Animated.View style={[styles.header, { paddingTop: insets.top + 6, backgroundColor: colors.background, borderBottomColor: colors.border, opacity: headerFade }]}>
-        <BackButton onPress={() => navigation.goBack()} />
+      {/* Header — carte flottante (même design que le reste de l'app).
+          paddingTop (status bar) isolé sur un wrapper externe transparent —
+          le mélanger au style de la carte ferait apparaître un coin visible
+          sous la status bar. */}
+      <View style={{ paddingTop: insets.top + 6 }}>
+        <Animated.View style={[styles.header, { backgroundColor: colors.surface, borderColor: colors.divider, opacity: headerFade }]}>
+          <BackButton onPress={() => navigation.goBack()} />
 
-        <View style={styles.headerMiddle}>
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Événements</Text>
-          {upcomingCount > 0 && (
-            <View style={[styles.countBadge, { backgroundColor: colors.primary }]}>
-              <Text style={styles.countBadgeText}>{upcomingCount}</Text>
-            </View>
+          <View style={styles.headerMiddle}>
+            <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Événements</Text>
+            {upcomingCount > 0 && (
+              <View style={[styles.countBadge, { backgroundColor: colors.primary }]}>
+                <Text style={styles.countBadgeText}>{upcomingCount}</Text>
+              </View>
+            )}
+          </View>
+
+          {isAdmin ? (
+            <TouchableOpacity
+              style={[styles.addBtn, { backgroundColor: colors.primary }]}
+              onPress={handleOpenCreate}
+              activeOpacity={0.85}
+            >
+              <Icon name="plus" size={18} color="#FFFFFF" />
+            </TouchableOpacity>
+          ) : (
+            <View style={{ width: 38 }} />
           )}
-        </View>
-
-        {isAdmin ? (
-          <TouchableOpacity
-            style={[styles.addBtn, { backgroundColor: colors.primary }]}
-            onPress={handleOpenCreate}
-            activeOpacity={0.85}
-          >
-            <Icon name="plus" size={18} color="#FFFFFF" />
-          </TouchableOpacity>
-        ) : (
-          <View style={{ width: 38 }} />
-        )}
-      </Animated.View>
+        </Animated.View>
+      </View>
 
       {/* Tabs */}
       <ScrollView
@@ -808,7 +813,20 @@ export function CommunityEventsScreen({ route }: Props) {
 const styles = StyleSheet.create({
   root: { flex: 1 },
 
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1 },
+  header: {
+    flexDirection:    'row',
+    alignItems:       'center',
+    paddingHorizontal: 16,
+    paddingVertical:  12,
+    marginHorizontal: 10,
+    borderRadius:     24,
+    borderWidth:      1,
+    shadowColor:      '#5B45B5',
+    shadowOpacity:    0.10,
+    shadowRadius:     14,
+    shadowOffset:     { width: 0, height: 5 },
+    elevation:        8,
+  },
   headerMiddle: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   headerTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, letterSpacing: 0.2 },
   countBadge: { minWidth: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },

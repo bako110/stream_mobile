@@ -788,25 +788,30 @@ export const CommunityChannelChatScreen: React.FC = () => {
     <View style={[C.root, { backgroundColor: colors.background }]}>
       <StatusBar barStyle="light-content" backgroundColor={colors.surface} />
 
-      {/* Header */}
-      <LinearGradient colors={[colors.surface, colors.surface]}
-        style={[C.header, { paddingTop: insets.top + 8, borderBottomColor: colors.divider }]}>
-        <BackButton onPress={() => nav.goBack()} />
-        {channelAvatar
-          ? <Image source={{ uri: channelAvatar }} style={[C.channelIconBox, { borderRadius: 10 }]} />
-          : <View style={[C.channelIconBox, { backgroundColor: colors.primary + '20', alignItems: 'center', justifyContent: 'center', borderRadius: 10 }]}>
-              <Icon name={isAnnouncement ? 'bell' : 'hash'} size={16} color={colors.primary} />
-            </View>
-        }
-        <View style={{ flex: 1 }}>
-          <Text style={[C.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>{channelName}</Text>
-          <Text style={[C.headerSub, { color: colors.textTertiary }]}>{communityName}</Text>
-        </View>
-        {isConnected
-          ? <View style={[C.onlineDot, { backgroundColor: '#22C55E' }]} />
-          : <View style={[C.onlineDot, { backgroundColor: '#94A3B8' }]} />
-        }
-      </LinearGradient>
+      {/* Header — carte flottante (même design que le reste de l'app).
+          paddingTop (status bar) isolé sur un wrapper externe transparent —
+          le mélanger au style de la carte ferait apparaître un coin visible
+          sous la status bar. */}
+      <View style={{ paddingTop: insets.top + 8 }}>
+        <LinearGradient colors={[colors.surface, colors.surface]}
+          style={[C.header, { borderColor: colors.divider }]}>
+          <BackButton onPress={() => nav.goBack()} />
+          {channelAvatar
+            ? <Image source={{ uri: channelAvatar }} style={[C.channelIconBox, { borderRadius: 10 }]} />
+            : <View style={[C.channelIconBox, { backgroundColor: colors.primary + '20', alignItems: 'center', justifyContent: 'center', borderRadius: 10 }]}>
+                <Icon name={isAnnouncement ? 'bell' : 'hash'} size={16} color={colors.primary} />
+              </View>
+          }
+          <View style={{ flex: 1 }}>
+            <Text style={[C.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>{channelName}</Text>
+            <Text style={[C.headerSub, { color: colors.textTertiary }]}>{communityName}</Text>
+          </View>
+          {isConnected
+            ? <View style={[C.onlineDot, { backgroundColor: '#22C55E' }]} />
+            : <View style={[C.onlineDot, { backgroundColor: '#94A3B8' }]} />
+          }
+        </LinearGradient>
+      </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {loading ? (
@@ -1160,7 +1165,8 @@ export const CommunityChannelChatScreen: React.FC = () => {
 
 const C = StyleSheet.create({
   root:   { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth, gap: 10 },
+  // Header — carte flottante (même design que le reste de l'app)
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 12, gap: 10, marginHorizontal: 10, borderRadius: 24, borderWidth: 1, shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14, shadowOffset: { width: 0, height: 5 }, elevation: 8 },
   channelIconBox: { width: 32, height: 32 },
   headerTitle: { fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold },
   headerSub:   { fontSize: FontSize.xsPlus, marginTop: 1 },

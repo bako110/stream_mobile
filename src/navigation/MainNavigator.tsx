@@ -16,6 +16,7 @@ import { ReelsScreen }              from '../screens/Main/ReelsScreen';
 import { UserPostsScreen }          from '../screens/Main/UserPostsScreen';
 import { SearchScreen }             from '../screens/Main/SearchScreen';
 import { UserGalleryScreen }        from '../screens/Main/UserGalleryScreen';
+import { UserReelsGridScreen }      from '../screens/Main/UserReelsGridScreen';
 import { ProfileScreen }            from '../screens/Main/ProfileScreen';
 import { PlanningScreen }           from '../screens/Main/PlanningScreen';
 import { AppTabBar, NotificationToast } from '../components/common';
@@ -23,6 +24,7 @@ import { UploadProgressBanner } from '../components/common/UploadProgressBanner'
 import { ActiveVoiceBar }       from '../components/call/ActiveVoiceBar';
 import { ActiveVoiceProvider }  from '../context/ActiveVoiceContext';
 import { BattleInviteModal }    from '../components/battle/BattleInviteModal';
+import { useTheme } from '../hooks/useTheme';
 
 // ── Écrans stack ──────────────────────────────────────────────────────────────
 import { FeedScreen }            from '../screens/Main/FeedScreen';
@@ -238,6 +240,7 @@ export type MainStackParamList = {
   UserReels:       { userId: string; initialReelId?: string; initialReels?: any[] };
   UserPosts:       { userId: string };
   UserGallery:     { userId: string };
+  UserReelsGrid:   { userId: string };
   ReelPlayer:      { reel?: any; reelId?: string };
   SearchReelViewer: { reel?: any; reelId?: string; authorId?: string };
   PostDetail:      { postId: string; initialPost?: any };
@@ -417,10 +420,21 @@ const SwipeTabScreen: React.FC<{ tabName: typeof SWIPE_TAB_ORDER[number]; childr
   );
 };
 
-const Tabs: React.FC<{ onLogout: () => void; onSwitchAccount: (userId: string) => Promise<void> }> = ({ onLogout, onSwitchAccount }) => (
+const Tabs: React.FC<{ onLogout: () => void; onSwitchAccount: (userId: string) => Promise<void> }> = ({ onLogout, onSwitchAccount }) => {
+  const { theme } = useTheme();
+  return (
   <Tab.Navigator
     tabBar={props => <AppTabBar {...props} />}
-    screenOptions={{ headerShown: false }}
+    // sceneStyle (pas sceneContainerStyle, absent de cette version de
+    // @react-navigation/bottom-tabs — erreur TS2769 constatée) : React
+    // Navigation applique un fond BLANC opaque par défaut à ce conteneur (en
+    // dessous de chaque écran, sous la tab bar custom) — chaque écran
+    // (FeedScreen, etc.) pose déjà son propre fond via colors.background,
+    // donc ce blanc par défaut ne sert jamais à rien, sauf à créer une bande
+    // visible entre la pilule flottante de AppTabBar et le fond réel de
+    // l'écran (le wrapper transparent de AppTabBar laissait transparaître CE
+    // fond-ci, pas celui de l'écran).
+    screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: theme.colors.background } }}
   >
     <Tab.Screen name="Home">
       {() => <SwipeTabScreen tabName="Home"><HomeScreen onLogout={onLogout} onSwitchAccount={onSwitchAccount} /></SwipeTabScreen>}
@@ -433,7 +447,8 @@ const Tabs: React.FC<{ onLogout: () => void; onSwitchAccount: (userId: string) =
       {() => <SwipeTabScreen tabName="Profile"><ProfileTab onLogout={onLogout} /></SwipeTabScreen>}
     </Tab.Screen>
   </Tab.Navigator>
-);
+  );
+};
 
 // ── ExitHandler — doit être rendu à l'intérieur du NavigationContainer ───────
 // Utilise useNavigationState qui nécessite d'être dans un navigator.
@@ -581,6 +596,7 @@ const SettingsWrapper = useCallback(
         <Stack.Screen name="UserPosts"      component={UserPostsScreen}       options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Search"         component={SearchScreen}          options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="UserGallery"    component={UserGalleryScreen}     options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="UserReelsGrid"  component={UserReelsGridScreen}   options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="ReelPlayer"    component={ReelPlayerScreen}      options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="SearchReelViewer" component={SearchReelViewerScreen} options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="CreatePost"     component={CreatePostWrapper}     options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />

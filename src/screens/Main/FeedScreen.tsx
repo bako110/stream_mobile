@@ -8,8 +8,8 @@ import {
   View, Text, ScrollView, TouchableOpacity, FlatList,
   RefreshControl, TextInput, ActivityIndicator, StyleSheet,
   Share, KeyboardAvoidingView, Platform, Image, StatusBar,
-  Modal, Dimensions, Linking, InteractionManager, useWindowDimensions,
-  TouchableWithoutFeedback,
+  Modal, Dimensions, Linking, InteractionManager,
+  TouchableWithoutFeedback, AppState,
 } from 'react-native';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import { TouchableOpacity as GHTouchableOpacity } from 'react-native-gesture-handler';
@@ -34,7 +34,8 @@ import { storage } from '../../utils/storage';
 import { showConfirm } from '../../services';
 import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet, FriendsWhoLiked, CachedImage, LiveThumbnailBackground, PriceWithLocal, GofolyxLoader, PeopleSuggestions, CommunityPromoHint } from '../../components/common';
 import { cacheImage } from '../../services/imageCacheService';
-import { AdvertiserRow, AdCTA, AdFullscreenPlayer, adIsVideo, type AdData } from '../../components/ads';
+import { AdvertiserRow, AdCTA, AdFullscreenPlayer, adIsVideo, adIsPhone, adHasContact, type AdData } from '../../components/ads';
+import { openPhoneMenu, callPhone, openWhatsapp } from '../../utils/phoneMenu';
 import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
 import { ShareBottomSheet } from '../../components/common/ShareBottomSheet';
 import type { UserPublic } from '../../types/user';
@@ -59,6 +60,7 @@ import type { Concert } from '../../types/concert';
 import type { Post } from '../../types/post';
 import type { AppColors } from '../../theme/colors';
 import { FontSize, FontWeight } from '../../theme';
+import { Spacing } from '../../theme/spacing';
 import { SectionHeader } from '../../components/common/SectionHeader';
 import { FeedCarousel, FeedCardLayout, FeedRadius, FeedActionIcon, getFeedCardStyle } from '../../theme/feed';
 import { feedStyles as s } from '../../styles/FeedScreen.styles';
@@ -73,7 +75,7 @@ type Nav = NativeStackNavigationProp<MainStackParamList>;
 type FeedFilter = 'all' | 'following' | 'live';
 
 interface FeedItem {
-  kind:    'event' | 'concert' | 'reel' | 'reel_row' | 'post' | 'suggestions' | 'communities' | 'ad';
+  kind:    'event' | 'concert' | 'reel' | 'reels' | 'post' | 'suggestions' | 'communities' | 'ad';
   id:      string;
   data:    any;
 }
@@ -109,7 +111,6 @@ const badgeS = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 4,
     borderWidth: 2,
-    borderColor: '#000',
   },
   badgeText: { color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.extraBold },
 });
@@ -148,13 +149,21 @@ const AdCard: React.FC<{
   const [imgFailed, setImgFailed] = useState(false);
   const hasCreative = !!creativeUri && !(imgFailed && !isVideo);
 
+  // Contact direct (numéro + Appel et/ou WhatsApp cochés par l'annonceur) prime sur
+  // cta_url — même priorité que ReelsScreen.tsx (AdSlide / carte recherche). Le tap
+  // sur la CARTE (hors bouton CTA, qui gère sa propre action via AdCTA/runAdButton)
+  // reste un comportement simple à une seule action : WhatsApp si disponible, sinon
+  // appel, sinon lien — pas de choix à faire, cohérent avec "ouvrir le lien" d'avant.
+  const hasContact = adHasContact(ad);
   const handleCardPress = () => {
     if (isVideo) { onOpenFullscreen(ad); return; }
+    if (hasContact) {
+      onPress(ad.id, '');
+      if (ad.contact_whatsapp) openWhatsapp((ad.contact_phone ?? '').trim());
+      else callPhone((ad.contact_phone ?? '').trim());
+      return;
+    }
     if (ad.cta_url) onPress(ad.id, ad.cta_url);
-  };
-  const handleCta = () => {
-    if (isVideo) { onOpenFullscreen(ad); return; }
-    onPress(ad.id, ad.cta_url ?? '');
   };
 
   // Carte douce SANS ombre (direction éditoriale : la pub se fond). La pub arrive
@@ -199,12 +208,12 @@ const AdCard: React.FC<{
         )}
       </View>
 
-      {ad.cta_url ? (
+      {(ad.cta_url || hasContact) ? (
         <AdCTA
           ad={ad}
           context={searchOverlay ? 'search-overlay' : 'feed'}
           activated={searchOverlay ? true : settled}
-          onPress={handleCta}
+          onPress={() => onPress(ad.id, ad.cta_url ?? '')}
         />
       ) : null}
     </GHTouchableOpacity>
@@ -516,6 +525,179 @@ const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
   );
 });
 
+// ── Encart : reels suggérés (grille) ─────────────────────────────────────────
+// 1 grand reel en haut (pleine largeur) + les suivants en petit côte à côte en
+// dessous — même esprit que l'onglet Reels (grille), pas une carte ReelFeedCard
+// pleine largeur par reel comme avant (2026-10 : l'ancien format n'affichait
+// qu'un seul reel suggéré à la fois, l'utilisateur en voulait plusieurs d'un
+// coup, visuellement groupés comme une mosaïque).
+const REEL_TILE_GAP = 6;
+
+const formatTileCount = (n: number) => {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n ?? 0);
+};
+
+const ReelSuggestionTile: React.FC<{
+  reel: any;
+  width: number;
+  height: number;
+  large?: boolean;
+  onPress: () => void;
+}> = ({ reel, width, height, large, onPress }) => {
+  const author = reel.author;
+  const name   = author?.display_name ?? author?.username ?? 'Utilisateur';
+  const durationLabel = reel.duration_sec
+    ? `${Math.floor(reel.duration_sec / 60)}:${String(Math.round(reel.duration_sec % 60)).padStart(2, '0')}`
+    : null;
+
+  return (
+    <TouchableOpacity activeOpacity={0.92} onPress={onPress} style={{ width, height, borderRadius: large ? 20 : 16, overflow: 'hidden', backgroundColor: '#0B0B0F' }}>
+      {reel.thumbnail_url ? (
+        <Image source={{ uri: reel.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+      ) : (
+        <View style={{ ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', backgroundColor: '#17171D' }}>
+          <Icon name="film" size={large ? 36 : 24} color="rgba(255,255,255,0.18)" />
+        </View>
+      )}
+
+      <LinearGradient
+        colors={['rgba(0,0,0,0.4)', 'transparent', 'transparent', 'rgba(0,0,0,0.82)']}
+        locations={[0, 0.25, 0.5, 1]}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
+
+      {/* Badge Reel + durée */}
+      <View style={rst.topRow} pointerEvents="none">
+        <View style={rst.reelBadge}>
+          <Icon name="play" size={large ? 10 : 8} color="#fff" />
+          <Text style={[rst.reelBadgeText, !large && { fontSize: FontSize['2xs'] }]}>Reel</Text>
+        </View>
+        {durationLabel && (
+          <View style={rst.durationBadge}>
+            <Text style={[rst.durationBadgeText, !large && { fontSize: FontSize['2xs'] }]}>{durationLabel}</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Colonne actions — droite (grande carte uniquement, comme la référence) */}
+      {large && (
+        <View style={rst.actionsCol} pointerEvents="none">
+          <View style={rst.actionItem}>
+            <View style={rst.actionCircle}><MCIcon name="heart" size={19} color="#fff" /></View>
+            <Text style={rst.actionTxt}>{formatTileCount(reel.like_count ?? 0)}</Text>
+          </View>
+          <View style={rst.actionItem}>
+            <View style={rst.actionCircle}><Icon name="message-circle" size={17} color="#fff" /></View>
+            <Text style={rst.actionTxt}>{formatTileCount(reel.comment_count ?? 0)}</Text>
+          </View>
+          <View style={rst.actionItem}>
+            <View style={rst.actionCircle}><Icon name="share" size={16} color="#fff" /></View>
+          </View>
+        </View>
+      )}
+
+      {/* Bas : auteur + légende/musique (grande) ou pseudo + likes compacts (petite) */}
+      <View style={[rst.bottomOverlay, large && { right: 60 }]} pointerEvents="none">
+        <View style={rst.authorRow}>
+          {author?.avatar_url ? (
+            <CachedImage uri={author.avatar_url} style={[rst.avatar, { width: large ? 26 : 20, height: large ? 26 : 20, borderRadius: large ? 13 : 10 }]} />
+          ) : (
+            <View style={[rst.avatar, { width: large ? 26 : 20, height: large ? 26 : 20, borderRadius: large ? 13 : 10, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' }]}>
+              <Text style={{ color: '#fff', fontWeight: FontWeight.extraBold, fontSize: FontSize['2xs'] }}>{name[0]?.toUpperCase() ?? '?'}</Text>
+            </View>
+          )}
+          <Text numberOfLines={1} style={[rst.authorName, !large && { fontSize: FontSize.xs }]}>
+            {large ? name : `@${author?.username ?? name}`}
+          </Text>
+          {large && author?.is_verified && (
+            <View style={rst.verifiedBadge}><Icon name="check" size={7} color="#fff" /></View>
+          )}
+        </View>
+        {large && reel.caption ? (
+          <Text numberOfLines={1} style={rst.caption}>{reel.caption}</Text>
+        ) : null}
+        {large ? (
+          <View style={rst.musicRow}>
+            <Icon name="music" size={10} color="rgba(255,255,255,0.8)" />
+            <Text numberOfLines={1} style={rst.musicTxt}>{reel.music_name || 'Son original'}</Text>
+          </View>
+        ) : (
+          <View style={rst.compactStatsRow}>
+            <MCIcon name="heart" size={11} color="#fff" />
+            <Text style={rst.compactStatsTxt}>{formatTileCount(reel.like_count ?? 0)}</Text>
+          </View>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+};
+
+const rst = StyleSheet.create({
+  topRow: { position: 'absolute', top: 10, left: 10, right: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  reelBadge:     { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 7, paddingVertical: 4, borderRadius: 20 },
+  reelBadgeText: { color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.extraBold, letterSpacing: 0.3 },
+  durationBadge:     { backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 7, paddingVertical: 4, borderRadius: 20 },
+  durationBadgeText: { color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+
+  actionsCol: { position: 'absolute', right: 10, bottom: 14, alignItems: 'center', gap: 14 },
+  actionItem: { alignItems: 'center', gap: 3 },
+  actionCircle: { alignItems: 'center', justifyContent: 'center' },
+  actionTxt:  { color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.bold, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+
+  bottomOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 10, gap: 3 },
+  authorRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  avatar:    { overflow: 'hidden', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.7)' },
+  authorName: { color: '#fff', fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, flexShrink: 1 },
+  verifiedBadge: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#1D9BF0', alignItems: 'center', justifyContent: 'center' },
+  caption: { color: 'rgba(255,255,255,0.92)', fontSize: FontSize.xs, marginTop: 1 },
+  musicRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
+  musicTxt: { color: 'rgba(255,255,255,0.78)', fontSize: FontSize.xs, fontWeight: FontWeight.semiBold, flexShrink: 1 },
+  compactStatsRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  compactStatsTxt: { color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold },
+});
+
+const ReelsSuggestionGrid: React.FC<{
+  reels: any[];
+  colors: AppColors;
+  nav: any;
+}> = ({ reels, colors, nav }) => {
+  if (!reels.length) return null;
+  const big   = reels[0];
+  const small = reels.slice(1, 3);
+  const gridW    = Dimensions.get('window').width - Spacing[4] * 2;
+  const bigH     = Math.round(gridW * 0.95);
+  const smallW   = small.length === 2 ? Math.round((gridW - REEL_TILE_GAP) / 2) : gridW;
+  const smallH   = Math.round(smallW * 0.95);
+
+  const openReel = (reel: any) =>
+    (nav as any).navigate('Tabs', { screen: 'Reels', params: { initialReelId: reel.id, initialReel: reel } });
+
+  return (
+    <View style={[getFeedCardStyle(colors), { paddingTop: 12, paddingHorizontal: Spacing[4], paddingBottom: 14 }]}>
+      <SectionHeader
+        title="Reels pour toi"
+        colors={colors}
+        icon="film"
+        seeAllLabel="Explorer"
+        onSeeAll={() => (nav as any).navigate('Tabs', { screen: 'Reels' })}
+      />
+      <View style={{ marginTop: 4 }}>
+        <ReelSuggestionTile reel={big} width={gridW} height={bigH} large onPress={() => openReel(big)} />
+        {small.length > 0 && (
+          <View style={{ flexDirection: 'row', gap: REEL_TILE_GAP, marginTop: REEL_TILE_GAP }}>
+            {small.map(r => (
+              <ReelSuggestionTile key={r.id} reel={r} width={smallW} height={smallH} onPress={() => openReel(r)} />
+            ))}
+          </View>
+        )}
+      </View>
+    </View>
+  );
+};
+
 // ── Encart : suggestions de communautés ─────────────────────────────────────────
 // Même gabarit de carte que PeopleSuggestions (cover + avatar chevauchant +
 // nom + bouton) — cohérence visuelle entre tous les encarts de suggestion du
@@ -611,78 +793,6 @@ const CommunitiesInlineCard: React.FC<{
   );
 };
 
-// ── Encart : rangée de reels ───────────────────────────────────────────────────
-// Carte grande, style Facebook "Reels pour vous" : 60% de la largeur d'écran
-// SUR TÉLÉPHONE — bien plus de présence qu'une simple vignette. Sur tablette
-// (largeur qui explose), 60% donnerait des cartes démesurées : on plafonne à
-// une largeur "confortable" de contenu vertical (280px, ~1.7 reel visible
-// même sur grand écran) au lieu de laisser le pourcentage grimper sans limite.
-// useWindowDimensions() (pas Dimensions.get figé) pour réagir aux rotations/
-// changements de fenêtre (split-screen, pliable).
-const REEL_ROW_MAX_W = 280;
-
-const ReelRowInlineCard: React.FC<{
-  reels: any[];
-  colors: AppColors;
-  nav: any;
-}> = ({ reels, colors, nav }) => {
-  const { width: winW } = useWindowDimensions();
-  const cardW = Math.min(Math.round(winW * 0.60), REEL_ROW_MAX_W);
-  return (
-    <View style={[getFeedCardStyle(colors), { paddingTop: 12 }]}>
-      <SectionHeader
-        title="Reels pour toi"
-        colors={colors}
-        icon="film"
-        onSeeAll={() => nav.navigate('Tabs', { screen: 'Reels' } as any)}
-      />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 4, paddingBottom: 12, gap: 10 }}>
-        {reels.map(r => {
-          const authorName = r.author?.display_name ?? r.author?.username ?? null;
-          return (
-            <TouchableOpacity
-              key={r.id}
-              activeOpacity={0.9}
-              onPress={() => (nav as any).navigate('Tabs', { screen: 'Reels', params: { initialReelId: r.id, initialReel: r } })}
-              style={{ width: cardW, aspectRatio: 9 / 16, borderRadius: FeedRadius.media, overflow: 'hidden', backgroundColor: '#000' }}>
-              {r.thumbnail_url
-                ? <CachedImage uri={r.thumbnail_url} style={{ width: '100%', height: '100%' }} />
-                : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                    <Icon name="film" size={30} color="rgba(255,255,255,0.3)" />
-                  </View>
-              }
-              {/* Icône lecture centrée — affirme que c'est un contenu vidéo */}
-              <View style={{ position: 'absolute', top: '42%', left: '42%' }}>
-                <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon name="play" size={15} color="#fff" style={{ marginLeft: 2 }} />
-                </View>
-              </View>
-              {/* Overlay bas dégradé — auteur + vues, lisibilité garantie */}
-              <LinearGradient
-                colors={['transparent', 'rgba(0,0,0,0.75)']}
-                style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '38%', justifyContent: 'flex-end', padding: 10, gap: 3 }}
-              >
-                {authorName ? (
-                  <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: '#fff' }} numberOfLines={1}>
-                    {authorName}
-                  </Text>
-                ) : null}
-                {(r.view_count ?? 0) > 0 && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Icon name="eye" size={11} color="rgba(255,255,255,0.85)" />
-                    <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold, color: 'rgba(255,255,255,0.85)' }}>
-                      {(r.view_count ?? 0) >= 1000 ? `${((r.view_count ?? 0) / 1000).toFixed(1)}k` : r.view_count}
-                    </Text>
-                  </View>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-    </View>
-  );
-};
 
 // ── FeedScreen ────────────────────────────────────────────────────────────────
 
@@ -857,8 +967,11 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     switch (item.kind) {
       case 'event':
       case 'concert':
-      case 'reel':
         return item.data?.thumbnail_url ? [item.data.thumbnail_url] : [];
+      case 'reels':
+        return (Array.isArray(item.data) ? item.data : [])
+          .map((r: any) => r?.thumbnail_url)
+          .filter((u: any): u is string => !!u);
       case 'post': {
         const urls: string[] = [];
         if (Array.isArray(item.data?.image_urls) && item.data.image_urls.length > 0) {
@@ -1392,12 +1505,12 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
             // Pub déjà résolue par le backend — item complet (créatif inclus),
             // jamais de placeholder à remplir après coup.
             result.push({ kind: 'ad', id: d.id, data: d });
-          } else if (d.kind === 'reel_row') {
-            result.push({ kind: 'reel_row', id: d.id, data: d.reels ?? [] });
           } else if (d.kind === 'suggestions') {
             result.push({ kind: 'suggestions', id: d.id, data: d.users ?? [] });
           } else if (d.kind === 'communities') {
             result.push({ kind: 'communities', id: d.id, data: d.communities ?? [] });
+          } else if (d.kind === 'reels') {
+            result.push({ kind: 'reels', id: d.id, data: d.reels ?? [] });
           }
         }
         // Filtrer les contenus masqués ("Pas intéressé") — après mapping, pour
@@ -1411,7 +1524,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
 
         // En mode silent : ne remplacer les items QUE si le contenu a réellement
         // changé. Comparer uniquement les `id` ne suffit pas : les rangées
-        // reel_row / suggestions / communities gardent leur id mais leur `data`
+        // suggestions / communities gardent leur id mais leur `data`
         // (nb de reels, liste de suggestions…) change à chaque refetch — la carte
         // se re-render alors avec une hauteur différente et pousse tout ce qui est
         // en dessous. On compare donc une signature du contenu (id + longueur/ids
@@ -1430,7 +1543,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           // PRÉSENCE à cette position compte pour la signature — jamais son id interne.
           const sig = (arr: FeedItem[]) => arr.map(i => {
             if (i.kind === 'ad') return 'ad';
-            if (i.kind === 'reel_row' || i.kind === 'suggestions' || i.kind === 'communities') {
+            if (i.kind === 'suggestions' || i.kind === 'communities' || i.kind === 'reels') {
               const d = (i.data ?? []) as any[];
               return `${i.kind}:${i.id}:${d.map(x => x?.id ?? '').join('|')}`;
             }
@@ -1515,6 +1628,38 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   const itemsRef = useRef<FeedItem[]>(items);
   useEffect(() => { itemsRef.current = items; }, [items]);
 
+  // Préchargement initial — avant cet effect, prefetchUpcomingImages n'était
+  // déclenché QUE par le scroll (onScroll/onViewableItemsChanged) : au tout
+  // premier chargement de l'écran, les images au-delà de ce qui est
+  // immédiatement visible n'étaient précargées qu'une fois l'utilisateur
+  // commence à scroller, pas avant. Se déclenche une seule fois, dès que la
+  // liste passe de vide à peuplée (reset à chaque changement de filtre pour
+  // re-précharger le nouveau fil).
+  const didInitialPrefetchRef = useRef(false);
+  useEffect(() => {
+    if (items.length === 0) { didInitialPrefetchRef.current = false; return; }
+    if (didInitialPrefetchRef.current) return;
+    didInitialPrefetchRef.current = true;
+    InteractionManager.runAfterInteractions(() => prefetchUpcomingImages(0));
+  }, [items]);
+
+  // Vide le tracking mémoire du préchargement (pas le cache disque — celui-ci
+  // reste précieusement gardé pour un retour rapide) au passage en
+  // arrière-plan — même principe que ReelsScreen, qui libère ses ressources
+  // actives sans toucher au cache. Sans ça, prefetchedImagesRef grossit sans
+  // limite tant que l'app tourne. Au retour au premier plan, le prochain
+  // scroll relance normalement le préchargement (le cache disque sert
+  // immédiatement les images déjà téléchargées, donc aucune perte de rapidité).
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'background') {
+        prefetchedImagesRef.current.clear();
+        didInitialPrefetchRef.current = false;
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
   // handleToggleFriends (bascule Général ↔ Mes amis) gère lui-même load() dans un
   // flux linéaire pour pouvoir attendre sa fin avant de repivoter l'animation —
   // pose ce flag à true juste avant son propre setFilter pour empêcher CET effect
@@ -1593,12 +1738,12 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           } else if (d.kind === 'ad') {
             // Pub déjà résolue par le backend — item complet, jamais de slot différé.
             appended.push({ kind: 'ad', id: d.id, data: d });
-          } else if (d.kind === 'reel_row') {
-            appended.push({ kind: 'reel_row', id: d.id, data: d.reels ?? [] });
           } else if (d.kind === 'suggestions') {
             appended.push({ kind: 'suggestions', id: d.id, data: d.users ?? [] });
           } else if (d.kind === 'communities') {
             appended.push({ kind: 'communities', id: d.id, data: d.communities ?? [] });
+          } else if (d.kind === 'reels') {
+            appended.push({ kind: 'reels', id: d.id, data: d.reels ?? [] });
           }
         }
 
@@ -1937,6 +2082,13 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
 
   const handleAdPress = useCallback((adId: string, url: string) => {
     apiClient.post(`/api/v1/ads/${adId}/click`).catch(() => {});
+    // url vide : AdCard/AdCTA ont déjà géré l'ouverture eux-mêmes (contact direct
+    // via callPhone/openWhatsapp ou runAdButton) — rien d'autre à faire ici.
+    if (!url) return;
+    // cta_url peut être un numéro de téléphone brut (ancien format, sans les champs
+    // contact_phone/contact_call/contact_whatsapp dédiés) — Linking.openURL échoue
+    // silencieusement sur un numéro brut, il faut passer par tel:/whatsapp://.
+    if (adIsPhone(url)) { openPhoneMenu(url.replace(/^tel:/i, '')); return; }
     Linking.openURL(url).catch(() => {});
   }, []);
 
@@ -2003,10 +2155,26 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
       if (!comms.length) return null;
       return <CommunitiesInlineCard communities={comms} colors={colors} nav={nav} />;
     }
-    if (item.kind === 'reel_row') {
+    if (item.kind === 'reels') {
       const reels = (item.data ?? []) as any[];
       if (!reels.length) return null;
-      return <ReelRowInlineCard reels={reels} colors={colors} nav={nav} />;
+      return <ReelsSuggestionGrid reels={reels} colors={colors} nav={nav} />;
+    }
+    if (item.kind === 'reel') {
+      if (!item.data) return null;
+      const r = item.data;
+      const tileW = Dimensions.get('window').width - Spacing[4] * 2;
+      return (
+        <View style={{ marginHorizontal: Spacing[4], marginBottom: 10 }}>
+          <ReelSuggestionTile
+            reel={r}
+            width={tileW}
+            height={Math.round(tileW * 0.95)}
+            large
+            onPress={() => (nav as any).navigate('Tabs', { screen: 'Reels', params: { initialReelId: r.id, initialReel: r } })}
+          />
+        </View>
+      );
     }
     if (!item.data) return null;
     const aid = item.kind === 'event'
@@ -2049,7 +2217,16 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
       />
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
-      <View style={[s.header, { backgroundColor: colors.surface, paddingTop: insets.top + (Platform.OS === 'android' ? 8 : 6) }]}>
+      {/* paddingTop (status bar) isolé sur un wrapper transparent — s.header
+          porte uniquement le style visuel de la carte (fond blanc, bordure,
+          ombre). Les mélanger ferait apparaître la zone status bar (lavande,
+          cf. s.root) comme faisant partie de la carte arrondie, avec un coin
+          visible sous la status bar — rendu incohérent. Carte flottante
+          blanche (colors.surface) distincte du fond lavande de l'écran
+          (colors.background), comme le reste du nouveau design (StoryBar,
+          AppTabBar). */}
+      <View style={{ paddingTop: insets.top + (Platform.OS === 'android' ? 8 : 6) }}>
+        <View style={[s.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
         <View style={s.headerRow}>
           {/* Gauche : avatar + pastille "en ligne" — masqué si recherche ouverte */}
           {!searchOpen && (
@@ -2095,114 +2272,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
             )
           )}
 
-          {/* ── Panneau infos primaires — s'ouvre sous le header, se ferme au tap extérieur ── */}
-          {showProfilePanel && currentUser && (
-            <>
-              <TouchableWithoutFeedback onPress={() => setShowProfilePanel(false)}>
-                <View style={StyleSheet.absoluteFill} />
-              </TouchableWithoutFeedback>
-              <View
-                style={{
-                  position: 'absolute', top: '100%', left: 12, marginTop: 6, zIndex: 50,
-                  width: 260, borderRadius: 16, padding: 16,
-                  backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.divider,
-                  shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8,
-                }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  {currentUser.avatar_url ? (
-                    <CachedImage uri={currentUser.avatar_url} style={{ width: 44, height: 44, borderRadius: 22 }} />
-                  ) : (
-                    <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary + '22', alignItems: 'center', justifyContent: 'center' }}>
-                      <Text style={{ color: colors.primary, fontWeight: FontWeight.bold, fontSize: FontSize.basePlus }}>{initials}</Text>
-                    </View>
-                  )}
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <Text style={{ fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold, color: colors.textPrimary, flexShrink: 1 }} numberOfLines={1}>
-                        {currentUser.display_name ?? currentUser.first_name ?? currentUser.username}
-                      </Text>
-                      {currentUser.is_verified && <Icon name="check-circle" size={14} color={colors.primary} />}
-                    </View>
-                    {currentUser.username && (
-                      <Text style={{ fontSize: FontSize.sm, color: colors.textTertiary, marginTop: 1 }} numberOfLines={1}>@{currentUser.username}</Text>
-                    )}
-                  </View>
-                </View>
-                {currentUser.bio && (
-                  <Text style={{ fontSize: FontSize.sm, color: colors.textSecondary, marginTop: 10, lineHeight: 17 }} numberOfLines={3}>
-                    {currentUser.bio}
-                  </Text>
-                )}
-                <TouchableOpacity
-                  onPress={() => { setShowProfilePanel(false); currentUser.id && (nav as any).navigate('UserProfile', { userId: currentUser.id }); }}
-                  activeOpacity={0.85}
-                  style={{ marginTop: 12, borderRadius: 10, paddingVertical: 9, alignItems: 'center', backgroundColor: colors.primary + '18' }}
-                >
-                  <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, color: colors.primary }}>Voir le profil</Text>
-                </TouchableOpacity>
-
-                {/* Multi-compte — bascule rapide, sans repasser par les Paramètres */}
-                {accounts.length > 1 && (
-                  <>
-                    <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.divider, marginVertical: 12 }} />
-                    <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, letterSpacing: 0.6, color: colors.textTertiary, marginBottom: 8 }}>
-                      MES COMPTES
-                    </Text>
-                    {accounts.map(account => {
-                      const isSwitching = switchingAccountId === account.user_id;
-                      const initial = (account.display_name || account.username || '?')[0]?.toUpperCase() ?? '?';
-                      return (
-                        <TouchableOpacity
-                          key={account.user_id}
-                          activeOpacity={account.is_active ? 1 : 0.7}
-                          disabled={account.is_active || !!switchingAccountId}
-                          onPress={async () => {
-                            if (account.is_active || !onSwitchAccount) return;
-                            setSwitchingAccountId(account.user_id);
-                            try {
-                              await onSwitchAccount(account.user_id);
-                              setShowProfilePanel(false);
-                            } catch (e: any) {
-                              toastService.error('Connexion impossible', e?.message ?? 'Ce compte ne semble plus valide.');
-                            } finally {
-                              setSwitchingAccountId(null);
-                            }
-                          }}
-                          style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 }}
-                        >
-                          {account.avatar_url ? (
-                            <CachedImage uri={account.avatar_url} style={{ width: 32, height: 32, borderRadius: 16 }} />
-                          ) : (
-                            <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary + '22', alignItems: 'center', justifyContent: 'center' }}>
-                              <Text style={{ color: colors.primary, fontWeight: FontWeight.extraBold, fontSize: FontSize.smPlus }}>{initial}</Text>
-                            </View>
-                          )}
-                          <Text style={{ flex: 1, fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold, color: colors.textPrimary }} numberOfLines={1}>
-                            {account.display_name || account.username}
-                          </Text>
-                          {isSwitching ? (
-                            <ActivityIndicator size="small" color={colors.primary} />
-                          ) : account.is_active ? (
-                            <Icon name="check-circle" size={16} color={colors.primary} />
-                          ) : null}
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </>
-                )}
-                <TouchableOpacity
-                  onPress={() => { setShowProfilePanel(false); (nav as any).navigate('SettingsCompte'); }}
-                  activeOpacity={0.7}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: accounts.length > 1 ? 10 : 12, paddingTop: accounts.length > 1 ? 4 : 0 }}
-                >
-                  <Icon name="plus-circle" size={15} color={colors.textSecondary} />
-                  <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, color: colors.textSecondary }}>Gérer les comptes</Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
-
           {/* Centre : barre de recherche permanente (remplace le logo). Au tap,
               ouvre l'overlay de recherche plein écran existant. */}
           {!searchOpen && (
@@ -2214,7 +2283,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
                 height: 32, borderRadius: 17, paddingHorizontal: 12,
                 marginHorizontal: 7,
                 backgroundColor: colors.backgroundSecondary,
-                borderWidth: 1, borderColor: colors.divider,
               }}
             >
               <Icon name="search" size={14} color={colors.textTertiary} />
@@ -2229,8 +2297,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
             <Animated.View style={[animatedSearchBar, {
               flexDirection: 'row', alignItems: 'center',
               paddingHorizontal: 10, height: 32,
-              borderRadius: 17, borderWidth: 1,
-              borderColor: colors.primary + '55',
+              borderRadius: 17,
               backgroundColor: colors.backgroundSecondary,
               gap: 7, flex: 1, marginRight: 7,
             }]}>
@@ -2312,11 +2379,13 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
             )}
           </View>
         </View>
+        </View>
+      </View>
 
-
-        {/* ── Onglets (pills) : Mes amis (filtre du fil) · Favoris · Direct ─── */}
-        {!searchOpen && (
-          <View style={s.headerPills}>
+      {/* En dehors de la carte header (cf. référence) — sur le fond lavande
+          de l'écran, pas dans la carte blanche. */}
+      {!searchOpen && (
+        <View style={[s.headerPills, { paddingHorizontal: 16 }]}>
             {/* Mes amis — bascule le filtre du fil (Général ↔ Suivis). Pas de
                 chevron : c'est un filtre, pas une navigation. */}
             <TouchableOpacity
@@ -2324,8 +2393,8 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
               onPress={handleToggleFriends}
               style={[
                 s.headerPill,
-                { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider },
-                filter === 'following' && { backgroundColor: colors.primary + '18', borderColor: colors.primary + '40' },
+                { backgroundColor: colors.backgroundSecondary },
+                filter === 'following' && { backgroundColor: colors.primary + '18' },
               ]}
             >
               <Icon
@@ -2346,7 +2415,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => nav.navigate('Favorites')}
-              style={[s.headerPillNav, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
+              style={[s.headerPillNav, { backgroundColor: colors.backgroundSecondary }]}
             >
               <View style={s.headerPillNavInner}>
                 <Icon name="heart" size={14} color={colors.textSecondary} />
@@ -2360,7 +2429,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => nav.navigate('GoLive')}
-              style={[s.headerPillNav, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
+              style={[s.headerPillNav, { backgroundColor: colors.backgroundSecondary }]}
             >
               <View style={s.headerPillNavInner}>
                 <View style={{ position: 'relative' }}>
@@ -2378,9 +2447,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
             </TouchableOpacity>
           </View>
         )}
-
-      </View>
-
 
       {searchOpen ? (
         /* ── Overlay recherche plein écran ──────────────────────────────── */
@@ -3066,216 +3132,123 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         {fullscreenAd && <AdFullscreenPlayer ad={fullscreenAd} onClose={() => setFullscreenAd(null)} />}
       </Modal>
 
+      {/* ── Panneau infos primaires — rendu au niveau racine de l'écran (pas
+          dans le header) pour pouvoir passer par-dessus headerPills et la
+          FlatList, qui sont rendus après le header dans l'arbre JSX et donc
+          l'auraient recouvert si le panneau était resté un enfant du header. */}
+      {showProfilePanel && currentUser && (
+        <>
+          <TouchableWithoutFeedback onPress={() => setShowProfilePanel(false)}>
+            <View style={StyleSheet.absoluteFill} />
+          </TouchableWithoutFeedback>
+          <View
+            style={{
+              position: 'absolute',
+              top: insets.top + (Platform.OS === 'android' ? 8 : 6) + 37 + 6,
+              left: 22, zIndex: 50,
+              width: 260, borderRadius: 16, padding: 16,
+              backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.divider,
+              shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              {currentUser.avatar_url ? (
+                <CachedImage uri={currentUser.avatar_url} style={{ width: 44, height: 44, borderRadius: 22 }} />
+              ) : (
+                <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary + '22', alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ color: colors.primary, fontWeight: FontWeight.bold, fontSize: FontSize.basePlus }}>{initials}</Text>
+                </View>
+              )}
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Text style={{ fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold, color: colors.textPrimary, flexShrink: 1 }} numberOfLines={1}>
+                    {currentUser.display_name ?? currentUser.first_name ?? currentUser.username}
+                  </Text>
+                  {currentUser.is_verified && <Icon name="check-circle" size={14} color={colors.primary} />}
+                </View>
+                {currentUser.username && (
+                  <Text style={{ fontSize: FontSize.sm, color: colors.textTertiary, marginTop: 1 }} numberOfLines={1}>@{currentUser.username}</Text>
+                )}
+              </View>
+            </View>
+            {currentUser.bio && (
+              <Text style={{ fontSize: FontSize.sm, color: colors.textSecondary, marginTop: 10, lineHeight: 17 }} numberOfLines={3}>
+                {currentUser.bio}
+              </Text>
+            )}
+            <TouchableOpacity
+              onPress={() => { setShowProfilePanel(false); currentUser.id && (nav as any).navigate('UserProfile', { userId: currentUser.id }); }}
+              activeOpacity={0.85}
+              style={{ marginTop: 12, borderRadius: 10, paddingVertical: 9, alignItems: 'center', backgroundColor: colors.primary + '18' }}
+            >
+              <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, color: colors.primary }}>Voir le profil</Text>
+            </TouchableOpacity>
+
+            {/* Multi-compte — bascule rapide, sans repasser par les Paramètres */}
+            {accounts.length > 1 && (
+              <>
+                <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.divider, marginVertical: 12 }} />
+                <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, letterSpacing: 0.6, color: colors.textTertiary, marginBottom: 8 }}>
+                  MES COMPTES
+                </Text>
+                {accounts.map(account => {
+                  const isSwitching = switchingAccountId === account.user_id;
+                  const initial = (account.display_name || account.username || '?')[0]?.toUpperCase() ?? '?';
+                  return (
+                    <TouchableOpacity
+                      key={account.user_id}
+                      activeOpacity={account.is_active ? 1 : 0.7}
+                      disabled={account.is_active || !!switchingAccountId}
+                      onPress={async () => {
+                        if (account.is_active || !onSwitchAccount) return;
+                        setSwitchingAccountId(account.user_id);
+                        try {
+                          await onSwitchAccount(account.user_id);
+                          setShowProfilePanel(false);
+                        } catch (e: any) {
+                          toastService.error('Connexion impossible', e?.message ?? 'Ce compte ne semble plus valide.');
+                        } finally {
+                          setSwitchingAccountId(null);
+                        }
+                      }}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 }}
+                    >
+                      {account.avatar_url ? (
+                        <CachedImage uri={account.avatar_url} style={{ width: 32, height: 32, borderRadius: 16 }} />
+                      ) : (
+                        <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary + '22', alignItems: 'center', justifyContent: 'center' }}>
+                          <Text style={{ color: colors.primary, fontWeight: FontWeight.extraBold, fontSize: FontSize.smPlus }}>{initial}</Text>
+                        </View>
+                      )}
+                      <Text style={{ flex: 1, fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold, color: colors.textPrimary }} numberOfLines={1}>
+                        {account.display_name || account.username}
+                      </Text>
+                      {isSwitching ? (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                      ) : account.is_active ? (
+                        <Icon name="check-circle" size={16} color={colors.primary} />
+                      ) : null}
+                    </TouchableOpacity>
+                  );
+                })}
+              </>
+            )}
+            <TouchableOpacity
+              onPress={() => { setShowProfilePanel(false); (nav as any).navigate('SettingsCompte'); }}
+              activeOpacity={0.7}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: accounts.length > 1 ? 10 : 12, paddingTop: accounts.length > 1 ? 4 : 0 }}
+            >
+              <Icon name="plus-circle" size={15} color={colors.textSecondary} />
+              <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, color: colors.textSecondary }}>Gérer les comptes</Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
+
     </View>
   );
 };
 
-// ── ReelFeedCard — carte reel style Facebook dans le feed ────────────────────
-
-const ReelFeedCard: React.FC<{
-  reel: any;
-  colors: AppColors;
-  isActive: boolean;
-  onPress: () => void;
-  onScrollLock?: (enabled: boolean) => void;
-}> = React.memo(({ reel, colors, isActive, onPress, onScrollLock }) => {
-  const author   = reel.author;
-  const name     = author?.display_name ?? author?.username ?? 'Utilisateur';
-  const initials = name[0]?.toUpperCase() ?? '?';
-
-  // null = pas encore détecté, true = portrait 9:16, false = paysage 16:9
-  const [isPortrait, setIsPortrait] = useState<boolean | null>(null);
-  const mountedRef = useRef(true);
-  useEffect(() => () => { mountedRef.current = false; }, []);
-
-  // Détection du ratio depuis le thumbnail uniquement
-  useEffect(() => {
-    if (!reel.thumbnail_url) return;
-    Image.getSize(
-      reel.thumbnail_url,
-      (w, h) => { if (mountedRef.current) setIsPortrait(h >= w); },
-      () => { if (mountedRef.current) setIsPortrait(true); },
-    );
-  }, [reel.thumbnail_url]);
-
-  const thumbAspectRatio = isPortrait === false ? 16 / 9 : 1 / 0.88;
-
-  // Animation pulse sur le bouton play (Reanimated)
-
-  const timeAgo = (iso: string) => {
-    const diff = (Date.now() - new Date(iso).getTime()) / 1000;
-    if (diff < 60)    return 'À l\'instant';
-    if (diff < 3600)  return `${Math.floor(diff / 60)} min`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)} h`;
-    return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
-  };
-
-  // Phrases d'accroche tournantes
-  const HOOKS = [
-    'La suite va te surprendre 👀',
-    'T\'as regardé jusqu\'au bout ? 🔥',
-    'Ce moment est trop fort 😱',
-    'Tout le monde en parle en ce moment',
-    'Tu ne vas pas le regretter ✨',
-    'Ce reel fait le buzz 🚀',
-  ];
-  const hookIdx = Math.abs(reel.id?.charCodeAt(0) ?? 0) % HOOKS.length;
-  const hookText = HOOKS[hookIdx];
-
-  return (
-    <TouchableOpacity
-      activeOpacity={0.96}
-      onPress={onPress}
-      style={[rs.card, { backgroundColor: '#000' }]}
-    >
-      <View style={[rs.thumbWrap, { aspectRatio: thumbAspectRatio }]}>
-
-        {/* Thumbnail */}
-        {reel.thumbnail_url ? (
-          <Image
-            source={{ uri: reel.thumbnail_url }}
-            style={StyleSheet.absoluteFill}
-            resizeMode={isPortrait === false ? 'contain' : 'cover'}
-          />
-        ) : (
-          <View style={{ ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="film" size={40} color="rgba(255,255,255,0.18)" />
-          </View>
-        )}
-
-        {/* Overlay filtre */}
-        {(() => {
-          const fKey = reel.filter_name as FilterKey | undefined;
-          const fDef = fKey ? FILTERS.find(f => f.key === fKey) : null;
-          const fOp  = fKey ? (FILTER_VIDEO_OPACITY[fKey] ?? 0) : 0;
-          const fOp2 = fKey ? (FILTER_VIDEO_OPACITY2[fKey] ?? 0) : 0;
-          if (!fDef || fOp === 0) return null;
-          return (
-            <>
-              <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: fDef.overlay, opacity: fOp }]} />
-              {(fDef as any).overlay2 && fOp2 > 0 && (
-                <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: (fDef as any).overlay2, opacity: fOp2 }]} />
-              )}
-            </>
-          );
-        })()}
-
-        {/* Text layers miniature */}
-        {reel.text_layers && (() => {
-          try {
-            const ls = JSON.parse(reel.text_layers);
-            return ls.slice(0, 3).map((l: any) => (
-              <View key={l.id} pointerEvents="none" style={{ position: 'absolute', left: `${(l.x / 390) * 100}%` as any, top: `${(l.y / 844) * 100}%` as any, zIndex: 2 }}>
-                <Text style={{ color: l.color, fontSize: Math.max(8, Math.round(l.fontSize * 0.35)), fontWeight: FontWeight.bold, textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }} numberOfLines={1}>{l.text}</Text>
-              </View>
-            ));
-          } catch { return null; }
-        })()}
-
-        {/* Gradient haut → bas */}
-        <LinearGradient
-          colors={['rgba(0,0,0,0.35)', 'transparent', 'rgba(0,0,0,0.78)']}
-          style={StyleSheet.absoluteFill}
-        />
-
-
-        {/* Auteur en haut */}
-        <View style={rs.authorOverlay}>
-          {author?.avatar_url ? (
-            <CachedImage uri={author.avatar_url} style={rs.avatarSm} />
-          ) : (
-            <View style={[rs.avatarSm, { backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }]}>
-              <Text style={{ color: '#fff', fontWeight: FontWeight.extraBold, fontSize: FontSize.sm }}>{initials}</Text>
-            </View>
-          )}
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Text style={rs.authorOverlayName} numberOfLines={1}>{name}</Text>
-              {author?.is_verified && (
-                <View style={{ width: 13, height: 13, borderRadius: 7, backgroundColor: '#1D9BF0', alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon name="check" size={8} color="#fff" />
-                </View>
-              )}
-            </View>
-            <Text style={rs.authorOverlayTime}>{timeAgo(reel.created_at)}</Text>
-          </View>
-        </View>
-
-        {/* Bouton play animé au centre */}
-        <View style={rs.playCenter} pointerEvents="none">
-          <View style={rs.playRipple} />
-          <View style={rs.playCircle}>
-            <Icon name="play" size={28} color="#fff" />
-          </View>
-        </View>
-
-        {/* Bas : accroche + caption + stats */}
-        <View style={rs.bottomOverlay}>
-          <View style={rs.hookWrap}>
-            <Text style={rs.hookText}>{hookText}</Text>
-          </View>
-          {reel.caption ? (
-            <Text style={rs.captionOverlay} numberOfLines={2}>{reel.caption}</Text>
-          ) : null}
-          <View style={rs.statsRow}>
-            <View style={rs.statItem}>
-              <Icon name="eye" size={13} color="rgba(255,255,255,0.85)" />
-              <Text style={rs.statTxt}>{(reel.view_count ?? 0).toLocaleString()}</Text>
-            </View>
-            <View style={rs.statItem}>
-              <MCIcon name="heart" size={14} color="rgba(255,255,255,0.85)" />
-              <Text style={rs.statTxt}>{reel.like_count ?? 0}</Text>
-            </View>
-            {reel.duration_sec ? (
-              <View style={rs.statItem}>
-                <Icon name="clock" size={13} color="rgba(255,255,255,0.85)" />
-                <Text style={rs.statTxt}>{reel.duration_sec}s</Text>
-              </View>
-            ) : null}
-            <View style={rs.ctaBtn}>
-              <Text style={rs.ctaTxt}>Voir le reel</Text>
-              <Icon name="arrow-right" size={13} color="#fff" />
-            </View>
-          </View>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-});
-
-const rs = StyleSheet.create({
-  card:     { marginBottom: 10, overflow: 'hidden', borderRadius: 14 },
-  thumbWrap:{ width: '100%', overflow: 'hidden' },
-
-  // Badge REEL
-  reelBadge:     { position: 'absolute', top: 12, left: 12, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
-  reelBadgeText: { color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.extraBold, letterSpacing: 0.5 },
-
-  // Auteur en overlay haut
-  authorOverlay:     { position: 'absolute', top: 40, left: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  avatarSm:          { width: 32, height: 32, borderRadius: 16, overflow: 'hidden', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)' },
-  authorOverlayName: { color: '#fff', fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
-  authorOverlayTime: { color: 'rgba(255,255,255,0.65)', fontSize: FontSize.xsPlus, marginTop: 1 },
-  muteBtnOverlay:    { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' },
-
-  // Bas overlay
-  bottomOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 14, gap: 6 },
-  hookWrap:  { alignSelf: 'flex-start', backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
-  hookText:  { color: '#fff', fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
-  captionOverlay: { color: 'rgba(255,255,255,0.9)', fontSize: FontSize.smPlus, lineHeight: 18 },
-
-  // Stats + CTA
-  statsRow:  { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  statItem:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  statTxt:   { color: 'rgba(255,255,255,0.85)', fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
-  ctaBtn:    { marginLeft: 'auto' as any, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' },
-  ctaTxt:    { color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.bold },
-
-  // Bouton play animé
-  playCenter:  { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-  playRipple:  { position: 'absolute', width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.15)' },
-  playCircle:  { width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.85)', paddingLeft: 4 },
-});
 
 const hk = StyleSheet.create({
   wrap: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 14, marginBottom: 10, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10, borderLeftWidth: 3 },

@@ -431,10 +431,12 @@ export const TournamentBracketScreen: React.FC = () => {
   if (loadError || !bracket) {
     return (
       <View style={[styles.root, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 12 }]}>
-          <BackButton onPress={() => nav.goBack()} />
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Tournoi</Text>
-          <View style={{ width: 38 }} />
+        <View style={{ paddingTop: insets.top + 8 }}>
+          <View style={[styles.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+            <BackButton onPress={() => nav.goBack()} />
+            <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Tournoi</Text>
+            <View style={{ width: 38 }} />
+          </View>
         </View>
         <View style={styles.errorBox}>
           <Icon name="alert-triangle" size={32} color="#EF4444" />
@@ -513,21 +515,23 @@ export const TournamentBracketScreen: React.FC = () => {
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.divider, paddingTop: insets.top + 12 }]}>
-        <BackButton onPress={() => nav.goBack()} />
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>{tournament.name}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <TouchableOpacity style={styles.headerIconBtn} onPress={handleShareTournament}>
-            <Icon name="share-2" size={18} color={colors.textPrimary} />
-          </TouchableOpacity>
-          {isOrganizer && tournament.status !== 'registration' && (
-            <TouchableOpacity
-              style={styles.financeBtn}
-              onPress={() => nav.navigate('TournamentFinance', { tournamentId })}
-            >
-              <Icon name="dollar-sign" size={18} color="#F59E0B" />
+      <View style={{ paddingTop: insets.top + 8 }}>
+        <View style={[styles.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => nav.goBack()} />
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>{tournament.name}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <TouchableOpacity style={styles.headerIconBtn} onPress={handleShareTournament}>
+              <Icon name="share-2" size={18} color={colors.textPrimary} />
             </TouchableOpacity>
-          )}
+            {isOrganizer && tournament.status !== 'registration' && (
+              <TouchableOpacity
+                style={styles.financeBtn}
+                onPress={() => nav.navigate('TournamentFinance', { tournamentId })}
+              >
+                <Icon name="dollar-sign" size={18} color="#F59E0B" />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </View>
 
@@ -1145,7 +1149,13 @@ const MatchSlot: React.FC<{ name: string; avatar?: string | null; isWinner: bool
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 16, paddingHorizontal: 16,
+    marginHorizontal: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
   headerTitle: { fontSize: FontSize.md, fontWeight: FontWeight.bold, flex: 1, textAlign: 'center' },
   financeBtn: {
     width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center',

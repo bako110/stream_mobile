@@ -97,30 +97,32 @@ export const NewConversationScreen: React.FC = () => {
       />
 
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.surface, paddingTop: STATUS_H + 8 }]}>
-        <View style={styles.headerRow}>
-          <BackButton onPress={() => nav.goBack()} />
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Nouvelle conversation</Text>
-        </View>
+      <View style={{ paddingTop: STATUS_H + 8 }}>
+        <View style={[styles.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <View style={styles.headerRow}>
+            <BackButton onPress={() => nav.goBack()} />
+            <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Nouvelle conversation</Text>
+          </View>
 
-        {/* Champ de recherche */}
-        <View style={[styles.searchBar, { backgroundColor: colors.inputBg ?? colors.backgroundSecondary }]}>
-          <Icon name="search" size={15} color={colors.textTertiary} />
-          <TextInput
-            value={query}
-            onChangeText={handleChange}
-            placeholder="Rechercher par nom ou @username…"
-            placeholderTextColor={colors.textDisabled}
-            autoFocus
-            returnKeyType="search"
-            style={[styles.searchInput, { color: colors.textPrimary }]}
-          />
-          {loading && <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 6 }} />}
-          {!loading && query.length > 0 && (
-            <TouchableOpacity onPress={() => { setQuery(''); setResults([]); setEmpty(false); }}>
-              <Icon name="x" size={14} color={colors.textTertiary} />
-            </TouchableOpacity>
-          )}
+          {/* Champ de recherche */}
+          <View style={[styles.searchBar, { backgroundColor: colors.inputBg ?? colors.backgroundSecondary }]}>
+            <Icon name="search" size={15} color={colors.textTertiary} />
+            <TextInput
+              value={query}
+              onChangeText={handleChange}
+              placeholder="Rechercher par nom ou @username…"
+              placeholderTextColor={colors.textDisabled}
+              autoFocus
+              returnKeyType="search"
+              style={[styles.searchInput, { color: colors.textPrimary }]}
+            />
+            {loading && <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 6 }} />}
+            {!loading && query.length > 0 && (
+              <TouchableOpacity onPress={() => { setQuery(''); setResults([]); setEmpty(false); }}>
+                <Icon name="x" size={14} color={colors.textTertiary} />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </View>
 
@@ -196,13 +198,17 @@ const styles = StyleSheet.create({
 
   header: {
     paddingHorizontal: Spacing[4],
-    paddingBottom: Spacing[3],
+    paddingVertical: Spacing[3],
     gap: 10,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
+    marginHorizontal: 10,
+    marginBottom: 10,
+    borderRadius: 24,
+    borderWidth: 1,
+    shadowColor: '#5B45B5',
+    shadowOpacity: 0.10,
+    shadowOffset: { width: 0, height: 5 },
+    shadowRadius: 14,
+    elevation: 8,
   },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing[3] },
   headerTitle: { fontSize: 18, fontWeight: '700' },

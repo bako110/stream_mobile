@@ -268,23 +268,28 @@ export const CommunityFundScreen: React.FC = () => {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
-      {/* Header */}
-      <View style={[st.header, { paddingTop: insets.top + 8, borderBottomColor: colors.divider, backgroundColor: colors.surface }]}>
-        <BackButton onPress={() => nav.goBack()} />
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: colors.textPrimary, fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold }}>Cotisations</Text>
-          <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus }}>{communityName}</Text>
+      {/* Header — carte flottante (même design que le reste de l'app).
+          paddingTop (status bar) isolé sur un wrapper externe transparent —
+          le mélanger au style de la carte ferait apparaître un coin visible
+          sous la status bar. */}
+      <View style={{ paddingTop: insets.top + 8 }}>
+        <View style={[st.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => nav.goBack()} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: colors.textPrimary, fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold }}>Cotisations</Text>
+            <Text style={{ color: colors.textTertiary, fontSize: FontSize.xsPlus }}>{communityName}</Text>
+          </View>
+          {isAdmin && (
+            <TouchableOpacity
+              onPress={() => setCreateOpen(true)}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
+                backgroundColor: '#7B3FF2', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20 }}
+            >
+              <Icon name="plus" size={14} color="#fff" />
+              <Text style={{ color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.smPlus }}>Lancer</Text>
+            </TouchableOpacity>
+          )}
         </View>
-        {isAdmin && (
-          <TouchableOpacity
-            onPress={() => setCreateOpen(true)}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 5,
-              backgroundColor: '#7B3FF2', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20 }}
-          >
-            <Icon name="plus" size={14} color="#fff" />
-            <Text style={{ color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.smPlus }}>Lancer</Text>
-          </TouchableOpacity>
-        )}
       </View>
 
       {loading ? (
@@ -495,7 +500,13 @@ export const CommunityFundScreen: React.FC = () => {
 };
 
 const st = StyleSheet.create({
-  header:       { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  header:       {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 16, paddingBottom: 12,
+    marginHorizontal: 10, borderRadius: 24, borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 8,
+  },
   card:         { borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
   summaryCard:  { borderRadius: 16, borderWidth: 1, padding: 14, marginBottom: 12 },
   progressTrack:{ height: 6, borderRadius: 3, overflow: 'hidden' },
