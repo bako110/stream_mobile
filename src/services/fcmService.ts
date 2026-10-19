@@ -166,6 +166,9 @@ export async function handleBackgroundFCM(
         pressAction:  { id: 'default', launchActivity: 'default' },
         ..._androidImagery(data as Record<string, string>, msgBody),
       },
+      ios: {
+        sound: 'message_sound.wav',
+      },
       data: data as Record<string, string>,
     });
     return;
