@@ -103,13 +103,18 @@ export const RootNavigator: React.FC = () => {
     }
 
     try {
-      await authService.getMe(true);
+      const me = await authService.getMe(true);
+      // Revérifié à chaque démarrage (pas seulement au login) — un compte
+      // OAuth qui a fermé l'app sans compléter sexe/âge ne doit jamais
+      // atterrir directement sur le feed à son retour.
+      if (me.profile_incomplete) return { state: 'completeProfile' };
       return { state: 'main' };
     } catch (err) {
       const isNetworkError = err instanceof ApiError && err.status === 0;
       if (isNetworkError) return { state: 'main' };
       try {
-        await authService.refresh();
+        const refreshed = await authService.refresh();
+        if (refreshed.profile_incomplete) return { state: 'completeProfile' };
         return { state: 'main' };
       } catch (refreshErr) {
         const isRefreshNetworkError = refreshErr instanceof ApiError && (refreshErr as ApiError).status === 0;

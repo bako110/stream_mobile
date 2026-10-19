@@ -33,6 +33,11 @@ export interface User {
   gofolyx_id?: string | null;
   // true si un code PIN wallet est défini (exigé pour cadeau/transfert/retrait)
   has_wallet_pin?: boolean;
+  // Calculé côté serveur à chaque réponse (date_of_birth ou gender manquant) —
+  // jamais figé au seul login, revérifié par RootNavigator à chaque démarrage
+  // de l'app pour ne jamais laisser passer un profil incomplet, y compris un
+  // compte OAuth qui a esquivé CompleteProfileScreen une première fois.
+  profile_incomplete?: boolean;
   last_login_at: string | null;
   created_at: string;
   updated_at: string;
