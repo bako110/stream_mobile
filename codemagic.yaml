@@ -1,0 +1,66 @@
+workflows:
+  ios-testflight:
+    name: iOS — build + TestFlight
+    max_build_duration: 90
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: gofolyx_asc
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.gofolyx.mobile
+      vars:
+        XCODE_WORKSPACE: "ios/stream_mobile.xcworkspace"
+        XCODE_SCHEME: "stream_mobile"
+        APP_STORE_APPLE_ID: 0000000000 # remplacer par l'Apple ID numérique de l'app une fois créée dans App Store Connect
+      node: 20.18.0
+      xcode: latest
+      cocoapods: default
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+        - pattern: feat/*
+          include: false
+    scripts:
+      - name: Installer les dépendances JS
+        script: |
+          npm ci
+
+      - name: Installer les pods iOS
+        script: |
+          cd ios && pod install --repo-update
+
+      - name: Récupérer les certificats de signature
+        script: |
+          xcode-project use-profiles
+
+      - name: Incrémenter le build number
+        script: |
+          cd ios
+          LATEST_BUILD_NUMBER=$(app-store-connect get-latest-build-number "$APP_STORE_APPLE_ID" || echo 0)
+          agvtool new-version -all $(($LATEST_BUILD_NUMBER + 1))
+
+      - name: Build .ipa
+        script: |
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME"
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        # Notifie automatiquement les testeurs internes déjà configurés dans
+        # App Store Connect à chaque nouveau build — à ajuster une fois le
+        # premier build passé si tu préfères une diffusion manuelle.
+        beta_groups:
+          - App Store Connect Users
