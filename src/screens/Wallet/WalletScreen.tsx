@@ -247,6 +247,10 @@ const WalletScreen: React.FC = () => {
             { icon: 'arrow-up-right',label: 'Retirer',    color: ACCENT, screen: 'Withdraw',           show: true },
             { icon: 'gift',          label: 'Parrainage', color: ACCENT, screen: 'Referral',           show: true },
             { icon: 'bullhorn',      label: 'Pub',        color: ACCENT, screen: 'Ads',                show: true, mci: true },
+            // Accessible sans compte monetise (2026-10) -- auparavant uniquement dans
+            // MonetisationScreen, verrouillee derriere monetStatus === 'approved' alors
+            // que booster son compte n'a rien a voir avec etre un createur monetise.
+            { icon: 'zap',           label: 'Booster',    color: ACCENT, screen: 'Boost',              show: true },
           ].filter(a => a.show).map(a => (
             <TouchableOpacity
               key={a.screen}

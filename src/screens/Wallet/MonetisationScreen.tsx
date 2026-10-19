@@ -38,13 +38,10 @@ const SECTIONS: { title: string; rows: RowItem[] }[] = [
       { icon: 'send',         label: 'Transférer des GoGold',sub: 'Envoyer des GoGold à un utilisateur',   screen: 'Transfer' },
     ],
   },
-  {
-    title: 'Visibilité',
-    rows: [
-      { icon: 'zap',          label: 'Booster mon compte',  sub: 'Abonnés, vues, portée de contenu',     screen: 'Boost' },
-    ],
-  },
 ];
+// "Booster mon compte" retiré d'ici (2026-10) : déplacé dans les actions rapides
+// du WalletScreen, accessible sans compte monétisé — booster sa visibilité n'a
+// aucune raison d'être verrouillé derrière une approbation monétisation.
 
 const GATE_CONFIG: Record<MonetStatus, { icon: string; title: string; message: string }> = {
   none:     { icon: 'lock',        title: 'Monetisation non activee',    message: 'Soumettez une demande pour acceder a votre espace createur.' },
