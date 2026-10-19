@@ -28,7 +28,11 @@ export interface Ad {
   clicks:           number;
   ctr_pct:          number;
   target_countries: string[] | null;
+  target_regions:   string[] | null;
+  target_genders:   string[] | null;
   target_interests: string[] | null;
+  target_age_min:   number | null;
+  target_age_max:   number | null;
   starts_at:        string | null;
   ends_at:          string | null;
   created_at:       string;
@@ -52,6 +56,12 @@ export interface AdCreate {
   budget_eur:        number;
   cpm_eur?:          number;
   daily_budget_eur?: number;
+  target_countries?: string[];
+  target_regions?:   string[];
+  target_genders?:   string[];
+  target_interests?: string[];
+  target_age_min?:   number;
+  target_age_max?:   number;
   starts_at?:        string;
   ends_at?:          string;
 }

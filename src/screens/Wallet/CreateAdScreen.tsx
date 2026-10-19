@@ -32,12 +32,28 @@ const FORMATS: { key: AdFormat; label: string; icon: string }[] = [
   { key: 'video',  label: 'Vidéo',  icon: 'video'      },
 ];
 
+const GENDERS: { key: string; label: string }[] = [
+  { key: 'male',               label: 'Hommes' },
+  { key: 'female',             label: 'Femmes' },
+  { key: 'other',               label: 'Autre' },
+  { key: 'prefer_not_to_say',   label: 'Non précisé' },
+];
+
 const CPM_OPTIONS = [
   { value: 1.0,  label: '1.00€', desc: 'Économique' },
   { value: 2.0,  label: '2.00€', desc: 'Standard' },
   { value: 5.0,  label: '5.00€', desc: 'Premium' },
   { value: 10.0, label: '10.00€', desc: 'Top' },
 ];
+
+// Texte libre "Côte d'Ivoire, Sénégal" → ["Côte d'Ivoire", "Sénégal"] — même
+// idée pour pays et régions, le backend tokenise lui-même pour le matching
+// (cf. _matches_country/_matches_region côté serveur), donc pas besoin d'un
+// sélecteur à choix fermé ici.
+const parseTargetList = (raw: string): string[] | undefined => {
+  const items = raw.split(',').map(s => s.trim()).filter(Boolean);
+  return items.length ? items : undefined;
+};
 
 // Defini en dehors du composant pour eviter le remontage a chaque render
 const Field: React.FC<{ label: string; textColor: string; children: React.ReactNode }> = ({ label, textColor, children }) => (
@@ -69,6 +85,14 @@ export const CreateAdScreen: React.FC = () => {
   const [format,       setFormat]       = useState<AdFormat>(existingAd?.format ?? 'native');
   const [budgetEur,    setBudgetEur]    = useState(existingAd ? String(existingAd.budget_eur) : '10');
   const [cpmEur,       setCpmEur]       = useState(existingAd ? existingAd.cpm_eur : 2.0);
+  // Ciblage — uniquement modifiable à la création (le backend n'accepte pas de
+  // changer le ciblage d'une campagne déjà active via PATCH), pré-rempli en
+  // lecture seule en mode édition pour que l'annonceur voie ce qui est actif.
+  const [targetCountries, setTargetCountries] = useState(existingAd?.target_countries?.join(', ') ?? '');
+  const [targetRegions,   setTargetRegions]   = useState(existingAd?.target_regions?.join(', ') ?? '');
+  const [targetGenders,   setTargetGenders]   = useState<string[]>(existingAd?.target_genders ?? []);
+  const [targetAgeMin,    setTargetAgeMin]    = useState(existingAd?.target_age_min != null ? String(existingAd.target_age_min) : '');
+  const [targetAgeMax,    setTargetAgeMax]    = useState(existingAd?.target_age_max != null ? String(existingAd.target_age_max) : '');
   const [saving,       setSaving]       = useState(false);
   const [walletGoGold,  setWalletGoGold]  = useState<number | null>(null);
   // Pré-rempli depuis existingAd en mode édition, sinon le thumbnail_url d'une
@@ -232,6 +256,17 @@ export const CreateAdScreen: React.FC = () => {
       toastService.error('Erreur', 'Numéro de téléphone invalide.');
       return;
     }
+    const ageMinNum = targetAgeMin.trim() ? parseInt(targetAgeMin, 10) : null;
+    const ageMaxNum = targetAgeMax.trim() ? parseInt(targetAgeMax, 10) : null;
+    if ((ageMinNum !== null && (isNaN(ageMinNum) || ageMinNum < 13 || ageMinNum > 100))
+      || (ageMaxNum !== null && (isNaN(ageMaxNum) || ageMaxNum < 13 || ageMaxNum > 100))) {
+      toastService.error('Erreur', 'Âge cible invalide (entre 13 et 100 ans).');
+      return;
+    }
+    if (ageMinNum !== null && ageMaxNum !== null && ageMinNum > ageMaxNum) {
+      toastService.error('Erreur', 'Âge minimum supérieur à l\'âge maximum.');
+      return;
+    }
 
     // Vérifier solde avant création
     const goGoldRequired = Math.ceil(budget * 100); // 1 € = 100 GoGold
@@ -263,6 +298,15 @@ export const CreateAdScreen: React.FC = () => {
         format,
         budget_eur:   budget,
         cpm_eur:      cpmEur,
+        // Ciblage — uniquement à la création (le backend ne permet pas de modifier
+        // le ciblage d'une campagne existante via PATCH, cf. AdUpdate côté serveur).
+        ...(isEdit ? {} : {
+          target_countries: parseTargetList(targetCountries),
+          target_regions:   parseTargetList(targetRegions),
+          target_genders:   targetGenders.length ? targetGenders : undefined,
+          target_age_min:   targetAgeMin.trim() ? parseInt(targetAgeMin, 10) : undefined,
+          target_age_max:   targetAgeMax.trim() ? parseInt(targetAgeMax, 10) : undefined,
+        }),
       };
 
       if (isEdit) {
@@ -543,6 +587,85 @@ export const CreateAdScreen: React.FC = () => {
           </View>
         </Field>
 
+        {/* Ciblage de l'audience — uniquement modifiable à la création (le backend
+            ne permet pas de changer le ciblage d'une campagne existante). En
+            édition, affiché en lecture seule pour que l'annonceur voie ce qui
+            est actif sans pouvoir le casser accidentellement. */}
+        <Field label={`Audience ciblée${isEdit ? ' (lecture seule)' : ' (optionnel)'}`} textColor={colors.textSecondary}>
+          <Text style={[s.hint, { color: colors.textTertiary, marginTop: 0, marginBottom: 8 }]}>
+            Laisse vide pour toucher tout le monde. Chaque critère rempli restreint l'audience.
+          </Text>
+
+          <Text style={[s.subLabel, { color: colors.textSecondary }]}>Sexe</Text>
+          <View style={[s.chips, { marginBottom: 12 }]}>
+            {GENDERS.map(g => {
+              const active = targetGenders.includes(g.key);
+              return (
+                <TouchableOpacity
+                  key={g.key}
+                  disabled={isEdit}
+                  style={[s.chip, { borderColor: active ? '#7B3FF2' : colors.divider,
+                    backgroundColor: active ? '#7B3FF222' : colors.backgroundSecondary, opacity: isEdit ? 0.6 : 1 }]}
+                  onPress={() => setTargetGenders(prev =>
+                    prev.includes(g.key) ? prev.filter(k => k !== g.key) : [...prev, g.key],
+                  )}
+                >
+                  <Text style={{ color: active ? '#7B3FF2' : colors.textSecondary, fontWeight: FontWeight.semiBold, fontSize: FontSize.smPlus }}>
+                    {g.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <Text style={[s.subLabel, { color: colors.textSecondary }]}>Tranche d'âge</Text>
+          <View style={[s.row, { marginBottom: 12 }]}>
+            <TextInput
+              editable={!isEdit}
+              style={[s.input, { flex: 1, backgroundColor: colors.backgroundSecondary, color: colors.textPrimary, borderColor: colors.divider, opacity: isEdit ? 0.6 : 1 }]}
+              value={targetAgeMin}
+              onChangeText={setTargetAgeMin}
+              placeholder="Âge min"
+              placeholderTextColor={colors.textTertiary}
+              keyboardType="number-pad"
+              maxLength={3}
+            />
+            <TextInput
+              editable={!isEdit}
+              style={[s.input, { flex: 1, backgroundColor: colors.backgroundSecondary, color: colors.textPrimary, borderColor: colors.divider, opacity: isEdit ? 0.6 : 1 }]}
+              value={targetAgeMax}
+              onChangeText={setTargetAgeMax}
+              placeholder="Âge max"
+              placeholderTextColor={colors.textTertiary}
+              keyboardType="number-pad"
+              maxLength={3}
+            />
+          </View>
+
+          <Text style={[s.subLabel, { color: colors.textSecondary }]}>Pays</Text>
+          <TextInput
+            editable={!isEdit}
+            style={[s.input, { backgroundColor: colors.backgroundSecondary, color: colors.textPrimary, borderColor: colors.divider, opacity: isEdit ? 0.6 : 1, marginBottom: 12 }]}
+            value={targetCountries}
+            onChangeText={setTargetCountries}
+            placeholder="Côte d'Ivoire, Sénégal, Mali…"
+            placeholderTextColor={colors.textTertiary}
+          />
+
+          <Text style={[s.subLabel, { color: colors.textSecondary }]}>Région / ville</Text>
+          <TextInput
+            editable={!isEdit}
+            style={[s.input, { backgroundColor: colors.backgroundSecondary, color: colors.textPrimary, borderColor: colors.divider, opacity: isEdit ? 0.6 : 1 }]}
+            value={targetRegions}
+            onChangeText={setTargetRegions}
+            placeholder="Abidjan, Bouaké…"
+            placeholderTextColor={colors.textTertiary}
+          />
+          <Text style={[s.hint, { color: colors.textTertiary }]}>
+            Séparés par des virgules. Comparé au lieu renseigné sur le profil de chaque utilisateur.
+          </Text>
+        </Field>
+
         {/* Budget */}
         <Field label="Budget total (€) *" textColor={colors.textSecondary}>
           <TextInput
@@ -587,6 +710,7 @@ const s = StyleSheet.create({
   estimateCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderRadius: 14, borderWidth: 1 },
   field:        { gap: 6 },
   fieldLabel:   { fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold },
+  subLabel:     { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, marginBottom: 6 },
   input:        { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: FontSize.base },
   textarea:     { minHeight: 80, textAlignVertical: 'top' },
   row:          { flexDirection: 'row', gap: 10 },
