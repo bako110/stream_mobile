@@ -2272,6 +2272,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   autoAdvance, onToggleAutoAdvance, giftHintEnabled, reelsShowInterface,
 }) => {
   const nav = useNavigation<Nav>();
+  const insets = useSafeAreaInsets();
 
   const [paused,       setPaused]       = useState(false);
   const [videoLoaded,  setVideoLoaded]  = useState(false);
@@ -3402,6 +3403,18 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         />
       )}
 
+      {!showInterface && (
+        <TouchableOpacity
+          style={[s.hiddenUiBanner, { top: insets.top + 68 }]}
+          activeOpacity={0.85}
+          onPress={() => nav.navigate('SettingsLecture' as never)}
+        >
+          <Icon name="eye-off" size={13} color="#fff" />
+          <Text style={s.hiddenUiBannerText}>Interface masquée</Text>
+          <Text style={s.hiddenUiBannerLink}>Réactiver</Text>
+        </TouchableOpacity>
+      )}
+
       <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} pointerEvents="box-none">
 
         {showInterface && (
@@ -3926,6 +3939,15 @@ const ActionBtn: React.FC<{
 const s = StyleSheet.create({
   root: { flex: 1 },
   bottomGradient: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '80%' },
+
+  hiddenUiBanner: {
+    position: 'absolute', alignSelf: 'center',
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 7, zIndex: 9,
+  },
+  hiddenUiBannerText: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '600' },
+  hiddenUiBannerLink: { color: '#fff', fontSize: 12, fontWeight: '800', textDecorationLine: 'underline' },
 
   floatingHeader: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, gap: 10, zIndex: 10 },
   iconBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.15)' },
