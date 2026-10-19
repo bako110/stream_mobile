@@ -35,8 +35,7 @@ import { showConfirm } from '../../services';
 import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet, FriendsWhoLiked, CachedImage, LiveThumbnailBackground, PriceWithLocal, GofolyxLoader, PeopleSuggestions, CommunityPromoHint } from '../../components/common';
 import { cacheImage } from '../../services/imageCacheService';
 import { AdvertiserRow, AdCTA, AdFullscreenPlayer, adIsVideo, adIsPhone, adHasContact, type AdData } from '../../components/ads';
-import { BoostPromptBottomSheet } from '../../components/ads/BoostPromptBottomSheet';
-import { adService, type BoostSuggestion } from '../../services/adService';
+import { BoostPromptBottomSheet, type BoostSuggestion } from '../../components/ads/BoostPromptBottomSheet';
 import { boostPromptService } from '../../services/boostPromptService';
 import { openPhoneMenu, callPhone, openWhatsapp } from '../../utils/phoneMenu';
 import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
@@ -46,6 +45,7 @@ import { StoryBar } from '../../components/story';
 import { eventService, concertService, socialService, authService, searchService, userService, reelService, feedPreferenceService, accountsService, toastService } from '../../services';
 import type { StoredAccount } from '../../services';
 import { apiClient } from '../../api/client';
+import { Endpoints } from '../../api/endpoints';
 import { searchHistoryService, type SearchHistoryItem } from '../../services/searchHistoryService';
 import { favoriteService } from '../../services/favoriteService';
 import { saveService } from '../../services/saveService';
@@ -846,11 +846,14 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   // côté pour le refermer — se referme désormais aussi à la perte de focus.
   const [showProfilePanel, setShowProfilePanel] = useState(false);
   useFocusEffect(useCallback(() => () => setShowProfilePanel(false), []));
-  // ── Bottom sheet "Booste ta publication" ───────────────────────────────────
-  // Déclenché après une publication (détecté au focus : un nouveau contenu
-  // propre à l'utilisateur apparaît dans la suggestion) et périodiquement
-  // pendant le scroll. Jamais plus d'une fois par session, et jamais pour un
-  // contenu déjà rabattu (boostPromptService) ou déjà boosté (filtré côté API).
+  // ── Bottom sheet "Booster" ──────────────────────────────────────────────
+  // Incite à utiliser le système de Boost GoGold existant (pas une pub payante
+  // tierce) sur la meilleure opportunité du compte — même moteur de suggestion
+  // que l'onglet "Pour toi" de BoostScreen (GET /wallet/boosts/suggestions).
+  // Déclenché après une publication (au focus) et périodiquement pendant le
+  // scroll. Jamais plus d'une fois par session, et jamais pour un contenu déjà
+  // rabattu (boostPromptService) ou déjà couvert par un boost actif (filtré
+  // côté service par cible).
   const [boostSuggestion, setBoostSuggestion] = useState<BoostSuggestion | null>(null);
   const [showBoostPrompt, setShowBoostPrompt] = useState(false);
   const boostCheckInFlightRef = useRef(false);
@@ -860,20 +863,23 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     if (boostPromptService.hasShownThisSession() || boostCheckInFlightRef.current) return;
     boostCheckInFlightRef.current = true;
     try {
-      const suggestion = await adService.getBoostSuggestion();
+      const res = await apiClient.get<{ suggestions: BoostSuggestion[] }>(Endpoints.wallet.boostSuggestions);
+      const suggestion = res.data?.suggestions?.[0];
       if (!suggestion) return;
-      if (boostPromptService.wasDismissed(suggestion.source_content_id, suggestion.source_content_type)) return;
+      if (boostPromptService.wasDismissed(suggestion.target, suggestion.content_id)) return;
       boostPromptService.markShownThisSession();
       setBoostSuggestion(suggestion);
       setShowBoostPrompt(true);
+    } catch {
+      // silencieux — pas de bottom sheet si l'appel échoue
     } finally {
       boostCheckInFlightRef.current = false;
     }
   }, []);
 
   // Après publication : au retour sur le feed avec un focus, on vérifie une
-  // fois s'il existe un contenu récent à suggérer (couvre le cas où l'upload
-  // en arrière-plan d'un nouveau post/reel/event/concert vient de se terminer).
+  // fois s'il existe une suggestion pertinente (couvre le cas où l'upload en
+  // arrière-plan d'un nouveau post/reel/event/concert vient de se terminer).
   useFocusEffect(useCallback(() => {
     maybeShowBoostPrompt();
   }, [maybeShowBoostPrompt]));
@@ -881,22 +887,13 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   const handleBoostPromptClose = useCallback(() => {
     setShowBoostPrompt(false);
     if (boostSuggestion) {
-      boostPromptService.markDismissed(boostSuggestion.source_content_id, boostSuggestion.source_content_type);
+      boostPromptService.markDismissed(boostSuggestion.target, boostSuggestion.content_id);
     }
   }, [boostSuggestion]);
 
   const handleBoostPromptBoost = useCallback((suggestion: BoostSuggestion) => {
     setShowBoostPrompt(false);
-    nav.navigate('CreateAd', {
-      prefill: {
-        title:               suggestion.title,
-        creative_url:        suggestion.creative_url,
-        thumbnail_url:       suggestion.thumbnail_url,
-        format:              suggestion.format,
-        source_content_type: suggestion.source_content_type,
-        source_content_id:   suggestion.source_content_id,
-      },
-    });
+    nav.navigate('Boost', { autoSuggestion: suggestion });
   }, [nav]);
   // Multi-compte — liste chargée à l'ouverture du panneau (pas au montage de l'écran,
   // pour toujours refléter les changements faits depuis les Paramètres).
@@ -3641,6 +3638,27 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
     setShareCount((c: number) => c + 1);
   };
 
+  // Repost — republication avec attribution de source (événements et concerts,
+  // même pattern que ReelsScreen.tsx). Distinct du partage externe (handleShare).
+  const [reposting, setReposting] = useState(false);
+  const handleRepost = async () => {
+    if ((!isEvent && !isConcert) || reposting) return;
+    setReposting(true);
+    try {
+      if (isEvent) {
+        await eventService.repost(item.id);
+        toastService.success('Repartagé', `« ${event?.title ?? ''} » a été republié sur votre profil.`);
+      } else {
+        await concertService.repost(item.id);
+        toastService.success('Repartagé', `« ${concert?.title ?? ''} » a été republié sur votre profil.`);
+      }
+    } catch {
+      toastService.error('Échec', isEvent ? 'Impossible de repartager cet événement pour le moment.' : 'Impossible de repartager ce concert pour le moment.');
+    } finally {
+      setReposting(false);
+    }
+  };
+
   const author       = isEvent ? event?.organizer : concert?.artist ?? null;
   const authorId     = author?.id ?? null;
   const authorName   = author?.display_name ?? author?.username ?? 'Gofolyx';
@@ -3752,6 +3770,42 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
         </View>
       </TouchableOpacity>
 
+      {/* ── Repost — bande d'attribution de source (événement uniquement),
+          même pattern que ReelsScreen.tsx (source_reel/remix_type). ──────── */}
+      {isEvent && event?.source_event && (
+        <View style={[fc.sourceBand, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+          <Icon name="repeat" size={9} color={colors.textTertiary} />
+          {event.source_event.thumbnail_url
+            ? <CachedImage uri={event.source_event.thumbnail_url} style={fc.sourceThumb} resizeMode="cover" />
+            : null
+          }
+          <Text style={[fc.sourceText, { color: colors.textSecondary }]} numberOfLines={1}>
+            Repost de{' '}
+            <Text style={{ fontWeight: FontWeight.extraBold }}>
+              {event.source_event.organizer?.display_name || event.source_event.organizer?.username || 'un organisateur'}
+            </Text>
+          </Text>
+        </View>
+      )}
+
+      {/* ── Repost — bande d'attribution de source (concert uniquement),
+          même pattern que ReelsScreen.tsx (source_reel/remix_type). ──────── */}
+      {isConcert && concert?.source_concert && (
+        <View style={[fc.sourceBand, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+          <Icon name="repeat" size={9} color={colors.textTertiary} />
+          {concert.source_concert.thumbnail_url
+            ? <CachedImage uri={concert.source_concert.thumbnail_url} style={fc.sourceThumb} resizeMode="cover" />
+            : null
+          }
+          <Text style={[fc.sourceText, { color: colors.textSecondary }]} numberOfLines={1}>
+            Repost de{' '}
+            <Text style={{ fontWeight: FontWeight.extraBold }}>
+              {concert.source_concert.artist?.display_name || concert.source_concert.artist?.username || 'un créateur'}
+            </Text>
+          </Text>
+        </View>
+      )}
+
       {/* ── Description ─────────────────────────────────────────────────── */}
       {desc ? (
         <View style={fc.descWrap}>
@@ -3821,7 +3875,7 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
 
       {/* ── Barre d'actions — icônes seules 22px, like actif rouge. Les nombres
           restent dans countsRow (pas de double affichage). ──────────────── */}
-      <View style={[fc.actionBar, { borderTopColor: colors.divider }]}>
+      <View style={[fc.actionBar, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
         <TouchableOpacity style={fc.actionBtn} onPress={handleLike} activeOpacity={0.7} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
           <Animated.View style={heartStyle}>
             <MCIcon name={liked ? 'heart' : 'heart-outline'} size={FeedActionIcon.size} color={liked ? colors.likeActive : colors.textSecondary} />
@@ -3837,6 +3891,12 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
         <TouchableOpacity style={fc.actionBtn} onPress={handleShare} activeOpacity={0.7} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
           <MCIcon name="share-outline" size={FeedActionIcon.size} color={colors.textSecondary} />
         </TouchableOpacity>
+
+        {(isEvent || isConcert) && (
+          <TouchableOpacity style={fc.actionBtn} onPress={handleRepost} disabled={reposting} activeOpacity={0.7} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+            <Icon name="repeat" size={FeedActionIcon.size} color={colors.textSecondary} />
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity style={[fc.actionBtn, fc.actionBtnSave]} onPress={handleSave} activeOpacity={0.7} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
           <Animated.View style={saveStyle}>
@@ -3901,6 +3961,10 @@ const fc = StyleSheet.create({
   // Description
   descWrap:       { paddingHorizontal: FCPAD, paddingBottom: 8 },
   desc:           { fontSize: FontSize.base, lineHeight: 21 },
+  // Repost — attribution de source (même pattern que ReelsScreen.tsx::sourceBand)
+  sourceBand:     { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: FeedRadius.chip, paddingHorizontal: 7, paddingVertical: 4, borderWidth: 1, alignSelf: 'flex-start', maxWidth: '100%', marginHorizontal: FCPAD, marginBottom: 8 },
+  sourceThumb:    { width: 16, height: 16, borderRadius: 4, overflow: 'hidden' },
+  sourceText:     { fontSize: FontSize.xs },
   // Media — encadré, coins arrondis
   mediaWrap:      { paddingHorizontal: FCPAD, paddingBottom: 10 },
   mediaClip:      { borderRadius: FeedRadius.media, overflow: 'hidden', backgroundColor: '#0d0d1a' },
@@ -3910,7 +3974,16 @@ const fc = StyleSheet.create({
   countText:    { fontSize: FontSize.sm, fontWeight: FontWeight.medium },
   commentIcon:  { width: 18, height: 18, borderRadius: FeedRadius.full, alignItems: 'center', justifyContent: 'center' },
   // Actions — icônes seules, cible 44px
-  actionBar:      { flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: FCPAD - 4, paddingVertical: 2 },
+  // Pilule flottante — même design que AppHeader/AppTabBar (borderRadius 24,
+  // bordure hairline, ombre douce #5B45B5), cohérent avec PostCard.tsx.
+  actionBar:      {
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: FCPAD - 4, marginBottom: 10, marginTop: 6,
+    borderRadius: 24, borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 4, paddingVertical: 2,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 4,
+  },
   actionBtn:      { flex: 1, height: 44, alignItems: 'center', justifyContent: 'center' },
   actionBtnSave:  { flex: 0, width: 44 },
 });
