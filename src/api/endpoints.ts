@@ -534,6 +534,7 @@ export const Endpoints = {
     create:      `${V1}/ads`,
     mine:        `${V1}/ads/mine`,
     mineStats:   `${V1}/ads/mine/stats`,
+    boostSuggestion: `${V1}/ads/boost-suggestion`,
     byId:        (id: string) => `${V1}/ads/${id}`,
     update:      (id: string) => `${V1}/ads/${id}`,
     delete:      (id: string) => `${V1}/ads/${id}`,

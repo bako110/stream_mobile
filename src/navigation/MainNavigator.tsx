@@ -268,7 +268,7 @@ export type MainStackParamList = {
   MySubscription:           undefined;
   MonetisationRequest:      undefined;
   Ads:                      undefined;
-  CreateAd:                 { ad: any | null };
+  CreateAd:                 { ad?: any | null; prefill?: any };
   AdminVerification:         undefined;
   WebQRScanner:              undefined;
   SettingsWallet:            undefined;

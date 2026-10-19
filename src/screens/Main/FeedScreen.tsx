@@ -35,6 +35,9 @@ import { showConfirm } from '../../services';
 import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet, FriendsWhoLiked, CachedImage, LiveThumbnailBackground, PriceWithLocal, GofolyxLoader, PeopleSuggestions, CommunityPromoHint } from '../../components/common';
 import { cacheImage } from '../../services/imageCacheService';
 import { AdvertiserRow, AdCTA, AdFullscreenPlayer, adIsVideo, adIsPhone, adHasContact, type AdData } from '../../components/ads';
+import { BoostPromptBottomSheet } from '../../components/ads/BoostPromptBottomSheet';
+import { adService, type BoostSuggestion } from '../../services/adService';
+import { boostPromptService } from '../../services/boostPromptService';
 import { openPhoneMenu, callPhone, openWhatsapp } from '../../utils/phoneMenu';
 import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
 import { ShareBottomSheet } from '../../components/common/ShareBottomSheet';
@@ -843,6 +846,58 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   // côté pour le refermer — se referme désormais aussi à la perte de focus.
   const [showProfilePanel, setShowProfilePanel] = useState(false);
   useFocusEffect(useCallback(() => () => setShowProfilePanel(false), []));
+  // ── Bottom sheet "Booste ta publication" ───────────────────────────────────
+  // Déclenché après une publication (détecté au focus : un nouveau contenu
+  // propre à l'utilisateur apparaît dans la suggestion) et périodiquement
+  // pendant le scroll. Jamais plus d'une fois par session, et jamais pour un
+  // contenu déjà rabattu (boostPromptService) ou déjà boosté (filtré côté API).
+  const [boostSuggestion, setBoostSuggestion] = useState<BoostSuggestion | null>(null);
+  const [showBoostPrompt, setShowBoostPrompt] = useState(false);
+  const boostCheckInFlightRef = useRef(false);
+  const boostScrollAccumRef   = useRef(0);
+
+  const maybeShowBoostPrompt = useCallback(async () => {
+    if (boostPromptService.hasShownThisSession() || boostCheckInFlightRef.current) return;
+    boostCheckInFlightRef.current = true;
+    try {
+      const suggestion = await adService.getBoostSuggestion();
+      if (!suggestion) return;
+      if (boostPromptService.wasDismissed(suggestion.source_content_id, suggestion.source_content_type)) return;
+      boostPromptService.markShownThisSession();
+      setBoostSuggestion(suggestion);
+      setShowBoostPrompt(true);
+    } finally {
+      boostCheckInFlightRef.current = false;
+    }
+  }, []);
+
+  // Après publication : au retour sur le feed avec un focus, on vérifie une
+  // fois s'il existe un contenu récent à suggérer (couvre le cas où l'upload
+  // en arrière-plan d'un nouveau post/reel/event/concert vient de se terminer).
+  useFocusEffect(useCallback(() => {
+    maybeShowBoostPrompt();
+  }, [maybeShowBoostPrompt]));
+
+  const handleBoostPromptClose = useCallback(() => {
+    setShowBoostPrompt(false);
+    if (boostSuggestion) {
+      boostPromptService.markDismissed(boostSuggestion.source_content_id, boostSuggestion.source_content_type);
+    }
+  }, [boostSuggestion]);
+
+  const handleBoostPromptBoost = useCallback((suggestion: BoostSuggestion) => {
+    setShowBoostPrompt(false);
+    nav.navigate('CreateAd', {
+      prefill: {
+        title:               suggestion.title,
+        creative_url:        suggestion.creative_url,
+        thumbnail_url:       suggestion.thumbnail_url,
+        format:              suggestion.format,
+        source_content_type: suggestion.source_content_type,
+        source_content_id:   suggestion.source_content_id,
+      },
+    });
+  }, [nav]);
   // Multi-compte — liste chargée à l'ouverture du panneau (pas au montage de l'écran,
   // pour toujours refléter les changements faits depuis les Paramètres).
   const [accounts, setAccounts] = useState<StoredAccount[]>([]);
@@ -1020,6 +1075,9 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   // section "En direct" (~260px) : dès que le carrousel commence à sortir par le
   // haut, on gèle le header. La resync se fait dès qu'on repasse sous ce seuil.
   const AT_TOP_THRESHOLD = 260;
+  // Distance de scroll cumulée (px) avant de vérifier s'il faut proposer le
+  // bottom sheet "Booste ta publication" — évite de le déclencher trop tôt.
+  const BOOST_PROMPT_SCROLL_THRESHOLD = 3000;
   const feedAtTopRef = useRef(true);
   const [feedAtTop, setFeedAtTop] = useState(true);
   // Dernier instantané "En direct" reçu pendant qu'on lisait plus bas — appliqué
@@ -1085,6 +1143,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
 
   const handleFeedScroll = (e: any) => {
     const offsetY = e.nativeEvent?.contentOffset?.y ?? 0;
+    const delta = offsetY - lastScrollYRef.current;
     lastScrollYRef.current = offsetY;
     const atTop = offsetY < AT_TOP_THRESHOLD;
     if (atTop !== feedAtTopRef.current) {
@@ -1096,6 +1155,15 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     if (approxIndex > lastScrollPrefetchIndexRef.current) {
       lastScrollPrefetchIndexRef.current = approxIndex;
       InteractionManager.runAfterInteractions(() => prefetchUpcomingImages(approxIndex + 1));
+    }
+    // Déclenchement périodique du bottom sheet "Booste ta publication" —
+    // après un certain volume de scroll vers le bas, une seule fois par session.
+    if (delta > 0 && !boostPromptService.hasShownThisSession()) {
+      boostScrollAccumRef.current += delta;
+      if (boostScrollAccumRef.current > BOOST_PROMPT_SCROLL_THRESHOLD) {
+        boostScrollAccumRef.current = 0;
+        maybeShowBoostPrompt();
+      }
     }
   };
 
@@ -3131,6 +3199,14 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
       <Modal visible={!!fullscreenAd} animationType="slide" onRequestClose={() => setFullscreenAd(null)} statusBarTranslucent>
         {fullscreenAd && <AdFullscreenPlayer ad={fullscreenAd} onClose={() => setFullscreenAd(null)} />}
       </Modal>
+
+      {/* Incitation à booster le contenu le plus engageant de l'utilisateur */}
+      <BoostPromptBottomSheet
+        visible={showBoostPrompt}
+        suggestion={boostSuggestion}
+        onClose={handleBoostPromptClose}
+        onBoost={handleBoostPromptBoost}
+      />
 
       {/* ── Panneau infos primaires — rendu au niveau racine de l'écran (pas
           dans le header) pour pouvoir passer par-dessus headerPills et la

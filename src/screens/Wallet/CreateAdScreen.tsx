@@ -8,12 +8,12 @@ import {
   ScrollView, Image,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
-import { BackButton, GofolyxLoader, PriceWithLocal } from '../../components/common';
+import { BackButton, GofolyxLoader, PriceWithLocal, CountryMultiSelect } from '../../components/common';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
-import { adService, type Ad, type AdPlacement, type AdFormat } from '../../services/adService';
+import { adService, type Ad, type AdPlacement, type AdFormat, type AdSourceType } from '../../services/adService';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -70,8 +70,15 @@ export const CreateAdScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const existingAd: Ad | null = route.params?.ad ?? null;
   const isEdit = !!existingAd;
+  // Pré-remplissage depuis le bottom sheet "Booste ta publication" — une
+  // suggestion de contenu existant (post/reel/event/concert), pas une pub
+  // déjà créée. Ignoré si existingAd est présent (l'édition prime).
+  const prefill: {
+    title?: string; creative_url?: string | null; thumbnail_url?: string | null;
+    format?: AdFormat; source_content_type?: AdSourceType; source_content_id?: string;
+  } | null = !existingAd ? (route.params?.prefill ?? null) : null;
 
-  const [title,        setTitle]        = useState(existingAd?.title ?? '');
+  const [title,        setTitle]        = useState(existingAd?.title ?? prefill?.title ?? '');
   const [description,  setDescription]  = useState(existingAd?.description ?? '');
   const [ctaText,      setCtaText]      = useState(existingAd?.cta_text ?? 'En savoir plus');
   const [ctaUrl,       setCtaUrl]       = useState(existingAd?.cta_url ?? '');
@@ -80,15 +87,17 @@ export const CreateAdScreen: React.FC = () => {
   const [contactPhone,    setContactPhone]    = useState(existingAd?.contact_phone ?? '');
   const [contactCall,     setContactCall]     = useState(existingAd?.contact_call ?? false);
   const [contactWhatsapp, setContactWhatsapp] = useState(existingAd?.contact_whatsapp ?? false);
-  const [creativeUrl,  setCreativeUrl]  = useState(existingAd?.creative_url ?? '');
+  const [creativeUrl,  setCreativeUrl]  = useState(existingAd?.creative_url ?? prefill?.creative_url ?? '');
   const [placement,    setPlacement]    = useState<AdPlacement>(existingAd?.placement ?? 'feed');
-  const [format,       setFormat]       = useState<AdFormat>(existingAd?.format ?? 'native');
+  const [format,       setFormat]       = useState<AdFormat>(existingAd?.format ?? prefill?.format ?? 'native');
   const [budgetEur,    setBudgetEur]    = useState(existingAd ? String(existingAd.budget_eur) : '10');
   const [cpmEur,       setCpmEur]       = useState(existingAd ? existingAd.cpm_eur : 2.0);
+  const [sourceContentType] = useState<AdSourceType | undefined>(existingAd?.source_content_type ?? prefill?.source_content_type ?? undefined);
+  const [sourceContentId]   = useState<string | undefined>(existingAd?.source_content_id ?? prefill?.source_content_id ?? undefined);
   // Ciblage — uniquement modifiable à la création (le backend n'accepte pas de
   // changer le ciblage d'une campagne déjà active via PATCH), pré-rempli en
   // lecture seule en mode édition pour que l'annonceur voie ce qui est actif.
-  const [targetCountries, setTargetCountries] = useState(existingAd?.target_countries?.join(', ') ?? '');
+  const [targetCountries, setTargetCountries] = useState<string[]>(existingAd?.target_countries ?? []);
   const [targetRegions,   setTargetRegions]   = useState(existingAd?.target_regions?.join(', ') ?? '');
   const [targetGenders,   setTargetGenders]   = useState<string[]>(existingAd?.target_genders ?? []);
   const [targetAgeMin,    setTargetAgeMin]    = useState(existingAd?.target_age_min != null ? String(existingAd.target_age_min) : '');
@@ -99,10 +108,12 @@ export const CreateAdScreen: React.FC = () => {
   // pub vidéo existante serait écrasé par creative_url (le flux HLS) au submit
   // si l'utilisateur ne retouche pas le média — cf. payload de handleSubmit.
   const [localMedia,     setLocalMedia]     = useState<string | null>(
-    existingAd?.thumbnail_url ?? existingAd?.creative_url ?? null,
+    existingAd?.thumbnail_url ?? existingAd?.creative_url
+    ?? prefill?.thumbnail_url ?? prefill?.creative_url ?? null,
   );
   const [mediaType,      setMediaType]      = useState<'image' | 'video' | null>(
-    existingAd ? (existingAd.format === 'video' ? 'video' : 'image') : null,
+    existingAd ? (existingAd.format === 'video' ? 'video' : 'image')
+    : prefill ? (prefill.format === 'video' ? 'video' : 'image') : null,
   );
   const [uploading,      setUploading]      = useState(false);
   const [uploadStatus,   setUploadStatus]   = useState<string>('');
@@ -294,6 +305,10 @@ export const CreateAdScreen: React.FC = () => {
         // flux (AdCard ne montre alors qu'un placeholder). Pour une image,
         // localMedia == creative_url, donc l'envoyer ici ne change rien de mal.
         thumbnail_url: (mediaType === 'video' ? localMedia : creativeUrl)?.trim() || undefined,
+        ...(isEdit ? {} : {
+          source_content_type: sourceContentType,
+          source_content_id:   sourceContentId,
+        }),
         placement,
         format,
         budget_eur:   budget,
@@ -301,7 +316,7 @@ export const CreateAdScreen: React.FC = () => {
         // Ciblage — uniquement à la création (le backend ne permet pas de modifier
         // le ciblage d'une campagne existante via PATCH, cf. AdUpdate côté serveur).
         ...(isEdit ? {} : {
-          target_countries: parseTargetList(targetCountries),
+          target_countries: targetCountries.length ? targetCountries : undefined,
           target_regions:   parseTargetList(targetRegions),
           target_genders:   targetGenders.length ? targetGenders : undefined,
           target_age_min:   targetAgeMin.trim() ? parseInt(targetAgeMin, 10) : undefined,
@@ -327,7 +342,7 @@ export const CreateAdScreen: React.FC = () => {
     } finally {
       setSaving(false);
     }
-  }, [title, description, ctaText, ctaUrl, creativeUrl, placement, format, budget, cpmEur, isEdit, existingAd, nav]);
+  }, [title, description, ctaText, ctaUrl, creativeUrl, placement, format, budget, cpmEur, isEdit, existingAd, nav, sourceContentType, sourceContentId]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -643,14 +658,13 @@ export const CreateAdScreen: React.FC = () => {
           </View>
 
           <Text style={[s.subLabel, { color: colors.textSecondary }]}>Pays</Text>
-          <TextInput
-            editable={!isEdit}
-            style={[s.input, { backgroundColor: colors.backgroundSecondary, color: colors.textPrimary, borderColor: colors.divider, opacity: isEdit ? 0.6 : 1, marginBottom: 12 }]}
-            value={targetCountries}
-            onChangeText={setTargetCountries}
-            placeholder="Côte d'Ivoire, Sénégal, Mali…"
-            placeholderTextColor={colors.textTertiary}
-          />
+          <View style={[{ marginBottom: 12 }, isEdit && { opacity: 0.6 }]} pointerEvents={isEdit ? 'none' : 'auto'}>
+            <CountryMultiSelect
+              selectedCodes={targetCountries}
+              onChange={setTargetCountries}
+              placeholder="Tous les pays"
+            />
+          </View>
 
           <Text style={[s.subLabel, { color: colors.textSecondary }]}>Région / ville</Text>
           <TextInput
