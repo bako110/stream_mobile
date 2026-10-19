@@ -1,7 +1,7 @@
 /**
  * AdsScreen — Dashboard annonceur.
  */
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, RefreshControl, StatusBar,
@@ -10,7 +10,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import { BackButton, GofolyxLoader, PriceWithLocal } from '../../components/common';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
@@ -229,7 +229,12 @@ export const AdsScreen: React.FC = () => {
     finally { setLoading(false); setRefreshing(false); }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  // Rechargement à chaque prise de focus — pas seulement au montage initial :
+  // après avoir modifié une campagne dans CreateAdScreen puis fait goBack(), cet
+  // écran gardait son state périmé (les champs édités, ex. contact_call/
+  // contact_whatsapp, semblaient "ne pas s'être enregistrés" au retour, alors que
+  // la sauvegarde avait bien réussi côté serveur — juste jamais rechargée ici).
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const loadMore = useCallback(() => {
     if (loadingMore || !hasMore || loading) return;
