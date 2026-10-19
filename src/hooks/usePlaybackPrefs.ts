@@ -5,9 +5,10 @@ const STORAGE_KEY = 'playback_prefs';
 export interface PlaybackPrefs {
   autoplay:     boolean;
   hd_streaming: boolean;
+  reels_show_interface: boolean;
 }
 
-const DEFAULTS: PlaybackPrefs = { autoplay: true, hd_streaming: false };
+const DEFAULTS: PlaybackPrefs = { autoplay: true, hd_streaming: false, reels_show_interface: true };
 
 export function getPlaybackPrefs(): PlaybackPrefs {
   try {

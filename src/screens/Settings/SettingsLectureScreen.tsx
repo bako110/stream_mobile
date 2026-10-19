@@ -13,10 +13,11 @@ interface PlaybackPrefs {
   autoplay:     boolean;
   hd_streaming: boolean;
   record_live_enabled: boolean;
+  reels_show_interface: boolean;
 }
 
 const STORAGE_KEY = 'playback_prefs';
-const DEFAULT_PREFS: PlaybackPrefs = { autoplay: true, hd_streaming: false, record_live_enabled: false };
+const DEFAULT_PREFS: PlaybackPrefs = { autoplay: true, hd_streaming: false, record_live_enabled: false, reels_show_interface: true };
 
 function loadCached(): PlaybackPrefs {
   try {
@@ -96,7 +97,10 @@ export const SettingsLectureScreen: React.FC = () => {
               right={sw('hd_streaming')}
             />
             <Row icon="video" label="Enregistrer mes lives" value="Sauvegarde une vidéo complète (vidéo + chat) de tes lives, battles et concerts"
-              last right={sw('record_live_enabled')}
+              right={sw('record_live_enabled')}
+            />
+            <Row icon="eye" label="Interface sur les reels" value="Affiche like, commentaires, partage et infos — désactive pour ne garder que la vidéo"
+              last right={sw('reels_show_interface')}
             />
           </Card>
         </ScrollView>

@@ -196,6 +196,16 @@ export const ReelsScreen: React.FC = () => {
   useKeepAwake();
   const isWifi = useIsWifi();
   const networkQuality = useNetworkQuality();
+  // Interface superposée aux reels (colonne actions, auteur/légende/musique) —
+  // Réglages > Lecture > "Interface sur les reels". Relue à chaque prise de
+  // focus de l'écran (pas seulement au montage) : sans ça, désactiver le
+  // réglage puis revenir sur un reel déjà actif ne changeait rien tant que ce
+  // slide précis ne redevenait pas actif depuis un état inactif — ce qui
+  // n'arrive jamais si on était déjà dessus en quittant vers Réglages.
+  const [reelsShowInterface, setReelsShowInterface] = useState(() => getPlaybackPrefs().reels_show_interface);
+  useFocusEffect(useCallback(() => {
+    setReelsShowInterface(getPlaybackPrefs().reels_show_interface);
+  }, []));
   const [screenDims, setScreenDims] = useState(() => Dimensions.get('screen'));
   useEffect(() => {
     const sub = Dimensions.addEventListener('change', ({ screen }) => setScreenDims(screen));
@@ -1282,9 +1292,10 @@ export const ReelsScreen: React.FC = () => {
         autoAdvance={autoAdvance}
         onToggleAutoAdvance={toggleAutoAdvanceHeader}
         giftHintEnabled={swipeHintDone}
+        reelsShowInterface={reelsShowInterface}
       />
     );
-  }, [currentIndex, screenFocused, fullscreenAd, searchOpen, muted, insets.bottom, colors, myId, myAvatar, myInitial, toggleMute, onAuthorPress, goNextReel, SCREEN_W, SCREEN_H, isWifi, ui, autoAdvance, toggleAutoAdvanceHeader, swipeHintDone]);
+  }, [currentIndex, screenFocused, fullscreenAd, searchOpen, muted, insets.bottom, colors, myId, myAvatar, myInitial, toggleMute, onAuthorPress, goNextReel, SCREEN_W, SCREEN_H, isWifi, ui, autoAdvance, toggleAutoAdvanceHeader, swipeHintDone, reelsShowInterface]);
 
   // ── Render: loading ───────────────────────────────────────────────────────
   if (loading && reels.length === 0) {
@@ -2244,13 +2255,21 @@ interface VideoSlideProps {
   // Le tuto cadeau (GiftHoldHint) n'a le droit de s'afficher qu'une fois le
   // tuto "glissez vers le haut" terminé — jamais les deux en même temps.
   giftHintEnabled:      boolean;
+  // Interface superposée (colonne actions, auteur/légende/musique) — réglage
+  // Réglages > Lecture > "Interface sur les reels". Remonté en prop (source de
+  // vérité au niveau du parent ReelsScreen, relu via useFocusEffect) plutôt que
+  // lu indépendamment ici : un slide déjà actif au moment où l'utilisateur
+  // change le réglage dans Réglages puis revient ne redéclenchait jamais sa
+  // propre relecture (isActive restait true tout du long, rien ne changeait
+  // pour retrigger un useEffect local ici).
+  reelsShowInterface:   boolean;
 }
 
 const VideoSlide: React.FC<VideoSlideProps> = memo(({
   reel, isActive, isPreload, preloadDistance, isCachePriority, isWifi, networkQuality, muted, screenW, screenH, insetBottom,
   colors, currentUserId, currentUserAvatar, currentUserInitial = 'M',
   onAuthorPress, onEnd, activePlayerRef, audioOwnerRef, ui,
-  autoAdvance, onToggleAutoAdvance, giftHintEnabled,
+  autoAdvance, onToggleAutoAdvance, giftHintEnabled, reelsShowInterface,
 }) => {
   const nav = useNavigation<Nav>();
 
@@ -2260,6 +2279,10 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   const [videoPlaying, setVideoPlaying] = useState(false);
   const [isStalling,   setIsStalling]   = useState(false);
   const [showControls, setShowControls] = useState(false);
+  // Interface superposée (colonne actions, auteur/légende/musique) — reçue en
+  // prop depuis ReelsScreen (source de vérité unique, relue via useFocusEffect
+  // à chaque retour sur l'écran), pas un state local ici.
+  const showInterface = reelsShowInterface;
   const stallingTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const controlsTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progressValue     = useSharedValue(0);
@@ -3181,6 +3204,12 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   // et les infos du reel se calent directement sur safeBottom, footer fixe.
   const COMMENT_BAR_H = 14;
 
+  // Le fond sombre en bas (bottomGradient) doit s'adapter à ce qu'il y a
+  // réellement à lire dans le footer (légende, musique, référence, source) —
+  // avant, il gardait toujours la même hauteur (80% de l'écran), laissant une
+  // bande noire vide bien visible quand le reel n'a aucune description.
+  const hasFooterContent = !!captionSt || !!reel.music_name || !!reel.source_reel || !!refInfo;
+
   return (
     <View style={{ width: screenW, height: screenH, backgroundColor: '#000', overflow: 'hidden' }}>
 
@@ -3364,10 +3393,18 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         </View>
       )}
 
-      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.95)']} locations={[0, 0.5, 1]} style={s.bottomGradient} pointerEvents="none" />
+      {showInterface && hasFooterContent && (
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.95)']}
+          locations={[0, 0.5, 1]}
+          style={s.bottomGradient}
+          pointerEvents="none"
+        />
+      )}
 
       <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} pointerEvents="box-none">
 
+        {showInterface && (
         <View style={[s.reelInfo, { bottom: safeBottom + COMMENT_BAR_H, right: ui.reelInfoRight }]} pointerEvents="box-none">
           {refInfo && (
             <View style={s.refBand}>
@@ -3495,10 +3532,13 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
             </View>
           )}
         </View>
+        )}
 
-        {/* Pluie de cœurs — reel très aimé */}
+        {/* Pluie de cœurs — reel très aimé, indépendant de showInterface (effet
+            visuel, pas un contrôle) */}
         <HeartRain active={isActive} likeCount={likes} contentId={reel.id} />
 
+        {showInterface && (
         <View style={[s.actions, { bottom: safeBottom + COMMENT_BAR_H, gap: ui.railGap }]}>
           <ActionBtn ui={ui} icon="heart" useMCIcon label={formatCount(likes)} color={liked ? REEL_LIKE : '#fff'} onPress={handleLike} active={liked} activeBackground="rgba(224,56,154,0.25)" activeBorder={REEL_LIKE} activeGlow={REEL_LIKE} />
           {!commentsDisabledSt && <ActionBtn ui={ui} icon="comment" useMCIcon label={formatCount(commentCount)} color="#fff" onPress={() => setShowComments(true)} />}
@@ -3528,6 +3568,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
             </TouchableOpacity>
           )}
         </View>
+        )}
 
         <ReportModal visible={reportVisible} contentType="reel" contentId={reel.id} onClose={() => setReportVisible(false)} />
 
