@@ -293,6 +293,8 @@ const PostCardInner: React.FC<PostCardProps> = ({
   const [likeCount,         setLikeCount]         = useState(post.like_count);
   const [commentCount,      setCommentCount]       = useState(post.comment_count ?? 0);
   const [shareCount,        setShareCount]         = useState(post.share_count ?? 0);
+  const [repostCount,       setRepostCount]        = useState(post.repost_count ?? 0);
+  const [reposting,         setReposting]          = useState(false);
   const [commentsDisabledSt,setCommentsDisabledSt] = useState(post.comments_disabled ?? false);
   const [saved,             setSaved]             = useState(() => saveService.isPostSaved(post.id));
   const [editOpen,          setEditOpen]          = useState(false);
@@ -340,6 +342,20 @@ const PostCardInner: React.FC<PostCardProps> = ({
   const handleShareDone = useCallback(() => {
     setShareCount(c => c + 1);
   }, []);
+
+  const handleRepost = useCallback(async () => {
+    if (reposting) return;
+    setReposting(true);
+    try {
+      await postService.repost(post.id);
+      setRepostCount(c => c + 1);
+      toastService.success('Repartagé', 'Ce post a été republié sur votre profil.');
+    } catch {
+      toastService.error('Erreur', 'Impossible de repartager ce post.');
+    } finally {
+      setReposting(false);
+    }
+  }, [post.id, reposting]);
 
   const handleDelete = useCallback(() => {
     showConfirm('Supprimer', 'Supprimer ce post ?', [
@@ -469,6 +485,29 @@ const PostCardInner: React.FC<PostCardProps> = ({
         </View>
       </View>
 
+      {/* ── Bande d'attribution — repost, même pattern que ReelsScreen.tsx
+          (source_reel/remix_type), adapté aux tokens de thème de PostCard
+          (ici theme-aware clair/sombre, contrairement à l'overlay vidéo
+          fixe de ReelsScreen). ──────────────────────────────────────────── */}
+      {post.source_post && (
+        <View style={[pc.sourceBand, { backgroundColor: colors.backgroundSecondary }]}>
+          <Icon name="repeat" size={11} color={colors.textTertiary} />
+          {(post.source_post.thumbnail_url || post.source_post.image_url) ? (
+            <CachedImage
+              uri={(post.source_post.thumbnail_url || post.source_post.image_url)!}
+              style={pc.sourceThumb}
+              resizeMode="cover"
+            />
+          ) : null}
+          <Text style={[pc.sourceText, { color: colors.textTertiary }]} numberOfLines={1}>
+            Repost de{' '}
+            <Text style={{ fontWeight: FontWeight.extraBold, color: colors.textSecondary }}>
+              {post.source_post.author?.display_name || post.source_post.author?.username || 'un créateur'}
+            </Text>
+          </Text>
+        </View>
+      )}
+
       {/* ── Body texte — toujours au même endroit, avec ou sans média ────────── */}
       {displayBody ? (
         <TouchableOpacity
@@ -577,7 +616,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
 
       {/* ── Barre d'actions — icônes seules, 22px, conventionnelles (FB/IG).
           Like actif = rouge (jamais le violet de marque). ────────────────── */}
-      <View style={[pc.actionBar, { borderTopColor: colors.divider }]}>
+      <View style={[pc.actionBar, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
         <TouchableOpacity
           style={pc.actionBtn}
           onPress={handleLike}
@@ -611,6 +650,19 @@ const PostCardInner: React.FC<PostCardProps> = ({
           hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
         >
           <MCIcon name="share-outline" size={FeedActionIcon.size} color={colors.textSecondary} />
+        </TouchableOpacity>
+
+        {/* Repartager (repost) — republication dans le fil, DIFFÉRENT du
+            partage externe ci-dessus (ShareBottomSheet) : icône distincte
+            (repeat, jamais share-2/share-outline déjà pris). */}
+        <TouchableOpacity
+          style={pc.actionBtn}
+          onPress={handleRepost}
+          activeOpacity={0.7}
+          disabled={reposting}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        >
+          <Icon name="repeat" size={FeedActionIcon.size} color={reposting ? colors.textDisabled : colors.textSecondary} />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -807,6 +859,12 @@ const pc = StyleSheet.create({
   verifiedBadge:{ width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
   followChip:   { paddingHorizontal: 10, paddingVertical: 4, borderRadius: FeedRadius.chip, borderWidth: 1 },
   moreBtn:      { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  // Repost — bande d'attribution, même layout que ReelsScreen.tsx (s.sourceBand/
+  // sourceThumb/sourceText) ; couleurs passées inline (theme clair/sombre) au lieu
+  // des rgba(255,255,255,…) fixes de ReelsScreen (overlay sur vidéo plein écran).
+  sourceBand:  { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: FeedRadius.chip, paddingHorizontal: 7, paddingVertical: 4, alignSelf: 'flex-start', maxWidth: '100%', marginHorizontal: PAD, marginBottom: 8 },
+  sourceThumb: { width: 16, height: 16, borderRadius: 4, overflow: 'hidden' },
+  sourceText:  { fontSize: FontSize.xs },
   // Content
   bodyWrap:     { paddingHorizontal: PAD, paddingBottom: 10, paddingTop: 1 },
   body:         { fontSize: FontSize.base, lineHeight: 21, letterSpacing: 0.1 },
@@ -822,7 +880,17 @@ const pc = StyleSheet.create({
   countText:        { fontSize: FontSize.sm, fontWeight: FontWeight.medium },
   commentCountIcon: { width: 18, height: 18, borderRadius: FeedRadius.full, alignItems: 'center', justifyContent: 'center' },
   // Action bar — icônes seules, 44px de cible, réparties également
-  actionBar:    { flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: PAD - 4, paddingVertical: 2 },
+  // Pilule flottante — même design que AppHeader/AppTabBar (borderRadius 24,
+  // bordure hairline, ombre douce #5B45B5) au lieu d'une barre plate collée
+  // aux bords de la carte.
+  actionBar:    {
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: PAD - 4, marginBottom: 10, marginTop: 6,
+    borderRadius: 24, borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 4, paddingVertical: 2,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 4,
+  },
   actionBtn:    { flex: 1, height: 44, alignItems: 'center', justifyContent: 'center' },
   actionBtnSave:{ flex: 0, width: 44 },
   // Menu sheet
