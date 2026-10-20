@@ -28,6 +28,7 @@ import { showConfirm } from '../../services/confirmService';
 import { CommentsBottomSheet } from './CommentsBottomSheet';
 import { RichText } from './RichText';
 import { ShareBottomSheet } from './ShareBottomSheet';
+import { RepostBottomSheet } from './RepostBottomSheet';
 import { ReportModal } from './ReportModal';
 import { LikersBottomSheet } from './LikersBottomSheet';
 import { FriendsWhoLiked } from './FriendsWhoLiked';
@@ -295,6 +296,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
   const [shareCount,        setShareCount]         = useState(post.share_count ?? 0);
   const [repostCount,       setRepostCount]        = useState(post.repost_count ?? 0);
   const [reposting,         setReposting]          = useState(false);
+  const [repostSheetOpen,   setRepostSheetOpen]    = useState(false);
   const [commentsDisabledSt,setCommentsDisabledSt] = useState(post.comments_disabled ?? false);
   const [saved,             setSaved]             = useState(() => saveService.isPostSaved(post.id));
   const [editOpen,          setEditOpen]          = useState(false);
@@ -343,12 +345,20 @@ const PostCardInner: React.FC<PostCardProps> = ({
     setShareCount(c => c + 1);
   }, []);
 
-  const handleRepost = useCallback(async () => {
+  // Ouvre le bottom sheet de confirmation — republication plus jamais instantanée
+  // au premier tap (demande explicite : apercu + bouton de confirmation avant envoi).
+  const handleRepostPress = useCallback(() => {
+    if (reposting) return;
+    setRepostSheetOpen(true);
+  }, [reposting]);
+
+  const handleRepostConfirm = useCallback(async () => {
     if (reposting) return;
     setReposting(true);
     try {
       await postService.repost(post.id);
       setRepostCount(c => c + 1);
+      setRepostSheetOpen(false);
       toastService.success('Repartagé', 'Ce post a été republié sur votre profil.');
     } catch {
       toastService.error('Erreur', 'Impossible de repartager ce post.');
@@ -657,7 +667,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
             (repeat, jamais share-2/share-outline déjà pris). */}
         <TouchableOpacity
           style={pc.actionBtn}
-          onPress={handleRepost}
+          onPress={handleRepostPress}
           activeOpacity={0.7}
           disabled={reposting}
           hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
@@ -780,6 +790,15 @@ const PostCardInner: React.FC<PostCardProps> = ({
       )}
       {shareOpen && (
         <ShareBottomSheet type="post" visible onClose={() => setShareOpen(false)} post={post} onShareCountChange={handleShareDone} />
+      )}
+      {repostSheetOpen && (
+        <RepostBottomSheet
+          visible
+          post={post}
+          reposting={reposting}
+          onConfirm={handleRepostConfirm}
+          onClose={() => { if (!reposting) setRepostSheetOpen(false); }}
+        />
       )}
       {commentsOpen && (
         <CommentsBottomSheet visible onClose={() => setCommentsOpen(false)} postId={post.id}

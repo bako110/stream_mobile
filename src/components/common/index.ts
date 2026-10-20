@@ -43,6 +43,7 @@ export {
 } from './SkeletonLoader';
 export { CommentsBottomSheet }  from './CommentsBottomSheet';
 export { ShareBottomSheet }     from './ShareBottomSheet';
+export { RepostBottomSheet }    from './RepostBottomSheet';
 export { HelpGuideSheet, HelpGuideButton, type HelpGuidePoint } from './HelpGuideSheet';
 export { NotificationToast }   from './NotificationToast';
 export { PeopleSuggestions }   from './PeopleSuggestions';
