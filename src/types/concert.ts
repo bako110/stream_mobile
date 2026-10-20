@@ -49,6 +49,16 @@ export interface Concert {
   replay_url?: string | null;
   replay_expires_at?: string | null;
   is_recording?: boolean;
+  // Repost — même pattern que Reel.remix_type/source_reel (cf. types/reel.ts)
+  repost_count?: number;
+  remix_type?: string | null;
+  source_concert_id?: string | null;
+  source_concert?: {
+    id: string;
+    title: string;
+    thumbnail_url?: string | null;
+    artist?: { id: string; username?: string; display_name?: string; avatar_url?: string };
+  } | null;
 }
 
 export interface ConcertCreate {

@@ -48,6 +48,16 @@ export interface Event {
   organizer?: import('./user').User;
   category?: string | null;
   ai_analysis_status?: 'pending' | 'done' | null;
+  // Repost (republication avec attribution de source) — même pattern que Reel
+  repost_count?: number;
+  remix_type?: string | null;
+  source_event_id?: string | null;
+  source_event?: {
+    id: string;
+    title: string;
+    thumbnail_url?: string | null;
+    organizer?: import('./user').User;
+  } | null;
 }
 
 export type TicketStatus = 'valid' | 'used' | 'refunded' | 'expired';

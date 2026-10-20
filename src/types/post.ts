@@ -30,6 +30,7 @@ export interface Post {
   like_count: number;
   comment_count: number;
   share_count: number;
+  repost_count?: number;
   comments_disabled: boolean;
   created_at: string;
   updated_at: string;
@@ -40,6 +41,16 @@ export interface Post {
   ai_analysis_status?: 'pending' | 'done' | null;
   status?: 'published' | 'limited' | 'archived' | 'pending_review' | null;
   is_private?: boolean;
+  // Repost (meme pattern que Reel.remix_type/source_reel, cf. types/reel.ts) —
+  // toujours 'repost' pour Post (pas de remix), champ garde pour coherence/extensibilite.
+  remix_type?: string | null;
+  source_post_id?: string | null;
+  source_post?: {
+    id: string;
+    thumbnail_url?: string | null;
+    image_url?: string | null;
+    author?: PostAuthor | null;
+  } | null;
 }
 
 export interface PostCreate {

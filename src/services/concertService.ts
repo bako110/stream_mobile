@@ -37,6 +37,12 @@ export const concertService = {
     try { await apiClient.post(Endpoints.concerts.view(id)); } catch { /* silencieux */ }
   },
 
+  /** Repost — republication du concert avec attribution de source (cf. reelService.repost). */
+  async repost(concertId: string): Promise<Concert> {
+    const res = await apiClient.post<Concert>(Endpoints.concerts.repost(concertId));
+    return res.data;
+  },
+
   async getStreamToken(concertId: string): Promise<StreamToken> {
     const res = await apiClient.get<StreamToken>(Endpoints.streaming.token(concertId));
     return res.data;

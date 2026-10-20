@@ -39,6 +39,11 @@ export const postService = {
     return res.data;
   },
 
+  async repost(sourceId: string, body?: string): Promise<Post> {
+    const res = await apiClient.post<Post>(Endpoints.posts.repost(sourceId), { body });
+    return res.data;
+  },
+
   async getLikers(id: string, page = 1, limit = 30): Promise<PostLiker[]> {
     try {
       const res = await apiClient.get<PostLiker[] | { data: PostLiker[] }>(

@@ -121,4 +121,11 @@ export const eventService = {
     const res = await apiClient.post<{ hidden: boolean }>(Endpoints.events.hide(eventId));
     return res.data;
   },
+
+  // ── Repost (republication avec attribution de source) ──────────────────────
+
+  async repost(eventId: string): Promise<Event> {
+    const res = await apiClient.post<Event>(Endpoints.events.repost(eventId));
+    return res.data;
+  },
 };

@@ -125,6 +125,7 @@ export const Endpoints = {
     validateTicket:  (ticketId: string)  => `${V1}/concerts/tickets/${ticketId}/validate`,
     myTicketPdf:     (concertId: string) => `${V1}/concerts/${concertId}/tickets/me/pdf`,
     view:            (id: string) => `${V1}/concerts/${id}/view`,
+    repost:          (id: string) => `${V1}/concerts/${id}/repost`,
   },
 
   // ── Streaming LiveKit (prefix: /api/v1/stream) ─────────────────────────────
@@ -159,6 +160,8 @@ export const Endpoints = {
     scanTicket:     (eventId: string, accessCode: string) => `${V1}/events/${eventId}/scan/${accessCode}`,
     validateByQr:   (eventId: string, accessCode: string) => `${V1}/events/${eventId}/scan/${accessCode}/validate`,
     view:           (eventId: string) => `${V1}/events/${eventId}/view`,
+    // Repost (republication avec attribution de source) — même pattern que Reel
+    repost:         (eventId: string) => `${V1}/events/${eventId}/repost`,
   },
 
   // ── Reels (prefix: /api/v1/reels) ─────────────────────────────────────────
@@ -205,6 +208,7 @@ export const Endpoints = {
     likers:  (id: string) => `${V1}/posts/${id}/likes`,
     update:  (id: string) => `${V1}/posts/${id}`,
     view:    (id: string) => `${V1}/posts/${id}/view`,
+    repost:  (id: string) => `${V1}/posts/${id}/repost`,
   },
 
   // ── Subscriptions (prefix: /api/v1) ───────────────────────────────────────
@@ -534,7 +538,6 @@ export const Endpoints = {
     create:      `${V1}/ads`,
     mine:        `${V1}/ads/mine`,
     mineStats:   `${V1}/ads/mine/stats`,
-    boostSuggestion: `${V1}/ads/boost-suggestion`,
     byId:        (id: string) => `${V1}/ads/${id}`,
     update:      (id: string) => `${V1}/ads/${id}`,
     delete:      (id: string) => `${V1}/ads/${id}`,
