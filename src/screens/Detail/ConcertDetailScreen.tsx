@@ -589,7 +589,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
         )}
 
         {/* ── Barre sociale ────────────────────────────────────────── */}
-        <View style={[ds.socialBar, { borderTopColor: colors.divider, borderBottomColor: colors.divider }]}>
+        <View style={[ds.socialBar, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
           <TouchableOpacity style={ds.socialBtn} onPress={handleLike} activeOpacity={0.7}>
             <Animated.View style={heartStyle}>
               <MCIcon name={liked ? 'heart' : 'heart-outline'} size={21} color={liked ? '#7B3FF2' : colors.textTertiary} />
@@ -802,11 +802,14 @@ const ds = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 6, paddingVertical: 14, borderRadius: 14,
   },
+  // Pilule flottante — même design que AppHeader/AppTabBar (borderRadius 24,
+  // bordure hairline, ombre douce #5B45B5), cohérent avec PostCard.tsx/FeedScreen.tsx.
   socialBar: {
     flexDirection: 'row', alignItems: 'center',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    marginTop: 4, marginBottom: 4,
+    marginHorizontal: 12, marginTop: 8, marginBottom: 8,
+    borderRadius: 24, borderWidth: StyleSheet.hairlineWidth,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 4,
   },
   socialBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center',

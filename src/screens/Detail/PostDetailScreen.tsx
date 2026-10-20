@@ -670,7 +670,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
 
         {/* ── Barre 3 boutons — compteurs déjà affichés à côté des icônes,
             plus besoin d'une ligne séparée au-dessus ── */}
-        <View style={[s.actionBar, { borderTopColor: colors.divider }]}>
+        <View style={[s.actionBar, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
 
           {/* J'aime — icône seule + compteur, pas de texte */}
           <TouchableOpacity
@@ -933,10 +933,14 @@ const s = StyleSheet.create({
   countDot: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   countTxt: { fontSize: FontSize.smPlus, fontWeight: FontWeight.medium },
 
-  // Barre 3 boutons plats
+  // Pilule flottante — même design que AppHeader/AppTabBar (borderRadius 24,
+  // bordure hairline, ombre douce #5B45B5), cohérent avec PostCard.tsx/FeedScreen.tsx.
   actionBar: {
     flexDirection: 'row', alignItems: 'center',
-    borderTopWidth: StyleSheet.hairlineWidth,
+    marginHorizontal: 12, marginBottom: 10, marginTop: 6,
+    borderRadius: 24, borderWidth: StyleSheet.hairlineWidth,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 4,
   },
   actionBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
