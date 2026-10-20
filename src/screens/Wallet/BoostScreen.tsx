@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { BackButton } from '../../components/common';
+import { BackButton, HelpGuideSheet, HelpGuideButton } from '../../components/common';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, StatusBar, ActivityIndicator,
@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
@@ -21,11 +21,11 @@ import { toastService, showConfirm } from '../../services';
 
 type Tab = 'suggest' | 'new' | 'active' | 'history';
 
-interface BoostSuggestion {
+export interface BoostSuggestion {
   target: string;
   tier_id: string;
   tier_label: string;
-  GoGold: number;
+  gogold: number;
   duration_days: number;
   target_quantity: number;
   quantity_label: string;
@@ -35,6 +35,7 @@ interface BoostSuggestion {
   content_id?: string | null;
   content_type?: string | null;
   content_title?: string | null;
+  content_thumbnail?: string | null;
   engagement_rate?: number | null;
   affordable: boolean;
 }
@@ -696,7 +697,7 @@ const SuggestionCard: React.FC<{
   const cat = BOOST_CATEGORIES.find(c => c.id === suggestion.target);
   const [g1, g2] = cat?.gradient ?? ['#7B3FF2', '#E0389A'];
   const icon = IMPACT_ICONS[suggestion.impact_label] ?? cat?.icon ?? 'zap';
-  const canAfford = suggestion.affordable && balance >= suggestion.GoGold;
+  const canAfford = suggestion.affordable && balance >= suggestion.gogold;
 
   return (
     <View style={[sc.card, { backgroundColor: colors.surface, borderColor: g1 + '30' }]}>
@@ -753,7 +754,7 @@ const SuggestionCard: React.FC<{
           <LinearGradient colors={canAfford ? [g1, g2] : ['#888', '#666']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={sc.boostBtn}>
             <Icon name="zap" size={12} color="#fff" />
             <Text style={sc.boostBtnText}>
-              {canAfford ? `${suggestion.GoGold.toLocaleString('fr-FR')} GoGold` : 'Solde insuffisant'}
+              {canAfford ? `${suggestion.gogold.toLocaleString('fr-FR')} GoGold` : 'Solde insuffisant'}
             </Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -767,7 +768,14 @@ const SuggestionCard: React.FC<{
 export default function BoostScreen() {
   const { theme: { colors }, isDark } = useTheme();
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const insets = useSafeAreaInsets();
+  // Ouverture directe sur une suggestion précise — depuis le bottom sheet
+  // "Booster" du feed d'accueil, qui pointe vers le même systeme que l'onglet
+  // "Pour toi" plutôt que de dupliquer sa logique de sélection/tiers.
+  const autoSuggestion: BoostSuggestion | null = route.params?.autoSuggestion ?? null;
+  const consumedAutoSuggestionRef = useRef(false);
+  const [showHelp, setShowHelp] = useState(false);
   const { currentUser } = useUser();
   const userId = currentUser?.id ?? '';
 
@@ -853,8 +861,8 @@ export default function BoostScreen() {
   }, [tab, refreshActiveBoosts]);
 
   function handleBoostFromSuggestion(s: BoostSuggestion) {
-    if (!s.affordable || balance < s.GoGold) {
-      showConfirm('Solde insuffisant', `Il te manque ${(s.GoGold - balance).toLocaleString('fr-FR')} GoGold.`, [
+    if (!s.affordable || balance < s.gogold) {
+      showConfirm('Solde insuffisant', `Il te manque ${(s.gogold - balance).toLocaleString('fr-FR')} GoGold.`, [
         { text: 'Annuler', style: 'cancel' },
         { text: 'Acheter des GoGold', onPress: () => navigation.navigate('BuyGoGold') },
       ]);
@@ -875,6 +883,14 @@ export default function BoostScreen() {
       }
     }
   }
+
+  // Arrivée depuis le bottom sheet du feed — saute direct au modal d'achat sur
+  // la suggestion déjà choisie là-bas, sans repasser par l'onglet "Pour toi".
+  useEffect(() => {
+    if (!autoSuggestion || consumedAutoSuggestionRef.current || loadingSuggestions) return;
+    consumedAutoSuggestionRef.current = true;
+    handleBoostFromSuggestion(autoSuggestion);
+  }, [autoSuggestion, loadingSuggestions, balance]);
 
   function selectCat(i: number) {
     setCatIdx(i);
@@ -972,6 +988,7 @@ export default function BoostScreen() {
             <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Booster</Text>
             <Text style={[s.headerSub, { color: colors.textTertiary }]}>Abonnes · Reels · Posts · Events · Live</Text>
           </View>
+          <HelpGuideButton onPress={() => setShowHelp(true)} />
           <TouchableOpacity onPress={() => navigation.navigate('BuyGoGold')} style={[s.balancePill, { backgroundColor: colors.backgroundSecondary }]}>
             <Icon name="zap" size={12} color="#FFD700" />
             <Text style={s.balanceText}>{balance.toLocaleString('fr-FR')}</Text>
@@ -1322,6 +1339,37 @@ export default function BoostScreen() {
 
             {selectedTier && (
               <>
+                {/* Changer de pack — tiers de la même catégorie, cote a cote */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={ms.tierPickerRow}>
+                  {cat.tiers.map(t => {
+                    const isSel = t.id === selectedTier.id;
+                    const canAfford = balance >= t.GoGold;
+                    return (
+                      <TouchableOpacity
+                        key={t.id}
+                        onPress={() => setSelectedTier(t)}
+                        activeOpacity={0.85}
+                        style={[
+                          ms.tierPick,
+                          { borderColor: isSel ? g1 : colors.border, backgroundColor: isSel ? g1 + '14' : colors.background },
+                          !canAfford && { opacity: 0.5 },
+                        ]}
+                      >
+                        {t.popular && (
+                          <View style={[ms.tierPickBadge, { backgroundColor: g1 }]}>
+                            <Text style={ms.tierPickBadgeText}>Populaire</Text>
+                          </View>
+                        )}
+                        <Text style={[ms.tierPickLabel, { color: isSel ? g1 : colors.textPrimary }]}>{t.label}</Text>
+                        <Text style={[ms.tierPickQty, { color: colors.textSecondary }]} numberOfLines={1}>{t.quantity}</Text>
+                        <Text style={[ms.tierPickGoGold, { color: isSel ? g1 : colors.textTertiary }]}>
+                          {t.GoGold.toLocaleString('fr-FR')} GoGold
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+
                 <LinearGradient colors={[g1, g2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.modalPreview}>
                   <Icon name={cat.icon as any} size={28} color="#fff" />
                   <Text style={s.modalPreviewQty}>{selectedTier.quantity}</Text>
@@ -1348,14 +1396,16 @@ export default function BoostScreen() {
 
                 <TouchableOpacity
                   onPress={confirmBoost}
-                  disabled={purchasing}
+                  disabled={purchasing || balance < selectedTier.GoGold}
                   activeOpacity={0.85}
-                  style={{ borderRadius: 16, overflow: 'hidden', opacity: purchasing ? 0.7 : 1 }}
+                  style={{ borderRadius: 16, overflow: 'hidden', opacity: purchasing || balance < selectedTier.GoGold ? 0.5 : 1 }}
                 >
                   <LinearGradient colors={[g1, g2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.confirmInner}>
                     {purchasing
                       ? <ActivityIndicator color="#fff" />
-                      : <><Icon name="zap" size={16} color="#fff" /><Text style={s.confirmText}>Activer le boost</Text></>
+                      : balance < selectedTier.GoGold
+                        ? <Text style={s.confirmText}>Solde insuffisant</Text>
+                        : <><Icon name="zap" size={16} color="#fff" /><Text style={s.confirmText}>Activer le boost</Text></>
                     }
                   </LinearGradient>
                 </TouchableOpacity>
@@ -1387,6 +1437,20 @@ export default function BoostScreen() {
           </Text>
         </Animated.View>
       </Animated.View>
+
+      <HelpGuideSheet
+        visible={showHelp}
+        onClose={() => setShowHelp(false)}
+        title="Comment fonctionne le Boost ?"
+        intro="Le Boost augmente artificiellement la visibilité de ton compte ou d'un contenu précis, payé en GoGold — différent d'une Pub (campagne publicitaire avec budget en euros, visible par tous, gérée dans Mes publicités)."
+        points={[
+          { icon: 'target',      title: 'Choisis une cible',       text: 'Abonnés, vues profil, portée de tes contenus, ou un Reel/post/event/concert précis.' },
+          { icon: 'layers',      title: 'Choisis un pack',          text: 'Starter, Growth, Viral ou Mega — plus le pack est grand, plus la portée et la durée augmentent, pour plus de GoGold.' },
+          { icon: 'cpu',         title: '"Pour toi"',              text: "L'onglet Pour toi analyse ton compte et te propose automatiquement la meilleure opportunité du moment, avec une raison personnalisée." },
+          { icon: 'rotate-ccw',  title: 'Remboursement',           text: "Tu peux annuler un boost actif dans les 30 premières minutes — 90% du GoGold dépensé t'est remboursé." },
+          { icon: 'activity',    title: 'Suivi en temps réel',     text: "L'onglet Actifs affiche la progression, le multiplicateur de visibilité et les impressions livrées." },
+        ]}
+      />
     </View>
   );
 }
@@ -1429,6 +1493,14 @@ const ms = StyleSheet.create({
   stopConfirmText: { color: '#fff', fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold },
   cancelBtn:       { alignItems: 'center', paddingVertical: 8 },
   cancelText:      { fontSize: FontSize.base, fontWeight: FontWeight.medium },
+
+  tierPickerRow:   { gap: 10, paddingBottom: 4 },
+  tierPick:        { width: 112, borderRadius: 14, borderWidth: 1.5, padding: 10, gap: 2 },
+  tierPickBadge:   { position: 'absolute', top: -8, right: 8, borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2 },
+  tierPickBadgeText: { color: '#fff', fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold },
+  tierPickLabel:   { fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold },
+  tierPickQty:     { fontSize: FontSize.xs },
+  tierPickGoGold:  { fontSize: FontSize.xs, fontWeight: FontWeight.bold, marginTop: 2 },
 });
 
 const cp = StyleSheet.create({

@@ -1,8 +1,9 @@
 /**
- * BoostPromptBottomSheet — incite l'utilisateur à booster son contenu le
- * plus engageant (post/reel/event/concert publié récemment), avec un aperçu
- * du média et ses statistiques réelles. Au tap sur le CTA, ouvre l'écran
- * Créer une publicité pré-rempli avec ce contenu.
+ * BoostPromptBottomSheet — incite l'utilisateur à utiliser le système de
+ * Boost GoGold (abonnés, vues, portée...) sur sa meilleure opportunité du
+ * moment. Consomme directement la même suggestion que l'onglet "Pour toi"
+ * de BoostScreen (GET /wallet/boosts/suggestions) — ce n'est pas une pub
+ * payante tierce (Ad), juste un raccourci vers Booster.
  */
 import React, { useEffect, useRef } from 'react';
 import {
@@ -13,27 +14,12 @@ import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import type { BoostSuggestion } from '../../services/adService';
+import type { BoostSuggestion } from '../../screens/Wallet/BoostScreen';
 
 const { height: H } = Dimensions.get('window');
-const SHEET_H = H * 0.58;
+const SHEET_H = H * 0.56;
 
-const TYPE_LABEL: Record<string, string> = {
-  post: 'publication', reel: 'reel', event: 'événement', concert: 'concert',
-};
-
-const HOOKS: Record<string, string> = {
-  post: 'Cette publication cartonne 🔥',
-  reel: 'Ce reel cartonne 🔥',
-  event: 'Cet événement attire du monde 👀',
-  concert: 'Ce concert attire du monde 👀',
-};
-
-function formatCount(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
-  if (n >= 1_000)      return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}k`;
-  return String(n);
-}
+export type { BoostSuggestion };
 
 interface Props {
   visible:    boolean;
@@ -64,16 +50,7 @@ export const BoostPromptBottomSheet: React.FC<Props> = ({ visible, suggestion, o
 
   if (!suggestion) return null;
 
-  const media = suggestion.thumbnail_url ?? suggestion.creative_url ?? null;
-  const isVideo = suggestion.format === 'video';
-  const typeLabel = TYPE_LABEL[suggestion.source_content_type] ?? 'contenu';
-  const hook = HOOKS[suggestion.source_content_type] ?? 'Ce contenu cartonne 🔥';
-
-  const stats: { icon: string; value: number; label: string }[] = [];
-  if (suggestion.view_count > 0) stats.push({ icon: 'eye', value: suggestion.view_count, label: 'vues' });
-  stats.push({ icon: 'heart', value: suggestion.like_count, label: "j'aime" });
-  stats.push({ icon: 'message-circle', value: suggestion.comment_count, label: 'commentaires' });
-  if (suggestion.share_count > 0) stats.push({ icon: 'share-2', value: suggestion.share_count, label: 'partages' });
+  const media = suggestion.content_thumbnail ?? null;
 
   return (
     <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
@@ -89,54 +66,53 @@ export const BoostPromptBottomSheet: React.FC<Props> = ({ visible, suggestion, o
         <View style={[st.handle, { backgroundColor: colors.divider }]} />
 
         <View style={st.content}>
-          {/* Média + overlay titre */}
-          <View style={st.mediaWrap}>
-            {media ? (
+          {media && (
+            <View style={st.mediaWrap}>
               <ImageBackground source={{ uri: media }} style={st.media} resizeMode="cover">
-                {isVideo && (
-                  <View style={st.playOverlay}>
-                    <Icon name="play" size={20} color="#fff" />
-                  </View>
-                )}
-                <LinearGradient
-                  colors={['transparent', 'rgba(0,0,0,0.75)']}
-                  style={st.mediaGradient}
-                >
-                  <Text style={st.mediaCaption} numberOfLines={2}>{suggestion.title}</Text>
+                <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={st.mediaGradient}>
+                  {suggestion.content_title ? (
+                    <Text style={st.mediaCaption} numberOfLines={2}>{suggestion.content_title}</Text>
+                  ) : null}
                 </LinearGradient>
               </ImageBackground>
-            ) : (
-              <View style={[st.media, { backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }]}>
-                <Icon name="image" size={28} color={colors.textTertiary} />
-              </View>
-            )}
+            </View>
+          )}
+
+          <View style={st.hookRow}>
+            <LinearGradient colors={['#7B3FF2', '#E0389A']} style={st.hookIcon}>
+              <Icon name="zap" size={16} color="#fff" />
+            </LinearGradient>
+            <Text style={[st.hook, { color: colors.textPrimary }]}>{suggestion.impact_label}</Text>
           </View>
 
-          <Text style={[st.hook, { color: colors.textPrimary }]}>{hook}</Text>
-          <Text style={[st.sub, { color: colors.textSecondary }]}>
-            Mets ton {typeLabel} en avant auprès de milliers de personnes et multiplie ta portée.
-          </Text>
+          <Text style={[st.sub, { color: colors.textSecondary }]}>{suggestion.reason}</Text>
 
-          {/* Stats réelles */}
-          <View style={st.statsRow}>
-            {stats.map(s => (
-              <View key={s.label} style={[st.statPill, { backgroundColor: colors.backgroundSecondary }]}>
-                <Icon name={s.icon} size={13} color={colors.primary} />
-                <Text style={[st.statValue, { color: colors.textPrimary }]}>{formatCount(s.value)}</Text>
-                <Text style={[st.statLabel, { color: colors.textTertiary }]}>{s.label}</Text>
-              </View>
-            ))}
+          {suggestion.engagement_rate != null && suggestion.engagement_rate > 0 && (
+            <View style={[st.engBadge, { backgroundColor: '#22C55E15', borderColor: '#22C55E30' }]}>
+              <Icon name="activity" size={11} color="#22C55E" />
+              <Text style={st.engText}>{(suggestion.engagement_rate * 100).toFixed(1)}% d'engagement</Text>
+            </View>
+          )}
+
+          <View style={st.quantityRow}>
+            <Text style={[st.quantity, { color: colors.textPrimary }]}>{suggestion.quantity_label}</Text>
+            <Text style={[st.duration, { color: colors.textTertiary }]}>
+              {suggestion.duration_days} jour{suggestion.duration_days > 1 ? 's' : ''}
+            </Text>
           </View>
 
-          {/* CTA */}
           <TouchableOpacity activeOpacity={0.85} onPress={() => onBoost(suggestion)}>
             <LinearGradient
-              colors={[colors.gradientStart, colors.gradientEnd]}
+              colors={suggestion.affordable ? [colors.gradientStart, colors.gradientEnd] : ['#888', '#666']}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={st.ctaBtn}
             >
               <Icon name="zap" size={16} color="#fff" />
-              <Text style={st.ctaTxt}>Booster ce {typeLabel}</Text>
+              <Text style={st.ctaTxt}>
+                {suggestion.affordable
+                  ? `Booster — ${suggestion.gogold.toLocaleString('fr-FR')} GoGold`
+                  : 'Solde insuffisant'}
+              </Text>
             </LinearGradient>
           </TouchableOpacity>
 
@@ -164,29 +140,26 @@ const st = StyleSheet.create({
     width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
     backgroundColor: 'rgba(120,120,140,0.14)',
   },
-  content: { paddingHorizontal: 20, paddingTop: 10, gap: 12 },
+  content: { paddingHorizontal: 20, paddingTop: 10, gap: 10 },
   mediaWrap: { alignItems: 'center' },
-  media: { width: '100%', height: 150, borderRadius: 16, overflow: 'hidden' },
+  media: { width: '100%', height: 130, borderRadius: 16, overflow: 'hidden' },
   mediaGradient: { flex: 1, justifyContent: 'flex-end', padding: 12 },
   mediaCaption: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  playOverlay: {
-    position: 'absolute', top: '50%', left: '50%', marginTop: -20, marginLeft: -20,
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.22)', alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.5)',
+  hookRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 2 },
+  hookIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  hook: { flex: 1, fontSize: 16, fontWeight: '800' },
+  sub:  { fontSize: 13, lineHeight: 18 },
+  engBadge: {
+    flexDirection: 'row', alignSelf: 'flex-start', alignItems: 'center', gap: 5,
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1,
   },
-  hook: { fontSize: 18, fontWeight: '800', textAlign: 'center', marginTop: 2 },
-  sub:  { fontSize: 13, textAlign: 'center', lineHeight: 18, paddingHorizontal: 8 },
-  statsRow: { flexDirection: 'row', justifyContent: 'center', gap: 8, flexWrap: 'wrap', marginTop: 2 },
-  statPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 11, paddingVertical: 7, borderRadius: 20,
-  },
-  statValue: { fontSize: 12, fontWeight: '800' },
-  statLabel: { fontSize: 11, fontWeight: '500' },
+  engText: { fontSize: 11, fontWeight: '700', color: '#22C55E' },
+  quantityRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 },
+  quantity: { fontSize: 14, fontWeight: '700' },
+  duration: { fontSize: 12, fontWeight: '500' },
   ctaBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    paddingVertical: 15, borderRadius: 16, marginTop: 6,
+    paddingVertical: 15, borderRadius: 16, marginTop: 4,
     shadowColor: '#7B3FF2', shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 6,
   },
   ctaTxt: { color: '#fff', fontSize: 15, fontWeight: '800' },

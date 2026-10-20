@@ -261,14 +261,14 @@ export type MainStackParamList = {
   Monetisation:     { preloadedStatus?: 'approved' } | undefined;
   Transfer:        { recipientId?: string; recipientName?: string; recipientAvatar?: string } | undefined;
   WalletPin:       undefined;
-  Boost:                    undefined;
+  Boost:                    { autoSuggestion?: any } | undefined;
   Referral:                 undefined;
   SubscriptionPlans:        undefined;
   SubscriptionPayment:      { plan: string; walletCheck: any };
   MySubscription:           undefined;
   MonetisationRequest:      undefined;
   Ads:                      undefined;
-  CreateAd:                 { ad?: any | null; prefill?: any };
+  CreateAd:                 { ad: any | null };
   AdminVerification:         undefined;
   WebQRScanner:              undefined;
   SettingsWallet:            undefined;

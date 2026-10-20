@@ -4,7 +4,6 @@ import { Endpoints } from '../api/endpoints';
 export type AdStatus = 'draft' | 'active' | 'paused' | 'ended' | 'rejected';
 export type AdPlacement = 'feed' | 'reels' | 'stories' | 'search';
 export type AdFormat = 'image' | 'video' | 'native';
-export type AdSourceType = 'post' | 'reel' | 'event' | 'concert';
 
 export interface Ad {
   id:               string;
@@ -18,8 +17,6 @@ export interface Ad {
   contact_phone?:   string | null;
   contact_call?:    boolean;
   contact_whatsapp?: boolean;
-  source_content_type?: AdSourceType | null;
-  source_content_id?:   string | null;
   format:           AdFormat;
   placement:        AdPlacement;
   status:           AdStatus;
@@ -54,8 +51,6 @@ export interface AdCreate {
   contact_phone?:    string;
   contact_call?:     boolean;
   contact_whatsapp?: boolean;
-  source_content_type?: AdSourceType;
-  source_content_id?:   string;
   format?:           AdFormat;
   placement?:        AdPlacement;
   budget_eur:        number;
@@ -99,23 +94,6 @@ const EMPTY_STATS: AdsStats = {
   gogold_debited: 0, gogold_spent: 0, gogold_remaining: 0,
 };
 
-// Le meilleur contenu récent de l'utilisateur à proposer au boost — alimente
-// le bottom sheet "Booste ta publication" du feed d'accueil.
-export interface BoostSuggestion {
-  source_content_type: AdSourceType;
-  source_content_id:   string;
-  title:        string;
-  creative_url: string | null;
-  thumbnail_url: string | null;
-  format:       AdFormat;
-  view_count:    number;
-  like_count:    number;
-  comment_count: number;
-  share_count:   number;
-  score:        number;
-  created_at:   string;
-}
-
 export const adService = {
   async getMine(page = 1, limit = 20): Promise<AdsPage> {
     const res = await apiClient.get<AdsPage>(`${Endpoints.ads.mine}?page=${page}&limit=${limit}`);
@@ -134,15 +112,6 @@ export const adService = {
       return { ...EMPTY_STATS, ...res.data };
     } catch {
       return EMPTY_STATS;
-    }
-  },
-
-  async getBoostSuggestion(): Promise<BoostSuggestion | null> {
-    try {
-      const res = await apiClient.get<BoostSuggestion | null>(Endpoints.ads.boostSuggestion);
-      return res.data ?? null;
-    } catch {
-      return null;
     }
   },
 
