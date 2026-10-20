@@ -2,13 +2,13 @@
           xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Galerie photos (Android 13+) -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <!-- Images/vidéos : sélectionnées via le Photo Picker système
+         (launchImageLibrary, react-native-image-picker) qui ne nécessite
+         aucune permission de stockage sur Android 13+ — conforme à la
+         politique Google Play sur les autorisations médias étendues. -->
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
-    <!-- Galerie photos sélection partielle (Android 14+) -->
-    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
-    <!-- Galerie photos (Android ≤ 12) -->
+    <!-- Musique locale (Android ≤ 12) — sélection de fichier audio dans
+         l'éditeur de reel, voir ReelEditorScreen.tsx -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <!-- Ecriture galerie (Android ≤ 29) -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
