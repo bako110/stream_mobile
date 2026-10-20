@@ -55,6 +55,7 @@ export const Endpoints = {
     privacy:        `${V1}/users/me/privacy`,
     playback:       `${V1}/users/me/playback`,
     feedPreferences: `${V1}/users/me/feed-preferences`,
+    appPreferences: `${V1}/users/me/app-preferences`,
     // Admin
     matchContacts:  `${V1}/users/match-contacts`,
     contactsSync:   `${V1}/users/contacts/sync`,

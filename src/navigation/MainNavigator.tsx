@@ -1,5 +1,6 @@
 import React, { useEffect, useCallback, useRef } from 'react';
 import { decodeId } from '../utils/slugId';
+import { getAppPreferences } from '../hooks/useAppPreferences';
 import { Platform, BackHandler, ToastAndroid, View, Dimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { toastService } from '../services/toastService';
@@ -420,10 +421,22 @@ const SwipeTabScreen: React.FC<{ tabName: typeof SWIPE_TAB_ORDER[number]; childr
   );
 };
 
+// Mappe la préférence 'feed'|'reels'|'communities' (Settings > Contenu) au nom
+// de route du Tab.Navigator — lu une seule fois au montage, n'affecte que
+// l'écran initial au lancement de l'app, jamais le comportement du tap sur un
+// onglet déjà actif (reset de pile, voir AppTabBar.tsx).
+const START_SCREEN_TO_ROUTE: Record<string, 'Home' | 'Reels' | 'Communities'> = {
+  feed: 'Home', reels: 'Reels', communities: 'Communities',
+};
+
 const Tabs: React.FC<{ onLogout: () => void; onSwitchAccount: (userId: string) => Promise<void> }> = ({ onLogout, onSwitchAccount }) => {
   const { theme } = useTheme();
+  const initialRouteNameRef = useRef(
+    START_SCREEN_TO_ROUTE[getAppPreferences().preferred_start_screen] ?? 'Home',
+  );
   return (
   <Tab.Navigator
+    initialRouteName={initialRouteNameRef.current}
     tabBar={props => <AppTabBar {...props} />}
     // sceneStyle (pas sceneContainerStyle, absent de cette version de
     // @react-navigation/bottom-tabs — erreur TS2769 constatée) : React
