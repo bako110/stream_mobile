@@ -22,7 +22,7 @@ import { authService } from '../../services/authService';
 import { apiClient, Endpoints } from '../../api';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { uploadMessageVideo, uploadAudioFile, uploadFileFromUri } from '../../services/uploadService';
-import { GofolyxLoader, BackButton } from '../../components/common';
+import { GofolyxLoader, BackButton, RichText } from '../../components/common';
 import { ZoomableImage } from '../../components/common/ZoomableImage';
 import { toastService, showConfirm } from '../../services';
 
@@ -553,7 +553,12 @@ export const CommunityChannelChatScreen: React.FC = () => {
                 </TouchableOpacity>
               )}
             </View>
-            <Text style={[C.announceText, { color: colors.textPrimary }]}>{msg.content}</Text>
+            <RichText
+              text={msg.content ?? ''}
+              textStyle={[C.announceText, { color: colors.textPrimary }]}
+              primaryColor={colors.primary}
+              showLinkPreview={false}
+            />
           </TouchableOpacity>
         </View>
       );
@@ -610,7 +615,12 @@ export const CommunityChannelChatScreen: React.FC = () => {
             )}
             {msg.content ? (
               <View style={[C.bubble, { backgroundColor: bubbleBg }, isMe ? myRadius : otherRadius]}>
-                <Text style={[C.msgText, { color: textColor }]}>{msg.content}</Text>
+                <RichText
+                  text={msg.content}
+                  textStyle={[C.msgText, { color: textColor }]}
+                  primaryColor={isMe ? '#fff' : colors.primary}
+                  showLinkPreview={false}
+                />
               </View>
             ) : null}
             <Text style={{ fontSize: FontSize.xs, color: colors.textTertiary, textAlign: isMe ? 'right' : 'left', marginTop: 2 }}>
@@ -732,7 +742,12 @@ export const CommunityChannelChatScreen: React.FC = () => {
               <Text style={{ color: isMe ? 'rgba(255,255,255,0.7)' : '#F59E0B', fontSize: FontSize['2xs'], fontWeight: FontWeight.bold, marginLeft: 3 }}>Épinglé</Text>
             </View>
           )}
-          <Text style={[C.msgText, { color: textColor }]}>{msg.content}</Text>
+          <RichText
+            text={msg.content ?? ''}
+            textStyle={[C.msgText, { color: textColor }]}
+            primaryColor={isMe ? '#fff' : colors.primary}
+            showLinkPreview={false}
+          />
           <View style={C.msgMeta}>
             {msg.edited_at && <Text style={[{ fontSize: FontSize.xs, fontStyle: 'italic', color: timeColor }]}>modifié · </Text>}
             <Text style={[C.msgTime, { color: timeColor }]}>{fmtTime(msg.created_at)}</Text>

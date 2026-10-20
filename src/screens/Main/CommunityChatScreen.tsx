@@ -24,7 +24,7 @@ import Geolocation from '@react-native-community/geolocation';
 import { uploadAudioFile, uploadFileFromUri } from '../../services/uploadService';
 import { backgroundUploadService } from '../../services/backgroundUploadService';
 import { useBackgroundUpload } from '../../hooks/useBackgroundUpload';
-import { BackButton, CachedImage, GofolyxLoader } from '../../components/common';
+import { BackButton, CachedImage, GofolyxLoader, RichText } from '../../components/common';
 import { ZoomableImage } from '../../components/common/ZoomableImage';
 import { useMediaDownload } from '../../hooks/useMediaDownload';
 import { useActiveVoice } from '../../context/ActiveVoiceContext';
@@ -1337,9 +1337,12 @@ export const CommunityChatScreen: React.FC = () => {
                 <View style={{ height: 1, backgroundColor: '#F59E0B25', marginBottom: 12 }} />
 
                 {/* Contenu */}
-                <Text style={{ color: colors.textPrimary, fontSize: FontSize.basePlus, lineHeight: 22, fontWeight: FontWeight.medium }}>
-                  {msg.content}
-                </Text>
+                <RichText
+                  text={msg.content ?? ''}
+                  textStyle={{ color: colors.textPrimary, fontSize: FontSize.basePlus, lineHeight: 22, fontWeight: FontWeight.medium }}
+                  primaryColor={colors.primary}
+                  showLinkPreview={false}
+                />
 
                 <Reactions msg={msg} />
               </View>
@@ -1683,7 +1686,12 @@ export const CommunityChatScreen: React.FC = () => {
               <Text style={{ color: isMe ? 'rgba(255,255,255,0.7)' : '#F59E0B', fontSize: FontSize['2xs'], fontWeight: FontWeight.bold, marginLeft: 3 }}>Épinglé</Text>
             </View>
           )}
-          <Text style={[S.msgText, { color: textColor }]}>{msg.content}</Text>
+          <RichText
+            text={msg.content ?? ''}
+            textStyle={[S.msgText, { color: textColor }]}
+            primaryColor={isMe ? '#fff' : colors.primary}
+            showLinkPreview={false}
+          />
           <View style={S.msgMeta}>
             {msg.edited_at && <Text style={[S.edited, { color: timeColor }]}>modifié · </Text>}
             <Text style={[S.msgTime, { color: timeColor }]}>{fmtTime(msg.created_at)}</Text>

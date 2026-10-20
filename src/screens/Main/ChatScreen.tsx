@@ -31,7 +31,7 @@ import { backgroundUploadService } from '../../services/backgroundUploadService'
 import { useBackgroundUpload } from '../../hooks/useBackgroundUpload';
 import { useWs } from '../../context/WebSocketContext';
 import { useActiveVoice } from '../../context/ActiveVoiceContext';
-import { AvatarWithBadge, GofolyxLoader } from '../../components/common';
+import { AvatarWithBadge, GofolyxLoader, RichText } from '../../components/common';
 import type { Message, MessageType } from '../../services/messageService';
 import type { WsPayload } from '../../context/WebSocketContext';
 import type { ConversationSummary, ConversationRequestStatus } from '../../services/messageService';
@@ -1079,7 +1079,12 @@ export const ChatScreen: React.FC = () => {
             </TouchableOpacity>
             {item.content && (
               <View style={{ paddingHorizontal: 14, paddingTop: 8, paddingBottom: 6 }}>
-                <Text style={[styles.msgText, { color: textColor }]}>{item.content}</Text>
+                <RichText
+                  text={item.content}
+                  textStyle={[styles.msgText, { color: textColor }]}
+                  primaryColor={colors.primary}
+                  showLinkPreview={false}
+                />
                 <View style={styles.bubbleFooter}>
                   {item.edited_at && <Text style={[styles.editedLabel, { color: subtextColor }]}>modifié</Text>}
                   <Text style={[styles.msgTime, { color: subtextColor }]}>{formatMsgTime(item.created_at)}</Text>
@@ -1247,7 +1252,14 @@ export const ChatScreen: React.FC = () => {
       }
 
       default: // text
-        return <Text style={[styles.msgText, { color: textColor }]}>{item.content}</Text>;
+        return (
+          <RichText
+            text={item.content}
+            textStyle={[styles.msgText, { color: textColor }]}
+            primaryColor={colors.primary}
+            showLinkPreview={false}
+          />
+        );
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [colors, playingId, playAudio, playProgress, playDuration, nav, getDl, startDl]);
