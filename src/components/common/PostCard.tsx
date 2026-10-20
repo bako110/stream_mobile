@@ -794,7 +794,10 @@ const PostCardInner: React.FC<PostCardProps> = ({
       {repostSheetOpen && (
         <RepostBottomSheet
           visible
-          post={post}
+          kind="post"
+          author={post.author}
+          body={post.body}
+          thumb={post.image_urls?.[0] ?? post.image_url ?? post.thumbnail_url ?? null}
           reposting={reposting}
           onConfirm={handleRepostConfirm}
           onClose={() => { if (!reposting) setRepostSheetOpen(false); }}

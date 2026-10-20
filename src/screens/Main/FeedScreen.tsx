@@ -40,6 +40,7 @@ import { boostPromptService } from '../../services/boostPromptService';
 import { openPhoneMenu, callPhone, openWhatsapp } from '../../utils/phoneMenu';
 import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
 import { ShareBottomSheet } from '../../components/common/ShareBottomSheet';
+import { RepostBottomSheet } from '../../components/common/RepostBottomSheet';
 import type { UserPublic } from '../../types/user';
 import { StoryBar } from '../../components/story';
 import { eventService, concertService, socialService, authService, searchService, userService, reelService, feedPreferenceService, accountsService, toastService } from '../../services';
@@ -3639,9 +3640,18 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
   };
 
   // Repost — republication avec attribution de source (événements et concerts,
-  // même pattern que ReelsScreen.tsx). Distinct du partage externe (handleShare).
+  // même pattern que ReelsScreen.tsx/PostCard.tsx). Distinct du partage externe
+  // (handleShare). Passe par un bottom sheet de confirmation (aperçu + bouton
+  // explicite) au lieu de republier instantanément au premier tap.
   const [reposting, setReposting] = useState(false);
-  const handleRepost = async () => {
+  const [repostSheetOpen, setRepostSheetOpen] = useState(false);
+
+  const handleRepostPress = () => {
+    if ((!isEvent && !isConcert) || reposting) return;
+    setRepostSheetOpen(true);
+  };
+
+  const handleRepostConfirm = async () => {
     if ((!isEvent && !isConcert) || reposting) return;
     setReposting(true);
     try {
@@ -3652,6 +3662,7 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
         await concertService.repost(item.id);
         toastService.success('Repartagé', `« ${concert?.title ?? ''} » a été republié sur votre profil.`);
       }
+      setRepostSheetOpen(false);
     } catch {
       toastService.error('Échec', isEvent ? 'Impossible de repartager cet événement pour le moment.' : 'Impossible de repartager ce concert pour le moment.');
     } finally {
@@ -3893,7 +3904,7 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
         </TouchableOpacity>
 
         {(isEvent || isConcert) && (
-          <TouchableOpacity style={fc.actionBtn} onPress={handleRepost} disabled={reposting} activeOpacity={0.7} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+          <TouchableOpacity style={fc.actionBtn} onPress={handleRepostPress} disabled={reposting} activeOpacity={0.7} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
             <Icon name="repeat" size={FeedActionIcon.size} color={colors.textSecondary} />
           </TouchableOpacity>
         )}
@@ -3918,6 +3929,18 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
         isEvent
           ? <ShareBottomSheet type="event" event={item.data as Event} visible={shareOpen} onClose={() => setShareOpen(false)} onShareCountChange={handleShareDone} />
           : <ShareBottomSheet type="concert" concert={item.data as Concert} visible={shareOpen} onClose={() => setShareOpen(false)} onShareCountChange={handleShareDone} />
+      )}
+      {repostSheetOpen && (
+        <RepostBottomSheet
+          visible
+          kind={isEvent ? 'event' : 'concert'}
+          author={author}
+          title={isEvent ? event?.title : concert?.title}
+          thumb={isEvent ? event?.thumbnail_url : concert?.thumbnail_url}
+          reposting={reposting}
+          onConfirm={handleRepostConfirm}
+          onClose={() => { if (!reposting) setRepostSheetOpen(false); }}
+        />
       )}
       <LikersBottomSheet visible={likersOpen} onClose={() => setLikersOpen(false)} postId={item.id} likeCount={likeCount}
         fetchLikers={(page, limit) => isEvent ? socialService.getReactionLikers({ event_id: item.id, page, limit }) : socialService.getReactionLikers({ concert_id: item.id, page, limit })}

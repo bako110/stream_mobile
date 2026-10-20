@@ -1,8 +1,9 @@
 /**
- * RepostBottomSheet — confirmation avant republication d'un post. Affiche
- * un aperçu du contenu (auteur original, texte, média) et un bouton de
- * confirmation explicite — avant ça, un tap sur l'icône repeat republiait
- * instantanément sans aucun aperçu ni confirmation.
+ * RepostBottomSheet — confirmation avant republication (post/event/concert).
+ * Affiche un aperçu du contenu (auteur original, titre/texte, média) et un
+ * bouton de confirmation explicite — avant ça, un tap sur l'icône repeat
+ * republiait instantanément sans aucun aperçu ni confirmation, quel que
+ * soit le type de contenu.
  */
 import React, { useEffect, useRef } from 'react';
 import {
@@ -13,20 +14,36 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { GofolyxLoader } from './FolixLoader';
-import type { Post } from '../../types/post';
+
+type RepostKind = 'post' | 'event' | 'concert';
+
+interface RepostAuthor {
+  display_name?: string | null;
+  username?: string | null;
+  avatar_url?: string | null;
+  is_verified?: boolean | null;
+}
+
+interface Props {
+  visible:   boolean;
+  kind:      RepostKind;
+  author:    RepostAuthor | null | undefined;
+  title?:    string | null;   // titre (event/concert) — absent pour un post
+  body?:     string | null;   // texte (post) — absent pour event/concert
+  thumb?:    string | null;
+  reposting: boolean;
+  onConfirm: () => void;
+  onClose:   () => void;
+}
 
 const { height: H } = Dimensions.get('window');
 const SHEET_H = H * 0.6;
 
-interface Props {
-  visible: boolean;
-  post: Post;
-  reposting: boolean;
-  onConfirm: () => void;
-  onClose: () => void;
-}
+const KIND_LABEL: Record<RepostKind, string> = {
+  post: 'ce post', event: 'cet événement', concert: 'ce concert',
+};
 
-export const RepostBottomSheet: React.FC<Props> = ({ visible, post, reposting, onConfirm, onClose }) => {
+export const RepostBottomSheet: React.FC<Props> = ({ visible, kind, author, title, body, thumb, reposting, onConfirm, onClose }) => {
   const { theme: { colors } } = useTheme();
   const insets = useSafeAreaInsets();
   const slideY = useRef(new Animated.Value(SHEET_H)).current;
@@ -39,10 +56,8 @@ export const RepostBottomSheet: React.FC<Props> = ({ visible, post, reposting, o
     }
   }, [visible]);
 
-  const author = post.author;
   const authorName = author?.display_name ?? author?.username ?? 'Utilisateur';
   const initials = authorName[0]?.toUpperCase() ?? '?';
-  const thumb = post.image_urls?.[0] ?? post.image_url ?? post.thumbnail_url ?? null;
 
   return (
     <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
@@ -51,7 +66,7 @@ export const RepostBottomSheet: React.FC<Props> = ({ visible, post, reposting, o
       <Animated.View style={[st.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + 16 }, { transform: [{ translateY: slideY }] }]}>
         <View style={[st.handle, { backgroundColor: colors.divider }]} />
 
-        <Text style={[st.title, { color: colors.textPrimary }]}>Republier ce post</Text>
+        <Text style={[st.title, { color: colors.textPrimary }]}>Republier {KIND_LABEL[kind]}</Text>
         <Text style={[st.subtitle, { color: colors.textTertiary }]}>
           Visible sur ton profil avec la mention de l'auteur original.
         </Text>
@@ -81,9 +96,15 @@ export const RepostBottomSheet: React.FC<Props> = ({ visible, post, reposting, o
             <Image source={{ uri: thumb }} style={st.thumb} resizeMode="cover" />
           ) : null}
 
-          {post.body ? (
+          {title ? (
+            <Text style={[st.contentTitle, { color: colors.textPrimary }]} numberOfLines={2}>
+              {title}
+            </Text>
+          ) : null}
+
+          {body ? (
             <Text style={[st.body, { color: colors.textSecondary }]} numberOfLines={4}>
-              {post.body}
+              {body}
             </Text>
           ) : null}
         </View>
@@ -132,6 +153,7 @@ const st = StyleSheet.create({
   authorName: { fontSize: 14, fontWeight: '700' },
   authorHint: { fontSize: 11, marginTop: 1 },
   thumb: { width: '100%', aspectRatio: 1.5, borderRadius: 12 },
+  contentTitle: { fontSize: 14, fontWeight: '700', lineHeight: 19 },
   body: { fontSize: 13, lineHeight: 19 },
 
   confirmBtn: {
