@@ -8,7 +8,7 @@
 import React, { useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, Modal, TouchableOpacity, Image,
-  Animated, Dimensions,
+  Animated, Dimensions, ScrollView,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -63,72 +63,81 @@ export const RepostBottomSheet: React.FC<Props> = ({ visible, kind, author, titl
     <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
       <TouchableOpacity style={st.backdrop} activeOpacity={1} onPress={onClose} />
 
-      <Animated.View style={[st.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + 16 }, { transform: [{ translateY: slideY }] }]}>
+      <Animated.View style={[st.sheet, { backgroundColor: colors.surface }, { transform: [{ translateY: slideY }] }]}>
         <View style={[st.handle, { backgroundColor: colors.divider }]} />
 
-        <Text style={[st.title, { color: colors.textPrimary }]}>Republier {KIND_LABEL[kind]}</Text>
-        <Text style={[st.subtitle, { color: colors.textTertiary }]}>
-          Visible sur ton profil avec la mention de l'auteur original.
-        </Text>
+        {/* Titre/sous-titre + aperçu défilables — seuls les boutons d'action
+            restent fixes hors du scroll, pour que "Republier" reste toujours
+            atteignable même quand body (description longue) pousse le
+            contenu au-delà de SHEET_H (bug corrigé : le bouton devenait
+            inaccessible sans aucun scroll sur une description longue). */}
+        <ScrollView style={st.scroll} contentContainerStyle={st.scrollContent} showsVerticalScrollIndicator={false}>
+          <Text style={[st.title, { color: colors.textPrimary }]}>Republier {KIND_LABEL[kind]}</Text>
+          <Text style={[st.subtitle, { color: colors.textTertiary }]}>
+            Visible sur ton profil avec la mention de l'auteur original.
+          </Text>
 
-        {/* Aperçu du contenu à republier */}
-        <View style={[st.preview, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
-          <View style={st.authorRow}>
-            {author?.avatar_url ? (
-              <Image source={{ uri: author.avatar_url }} style={st.avatar} />
-            ) : (
-              <View style={[st.avatar, { backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }]}>
-                <Text style={{ color: '#fff', fontWeight: '700' }}>{initials}</Text>
+          {/* Aperçu du contenu à republier */}
+          <View style={[st.preview, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
+            <View style={st.authorRow}>
+              {author?.avatar_url ? (
+                <Image source={{ uri: author.avatar_url }} style={st.avatar} />
+              ) : (
+                <View style={[st.avatar, { backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }]}>
+                  <Text style={{ color: '#fff', fontWeight: '700' }}>{initials}</Text>
+                </View>
+              )}
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Text style={[st.authorName, { color: colors.textPrimary }]} numberOfLines={1}>{authorName}</Text>
+                  {author?.is_verified && (
+                    <Icon name="check-circle" size={13} color={colors.primary} />
+                  )}
+                </View>
+                <Text style={[st.authorHint, { color: colors.textTertiary }]}>Auteur original</Text>
               </View>
-            )}
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Text style={[st.authorName, { color: colors.textPrimary }]} numberOfLines={1}>{authorName}</Text>
-                {author?.is_verified && (
-                  <Icon name="check-circle" size={13} color={colors.primary} />
-                )}
-              </View>
-              <Text style={[st.authorHint, { color: colors.textTertiary }]}>Auteur original</Text>
             </View>
+
+            {thumb ? (
+              <Image source={{ uri: thumb }} style={st.thumb} resizeMode="cover" />
+            ) : null}
+
+            {title ? (
+              <Text style={[st.contentTitle, { color: colors.textPrimary }]} numberOfLines={2}>
+                {title}
+              </Text>
+            ) : null}
+
+            {body ? (
+              <Text style={[st.body, { color: colors.textSecondary }]} numberOfLines={4}>
+                {body}
+              </Text>
+            ) : null}
           </View>
+        </ScrollView>
 
-          {thumb ? (
-            <Image source={{ uri: thumb }} style={st.thumb} resizeMode="cover" />
-          ) : null}
+        {/* Actions — fixes, toujours visibles */}
+        <View style={[st.actions, { paddingBottom: insets.bottom + 16 }]}>
+          <TouchableOpacity
+            style={[st.confirmBtn, { backgroundColor: colors.primary, opacity: reposting ? 0.7 : 1 }]}
+            onPress={onConfirm}
+            disabled={reposting}
+            activeOpacity={0.85}
+          >
+            {reposting ? (
+              <GofolyxLoader variant="bar" color="#fff" />
+            ) : (
+              <>
+                <Icon name="repeat" size={16} color="#fff" />
+                <Text style={st.confirmBtnText}>Republier</Text>
+              </>
+            )}
+          </TouchableOpacity>
 
-          {title ? (
-            <Text style={[st.contentTitle, { color: colors.textPrimary }]} numberOfLines={2}>
-              {title}
-            </Text>
-          ) : null}
-
-          {body ? (
-            <Text style={[st.body, { color: colors.textSecondary }]} numberOfLines={4}>
-              {body}
-            </Text>
-          ) : null}
+          <TouchableOpacity style={st.cancelBtn} onPress={onClose} disabled={reposting}>
+            <Text style={[st.cancelBtnText, { color: colors.textSecondary }]}>Annuler</Text>
+          </TouchableOpacity>
         </View>
-
-        {/* Actions */}
-        <TouchableOpacity
-          style={[st.confirmBtn, { backgroundColor: colors.primary, opacity: reposting ? 0.7 : 1 }]}
-          onPress={onConfirm}
-          disabled={reposting}
-          activeOpacity={0.85}
-        >
-          {reposting ? (
-            <GofolyxLoader variant="bar" color="#fff" />
-          ) : (
-            <>
-              <Icon name="repeat" size={16} color="#fff" />
-              <Text style={st.confirmBtnText}>Republier</Text>
-            </>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity style={st.cancelBtn} onPress={onClose} disabled={reposting}>
-          <Text style={[st.cancelBtnText, { color: colors.textSecondary }]}>Annuler</Text>
-        </TouchableOpacity>
       </Animated.View>
     </Modal>
   );
@@ -140,10 +149,12 @@ const st = StyleSheet.create({
     position: 'absolute', bottom: 0, left: 0, right: 0,
     maxHeight: SHEET_H,
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    paddingTop: 10, paddingHorizontal: 18,
+    paddingTop: 10,
     shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 20, elevation: 12,
   },
   handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  scroll: { flexGrow: 0 },
+  scrollContent: { paddingHorizontal: 18 },
   title: { fontSize: 17, fontWeight: '800', textAlign: 'center' },
   subtitle: { fontSize: 13, textAlign: 'center', marginTop: 4, marginBottom: 16, lineHeight: 18 },
 
@@ -156,6 +167,7 @@ const st = StyleSheet.create({
   contentTitle: { fontSize: 14, fontWeight: '700', lineHeight: 19 },
   body: { fontSize: 13, lineHeight: 19 },
 
+  actions: { paddingHorizontal: 18, paddingTop: 12 },
   confirmBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     borderRadius: 14, paddingVertical: 14, marginBottom: 8,
