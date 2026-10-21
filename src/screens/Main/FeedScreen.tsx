@@ -32,10 +32,14 @@ import { useTheme } from '../../hooks/useTheme';
 import { useUserLocation } from '../../hooks/useUserLocation';
 import { storage } from '../../utils/storage';
 import { showConfirm } from '../../services';
+import { confirmService } from '../../services/confirmService';
 import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet, FriendsWhoLiked, CachedImage, LiveThumbnailBackground, PriceWithLocal, GofolyxLoader, PeopleSuggestions, CommunityPromoHint } from '../../components/common';
 import { cacheImage } from '../../services/imageCacheService';
 import { AdvertiserRow, AdCTA, AdFullscreenPlayer, adIsVideo, adIsPhone, adHasContact, type AdData } from '../../components/ads';
 import { BoostPromptBottomSheet, type BoostSuggestion } from '../../components/ads/BoostPromptBottomSheet';
+import { StartScreenSurveySheet } from '../../components/common/StartScreenSurveySheet';
+import { startScreenSurveyService } from '../../services/startScreenSurveyService';
+import { setCachedAppPreferences, type StartScreen } from '../../hooks/useAppPreferences';
 import { boostPromptService } from '../../services/boostPromptService';
 import { openPhoneMenu, callPhone, openWhatsapp } from '../../utils/phoneMenu';
 import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
@@ -529,13 +533,52 @@ const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
   );
 });
 
-// ── Encart : reels suggérés (grille) ─────────────────────────────────────────
-// 1 grand reel en haut (pleine largeur) + les suivants en petit côte à côte en
-// dessous — même esprit que l'onglet Reels (grille), pas une carte ReelFeedCard
-// pleine largeur par reel comme avant (2026-10 : l'ancien format n'affichait
-// qu'un seul reel suggéré à la fois, l'utilisateur en voulait plusieurs d'un
-// coup, visuellement groupés comme une mosaïque).
-const REEL_TILE_GAP = 6;
+// ── Reels suggérés : chaque reel de l'encart backend (kind='reels') est
+// éclaté en item individuel kind='reel', inséré dans le flux — un seul reel
+// plein cadre rencontré au fil du scroll vertical normal, pas un bloc groupé
+// avec son propre scroll horizontal (2026-10, demande explicite : "je
+// scrolle je vois un reel, je continue je vois ainsi de suite", pas de
+// carrousel forcé). Rendu par renderItem (kind === 'reel').
+const MIN_REEL_GAP = 4;
+
+// Le backend renvoie les 3 reels d'un même encart groupés à une seule
+// position dans la page — les éclater en 3 items 'reel' sans rien d'autre
+// les laisserait adjacents les uns aux autres dans le flux final (3 reels
+// à la suite), ce qui reproduit visuellement le même problème que le bloc
+// groupé qu'on vient de retirer. Cette fonction les redistribue après coup :
+// chaque reel garde sa position d'origine SAUF s'il se trouve à moins de
+// MIN_REEL_GAP positions d'un reel déjà placé, auquel cas il est repoussé
+// juste après le prochain item non-reel disponible.
+function spreadOutReels(arr: FeedItem[]): FeedItem[] {
+  const out: FeedItem[] = [];
+  let pendingReels: FeedItem[] = [];
+  let sinceLastReel = Infinity;
+
+  const flushOnePendingIfPossible = () => {
+    if (pendingReels.length && sinceLastReel >= MIN_REEL_GAP) {
+      out.push(pendingReels.shift()!);
+      sinceLastReel = 0;
+    }
+  };
+
+  for (const item of arr) {
+    if (item.kind === 'reel') {
+      pendingReels.push(item);
+      continue;
+    }
+    flushOnePendingIfPossible();
+    out.push(item);
+    sinceLastReel += 1;
+  }
+  // Fin de page : écoule les reels restants même sans contenu normal après
+  // eux pour les espacer (mieux que de les perdre), au pire adjacents entre
+  // eux seulement s'il ne reste vraiment plus rien d'autre à intercaler.
+  while (pendingReels.length) {
+    flushOnePendingIfPossible();
+    if (pendingReels.length) { out.push(pendingReels.shift()!); sinceLastReel = 0; }
+  }
+  return out;
+}
 
 const formatTileCount = (n: number) => {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -572,6 +615,15 @@ const ReelSuggestionTile: React.FC<{
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
+
+      {/* Bouton play centré */}
+      <View style={rst.playCenter} pointerEvents="none">
+        <View style={rst.playCenterRing}>
+          <View style={rst.playCenterCircle}>
+            <Icon name="play" size={large ? 26 : 18} color="#fff" style={{ marginLeft: 3 }} />
+          </View>
+        </View>
+      </View>
 
       {/* Badge Reel + durée */}
       <View style={rst.topRow} pointerEvents="none">
@@ -640,6 +692,18 @@ const ReelSuggestionTile: React.FC<{
 };
 
 const rst = StyleSheet.create({
+  playCenter: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
+  playCenterRing: {
+    width: 64, height: 64, borderRadius: 32,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  playCenterCircle: {
+    width: 50, height: 50, borderRadius: 25,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.9)',
+    alignItems: 'center', justifyContent: 'center',
+  },
   topRow: { position: 'absolute', top: 10, left: 10, right: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   reelBadge:     { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 7, paddingVertical: 4, borderRadius: 20 },
   reelBadgeText: { color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.extraBold, letterSpacing: 0.3 },
@@ -662,45 +726,6 @@ const rst = StyleSheet.create({
   compactStatsRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   compactStatsTxt: { color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold },
 });
-
-const ReelsSuggestionGrid: React.FC<{
-  reels: any[];
-  colors: AppColors;
-  nav: any;
-}> = ({ reels, colors, nav }) => {
-  if (!reels.length) return null;
-  const big   = reels[0];
-  const small = reels.slice(1, 3);
-  const gridW    = Dimensions.get('window').width - Spacing[4] * 2;
-  const bigH     = Math.round(gridW * 0.95);
-  const smallW   = small.length === 2 ? Math.round((gridW - REEL_TILE_GAP) / 2) : gridW;
-  const smallH   = Math.round(smallW * 0.95);
-
-  const openReel = (reel: any) =>
-    (nav as any).navigate('Tabs', { screen: 'Reels', params: { initialReelId: reel.id, initialReel: reel } });
-
-  return (
-    <View style={[getFeedCardStyle(colors), { paddingTop: 12, paddingHorizontal: Spacing[4], paddingBottom: 14 }]}>
-      <SectionHeader
-        title="Reels pour toi"
-        colors={colors}
-        icon="film"
-        seeAllLabel="Explorer"
-        onSeeAll={() => (nav as any).navigate('Tabs', { screen: 'Reels' })}
-      />
-      <View style={{ marginTop: 4 }}>
-        <ReelSuggestionTile reel={big} width={gridW} height={bigH} large onPress={() => openReel(big)} />
-        {small.length > 0 && (
-          <View style={{ flexDirection: 'row', gap: REEL_TILE_GAP, marginTop: REEL_TILE_GAP }}>
-            {small.map(r => (
-              <ReelSuggestionTile key={r.id} reel={r} width={smallW} height={smallH} onPress={() => openReel(r)} />
-            ))}
-          </View>
-        )}
-      </View>
-    </View>
-  );
-};
 
 // ── Encart : suggestions de communautés ─────────────────────────────────────────
 // Même gabarit de carte que PeopleSuggestions (cover + avatar chevauchant +
@@ -828,6 +853,16 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   const [loadingMoreFeed, setLoadingMoreFeed] = useState(false);
   const loadingMoreRef   = useRef(false);
   const seenItemIdsRef   = useRef<Set<string>>(new Set());
+  // Pagination dédiée au filtre "Mes amis" — jusqu'ici figée à la seule page 1
+  // (30 posts/events/concerts + 20 reels) sans jamais charger la suite au
+  // scroll, contrairement au filtre "Général". Compteurs séparés : la page
+  // suivante dépend de deux endpoints distincts (feed mixte + reels), chacun
+  // avec son propre statut "encore du contenu ou pas".
+  const followingFeedPageRef  = useRef(1);
+  const followingReelPageRef  = useRef(1);
+  const followingFeedHasMoreRef = useRef(true);
+  const followingReelHasMoreRef = useRef(true);
+  const followingSeenIdsRef   = useRef<Set<string>>(new Set());
   // Continuité de comptage entre page 1 (load) et pages suivantes (loadMoreFeed)
   // — sert à espacer la pub côté client.
   const nonReelCountRef  = useRef(0);
@@ -847,6 +882,37 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   // côté pour le refermer — se referme désormais aussi à la perte de focus.
   const [showProfilePanel, setShowProfilePanel] = useState(false);
   useFocusEffect(useCallback(() => () => setShowProfilePanel(false), []));
+
+  // ── File d'attente des sollicitations au démarrage ──────────────────────
+  // Contacts, suggestion de boost et sondage écran de démarrage se
+  // déclenchaient chacun indépendamment (useEffect/useFocusEffect séparés,
+  // délais non coordonnés) — résultat : plusieurs popups pouvaient apparaître
+  // en même temps ou se chevaucher au lancement de l'app. Cette file garantit
+  // qu'une seule sollicitation est affichée à la fois, dans un ordre fixe.
+  // Chaque appelant "réserve son tour" avec requestOverlaySlot(name) et ne
+  // montre son UI que quand overlayQueueRef.current[0] === name ; il doit
+  // ensuite appeler releaseOverlaySlot(name) à sa fermeture pour laisser
+  // passer le suivant.
+  const OVERLAY_ORDER = ['contacts', 'boost', 'startScreenSurvey'] as const;
+  type OverlayName = typeof OVERLAY_ORDER[number];
+  const overlayQueueRef = useRef<Set<OverlayName>>(new Set());
+  const [activeOverlay, setActiveOverlay] = useState<OverlayName | null>(null);
+
+  const recomputeActiveOverlay = useCallback(() => {
+    const next = OVERLAY_ORDER.find(name => overlayQueueRef.current.has(name)) ?? null;
+    setActiveOverlay(next);
+  }, []);
+
+  const requestOverlaySlot = useCallback((name: OverlayName) => {
+    overlayQueueRef.current.add(name);
+    recomputeActiveOverlay();
+  }, [recomputeActiveOverlay]);
+
+  const releaseOverlaySlot = useCallback((name: OverlayName) => {
+    overlayQueueRef.current.delete(name);
+    recomputeActiveOverlay();
+  }, [recomputeActiveOverlay]);
+
   // ── Bottom sheet "Booster" ──────────────────────────────────────────────
   // Incite à utiliser le système de Boost GoGold existant (pas une pub payante
   // tierce) sur la meilleure opportunité du compte — même moteur de suggestion
@@ -856,7 +922,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   // rabattu (boostPromptService) ou déjà couvert par un boost actif (filtré
   // côté service par cible).
   const [boostSuggestion, setBoostSuggestion] = useState<BoostSuggestion | null>(null);
-  const [showBoostPrompt, setShowBoostPrompt] = useState(false);
   const boostCheckInFlightRef = useRef(false);
   const boostScrollAccumRef   = useRef(0);
 
@@ -865,18 +930,24 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     boostCheckInFlightRef.current = true;
     try {
       const res = await apiClient.get<{ suggestions: BoostSuggestion[] }>(Endpoints.wallet.boostSuggestions);
+      // Marqué "vérifié pour cette session" dès que l'appel a répondu, QUELLE QUE
+      // SOIT sa réponse — sans ça, "aucune suggestion dispo" ou "déjà rabattue"
+      // ne posait jamais ce marqueur, et l'appel se répétait à chaque focus/scroll
+      // pour le reste de la session (vu dans les logs serveur : des dizaines
+      // d'appels GET /wallet/boosts/suggestions au lieu d'un seul).
+      boostPromptService.markShownThisSession();
       const suggestion = res.data?.suggestions?.[0];
       if (!suggestion) return;
       if (boostPromptService.wasDismissed(suggestion.target, suggestion.content_id)) return;
-      boostPromptService.markShownThisSession();
       setBoostSuggestion(suggestion);
-      setShowBoostPrompt(true);
+      requestOverlaySlot('boost');
     } catch {
-      // silencieux — pas de bottom sheet si l'appel échoue
+      // silencieux — pas de bottom sheet si l'appel échoue (on retentera à la
+      // prochaine session, l'échec n'est pas marqué comme "déjà vérifié")
     } finally {
       boostCheckInFlightRef.current = false;
     }
-  }, []);
+  }, [requestOverlaySlot]);
 
   // Après publication : au retour sur le feed avec un focus, on vérifie une
   // fois s'il existe une suggestion pertinente (couvre le cas où l'upload en
@@ -885,17 +956,41 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     maybeShowBoostPrompt();
   }, [maybeShowBoostPrompt]));
 
+  // ── Sondage "Qu'est-ce qui t'amène sur Gofolyx ?" ──────────────────────────
+  // Affiché au démarrage, pas plus d'une fois toutes les 48h (répondu ou
+  // fermé sans répondre). Passe son tour dans la file si contacts/boost sont
+  // déjà en attente ou affichés.
+  useFocusEffect(useCallback(() => {
+    if (!startScreenSurveyService.shouldShow()) return;
+    startScreenSurveyService.markShown();
+    requestOverlaySlot('startScreenSurvey');
+  }, [requestOverlaySlot]));
+
+  const handleStartScreenAnswer = useCallback(async (choice: StartScreen) => {
+    const labels: Record<StartScreen, string> = { feed: 'Accueil', reels: 'Reels', communities: 'Communautés' };
+    setCachedAppPreferences({ preferred_start_screen: choice });
+    // Laisse la coche de sélection visible un instant dans le sheet avant de
+    // le refermer — une fermeture instantanée ne confirmait jamais le choix.
+    setTimeout(() => releaseOverlaySlot('startScreenSurvey'), 450);
+    toastService.success('Préférence enregistrée', `${labels[choice]} s'ouvrira au démarrage de l'app.`);
+    try {
+      await apiClient.put(Endpoints.users.appPreferences, { preferred_start_screen: choice });
+    } catch {
+      // le cache local garde la préférence même si la sync échoue
+    }
+  }, [releaseOverlaySlot]);
+
   const handleBoostPromptClose = useCallback(() => {
-    setShowBoostPrompt(false);
+    releaseOverlaySlot('boost');
     if (boostSuggestion) {
       boostPromptService.markDismissed(boostSuggestion.target, boostSuggestion.content_id);
     }
-  }, [boostSuggestion]);
+  }, [boostSuggestion, releaseOverlaySlot]);
 
   const handleBoostPromptBoost = useCallback((suggestion: BoostSuggestion) => {
-    setShowBoostPrompt(false);
+    releaseOverlaySlot('boost');
     nav.navigate('Boost', { autoSuggestion: suggestion });
-  }, [nav]);
+  }, [nav, releaseOverlaySlot]);
   // Multi-compte — liste chargée à l'ouverture du panneau (pas au montage de l'écran,
   // pour toujours refléter les changements faits depuis les Paramètres).
   const [accounts, setAccounts] = useState<StoredAccount[]>([]);
@@ -997,6 +1092,11 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   // valeur partout, page 1 comprise, pour que la pagination web/mobile se
   // comporte de façon identique et prévisible.
   const FEED_PAGE_SIZE = 30;
+  // Filtre "Mes amis" — deux sources paginées séparément (feed mixte + reels),
+  // mêmes tailles de page que leur premier chargement (load('following')) pour
+  // ne jamais désynchroniser le calcul de hasMore entre page 1 et les suivantes.
+  const FOLLOWING_FEED_PAGE_SIZE = 30;
+  const FOLLOWING_REEL_PAGE_SIZE = 20;
 
   // Distance en nombre d'items restants à laquelle on déclenche le chargement de la page
   // suivante. Un seuil trop serre (teste a 2/30) s'est revele peu fiable en pratique :
@@ -1081,9 +1181,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   // Dernier instantané "En direct" reçu pendant qu'on lisait plus bas — appliqué
   // en différé quand on remonte au sommet (voir l'effect de resync du header).
   const pendingLiveHeaderRef = useRef<{ liveConcerts: Concert[]; spontLives: LiveStream[] } | null>(null);
-  // Offset de scroll à restaurer juste après un refresh silencieux de focus
-  // (filet de sécurité ultime si malgré tout une hauteur au-dessus a bougé).
-  const focusRestoreOffsetRef = useRef<number | null>(null);
   const lastScrollYRef = useRef(0);
   // Vrai tant que le doigt de l'utilisateur tient la liste (entre begin/end drag)
   // ou que la liste décélère après un fling — la restauration d'offset s'abstient.
@@ -1418,20 +1515,11 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
       if (contactsStatus === RESULTS.GRANTED) {
         syncContactsForSuggestions();
       } else if (contactsStatus === RESULTS.DENIED && !storage.getBoolean(CONTACTS_PROMPT_SEEN_KEY)) {
-        storage.setBoolean(CONTACTS_PROMPT_SEEN_KEY, true);
-        showConfirm(
-          'Trouve tes amis sur Gofolyx',
-          'Autorise l\'accès à tes contacts pour qu\'on te suggère en priorité les personnes que tu connais déjà — jamais tes contacts ne sont partagés ni affichés, seule une empreinte chiffrée sert à faire le lien.',
-          [
-            { text: 'Plus tard', style: 'cancel' },
-            {
-              text: 'Autoriser', style: 'default', onPress: async () => {
-                const granted = await request(contactsPerm);
-                if (granted === RESULTS.GRANTED) syncContactsForSuggestions();
-              },
-            },
-          ],
-        );
+        // showConfirm est une alerte native immédiate (pas un composant React
+        // contrôlable par `visible`) — on réserve donc son tour dans la file
+        // et on attend que ce soit son créneau pour l'afficher réellement,
+        // cf. l'effet sur activeOverlay ci-dessous.
+        requestOverlaySlot('contacts');
       }
 
       // Localisation : même logique, permission déjà tranchée par ailleurs
@@ -1442,6 +1530,41 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Affiche réellement la demande de contacts quand c'est son tour dans la
+  // file. Le slot est libéré via confirmService.subscribe (pas via les
+  // onPress des boutons) car un tap sur l'overlay du modal ferme celui-ci
+  // directement (confirmService.dismiss()) sans jamais appeler onPress —
+  // s'appuyer seulement sur les callbacks de boutons aurait laissé le slot
+  // bloqué indéfiniment dans ce cas, gelant toute la file derrière lui.
+  useEffect(() => {
+    if (activeOverlay !== 'contacts') return;
+    storage.setBoolean(CONTACTS_PROMPT_SEEN_KEY, true);
+    const contactsPerm = Platform.OS === 'ios' ? PERMISSIONS.IOS.CONTACTS : PERMISSIONS.ANDROID.READ_CONTACTS;
+
+    const unsubscribe = confirmService.subscribe(state => {
+      if (state === null) {
+        releaseOverlaySlot('contacts');
+        unsubscribe();
+      }
+    });
+
+    showConfirm(
+      'Trouve tes amis sur Gofolyx',
+      'Autorise l\'accès à tes contacts pour qu\'on te suggère en priorité les personnes que tu connais déjà — jamais tes contacts ne sont partagés ni affichés, seule une empreinte chiffrée sert à faire le lien.',
+      [
+        { text: 'Plus tard', style: 'cancel' },
+        {
+          text: 'Autoriser', style: 'default', onPress: async () => {
+            const granted = await request(contactsPerm);
+            if (granted === RESULTS.GRANTED) syncContactsForSuggestions();
+          },
+        },
+      ],
+    );
+    return unsubscribe;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeOverlay]);
 
   // ── Chargement de la pub feed — une campagne par emplacement, jamais deux fois la
   // même dans le même feed (exclude_ids envoyé au backend à chaque tirage). Retourne
@@ -1487,6 +1610,17 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   // ref est lue/écrite de façon synchrone, donc fiable comme garde immédiate.
   const loadingInitialRef = useRef(false);
 
+  // Verrou réseau UNIQUE pour tout le feed (load + loadMoreFeed + loadMoreFollowing).
+  // Avant ce verrou, chaque fonction avait sa propre garde locale (loadingInitialRef,
+  // loadingMoreRef) et elles ne se protégeaient pas forcément l'une l'autre dans tous
+  // les cas (ex: load('following') ne posait jamais loadingInitialRef à true, donc un
+  // scroll rapide à l'arrivée sur l'onglet pouvait lancer loadMoreFollowing EN MÊME
+  // TEMPS que le chargement initial — logs serveur confirmés : page=1 appelée deux
+  // fois d'affilée, puis page=2/page=3 quasi simultanées). Règle maintenant appliquée
+  // partout, sans exception : UN SEUL appel réseau de pagination du feed à la fois,
+  // page N+1 ne part jamais avant que la page N ait fini d'écrire son résultat.
+  const feedBusyRef = useRef(false);
+
   // Anti race-condition (2026-09) : plusieurs pull-to-refresh rapprochés lancent
   // chacun leur propre appel réseau (aucun AbortController/annulation ici), et
   // rien ne garantissait que les réponses reviennent dans l'ordre d'envoi — un
@@ -1500,7 +1634,27 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   const loadRequestIdRef = useRef(0);
 
   const load = useCallback(async (f: FeedFilter, silent = false, forceRefresh = false) => {
-    if (f === 'all') loadingInitialRef.current = true;
+    // Verrou anti-collision ENTRE DEUX load() : si un load() tourne déjà (ex: focus
+    // qui redéclenche pendant qu'un premier montage est encore en vol), on renonce
+    // tout de suite plutôt que d'attendre (jamais de boucle d'attente ici — un appel
+    // qui ne libère jamais le verrou figerait sinon tout futur load(), comme observé
+    // une première fois avec une version à attente active de ce verrou). Les
+    // rafraîchissements explicites sont rares et espacés : perdre l'un d'eux dans ce
+    // cas de collision est sans conséquence, le prochain déclenchement reprendra.
+    // NB : ce verrou ne concerne QUE load() vs load() — loadMoreFeed/loadMoreFollowing
+    // ont leurs propres gardes (loadingInitialRef/loadingMoreRef) et ne le touchent
+    // plus (les y faire participer bloquait la pagination : un scroll pendant un
+    // refresh silencieux de focus perdait sa chance et plus rien ne la relançait).
+    if (feedBusyRef.current) return;
+    feedBusyRef.current = true;
+    // Garde active pour 'all' ET 'following' : les deux ont un vrai scroll infini
+    // (loadMoreFeed / loadMoreFollowing) qui doit attendre la fin de CE chargement
+    // avant de pouvoir démarrer — sans ça, un scroll rapide dès l'arrivée sur
+    // l'onglet pouvait lancer la pagination EN PARALLÈLE du chargement initial,
+    // les deux écrivant dans `items`/les refs de pagination en même temps
+    // (symptôme observé : le feed "charge au hasard" pendant qu'on scrolle).
+    // 'live' n'a pas de pagination, inutile de le gérer ici.
+    if (f === 'all' || f === 'following') loadingInitialRef.current = true;
     const requestId = f === 'all' ? ++loadRequestIdRef.current : loadRequestIdRef.current;
     try {
       if (f === 'all') {
@@ -1576,12 +1730,17 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           } else if (d.kind === 'communities') {
             result.push({ kind: 'communities', id: d.id, data: d.communities ?? [] });
           } else if (d.kind === 'reels') {
-            result.push({ kind: 'reels', id: d.id, data: d.reels ?? [] });
+            // Éclaté en items 'reel' individuels — cf. spreadOutReels plus
+            // bas, qui les redistribue pour qu'ils ne restent jamais groupés.
+            for (const r of (d.reels ?? []) as any[]) {
+              if (!r?.id) continue;
+              result.push({ kind: 'reel', id: r.id, data: r });
+            }
           }
         }
         // Filtrer les contenus masqués ("Pas intéressé") — après mapping, pour
         // ne s'appliquer qu'au contenu normal (pas aux encarts spéciaux).
-        const filtered = feedPreferenceService.filterFeed(result);
+        const filtered = feedPreferenceService.filterFeed(spreadOutReels(result));
 
         // Mémorise les clés composites (kind-id) chargées en page 1 pour dédupliquer
         // les pages suivantes du scroll infini (loadMoreFeed)
@@ -1633,10 +1792,32 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         // score comme le fil principal). Pas d'injection pub/suggestions/communautés :
         // contenu pur des amis, sans bruit de découverte. Tri chronologique — un fil
         // "amis" doit rester lisible dans l'ordre des publications, pas mélangé.
+        //
+        // Pagination réinitialisée à chaque vrai chargement (pas en mode silent,
+        // même garde que le filtre "all" juste au-dessus) — loadMoreFeed reprend
+        // ensuite à partir de ces refs au scroll.
+        if (!silent) {
+          followingFeedPageRef.current = 1;
+          followingReelPageRef.current = 1;
+          followingFeedHasMoreRef.current = true;
+          followingReelHasMoreRef.current = true;
+        } else if (followingFeedPageRef.current > 1 || followingReelPageRef.current > 1) {
+          // Refresh silencieux alors qu'on a déjà paginé plus loin : ne pas
+          // écraser la progression (même garde que le filtre "all", mais sur
+          // les refs qui appartiennent réellement à CE filtre — feedPageRef
+          // est celle du filtre "all", la tester ici n'avait aucun sens).
+          lastLoadedAtRef.current = Date.now();
+          loadingInitialRef.current = false;
+          return;
+        }
+
         const [feedResult, reelsResult] = await Promise.all([
-          searchService.getFeed(1, 30, true).catch(() => ({ items: [] })),
-          reelService.getFeed({ limit: 20, followingOnly: true }).catch(() => ({ items: [], has_more: false, page: 1 })),
+          searchService.getFeed(1, FOLLOWING_FEED_PAGE_SIZE, true).catch(() => ({ items: [] })),
+          reelService.getFeed({ page: 1, limit: FOLLOWING_REEL_PAGE_SIZE, followingOnly: true }).catch(() => ({ items: [], has_more: false, page: 1, total: 0, limit: FOLLOWING_REEL_PAGE_SIZE })),
         ]);
+        followingFeedHasMoreRef.current = (feedResult.items ?? []).length >= FOLLOWING_FEED_PAGE_SIZE;
+        followingReelHasMoreRef.current = !!reelsResult?.has_more;
+
         const feedItems: FeedItem[] = (feedResult.items ?? [])
           .filter((item: any) => (item.kind === 'event' || item.kind === 'concert' || item.kind === 'post') && item.id)
           .map((item: any) => ({ kind: item.kind as 'event' | 'concert' | 'post', id: item.id, data: item }));
@@ -1656,9 +1837,15 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           const db2 = b.data?.created_at ?? b.data?.starts_at ?? b.data?.scheduled_at ?? '';
           return new Date(db2).getTime() - new Date(da).getTime();
         });
+        followingSeenIdsRef.current = new Set(merged.map(i => `${i.kind}-${i.id}`));
         setItems(merged);
+        setHasMoreFeed(followingFeedHasMoreRef.current || followingReelHasMoreRef.current);
       } else if (f === 'live') {
-        // Onglet En direct — concerts live + lives spontanés comme feed items
+        // Onglet En direct — concerts live + lives spontanés comme feed items.
+        // Pas de pagination par choix : le catalogue est borné par définition
+        // (seuls les contenus EN COURS de diffusion à l'instant T, jamais plus
+        // qu'une poignée en pratique) — loadMoreFeed/handleEndReached n'a donc
+        // rien à faire pour ce filtre, hasMoreFeed reste figé à false pour lui.
         const [concerts, spont] = await Promise.all([
           concertService.getLive().catch(() => [] as Concert[]),
           liveService.getLives().catch(() => [] as LiveStream[]),
@@ -1670,6 +1857,10 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         // On affiche les concerts live comme feed items
         const results: FeedItem[] = liveConc.map(c => ({ kind: 'concert' as const, id: c.id, data: c }));
         setItems(results);
+        // hasMoreFeed peut encore valoir true depuis le filtre précédent ('all'/
+        // 'following') — sans ce reset explicite, le footer "chargement..." et
+        // onEndReached resteraient actifs pour un filtre qui n'a rien à paginer.
+        setHasMoreFeed(false);
       }
       lastLoadedAtRef.current = Date.now();
     } catch (err) {
@@ -1686,6 +1877,11 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         setLoading(false);
         setRefreshing(false);
       }
+      // Libéré inconditionnellement : CET appel a posé le verrou à son entrée,
+      // c'est à lui de le rendre, que son résultat ait été gardé ou jeté
+      // (appel obsolète dépassé par requestId) — sinon le verrou resterait
+      // pris pour de bon et plus aucun chargement ne pourrait jamais repartir.
+      feedBusyRef.current = false;
     }
   }, []);
 
@@ -1763,8 +1959,65 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   // par score(temps) finit toujours par exposer du contenu neuf ou par se vider).
   const MAX_CONSECUTIVE_RECOUPEMENT = 5;
 
+  // Scroll infini du filtre "Mes amis" — jusqu'ici inexistant (load('following')
+  // ne chargeait que la page 1, une fois pour toutes, sans jamais rien ajouter
+  // au scroll). Même squelette que loadMoreFeed (garde loadingMoreRef/hasMoreFeed
+  // partagée avec le filtre "all", un seul filtre actif à la fois), mais deux
+  // sources à paginer séparément (feed mixte + reels), chacune avec son propre
+  // epuisement — on arrête de proposer la suite seulement quand LES DEUX sont
+  // épuisées.
+  const loadMoreFollowing = useCallback(async () => {
+    if (loadingInitialRef.current) return;
+    if (loadingMoreRef.current || !hasMoreFeed) return;
+    loadingMoreRef.current = true;
+    setLoadingMoreFeed(true);
+    try {
+      const appended: FeedItem[] = [];
+
+      if (followingFeedHasMoreRef.current) {
+        const nextPage = followingFeedPageRef.current + 1;
+        const feedResult = await searchService.getFeed(nextPage, FOLLOWING_FEED_PAGE_SIZE, true).catch(() => ({ items: [] }));
+        const raw = feedResult.items ?? [];
+        followingFeedHasMoreRef.current = raw.length >= FOLLOWING_FEED_PAGE_SIZE;
+        followingFeedPageRef.current = nextPage;
+        for (const d of raw) {
+          if (!d || !d.id) continue;
+          if (d.kind !== 'event' && d.kind !== 'concert' && d.kind !== 'post') continue;
+          const key = `${d.kind}-${d.id}`;
+          if (followingSeenIdsRef.current.has(key)) continue;
+          followingSeenIdsRef.current.add(key);
+          appended.push({ kind: d.kind, id: d.id, data: d });
+        }
+      }
+
+      if (followingReelHasMoreRef.current) {
+        const nextReelPage = followingReelPageRef.current + 1;
+        const reelsResult = await reelService.getFeed({ page: nextReelPage, limit: FOLLOWING_REEL_PAGE_SIZE, followingOnly: true })
+          .catch(() => ({ items: [], has_more: false, page: nextReelPage, total: 0, limit: FOLLOWING_REEL_PAGE_SIZE }));
+        followingReelHasMoreRef.current = !!reelsResult?.has_more;
+        followingReelPageRef.current = nextReelPage;
+        for (const r of (reelsResult?.items ?? [])) {
+          if (!r?.id) continue;
+          const key = `reel-${r.id}`;
+          if (followingSeenIdsRef.current.has(key)) continue;
+          followingSeenIdsRef.current.add(key);
+          appended.push({ kind: 'reel', id: r.id, data: r });
+        }
+      }
+
+      if (appended.length > 0) setItems(prev => [...prev, ...appended]);
+      setHasMoreFeed(followingFeedHasMoreRef.current || followingReelHasMoreRef.current);
+    } catch (err) {
+      if (__DEV__) console.warn('[FeedScreen] loadMoreFollowing error:', err);
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMoreFeed(false);
+    }
+  }, [hasMoreFeed]);
+
   const loadMoreFeed = useCallback(async () => {
-    if (filter !== 'all') return; // pagination gérée uniquement pour le flux principal
+    if (filter === 'following') return loadMoreFollowing();
+    if (filter !== 'all') return; // pagination gérée uniquement pour "Général"/"Mes amis"
     // La page 1 (load('all')) doit avoir fini d'écrire son résultat AVANT que la page 2
     // ne puisse démarrer — sans cette garde, un déclenchement de viewability/onEndReached
     // pendant que load() tourne encore pouvait lancer loadMoreFeed en parallèle.
@@ -1809,7 +2062,11 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           } else if (d.kind === 'communities') {
             appended.push({ kind: 'communities', id: d.id, data: d.communities ?? [] });
           } else if (d.kind === 'reels') {
-            appended.push({ kind: 'reels', id: d.id, data: d.reels ?? [] });
+            // Même éclatement que page 1 — cf. commentaire plus haut.
+            for (const r of (d.reels ?? []) as any[]) {
+              if (!r?.id) continue;
+              appended.push({ kind: 'reel', id: r.id, data: r });
+            }
           }
         }
 
@@ -1832,7 +2089,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
       loadingMoreRef.current = false;
       setLoadingMoreFeed(false);
     }
-  }, [filter, hasMoreFeed]);
+  }, [filter, hasMoreFeed, loadMoreFollowing]);
   useEffect(() => { loadMoreFeedRef.current = loadMoreFeed; }, [loadMoreFeed]);
 
   // Près de toi — chargé dès que la position est disponible
@@ -1913,13 +2170,46 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     }));
   }, [lastPresenceUpdate]);
 
-  // Rafraîchissement temps réel : reload quand un autre utilisateur publie
+  // Rafraîchissement temps réel : reload quand un autre utilisateur publie.
+  // Debounce obligatoire (2026-10) : avec beaucoup d'utilisateurs actifs, une
+  // rafale de "feed_updated" rapprochés (plusieurs publications proches dans le
+  // temps) appelait load(filter) à CHAQUE événement, sans délai — confirmé par
+  // les logs serveur : 4-5 appels page=1 consécutifs en quelques secondes. Or
+  // chaque page=1 réinvalide et recalcule le pool mis en cache côté backend
+  // (force_recompute = page<=1, voir FeedService.get_feed) : le pool affiché à
+  // l'écran changeait sous les pieds de l'utilisateur avant même qu'il n'ait
+  // scrollé jusqu'à la page 2, qui tranchait alors un pool DIFFÉRENT de celui
+  // déjà vu → doublons massifs côté mobile → la boucle de retry anti-recoupement
+  // enchaînait automatiquement page 2 puis page 3 sans rien afficher de neuf.
+  // Un seul load() groupé par fenêtre de 10s, jamais un par événement reçu.
+  const feedUpdatedDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     const handler = (payload: { type: string }) => {
-      if (payload.type === 'feed_updated') load(filter);
+      if (payload.type !== 'feed_updated') return;
+      if (feedUpdatedDebounceRef.current) clearTimeout(feedUpdatedDebounceRef.current);
+      feedUpdatedDebounceRef.current = setTimeout(() => {
+        feedUpdatedDebounceRef.current = null;
+        // Évite aussi un load() si un chargement (focus, pull-to-refresh...)
+        // vient déjà de se produire il y a moins de 10s, pour la même raison.
+        if (Date.now() - lastLoadedAtRef.current < 10_000) return;
+        // silent=true impératif : un load(filter) "normal" REMPLACE tout de suite
+        // items par la page 1 fraîche (voir la branche 'all', setItems(filtered)
+        // sans comparaison) — si l'utilisateur lit déjà plus bas dans le feed
+        // (pages > 1 chargées), ça aurait fait disparaître sous ses yeux tout ce
+        // qu'il regardait au profit d'une nouvelle page 1, juste parce que
+        // quelqu'un d'autre a publié quelque part sur la plateforme. silent=true
+        // déclenche le même garde-fou que le retour de focus : early-return sans
+        // toucher à l'écran si on a déjà scrollé (feedPageRef > 1), et sinon ne
+        // remplace le haut du feed QUE si son contenu a réellement changé
+        // (comparaison de signature, cf. plus haut dans load()).
+        load(filter, true, true);
+      }, 10_000);
     };
     addListener(handler);
-    return () => removeListener(handler);
+    return () => {
+      removeListener(handler);
+      if (feedUpdatedDebounceRef.current) clearTimeout(feedUpdatedDebounceRef.current);
+    };
   }, [filter, load, addListener, removeListener]);
 
   // Restauration explicite de la status bar à chaque prise de focus — le
@@ -1970,11 +2260,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     // seulement relire un résultat encore en cache côté backend (TTL 5 min).
     const age = Date.now() - lastLoadedAtRef.current;
     if (age > 60_000) {
-      // Filet de sécurité : si l'utilisateur avait scrollé, on mémorise sa
-      // position AVANT le refresh. Un effect post-`items` la restaure (sans
-      // animation) si malgré les gardes une hauteur au-dessus a bougé — la page
-      // ne "glisse" plus jamais au retour, même dans un cas limite non prévu.
-      focusRestoreOffsetRef.current = lastScrollYRef.current > 4 ? lastScrollYRef.current : null;
       load(filter, true, true);
     }
     return () => {
@@ -1991,22 +2276,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
       clearSettleTimers();
     };
   }, [filter]));
-
-  // Filet de sécurité anti-"la page glisse au retour" : après un refresh
-  // silencieux de focus, si on avait mémorisé un offset et que la liste s'est
-  // re-rendue, on repositionne le scroll là où il était — MAIS jamais si
-  // l'utilisateur a la main sur l'écran (userDraggingRef) : on ne lui vole pas
-  // son geste. Ne s'exécute qu'une fois par retour (la ref est consommée).
-  useEffect(() => {
-    const target = focusRestoreOffsetRef.current;
-    if (target == null) return;
-    focusRestoreOffsetRef.current = null;
-    const id = requestAnimationFrame(() => {
-      if (userDraggingRef.current) return;
-      try { feedListRef.current?.scrollToOffset({ offset: target, animated: false }); } catch {}
-    });
-    return () => cancelAnimationFrame(id);
-  }, [items]);
 
   // ── Posts ──────────────────────────────────────────────────────────────────
 
@@ -2221,11 +2490,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
       if (!comms.length) return null;
       return <CommunitiesInlineCard communities={comms} colors={colors} nav={nav} />;
     }
-    if (item.kind === 'reels') {
-      const reels = (item.data ?? []) as any[];
-      if (!reels.length) return null;
-      return <ReelsSuggestionGrid reels={reels} colors={colors} nav={nav} />;
-    }
     if (item.kind === 'reel') {
       if (!item.data) return null;
       const r = item.data;
@@ -2235,7 +2499,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           <ReelSuggestionTile
             reel={r}
             width={tileW}
-            height={Math.round(tileW * 0.95)}
+            height={Math.round(tileW * 1.55)}
             large
             onPress={() => (nav as any).navigate('Tabs', { screen: 'Reels', params: { initialReelId: r.id, initialReel: r } })}
           />
@@ -3198,12 +3462,21 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         {fullscreenAd && <AdFullscreenPlayer ad={fullscreenAd} onClose={() => setFullscreenAd(null)} />}
       </Modal>
 
-      {/* Incitation à booster le contenu le plus engageant de l'utilisateur */}
+      {/* Incitation à booster le contenu le plus engageant de l'utilisateur —
+          jamais affiché en même temps que les contacts ou le sondage de
+          démarrage, cf. file d'attente des sollicitations ci-dessus. */}
       <BoostPromptBottomSheet
-        visible={showBoostPrompt}
+        visible={activeOverlay === 'boost'}
         suggestion={boostSuggestion}
         onClose={handleBoostPromptClose}
         onBoost={handleBoostPromptBoost}
+      />
+
+      {/* "Qu'est-ce qui t'amène sur Gofolyx ?" — configure l'écran de démarrage */}
+      <StartScreenSurveySheet
+        visible={activeOverlay === 'startScreenSurvey'}
+        onClose={() => releaseOverlaySlot('startScreenSurvey')}
+        onAnswer={handleStartScreenAnswer}
       />
 
       {/* ── Panneau infos primaires — rendu au niveau racine de l'écran (pas
