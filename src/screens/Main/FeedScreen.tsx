@@ -599,6 +599,20 @@ const ReelSuggestionTile: React.FC<{
     ? `${Math.floor(reel.duration_sec / 60)}:${String(Math.round(reel.duration_sec % 60)).padStart(2, '0')}`
     : null;
 
+  // Pulsation continue du bouton play — anneau extérieur qui respire
+  // (scale + fade) pour signaler "appuie ici" sans être une icône statique.
+  const pulse = useSharedValue(0);
+  useEffect(() => {
+    pulse.value = withRepeat(withTiming(1, { duration: 1400 }), -1, false);
+  }, [pulse]);
+  const pulseRingStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: interpolate(pulse.value, [0, 1], [1, 1.35]) }],
+    opacity: interpolate(pulse.value, [0, 0.6, 1], [0.5, 0.18, 0]),
+  }));
+  const pulseCoreStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: interpolate(pulse.value, [0, 0.5, 1], [1, 1.06, 1]) }],
+  }));
+
   return (
     <TouchableOpacity activeOpacity={0.92} onPress={onPress} style={{ width, height, borderRadius: large ? 20 : 16, overflow: 'hidden', backgroundColor: '#0B0B0F' }}>
       {reel.thumbnail_url ? (
@@ -616,13 +630,14 @@ const ReelSuggestionTile: React.FC<{
         pointerEvents="none"
       />
 
-      {/* Bouton play centré */}
+      {/* Bouton play centré — anneau qui pulse en boucle pour signaler "appuie ici" */}
       <View style={rst.playCenter} pointerEvents="none">
-        <View style={rst.playCenterRing}>
+        <Animated.View style={[rst.playCenterPulseRing, pulseRingStyle]} />
+        <Animated.View style={[rst.playCenterRing, pulseCoreStyle]}>
           <View style={rst.playCenterCircle}>
             <Icon name="play" size={large ? 26 : 18} color="#fff" style={{ marginLeft: 3 }} />
           </View>
-        </View>
+        </Animated.View>
       </View>
 
       {/* Badge Reel + durée */}
@@ -693,6 +708,11 @@ const ReelSuggestionTile: React.FC<{
 
 const rst = StyleSheet.create({
   playCenter: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
+  playCenterPulseRing: {
+    position: 'absolute',
+    width: 64, height: 64, borderRadius: 32,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+  },
   playCenterRing: {
     width: 64, height: 64, borderRadius: 32,
     backgroundColor: 'rgba(255,255,255,0.18)',
@@ -2499,7 +2519,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           <ReelSuggestionTile
             reel={r}
             width={tileW}
-            height={Math.round(tileW * 1.55)}
+            height={Math.round(tileW * 1.4)}
             large
             onPress={() => (nav as any).navigate('Tabs', { screen: 'Reels', params: { initialReelId: r.id, initialReel: r } })}
           />
