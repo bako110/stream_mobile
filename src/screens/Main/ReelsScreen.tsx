@@ -286,6 +286,11 @@ export const ReelsScreen: React.FC = () => {
   const lastInitialReelRef  = useRef<string | undefined>(undefined);
   // Reel demandé depuis FeedScreen — consommé dans onLayout (FlatList montée = garantie)
   const pendingTargetRef    = useRef<{ id: string; reel?: Reel } | null>(null);
+  // id du reel actuellement attendu par awaitingTarget (cf. useEffect de libération
+  // plus bas) — distinct de pendingTargetRef : celui-ci reste valorisé même une fois
+  // le reel déjà trouvé/injecté et le scroll lancé, tant que currentIndex n'a pas
+  // confirmé l'arrivée dessus.
+  const awaitingTargetIdRef = useRef<string | null>(null);
   // ── State ─────────────────────────────────────────────────────────────────
   const seedReel = useRef(
     userMode && params.initialReels && params.initialReels.length > 0
@@ -388,6 +393,15 @@ export const ReelsScreen: React.FC = () => {
   const [myAvatar,      setMyAvatar]      = useState<string | null>(null);
   const [myInitial,     setMyInitial]     = useState<string>('M');
   const [currentIndex,  setCurrentIndex]  = useState(0);
+  // Tant que true, AUCUN reel n'est actif (isActive forcé à false partout) et un
+  // spinner plein écran masque le lecteur — évite qu'un autre reel que celui sur
+  // lequel l'utilisateur a tapé depuis le feed ne démarre sa lecture pendant la
+  // course entre l'injection/scroll vers la cible et la mise à jour effective de
+  // currentIndex (setReels puis setCurrentIndex ne sont pas synchrones : un rendu
+  // intermédiaire peut encore pointer sur l'ancien index). Initialisé à true dès
+  // qu'on arrive avec une cible précise (cf. useFocusEffect ci-dessous), remis à
+  // false seulement une fois que currentIndex pointe reellement sur targetId.
+  const [awaitingTarget, setAwaitingTarget] = useState(!!params.initialReelId);
   // Tant que false, le tuto cadeau (VideoSlide → GiftHoldHint) reste masqué —
   // évite que les deux tutos d'onboarding se superposent à l'écran.
   const [swipeHintDone, setSwipeHintDone] = useState(false);
@@ -902,6 +916,10 @@ export const ReelsScreen: React.FC = () => {
     if (targetId) {
       // CAS FEED — effacer les params tout de suite
       nav.setParams({ initialReelId: undefined, initialReel: undefined } as any);
+      // Bloque toute lecture tant que currentIndex ne pointe pas confirmé sur
+      // targetId (cf. useEffect dédié plus bas, qui le repasse à false).
+      awaitingTargetIdRef.current = targetId;
+      setAwaitingTarget(true);
 
       const existingIdx = reelsRef.current.findIndex(r => r.id === targetId);
       if (existingIdx >= 0) {
@@ -1191,6 +1209,23 @@ export const ReelsScreen: React.FC = () => {
   const feedWithAdsRef = useRef(feedWithAds);
   feedWithAdsRef.current = feedWithAds;
 
+  // Libère awaitingTarget dès que currentIndex pointe confirmé sur le reel
+  // demandé — re-tenté à chaque changement de currentIndex/feedWithAds (le
+  // scroll vers la cible peut prendre plusieurs rendus : injection, puis
+  // scrollToOffset, puis le rendu qui en résulte). Sécurité : relâche aussi
+  // après un court délai même sans correspondance exacte (ex. reel introuvable
+  // après chargement complet) pour ne jamais bloquer l'écran indéfiniment.
+  useEffect(() => {
+    if (!awaitingTarget) return;
+    const targetId = awaitingTargetIdRef.current;
+    if (!targetId || feedWithAds[currentIndex]?.id === targetId) {
+      setAwaitingTarget(false);
+      return;
+    }
+    const timer = setTimeout(() => setAwaitingTarget(false), 2500);
+    return () => clearTimeout(timer);
+  }, [awaitingTarget, currentIndex, feedWithAds]);
+
   // Le slide courant est-il une pub ? AdSlide affiche déjà son propre bandeau
   // "ANNONCE" / "Passer" à cette hauteur — le header global (retour + icônes)
   // doit s'effacer pour ne pas se superposer avec lui.
@@ -1254,7 +1289,7 @@ export const ReelsScreen: React.FC = () => {
       return (
         <AdSlide
           ad={item.ad}
-          isActive={index === currentIndex && screenFocused && !fullscreenAd && !searchOpen}
+          isActive={index === currentIndex && screenFocused && !fullscreenAd && !searchOpen && !awaitingTarget}
           muted={muted}
           screenW={SCREEN_W}
           screenH={SCREEN_H}
@@ -1270,7 +1305,7 @@ export const ReelsScreen: React.FC = () => {
     return (
       <VideoSlide
         reel={item}
-        isActive={index === currentIndex && screenFocused && !fullscreenAd && !searchOpen}
+        isActive={index === currentIndex && screenFocused && !fullscreenAd && !searchOpen && !awaitingTarget}
         isPreload={Math.abs(index - currentIndex) <= PRELOAD_WINDOW && index !== currentIndex}
         preloadDistance={Math.abs(index - currentIndex)}
         isCachePriority={Math.abs(index - currentIndex) <= (isWifi ? CACHE_PRELOAD_WINDOW_WIFI : CACHE_PRELOAD_WINDOW) && index !== currentIndex}
@@ -1295,7 +1330,7 @@ export const ReelsScreen: React.FC = () => {
         reelsShowInterface={reelsShowInterface}
       />
     );
-  }, [currentIndex, screenFocused, fullscreenAd, searchOpen, muted, insets.bottom, colors, myId, myAvatar, myInitial, toggleMute, onAuthorPress, goNextReel, SCREEN_W, SCREEN_H, isWifi, ui, autoAdvance, toggleAutoAdvanceHeader, swipeHintDone, reelsShowInterface]);
+  }, [currentIndex, screenFocused, fullscreenAd, searchOpen, awaitingTarget, muted, insets.bottom, colors, myId, myAvatar, myInitial, toggleMute, onAuthorPress, goNextReel, SCREEN_W, SCREEN_H, isWifi, ui, autoAdvance, toggleAutoAdvanceHeader, swipeHintDone, reelsShowInterface]);
 
   // ── Render: loading ───────────────────────────────────────────────────────
   if (loading && reels.length === 0) {
@@ -1639,6 +1674,17 @@ export const ReelsScreen: React.FC = () => {
         windowSize={7}
         initialNumToRender={3}
       />
+
+      {/* Masque plein écran pendant la navigation depuis un reel suggéré du
+          feed — tant qu'awaitingTarget est vrai, isActive est forcé à false
+          sur TOUS les slides (cf. renderVideoSlide), donc rien ne joue en
+          dessous ; cet overlay évite juste que l'utilisateur voie la frame
+          figée d'un autre reel pendant la course scroll/injection. */}
+      {awaitingTarget && (
+        <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: '#000', zIndex: 50, alignItems: 'center', justifyContent: 'center' }}>
+          <GofolyxLoader variant="reel" color="#ffffff" />
+        </View>
+      )}
 
       {/* Tuto "glissez vers le haut" — une seule fois par installation (flag
           MMKV interne au composant), disparaît dès le premier vrai swipe.
