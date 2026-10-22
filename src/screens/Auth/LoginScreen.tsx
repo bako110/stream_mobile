@@ -215,11 +215,7 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onNeedsVerificati
 
       {/* ── HERO (vague violette) ── */}
       <View style={[styles.hero, { height: HERO_H }]}>
-        <LinearGradient
-          colors={[colors.gradientStart, colors.gradientEnd, colors.primary + 'CC']}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.primary }]} />
         {/* Cercles décoratifs flottants */}
         <View style={[styles.heroCircle1, { backgroundColor: 'rgba(255,255,255,0.10)' }]} />
         <View style={[styles.heroCircle2, { backgroundColor: 'rgba(255,255,255,0.07)' }]} />

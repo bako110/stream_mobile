@@ -39,10 +39,14 @@ export interface Ad {
   gogold_debited?:   number;
   gogold_spent?:     number;
   gogold_remaining?: number;
+  like_count?:        number;
+  comment_count?:     number;
+  source_event_id?:   string | null;
+  source_concert_id?: string | null;
 }
 
 export interface AdCreate {
-  title:             string;
+  title?:             string;
   description?:      string;
   cta_text?:         string;
   cta_url?:          string;
@@ -64,6 +68,11 @@ export interface AdCreate {
   target_age_max?:   number;
   starts_at?:        string;
   ends_at?:          string;
+  // Création depuis un contenu déjà publié par ce même annonceur — au plus un
+  // des deux (validé côté backend). title devient optionnel dans ce cas, le
+  // backend le pré-remplit depuis la source si omis.
+  source_event_id?:   string;
+  source_concert_id?: string;
 }
 
 export interface AdsPage {

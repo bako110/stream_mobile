@@ -18,7 +18,7 @@ import { useUser } from '../../context/UserContext';
 import { postService } from '../../services/postService';
 import { socialService } from '../../services/socialService';
 import { toastService, showConfirm } from '../../services';
-import { CommentsBottomSheet, ShareBottomSheet, SkeletonPostDetail, LikersBottomSheet, BackButton } from '../../components/common';
+import { CommentsBottomSheet, ShareBottomSheet, SkeletonPostDetail, LikersBottomSheet, BackButton, RepostBottomSheet } from '../../components/common';
 import { RichText } from '../../components/common/RichText';
 import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
 import { LinkPreviewCard } from '../../components/common/LinkPreviewCard';
@@ -196,6 +196,9 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
   const [likeCount,     setLikeCount]     = useState(initialPost?.like_count ?? 0);
   const [commentCount,  setCommentCount]  = useState(initialPost?.comment_count ?? 0);
   const [shareCount,    setShareCount]    = useState(initialPost?.share_count ?? 0);
+  const [repostCount,   setRepostCount]   = useState(initialPost?.repost_count ?? 0);
+  const [reposting,     setReposting]     = useState(false);
+  const [repostSheetOpen, setRepostSheetOpen] = useState(false);
   const [commentsOpen,  setCommentsOpen]  = useState(false);
   const [likersOpen,    setLikersOpen]    = useState(false);
   const [shareOpen,     setShareOpen]     = useState(false);
@@ -295,6 +298,29 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
     setMenuOpen(false);
     setShareOpen(true);
   }, []);
+
+  // Repartager — republication dans le fil (avec attribution de source),
+  // distinct du partage externe ci-dessus. Aperçu + confirmation explicite
+  // avant envoi, jamais instantané au premier tap.
+  const handleRepostPress = useCallback(() => {
+    if (reposting) return;
+    setRepostSheetOpen(true);
+  }, [reposting]);
+
+  const handleRepostConfirm = useCallback(async () => {
+    if (reposting || !postId) return;
+    setReposting(true);
+    try {
+      await postService.repost(postId);
+      setRepostCount(c => c + 1);
+      setRepostSheetOpen(false);
+      toastService.success('Repartagé', 'Ce post a été republié sur votre profil.');
+    } catch {
+      toastService.error('Erreur', 'Impossible de repartager ce post.');
+    } finally {
+      setReposting(false);
+    }
+  }, [postId, reposting]);
 
   const handleDelete = useCallback(() => {
     showConfirm('Supprimer', 'Supprimer ce post définitivement ?', [
@@ -622,7 +648,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
             <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
               <RichText
                 text={bodyToShow}
-                maxLines={6}
+                maxLines={2}
                 primaryColor={colors.primary}
                 textStyle={[s.bodyTxt, { color: colors.textPrimary }]}
                 // L'aperçu est géré par <LinkPreviewCard> ci-dessous.
@@ -646,14 +672,18 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
           </View>
         ) : null}
 
-        {/* Vidéo inline */}
+        {/* Vidéo inline — pleine largeur comme les images (pas de marge/radius
+            qui la ferait paraître secondaire), ratio réel de la vidéo quand
+            connu (video_width/height) plutôt qu'un 16:9 générique qui
+            ajoutait des bandes noires sur une vidéo portrait ou carrée. */}
         {(post.hls_url ?? post.video_url) && allUrls.length === 0 && (
-          <View style={{ marginHorizontal: 16, marginBottom: 12, borderRadius: 14, overflow: 'hidden' }}>
+          <View style={{ marginBottom: 12 }}>
             <InlineVideoPlayer
               uri={(post.hls_url ?? post.video_url)!}
               thumbnailUri={post.thumbnail_url}
-              aspectRatio={16 / 9}
-              borderRadius={14}
+              aspectRatio={post.video_width && post.video_height ? post.video_width / post.video_height : 16 / 9}
+              ratioIsExact={!!(post.video_width && post.video_height)}
+              borderRadius={0}
               showControls
               muted={false}
             />
@@ -712,6 +742,22 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
             style={s.actionBtn}
           >
             <MCIcon name="share-outline" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+
+          <View style={[s.actionSep, { backgroundColor: colors.divider }]} />
+
+          {/* Repartager — republication dans le fil, distinct du partage
+              externe ci-dessus (icône repeat, jamais share-outline). */}
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={handleRepostPress}
+            disabled={reposting}
+            style={s.actionBtn}
+          >
+            <Icon name="repeat" size={20} color={reposting ? colors.textDisabled : colors.textSecondary} />
+            {repostCount > 0 && (
+              <Text style={[s.actionBtnTxt, { color: colors.textSecondary }]}>{fmtN(repostCount)}</Text>
+            )}
           </TouchableOpacity>
 
         </View>
@@ -836,6 +882,19 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
             setShareCount(c => c + 1);
             socialService.share({ platform: 'external', post_id: post.id } as any).catch(() => setShareCount(c => Math.max(0, c - 1)));
           }}
+        />
+      )}
+
+      {repostSheetOpen && post && (
+        <RepostBottomSheet
+          visible
+          kind="post"
+          author={post.author}
+          body={post.body}
+          thumb={post.image_urls?.[0] ?? post.image_url ?? post.thumbnail_url ?? null}
+          reposting={reposting}
+          onConfirm={handleRepostConfirm}
+          onClose={() => { if (!reposting) setRepostSheetOpen(false); }}
         />
       )}
 

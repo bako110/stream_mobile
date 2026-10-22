@@ -2,7 +2,7 @@ import { apiClient } from '../api/client';
 import { Endpoints } from '../api/endpoints';
 import { saveService } from './saveService';
 
-export type FavoriteType = 'event' | 'concert' | 'reel' | 'post' | 'community' | 'content' | 'story' | 'film' | 'serie';
+export type FavoriteType = 'event' | 'concert' | 'reel' | 'post' | 'community' | 'content' | 'story' | 'film' | 'serie' | 'ad';
 
 export interface FavoriteOut {
   id: string;
@@ -96,6 +96,18 @@ async function togglePost(item: any): Promise<boolean> {
   return true;
 }
 
+async function toggleAd(item: { id: string; title: string; thumbnail_url?: string; creative_url?: string; advertiser_name?: string }): Promise<boolean> {
+  const id: string = item.id;
+  if (saveService.isAdSaved(id)) {
+    saveService.unsaveAd(id);
+    await unsave('ad', id).catch(() => {});
+    return false;
+  }
+  saveService.saveAd(item as any);
+  await save({ target_type: 'ad', target_id: id, target_title: item.title, target_subtitle: item.advertiser_name, target_thumbnail: item.thumbnail_url ?? item.creative_url }).catch(() => {});
+  return true;
+}
+
 async function toggleCommunity(item: { id: string; name: string; avatar_url?: string | null; members_count?: number; description?: string | null }): Promise<boolean> {
   const id: string = item.id;
   if (saveService.isCommunitysaved(id)) {
@@ -143,6 +155,11 @@ async function syncFromServer(): Promise<void> {
             saveService.saveCommunity({ id: fav.target_id, name: fav.target_title ?? '', avatar_url: fav.target_thumbnail, description: fav.target_subtitle });
           }
           break;
+        case 'ad':
+          if (!saveService.isAdSaved(fav.target_id)) {
+            saveService.saveAd({ id: fav.target_id, title: fav.target_title ?? '', thumbnail_url: fav.target_thumbnail ?? undefined, advertiser_name: fav.target_subtitle ?? undefined } as any);
+          }
+          break;
       }
     }
   } catch {
@@ -161,4 +178,5 @@ export const favoriteService = {
   toggleReel,
   togglePost,
   toggleCommunity,
+  toggleAd,
 };

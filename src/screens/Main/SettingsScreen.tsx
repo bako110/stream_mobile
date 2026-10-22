@@ -83,14 +83,14 @@ export const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
   const SECTION_APP: SectionDef[] = [
     { key: 'apparence',    icon: 'sun',            label: 'Apparence',          color: '#F59E0B', sub: isDark ? 'Mode sombre' : 'Mode clair', onPress: () => nav.navigate('SettingsApparence') },
     { key: 'notifications',icon: 'bell',           label: 'Notifications',      color: '#3B82F6',
-      sub: unreadCount > 0 ? `${unreadCount} non lue${unreadCount > 1 ? 's' : ''}` : undefined,
+      sub: unreadCount > 0 ? `${unreadCount} non lue${unreadCount > 1 ? 's' : ''}` : 'Préférences d\'alertes et de rappels',
       onPress: () => nav.navigate('SettingsNotifications') },
-    { key: 'lecture',      icon: 'play-circle',    label: 'Lecture',            color: '#10B981', onPress: () => nav.navigate('SettingsLecture') },
+    { key: 'lecture',      icon: 'play-circle',    label: 'Lecture',            color: '#10B981', sub: 'Lecture auto, streaming HD, enregistrement des lives', onPress: () => nav.navigate('SettingsLecture') },
     { key: 'devise',       icon: 'dollar-sign',    label: 'Devise',             color: '#F59E0B', sub: selectedCurrency ? `${selectedCurrency.code}` : 'Euro (EUR)', onPress: () => nav.navigate('SettingsDevise') },
-    { key: 'compte',       icon: 'user',           label: 'Compte',             color: '#7B3FF2', onPress: () => nav.navigate('SettingsCompte') },
-    { key: 'contenu',      icon: 'film',           label: 'Contenu',            color: '#E0389A', onPress: () => nav.navigate('SettingsContenu') },
-    { key: 'apropos',      icon: 'info',           label: 'À propos',           color: '#6366F1', onPress: () => nav.navigate('SettingsAPropos') },
-    { key: 'danger',       icon: 'alert-triangle', label: 'Zone dangereuse',    color: '#EF4444', onPress: () => nav.navigate('SettingsDanger') },
+    { key: 'compte',       icon: 'user',           label: 'Compte',             color: '#7B3FF2', sub: 'Informations personnelles et sécurité', onPress: () => nav.navigate('SettingsCompte') },
+    { key: 'contenu',      icon: 'film',           label: 'Contenu',            color: '#E0389A', sub: 'Écran de démarrage, suggestions, lecture auto', onPress: () => nav.navigate('SettingsContenu') },
+    { key: 'apropos',      icon: 'info',           label: 'À propos',           color: '#6366F1', sub: 'Version, conditions d\'utilisation, aide et support', onPress: () => nav.navigate('SettingsAPropos') },
+    { key: 'danger',       icon: 'alert-triangle', label: 'Zone dangereuse',    color: '#EF4444', sub: 'Désactivation ou suppression du compte', onPress: () => nav.navigate('SettingsDanger') },
   ];
 
   const SectionGroup: React.FC<{ title: string; icon: string; color: string; items: SectionDef[] }> = ({ title, icon, color, items }) => (

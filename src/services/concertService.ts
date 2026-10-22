@@ -3,13 +3,14 @@ import type { Concert, StreamToken, StreamStatus, ConcertCreate, ConcertUpdate }
 import { DEFAULT_PAGE_LIMIT } from '../utils/constants';
 
 export const concertService = {
-  async list(params?: { page?: number; limit?: number; genre?: string; lat?: number; lon?: number }): Promise<Concert[]> {
+  async list(params?: { page?: number; limit?: number; genre?: string; lat?: number; lon?: number; radius_km?: number }): Promise<Concert[]> {
     const query = new URLSearchParams({
       page:  String(params?.page  ?? 1),
       limit: String(params?.limit ?? DEFAULT_PAGE_LIMIT),
       ...(params?.genre   ? { genre: params.genre }       : {}),
       ...(params?.lat != null ? { lat: String(params.lat) } : {}),
       ...(params?.lon != null ? { lon: String(params.lon) } : {}),
+      ...(params?.radius_km != null ? { radius_km: String(params.radius_km) } : {}),
     }).toString();
     const res = await apiClient.get<Concert[]>(
       `${Endpoints.concerts.list}?${query}`,

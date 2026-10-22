@@ -15,7 +15,6 @@ import { ExplorerMenuScreen } from '../screens/Main/ExplorerMenuScreen';
 import { CommunitiesScreen as CommunitiesTabScreen } from '../screens/Main/CommunitiesScreen';
 import { ReelsScreen }              from '../screens/Main/ReelsScreen';
 import { UserPostsScreen }          from '../screens/Main/UserPostsScreen';
-import { SearchScreen }             from '../screens/Main/SearchScreen';
 import { UserGalleryScreen }        from '../screens/Main/UserGalleryScreen';
 import { UserReelsGridScreen }      from '../screens/Main/UserReelsGridScreen';
 import { ProfileScreen }            from '../screens/Main/ProfileScreen';
@@ -25,6 +24,8 @@ import { UploadProgressBanner } from '../components/common/UploadProgressBanner'
 import { ActiveVoiceBar }       from '../components/call/ActiveVoiceBar';
 import { ActiveVoiceProvider }  from '../context/ActiveVoiceContext';
 import { BattleInviteModal }    from '../components/battle/BattleInviteModal';
+import { SearchOverlayProvider } from '../context/SearchOverlayContext';
+import { SearchOverlay }        from '../components/search/SearchOverlay';
 import { useTheme } from '../hooks/useTheme';
 
 // ── Écrans stack ──────────────────────────────────────────────────────────────
@@ -176,7 +177,6 @@ export type MainStackParamList = {
   Attendees:       { eventId: string; eventTitle: string };
   TicketScanner:   { eventId: string; eventTitle: string };
   UserProfile:     { userId:    string };
-  Search:          { query?: string } | undefined;
   EditProfile:     undefined;
   Messages:        undefined;
   Films:           undefined;
@@ -545,6 +545,7 @@ const SettingsWrapper = useCallback(
 
   return (
     <ActiveVoiceProvider>
+    <SearchOverlayProvider>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Tabs"           children={() => <><ExitHandler /><Tabs onLogout={onLogout} onSwitchAccount={onSwitchAccount} /></>} />
         <Stack.Screen name="Feed"           component={FeedScreen}            options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
@@ -607,7 +608,6 @@ const SettingsWrapper = useCallback(
         <Stack.Screen name="LiveViewer"     component={LiveViewerWrapper}     options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="UserReels"      component={ReelsScreen}           options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="UserPosts"      component={UserPostsScreen}       options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="Search"         component={SearchScreen}          options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="UserGallery"    component={UserGalleryScreen}     options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="UserReelsGrid"  component={UserReelsGridScreen}   options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="ReelPlayer"    component={ReelPlayerScreen}      options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
@@ -717,6 +717,8 @@ const SettingsWrapper = useCallback(
       <NotificationToast />
       <ActiveVoiceBar />
       <BattleInviteModal />
+      <SearchOverlay />
+    </SearchOverlayProvider>
     </ActiveVoiceProvider>
   );
 };

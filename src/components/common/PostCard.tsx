@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   Modal, TextInput, KeyboardAvoidingView, Platform, Dimensions,
-  StatusBar, ActivityIndicator,
+  StatusBar, ActivityIndicator, Image,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -189,13 +189,18 @@ const VideoFsModal: React.FC<{
   shareCount: number; onShare: () => void;
   saved: boolean; onSave: () => void;
 }> = ({
-  visible, uri, onClose, onViewPost,
+  visible, uri, thumbnailUri, onClose, onViewPost,
   liked, likeCount, onLike, heartStyle,
   commentsDisabled, commentCount, onComment,
   shareCount, onShare,
   saved, onSave,
 }) => {
   const [nav, setNav] = useState(false);
+  // Écran noir sans aucun repère pendant le temps de chargement/buffer initial
+  // (surtout sensible en HLS sur réseau mobile) — la miniature + un spinner
+  // couvrent ce trou visuel jusqu'à la première frame réellement affichable.
+  const [ready, setReady] = useState(false);
+  const insets = useSafeAreaInsets();
   const player = useVideoPlayer({ uri }, p => { p.loop = false; p.muted = false; });
 
   const close = useCallback(() => {
@@ -204,14 +209,21 @@ const VideoFsModal: React.FC<{
   }, [player, onClose]);
 
   React.useEffect(() => {
-    if (visible) { setNav(false); player.play(); } else { player.pause(); }
+    if (visible) { setNav(false); setReady(false); player.play(); } else { player.pause(); }
   }, [visible]);
 
   React.useEffect(() => {
     if (!visible) return;
-    let sub: { remove: () => void } | undefined;
-    try { sub = player.addEventListener('onEnd', () => close()); } catch {}
-    return () => { try { sub?.remove(); } catch {} };
+    const subs: { remove: () => void }[] = [];
+    try { subs.push(player.addEventListener('onEnd', () => close())); } catch {}
+    try { subs.push(player.addEventListener('onReadyToDisplay', () => setReady(true))); } catch {}
+    // Filet de sécurité : onReadyToDisplay n'est pas garanti sur toutes les
+    // plateformes/versions — sans lui, le spinner resterait bloqué à l'écran
+    // alors que la vidéo joue déjà. onPlaybackStateChange(isPlaying) et
+    // onProgress (la lecture avance réellement) lèvent aussi le spinner.
+    try { subs.push(player.addEventListener('onPlaybackStateChange', d => { if (d.isPlaying) setReady(true); })); } catch {}
+    try { subs.push(player.addEventListener('onProgress', d => { if (d.currentTime > 0) setReady(true); })); } catch {}
+    return () => { subs.forEach(s => { try { s.remove(); } catch {} }); };
   }, [visible, player, close]);
 
   if (!visible) return null;
@@ -223,47 +235,70 @@ const VideoFsModal: React.FC<{
         <StatusBar hidden />
         <View style={{ flex: 1 }}>
           <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="contain" controls />
+          {!ready && (
+            <View style={StyleSheet.absoluteFill} pointerEvents="none">
+              {thumbnailUri ? (
+                <Image source={{ uri: thumbnailUri }} style={StyleSheet.absoluteFill} resizeMode="contain" blurRadius={2} />
+              ) : null}
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' }]}>
+                <ActivityIndicator size="large" color="#fff" />
+              </View>
+            </View>
+          )}
         </View>
-        <TouchableOpacity style={pc.vfClose} onPress={close}>
-          <Icon name="x" size={20} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity style={pc.vfDetails} onPress={() => { setNav(true); close(); onViewPost(); }} disabled={nav}>
-          {nav ? <ActivityIndicator size="small" color="#fff" /> : (
-            <><Icon name="arrow-right" size={14} color="#fff" />
-              <Text style={pc.vfDetailsTxt}>Voir les détails</Text></>
-          )}
-        </TouchableOpacity>
-
-        {/* ── Barre d'actions — même set que PostCard, superposée en bas ──── */}
-        <View style={pc.vfActionBar}>
-          <TouchableOpacity style={pc.vfActionBtn} onPress={onLike} activeOpacity={0.7}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-            <Animated.View style={heartStyle}>
-              <MCIcon name={liked ? 'heart' : 'heart-outline'} size={FeedActionIcon.size}
-                color={liked ? '#EF4444' : '#fff'} />
-            </Animated.View>
-            {likeCount > 0 && <Text style={pc.vfActionCount}>{fmtN(likeCount)}</Text>}
+        {/* Fermer + "Voir les détails" — groupés en haut, jamais dépendants de
+            la hauteur de la pilule d'actions en bas (qui varie avec le safe
+            area de l'appareil) ni susceptibles de la chevaucher. */}
+        <View style={[pc.vfTopBar, { top: insets.top + 10 }]} pointerEvents="box-none">
+          <TouchableOpacity style={pc.vfDetails} onPress={() => { setNav(true); close(); onViewPost(); }} disabled={nav}>
+            {nav ? <ActivityIndicator size="small" color="#fff" /> : (
+              <Icon name="info" size={19} color="#fff" />
+            )}
           </TouchableOpacity>
+          <TouchableOpacity style={pc.vfClose} onPress={close}>
+            <Icon name="x" size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
 
-          {!commentsDisabled && (
-            <TouchableOpacity style={pc.vfActionBtn} onPress={onComment} activeOpacity={0.7}
+        {/* ── Barre d'actions — pilule flottante (carte translucide arrondie,
+            bordure, ombre) posée sur la vidéo, au lieu de flotter nue sur un
+            simple dégradé. Safe area respecté (barre de gestes). ─────────── */}
+        <View pointerEvents="box-none" style={[pc.vfActionBarWrap, { paddingBottom: insets.bottom + 14 }]}>
+          <View style={pc.vfActionBar}>
+            <TouchableOpacity style={pc.vfActionBtn} onPress={onLike} activeOpacity={0.7}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-              <MCIcon name="comment-outline" size={FeedActionIcon.size} color="#fff" />
-              {commentCount > 0 && <Text style={pc.vfActionCount}>{fmtN(commentCount)}</Text>}
+              <Animated.View style={heartStyle}>
+                <MCIcon name={liked ? 'heart' : 'heart-outline'} size={FeedActionIcon.size}
+                  color={liked ? '#EF4444' : '#fff'} />
+              </Animated.View>
+              {likeCount > 0 && <Text style={pc.vfActionCount}>{fmtN(likeCount)}</Text>}
             </TouchableOpacity>
-          )}
 
-          <TouchableOpacity style={pc.vfActionBtn} onPress={onShare} activeOpacity={0.7}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-            <MCIcon name="share-outline" size={FeedActionIcon.size} color="#fff" />
-            {shareCount > 0 && <Text style={pc.vfActionCount}>{fmtN(shareCount)}</Text>}
-          </TouchableOpacity>
+            {!commentsDisabled && (
+              <>
+                <View style={pc.vfActionSep} />
+                <TouchableOpacity style={pc.vfActionBtn} onPress={onComment} activeOpacity={0.7}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                  <MCIcon name="comment-outline" size={FeedActionIcon.size} color="#fff" />
+                  {commentCount > 0 && <Text style={pc.vfActionCount}>{fmtN(commentCount)}</Text>}
+                </TouchableOpacity>
+              </>
+            )}
 
-          <TouchableOpacity style={pc.vfActionBtn} onPress={onSave} activeOpacity={0.7}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-            <MCIcon name={saved ? 'bookmark' : 'bookmark-outline'} size={FeedActionIcon.size}
-              color={saved ? '#fff' : '#fff'} />
-          </TouchableOpacity>
+            <View style={pc.vfActionSep} />
+            <TouchableOpacity style={pc.vfActionBtn} onPress={onShare} activeOpacity={0.7}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+              <MCIcon name="share-outline" size={FeedActionIcon.size} color="#fff" />
+              {shareCount > 0 && <Text style={pc.vfActionCount}>{fmtN(shareCount)}</Text>}
+            </TouchableOpacity>
+
+            <View style={pc.vfActionSep} />
+            <TouchableOpacity style={pc.vfActionBtn} onPress={onSave} activeOpacity={0.7}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+              <MCIcon name={saved ? 'bookmark' : 'bookmark-outline'} size={FeedActionIcon.size}
+                color={saved ? '#fff' : '#fff'} />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </Modal>
@@ -594,7 +629,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
       {/* ── Résumé social — noms d'amis qui ont aimé + nb commentaires + partages.
           Seul endroit où les compteurs sont chiffrés : la barre d'actions dessous
           ne répète plus les nombres (évite le double affichage). ───────────── */}
-      {(likeCount > 0 || (!commentsDisabledSt && commentCount > 0) || shareCount > 0) && (
+      {(likeCount > 0 || (!commentsDisabledSt && commentCount > 0) || shareCount > 0 || repostCount > 0) && (
         <View style={[pc.countsRow, { borderBottomColor: colors.divider }]}>
           {likeCount > 0 && (
             <View style={pc.countsGrow}>
@@ -619,6 +654,12 @@ const PostCardInner: React.FC<PostCardProps> = ({
             <View style={[pc.countChipRight, { marginLeft: commentCount > 0 ? 12 : ('auto' as any) }]}>
               <MCIcon name="share-outline" size={10} color={colors.textTertiary} />
               <Text style={[pc.countText, { color: colors.textTertiary }]}>{fmtN(shareCount)}</Text>
+            </View>
+          )}
+          {repostCount > 0 && (
+            <View style={[pc.countChipRight, { marginLeft: (commentCount > 0 || shareCount > 0) ? 12 : ('auto' as any) }]}>
+              <Icon name="repeat" size={10} color={colors.textTertiary} />
+              <Text style={[pc.countText, { color: colors.textTertiary }]}>{fmtN(repostCount)}</Text>
             </View>
           )}
         </View>
@@ -935,10 +976,20 @@ const pc = StyleSheet.create({
   editInput:    { borderRadius: 12, padding: 14, fontSize: FontSize.basePlus, minHeight: 110, textAlignVertical: 'top' },
   editBtn:      { flex: 1, padding: 14, borderRadius: 12, alignItems: 'center' },
   // Video modal
-  vfClose:      { position: 'absolute', top: 48, right: 16, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
-  vfDetails:    { position: 'absolute', bottom: 108, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 20, paddingVertical: 11, borderRadius: 30 },
-  vfDetailsTxt: { color: '#fff', fontSize: FontSize.base, fontWeight: FontWeight.bold },
-  vfActionBar:  { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingBottom: 28, paddingTop: 14, backgroundColor: 'rgba(0,0,0,0.35)' },
-  vfActionBtn:  { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, height: 44 },
+  vfTopBar:     { position: 'absolute', left: 16, right: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  vfClose:      { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
+  vfDetails:    { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
+  // Pilule flottante posée sur la vidéo (carte translucide, bordure, ombre) —
+  // au lieu des icônes nues directement sur le dégradé.
+  vfActionBarWrap: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center', paddingHorizontal: 16 },
+  vfActionBar: {
+    flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch',
+    backgroundColor: 'rgba(28,26,42,0.72)', borderRadius: 24, borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+    shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 }, elevation: 10,
+  },
+  vfActionBtn:  { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, paddingVertical: 11 },
+  vfActionSep:  { width: StyleSheet.hairlineWidth, height: 28, backgroundColor: 'rgba(255,255,255,0.18)' },
   vfActionCount:{ color: '#fff', fontSize: FontSize.xsPlus, fontWeight: FontWeight.semiBold },
 });

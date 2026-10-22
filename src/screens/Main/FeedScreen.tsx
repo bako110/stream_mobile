@@ -6,17 +6,16 @@ import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, ScrollView, TouchableOpacity, FlatList,
-  RefreshControl, TextInput, ActivityIndicator, StyleSheet,
+  RefreshControl, ActivityIndicator, StyleSheet,
   Share, KeyboardAvoidingView, Platform, Image, StatusBar,
   Modal, Dimensions, Linking, InteractionManager,
   TouchableWithoutFeedback, AppState,
 } from 'react-native';
 import { VideoView, useVideoPlayer } from 'react-native-video';
-import { TouchableOpacity as GHTouchableOpacity } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue, useAnimatedStyle,
   withSpring, withSequence, withTiming, withRepeat,
-  interpolate, FadeInDown,
+  interpolate, FadeInRight,
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
@@ -30,18 +29,19 @@ import Geolocation from '@react-native-community/geolocation';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { useTheme } from '../../hooks/useTheme';
 import { useUserLocation } from '../../hooks/useUserLocation';
+import { useUserCountry, normalizeCountryName } from '../../hooks/useUserCountry';
 import { storage } from '../../utils/storage';
 import { showConfirm } from '../../services';
 import { confirmService } from '../../services/confirmService';
-import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet, FriendsWhoLiked, CachedImage, LiveThumbnailBackground, PriceWithLocal, GofolyxLoader, PeopleSuggestions, CommunityPromoHint } from '../../components/common';
+import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet, FriendsWhoLiked, CachedImage, LiveThumbnailBackground, PriceWithLocal, PeopleSuggestions } from '../../components/common';
 import { cacheImage } from '../../services/imageCacheService';
-import { AdvertiserRow, AdCTA, AdFullscreenPlayer, adIsVideo, adIsPhone, adHasContact, type AdData } from '../../components/ads';
+import { AdCard, AdFullscreenPlayer, adIsPhone, type AdData } from '../../components/ads';
 import { BoostPromptBottomSheet, type BoostSuggestion } from '../../components/ads/BoostPromptBottomSheet';
 import { StartScreenSurveySheet } from '../../components/common/StartScreenSurveySheet';
 import { startScreenSurveyService } from '../../services/startScreenSurveyService';
-import { setCachedAppPreferences, type StartScreen } from '../../hooks/useAppPreferences';
+import { getAppPreferences, setCachedAppPreferences, type StartScreen } from '../../hooks/useAppPreferences';
 import { boostPromptService } from '../../services/boostPromptService';
-import { openPhoneMenu, callPhone, openWhatsapp } from '../../utils/phoneMenu';
+import { openPhoneMenu } from '../../utils/phoneMenu';
 import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
 import { ShareBottomSheet } from '../../components/common/ShareBottomSheet';
 import { RepostBottomSheet } from '../../components/common/RepostBottomSheet';
@@ -51,7 +51,6 @@ import { eventService, concertService, socialService, authService, searchService
 import type { StoredAccount } from '../../services';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
-import { searchHistoryService, type SearchHistoryItem } from '../../services/searchHistoryService';
 import { favoriteService } from '../../services/favoriteService';
 import { saveService } from '../../services/saveService';
 import { liveService } from '../../services/liveService';
@@ -59,10 +58,10 @@ import type { LiveStream } from '../../services/liveService';
 import { communityService, type CommunityData } from '../../services/communityService';
 import { useWs } from '../../context/WebSocketContext';
 import { useUser } from '../../context/UserContext';
+import { useSearchOverlayActions } from '../../context/SearchOverlayContext';
 import { networkService } from '../../services/networkService';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import type { User } from '../../types/user';
-import type { SearchResults } from '../../types/search';
 import type { Event } from '../../types/event';
 import type { Concert } from '../../types/concert';
 import type { Post } from '../../types/post';
@@ -107,6 +106,29 @@ function getInitials(name?: string | null): string {
   return name.split(' ').map(n => n?.[0] ?? '').filter(Boolean).join('').slice(0, 2).toUpperCase() || '?';
 }
 
+// Carrousel "Près de chez toi" — events ET concerts mélangés (2026-10, demande
+// explicite), triés ensemble par date de DÉBUT ("starts_at" pour un event,
+// "scheduled_at" pour un concert — champs différents, source unifiée ici).
+export type NearbyItem =
+  | { kind: 'event';   data: Event }
+  | { kind: 'concert'; data: Concert };
+
+function nearbyItemStartDate(item: NearbyItem): string | null {
+  return item.kind === 'event' ? item.data.starts_at : item.data.scheduled_at;
+}
+
+// Trie par date de début croissante — un item sans date valide est relégué
+// en fin de liste plutôt que de perturber le tri (Date invalide → NaN,
+// toujours trié après un nombre fini via Infinity).
+function sortByStartDate(items: NearbyItem[]): NearbyItem[] {
+  const time = (item: NearbyItem) => {
+    const raw = nearbyItemStartDate(item);
+    const t = raw ? new Date(raw).getTime() : NaN;
+    return isNaN(t) ? Infinity : t;
+  };
+  return [...items].sort((a, b) => time(a) - time(b));
+}
+
 // ── Styles badges (déclarés ici pour être disponibles avant FeedHeaderBadges) ─
 // Agrandi (14→18px, bordure/texte suivent) : à la taille précédente, le badge
 // se distinguait à peine de l'icône à côté (19px) — trop petit pour un compteur
@@ -123,178 +145,6 @@ const badgeS = StyleSheet.create({
   badgeText: { color: '#fff', fontSize: FontSize.xs, fontWeight: FontWeight.extraBold },
 });
 
-
-// ── AdCard — publicité native dans le feed (direction éditoriale) ─────────────
-// Type AdData, hooks et sous-composants viennent de src/components/ads/.
-// `settled` = la carte est immobile à l'écran depuis ≥ ~450 ms → le CTA passe
-// de « lien texte » à « bouton discret » avec une accroche unique.
-
-const AdCard: React.FC<{
-  ad: AdData;
-  colors: AppColors;
-  settled?: boolean;
-  searchOverlay?: boolean;   // rendu dans l'overlay recherche : CTA = lien texte, entrée FadeInDown
-  onImpression: (id: string) => void;
-  onPress: (id: string, url: string) => void;
-  onOpenFullscreen: (ad: AdData) => void;
-}> = React.memo(({ ad, colors, settled = false, searchOverlay = false, onImpression, onPress, onOpenFullscreen }) => {
-  // Impression envoyée au montage UNIQUEMENT dans l'overlay recherche (ScrollView
-  // non virtualisé : tout ce qui est monté est déjà visible ou à portée immédiate
-  // de scroll). Dans le flux principal (FlatList virtualisée), une carte peut être
-  // montée par la fenêtre de rendu AVANT d'être réellement visible à l'écran — le
-  // tracking y est fait par le parent via onFeedViewableChanged (vraie viewability,
-  // même principe que ReelsScreen/AdSlide avec `isActive`), jamais ici.
-  const firedRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (searchOverlay && ad?.id && firedRef.current !== ad.id) {
-      firedRef.current = ad.id;
-      onImpression(ad.id);
-    }
-  }, [searchOverlay, ad?.id, onImpression]);
-
-  const creativeUri = ad.creative_url || ad.thumbnail_url;
-  const isVideo = adIsVideo(ad);
-  const [imgFailed, setImgFailed] = useState(false);
-  const hasCreative = !!creativeUri && !(imgFailed && !isVideo);
-
-  // Contact direct (numéro + Appel et/ou WhatsApp cochés par l'annonceur) prime sur
-  // cta_url — même priorité que ReelsScreen.tsx (AdSlide / carte recherche). Le tap
-  // sur la CARTE (hors bouton CTA, qui gère sa propre action via AdCTA/runAdButton)
-  // reste un comportement simple à une seule action : WhatsApp si disponible, sinon
-  // appel, sinon lien — pas de choix à faire, cohérent avec "ouvrir le lien" d'avant.
-  const hasContact = adHasContact(ad);
-  const handleCardPress = () => {
-    if (isVideo) { onOpenFullscreen(ad); return; }
-    if (hasContact) {
-      onPress(ad.id, '');
-      if (ad.contact_whatsapp) openWhatsapp((ad.contact_phone ?? '').trim());
-      else callPhone((ad.contact_phone ?? '').trim());
-      return;
-    }
-    if (ad.cta_url) onPress(ad.id, ad.cta_url);
-  };
-
-  // Carte douce SANS ombre (direction éditoriale : la pub se fond). La pub arrive
-  // déjà résolue depuis le backend (voir InjectionPlanner.maybe_inject_ads côté
-  // serveur) — plus de placeholder à hauteur estimée qui change de taille au
-  // chargement, donc plus besoin de minHeight réservée ici.
-  const cardStyle = {
-    ...getFeedCardStyle(colors),
-    shadowOpacity: 0,
-    elevation: 0,
-  };
-  // Dans l'overlay recherche : entrée FadeInDown + fond sombre (cohérent avec l'overlay).
-  const Wrapper: any = searchOverlay ? Animated.View : React.Fragment;
-  const wrapperProps = searchOverlay ? { entering: FadeInDown.duration(220) } : {};
-  const mediaAlwaysOn = searchOverlay || settled;
-
-  return (
-    <Wrapper {...wrapperProps}>
-    <GHTouchableOpacity style={cardStyle} activeOpacity={0.94} onPress={handleCardPress}>
-      <AdvertiserRow ad={ad} variant="light" />
-
-      {(ad.title || ad.description) ? (
-        <View style={adSt.copy}>
-          {ad.title ? <Text style={[adSt.hl, { color: colors.textPrimary }]} numberOfLines={2}>{ad.title}</Text> : null}
-          {ad.description ? <Text style={[adSt.sub, { color: colors.textSecondary }]} numberOfLines={3}>{ad.description}</Text> : null}
-        </View>
-      ) : null}
-
-      <View style={adSt.mediaWrap}>
-        {hasCreative ? (
-          isVideo ? (
-            <View style={adSt.mediaClip}>
-              <FeedAdVideo uri={creativeUri!} thumbnailUri={ad.thumbnail_url} isVisible={mediaAlwaysOn} />
-            </View>
-          ) : (
-            <CachedImage uri={creativeUri!} style={[adSt.image, adSt.mediaClip]} resizeMode="cover" onError={() => setImgFailed(true)} />
-          )
-        ) : (
-          <View style={[adSt.imagePlaceholder, adSt.mediaClip, { backgroundColor: colors.primary + '12' }]}>
-            <Icon name="image" size={30} color={colors.primary + '55'} />
-          </View>
-        )}
-      </View>
-
-      {(ad.cta_url || hasContact) ? (
-        <AdCTA
-          ad={ad}
-          context={searchOverlay ? 'search-overlay' : 'feed'}
-          activated={searchOverlay ? true : settled}
-          onPress={() => onPress(ad.id, ad.cta_url ?? '')}
-        />
-      ) : null}
-    </GHTouchableOpacity>
-    </Wrapper>
-  );
-});
-
-// Créatif vidéo du feed — jamais d'autoplay : miniature figée + bouton play
-// tant que l'utilisateur n'a pas tapé dessus explicitement. `isVisible` ne
-// sert plus qu'à mettre en pause si la carte sort de l'écran pendant la
-// lecture, jamais à déclencher la lecture elle-même.
-const FeedAdVideo: React.FC<{ uri: string; thumbnailUri?: string; isVisible: boolean }> = ({ uri, thumbnailUri, isVisible }) => {
-  const [muted, setMuted] = useState(true);
-  const [userStarted, setUserStarted] = useState(false);
-
-  const videoSource = useMemo(
-    () => (userStarted ? { uri } : 'about:blank'),
-    [uri, userStarted],
-  );
-  const player = useVideoPlayer(videoSource, p => { p.loop = true; p.muted = true; });
-
-  useEffect(() => {
-    if (!userStarted) return;
-    if (isVisible) player.play();
-    else player.pause();
-  }, [isVisible, userStarted, player]);
-
-  const toggleMute = useCallback(() => {
-    setMuted(m => { player.muted = !m; return !m; });
-  }, [player]);
-
-  if (!userStarted) {
-    // Miniature statique + bouton play cliquable — la lecture ne démarre que
-    // sur une action explicite de l'utilisateur, jamais toute seule.
-    return (
-      <TouchableOpacity activeOpacity={0.9} onPress={() => setUserStarted(true)} style={{ position: 'relative' }}>
-        {thumbnailUri ? (
-          <CachedImage uri={thumbnailUri} style={adSt.image} resizeMode="cover" />
-        ) : (
-          <View style={[adSt.image, { backgroundColor: '#1a1a2e' }]} />
-        )}
-        <View style={adSt.videoPlayOverlay} pointerEvents="none">
-          <View style={adSt.videoPlayCircle}>
-            <Icon name="play" size={24} color="#fff" style={{ marginLeft: 3 }} />
-          </View>
-        </View>
-      </TouchableOpacity>
-    );
-  }
-  return (
-    <View style={{ position: 'relative' }}>
-      <VideoView player={player} style={adSt.image} resizeMode="cover" controls={false} />
-      <TouchableOpacity onPress={toggleMute} style={adSt.muteBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-        <Icon name={muted ? 'volume-x' : 'volume-2'} size={14} color="#fff" />
-      </TouchableOpacity>
-    </View>
-  );
-};
-
-const adSt = StyleSheet.create({
-  copy:            { paddingHorizontal: FeedCardLayout.padH, paddingTop: 10, paddingBottom: 12 },
-  hl:              { fontSize: FontSize.basePlus, fontWeight: FontWeight.bold, lineHeight: 21, letterSpacing: -0.2 },
-  sub:             { fontSize: FontSize.smPlus, lineHeight: 19, marginTop: 5 },
-  mediaWrap:       { paddingHorizontal: FeedCardLayout.padH, paddingBottom: 0 },
-  mediaClip:       { borderRadius: FeedRadius.media, overflow: 'hidden' },
-  image:           { width: '100%', aspectRatio: 1.6 },
-  imagePlaceholder:{ width: '100%', aspectRatio: 1.6, alignItems: 'center', justifyContent: 'center' },
-  muteBtn:         { position: 'absolute', bottom: 10, right: 10, width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
-  // Indicateur "c'est une vidéo" sur la miniature statique — même design que
-  // PostCard (voile sombre + cercle play centré), avant que la lecture démarre.
-  videoPlayOverlay:{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.28)' },
-  videoPlayCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
-});
 
 // ── LiveConcertCard — mémoïsé : re-rend uniquement si ses props changent ──────
 
@@ -347,37 +197,33 @@ const LiveConcertCard: React.FC<LiveConcertCardProps> = React.memo(({
   );
 });
 
-// ── FeedListHeader — mémoïsé, ne re-rend que quand liveConcerts/spontLives/nearbyEvents changent ─
+// ── FeedListHeader — mémoïsé, ne re-rend que quand liveConcerts/spontLives changent.
+// nearbyEvents n'est plus géré ici (voir NearbyEventsCarousel, extrait et
+// positionné séparément plus haut dans feedListHeader, 2026-10).
 
 interface FeedListHeaderProps {
   liveConcerts:  Concert[];
   spontLives:    LiveStream[];
-  nearbyEvents:  Event[];
   colors:        AppColors;
   isDark:        boolean;
   currentUserId?: string;
-  filter:        FeedFilter;
   onNavLiveList:        () => void;
   onNavSpontList:       () => void;
-  onNavNearby:          () => void;
   onNavLiveStream:      (concertId: string) => void;
   onNavLiveViewer:      (concertId: string) => void;
   onNavSpontStream:     (liveId: string) => void;
   onNavSpontViewer:     (liveId: string) => void;
-  onNavEvent:           (eventId: string) => void;
 }
 
 const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
-  liveConcerts, spontLives, nearbyEvents, colors, isDark,
-  currentUserId, filter,
-  onNavLiveList, onNavSpontList, onNavNearby,
+  liveConcerts, spontLives, colors, isDark,
+  currentUserId,
+  onNavLiveList, onNavSpontList,
   onNavLiveStream, onNavLiveViewer,
   onNavSpontStream, onNavSpontViewer,
-  onNavEvent,
 }) => {
-  const showNearby = filter === 'all' && nearbyEvents.length > 0;
   const liveTotal = liveConcerts.length + spontLives.length;
-  if (!liveTotal && !showNearby) return null;
+  if (!liveTotal) return null;
   return (
     <View style={{ backgroundColor: colors.background }}>
       {/* ── En direct — concerts + lives spontanés fusionnés en UNE section ── */}
@@ -462,73 +308,156 @@ const FeedListHeader: React.FC<FeedListHeaderProps> = React.memo(({
         </View>
       )}
 
-      {/* ── Près de toi — masqué dans l'onglet Suivis ────────── */}
-      {showNearby && (
-        <View style={[nbS.wrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <SectionHeader
-            title="Dans ton quartier"
-            colors={colors}
-            icon="map-pin"
-            onSeeAll={onNavNearby}
-          />
-          <Text style={[nbS.subtitle, { color: colors.textTertiary, paddingHorizontal: 16, marginTop: -4, marginBottom: 10 }]}>
-            Des événements proches de toi
-          </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={nbS.list}>
-            {nearbyEvents.map(ev => {
-              const dist = (ev as any).distance_km as number | null | undefined;
-              const distLabel = dist != null ? (dist < 1 ? `${Math.round(dist * 1000)} m` : `${dist.toFixed(1)} km`) : null;
-              // Neutre — la couleur de marque n'a pas besoin d'habiller chaque
-              // carte type, elle reste réservée aux signaux (LIVE, badges…).
-              const typeColor = colors.textSecondary;
-              const typeIcon  = EVENT_ICONS[ev.event_type ?? 'other'] ?? 'calendar';
-              const NCARD_W   = Dimensions.get('window').width * 0.45;
-              const NCOVER_H  = NCARD_W * 0.5;
-              return (
-                <View key={ev.id} style={[nbS.card, { width: NCARD_W, backgroundColor: colors.surface, borderColor: colors.divider }]}>
-                  <TouchableOpacity activeOpacity={0.9} onPress={() => onNavEvent(ev.id)}>
-                    {ev.thumbnail_url ? (
-                      <CachedImage uri={ev.thumbnail_url} style={{ width: NCARD_W, height: NCOVER_H }} resizeMode="cover" />
-                    ) : (
-                      <LinearGradient colors={[typeColor + 'DD', typeColor + '55']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: NCARD_W, height: NCOVER_H, alignItems: 'center', justifyContent: 'center' }}>
-                        <Icon name={typeIcon} size={28} color="rgba(255,255,255,0.7)" />
-                      </LinearGradient>
-                    )}
-                    {distLabel && (
-                      <View style={{ position: 'absolute', top: 8, right: 8, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 }}>
-                        <Icon name="map-pin" size={9} color="#fff" />
-                        <Text style={{ fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: '#fff' }}>{distLabel}</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                  <View style={[nbS.iconWrap, { borderColor: colors.background, backgroundColor: typeColor, marginTop: -18 }]}>
-                    <Icon name={typeIcon} size={14} color="#fff" />
-                  </View>
-                  <View style={[nbS.cardBody, { paddingTop: 14 }]}>
-                    <TouchableOpacity onPress={() => onNavEvent(ev.id)} activeOpacity={0.8} style={{ alignItems: 'center', width: '100%' }}>
-                      <Text style={[nbS.name, { color: colors.textPrimary }]} numberOfLines={1}>{ev.title}</Text>
-                      {ev.starts_at && !isNaN(new Date(ev.starts_at).getTime()) && (
-                        <Text style={[nbS.handle, { color: colors.textTertiary }]}>
-                          {new Date(ev.starts_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-                          {ev.venue_city ? ` · ${ev.venue_city}` : ''}
-                        </Text>
-                      )}
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[nbS.goBtn, { backgroundColor: typeColor }]}
-                      activeOpacity={0.8}
-                      onPress={() => onNavEvent(ev.id)}
-                    >
-                      <Icon name="arrow-right" size={14} color="#fff" />
-                      <Text style={nbS.goBtnText}>Découvrir</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              );
-            })}
-          </ScrollView>
+    </View>
+  );
+});
+
+// ── NearbyEventsCarousel — événements ET concerts proches / dans ton pays,
+// tout en haut du feed (avant la bannière communautés/stories, 2026-10 :
+// extrait de FeedListHeader pour pouvoir être positionné séparément plus
+// haut, demande explicite — puis étendu aux concerts, même demande).
+// Distingue visuellement "vraiment proche" (distance_km fourni par le
+// backend pour le rayon serré) de "ailleurs dans ton pays" (repli élargi,
+// voir le useEffect qui charge nearbyItems dans FeedScreen) via un badge
+// dédié, comparaison tolérante par normalizeCountryName (venue_country est
+// un texte libre saisi par l'organisateur, jamais un code ISO). Design
+// carte pleine image (dégradé bas pour la lisibilité du texte directement
+// sur la photo, façon story/découverte) + entrée en cascade (FadeInRight,
+// délai croissant par position) au montage.
+interface NearbyEventsCarouselProps {
+  items: NearbyItem[];
+  userCountry: string | null;
+  colors: AppColors;
+  onSeeAll: () => void;
+  onPress: (item: NearbyItem) => void;
+}
+
+// Champs communs Event/Concert normalisés en un seul accès — title/
+// thumbnail_url/venue_city/venue_country sont nommés identiquement dans les
+// deux types, seule la date de début diffère (starts_at vs scheduled_at,
+// cf. nearbyItemStartDate) et l'icône de type n'existe que côté Event.
+function nearbyItemIcon(item: NearbyItem): string {
+  return item.kind === 'concert' ? 'music' : (EVENT_ICONS[item.data.event_type ?? 'other'] ?? 'calendar');
+}
+
+const NearbyEventsCarousel: React.FC<NearbyEventsCarouselProps> = React.memo(({
+  items, userCountry, colors, onSeeAll, onPress,
+}) => {
+  if (items.length === 0) return null;
+  const normalizedUserCountry = normalizeCountryName(userCountry);
+  // Format paysage — large plutôt que haut (2026-10, ajustement demandé).
+  const NCARD_W  = Dimensions.get('window').width * 0.72;
+  const NCARD_H  = NCARD_W * 0.58;
+
+  return (
+    <View style={nb2.wrap}>
+      <View style={nb2.headerRow}>
+        <View style={[nb2.headerIconWrap, { backgroundColor: colors.primary + '18' }]}>
+          <Icon name="map-pin" size={14} color={colors.primary} />
         </View>
-      )}
+        <View style={{ flex: 1 }}>
+          <Text style={[nb2.headerTitle, { color: colors.textPrimary }]}>Près de chez toi</Text>
+          <Text style={[nb2.headerSubtitle, { color: colors.textTertiary }]}>
+            En ce moment, près de toi et dans ton pays
+          </Text>
+        </View>
+        <TouchableOpacity onPress={onSeeAll} activeOpacity={0.7} style={nb2.seeAllBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Text style={[nb2.seeAllTxt, { color: colors.primary }]}>Tout voir</Text>
+          <Icon name="chevron-right" size={14} color={colors.primary} />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={nb2.list} decelerationRate="fast" snapToInterval={NCARD_W + 12} snapToAlignment="start">
+        {items.map((item, idx) => {
+          const d = item.data;
+          const dist = (d as any).distance_km as number | null | undefined;
+          const distLabel = dist != null ? (dist < 1 ? `${Math.round(dist * 1000)} m` : `${dist.toFixed(1)} km`) : null;
+          // "Dans ton pays" affiché seulement quand ce n'est PAS déjà une
+          // distance proche (le badge distance prime, il est plus précis) —
+          // sinon pour tout item au-delà du rayon serré dont le pays
+          // correspond au pays détecté par GPS.
+          const inUserCountry = !distLabel && !!normalizedUserCountry
+            && normalizeCountryName(d.venue_country) === normalizedUserCountry;
+          const typeIcon = nearbyItemIcon(item);
+          const startRaw = nearbyItemStartDate(item);
+          const dateLabel = startRaw && !isNaN(new Date(startRaw).getTime())
+            ? new Date(startRaw).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+            : null;
+
+          return (
+            <Animated.View
+              key={`${item.kind}-${d.id}`}
+              // "Ultra bounce" (2026-10, demande explicite) : distance de départ
+              // plus grande (FadeInRight démarre par défaut à ~25% de la largeur
+              // de l'écran, insuffisant pour un vrai effet de rebond visible sur
+              // une carte déjà large) + ressort très sous-amorti (damping bas,
+              // stiffness haute) pour un rebond net et dynamique à l'arrivée,
+              // au lieu d'un ralenti sans à-coup.
+              entering={FadeInRight.delay(Math.min(idx, 6) * 90).duration(500).springify().damping(9).stiffness(160).mass(0.7)}
+            >
+              <TouchableOpacity
+                activeOpacity={0.92}
+                onPress={() => onPress(item)}
+                style={[nb2.card, { width: NCARD_W, height: NCARD_H, shadowColor: colors.primary }]}
+              >
+                {d.thumbnail_url ? (
+                  <CachedImage uri={d.thumbnail_url} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                ) : (
+                  <LinearGradient
+                    colors={[colors.primary, colors.primary + 'AA']}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}
+                  >
+                    <Icon name={typeIcon} size={34} color="rgba(255,255,255,0.55)" />
+                  </LinearGradient>
+                )}
+
+                {/* Dégradé bas — garantit la lisibilité du texte quel que soit le fond */}
+                <LinearGradient
+                  colors={['transparent', 'transparent', 'rgba(0,0,0,0.88)']}
+                  locations={[0, 0.45, 1]}
+                  style={StyleSheet.absoluteFill}
+                  pointerEvents="none"
+                />
+
+                {/* Badge type — haut gauche, pastille translucide */}
+                <View style={[nb2.typeBadge, { backgroundColor: 'rgba(255,255,255,0.22)' }]}>
+                  <Icon name={typeIcon} size={12} color="#fff" />
+                </View>
+
+                {/* Badge distance / pays — haut droite */}
+                {distLabel ? (
+                  <View style={[nb2.pillBadge, { backgroundColor: colors.primary }]}>
+                    <Icon name="navigation" size={9} color="#fff" />
+                    <Text style={nb2.pillBadgeTxt}>{distLabel}</Text>
+                  </View>
+                ) : inUserCountry ? (
+                  <View style={[nb2.pillBadge, nb2.pillBadgeCountry]}>
+                    <Icon name="flag" size={9} color="#fff" />
+                    <Text style={nb2.pillBadgeTxt}>Dans ton pays</Text>
+                  </View>
+                ) : null}
+
+                {/* Texte — directement sur l'image, au-dessus du dégradé */}
+                <View style={nb2.cardFooter}>
+                  {dateLabel && (
+                    <View style={nb2.dateChip}>
+                      <Text style={nb2.dateChipTxt}>{dateLabel.toUpperCase()}</Text>
+                    </View>
+                  )}
+                  <Text style={nb2.cardTitle} numberOfLines={1}>{d.title}</Text>
+                  {d.venue_city ? (
+                    <View style={nb2.cardLocRow}>
+                      <Icon name="map-pin" size={10} color="rgba(255,255,255,0.75)" />
+                      <Text style={nb2.cardLoc} numberOfLines={1}>{d.venue_city}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              </TouchableOpacity>
+            </Animated.View>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 });
@@ -592,15 +521,46 @@ const ReelSuggestionTile: React.FC<{
   height: number;
   large?: boolean;
   onPress: () => void;
-}> = ({ reel, width, height, large, onPress }) => {
+  // Lecture auto (2026-10, paramètre "Lecture automatique" dans Réglages >
+  // Contenu) : isActive = ce reel est visible à l'écran EN CE MOMENT (porté
+  // par onFeedViewableChanged, même mécanisme déjà en place pour les pubs
+  // vidéo du feed) ET autoplayEnabled = l'utilisateur n'a pas désactivé la
+  // fonctionnalité. Les deux conditions sont nécessaires : jamais plus d'une
+  // vidéo ne joue à la fois dans le feed (une seule tuile peut être isActive),
+  // et jamais de lecture du tout si l'utilisateur a coupé le réglage.
+  isActive?: boolean;
+  autoplayEnabled?: boolean;
+}> = ({ reel, width, height, large, onPress, isActive = false, autoplayEnabled = false }) => {
   const author = reel.author;
   const name   = author?.display_name ?? author?.username ?? 'Utilisateur';
   const durationLabel = reel.duration_sec
     ? `${Math.floor(reel.duration_sec / 60)}:${String(Math.round(reel.duration_sec % 60)).padStart(2, '0')}`
     : null;
 
+  // mp4_url préféré (décodage direct, pas de manifeste à résoudre) — hls_url
+  // gardé en repli pour les reels plus anciens qui n'ont que ce format (voir
+  // la migration progressive HLS→MP4, encore en cours côté anciens APK).
+  const videoUri = reel.mp4_url || reel.hls_url || '';
+  const hasVideo = !!videoUri;
+  const shouldPlay = autoplayEnabled && isActive && hasVideo;
+
+  // 'about:blank' quand aucune URL exploitable — même convention que
+  // ReelsScreen (videoSource) : useVideoPlayer n'accepte pas une source null,
+  // et on ne veut de toute façon jamais initialiser un vrai lecteur tant que
+  // le reel n'a ni mp4_url ni hls_url.
+  const player = useVideoPlayer(
+    { uri: hasVideo ? videoUri : 'about:blank' },
+    p => { p.loop = true; p.muted = true; p.volume = 0; },
+  );
+  useEffect(() => {
+    if (!player || !hasVideo) return;
+    try { if (shouldPlay) player.play(); else player.pause(); } catch {}
+  }, [shouldPlay, player, hasVideo]);
+
   // Pulsation continue du bouton play — anneau extérieur qui respire
   // (scale + fade) pour signaler "appuie ici" sans être une icône statique.
+  // Inutile/masquée une fois la vidéo effectivement en lecture (voir plus
+  // bas, le bouton play ne s'affiche plus dans ce cas).
   const pulse = useSharedValue(0);
   useEffect(() => {
     pulse.value = withRepeat(withTiming(1, { duration: 1400 }), -1, false);
@@ -615,7 +575,9 @@ const ReelSuggestionTile: React.FC<{
 
   return (
     <TouchableOpacity activeOpacity={0.92} onPress={onPress} style={{ width, height, borderRadius: large ? 20 : 16, overflow: 'hidden', backgroundColor: '#0B0B0F' }}>
-      {reel.thumbnail_url ? (
+      {shouldPlay && player ? (
+        <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="cover" />
+      ) : reel.thumbnail_url ? (
         <Image source={{ uri: reel.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
       ) : (
         <View style={{ ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', backgroundColor: '#17171D' }}>
@@ -630,15 +592,19 @@ const ReelSuggestionTile: React.FC<{
         pointerEvents="none"
       />
 
-      {/* Bouton play centré — anneau qui pulse en boucle pour signaler "appuie ici" */}
-      <View style={rst.playCenter} pointerEvents="none">
-        <Animated.View style={[rst.playCenterPulseRing, pulseRingStyle]} />
-        <Animated.View style={[rst.playCenterRing, pulseCoreStyle]}>
-          <View style={rst.playCenterCircle}>
-            <Icon name="play" size={large ? 26 : 18} color="#fff" style={{ marginLeft: 3 }} />
-          </View>
-        </Animated.View>
-      </View>
+      {/* Bouton play centré — anneau qui pulse en boucle pour signaler "appuie ici".
+          Masqué une fois la vidéo réellement en lecture (shouldPlay) : il n'y a
+          plus rien à signaler, la tuile joue déjà d'elle-même. */}
+      {!shouldPlay && (
+        <View style={rst.playCenter} pointerEvents="none">
+          <Animated.View style={[rst.playCenterPulseRing, pulseRingStyle]} />
+          <Animated.View style={[rst.playCenterRing, pulseCoreStyle]}>
+            <View style={rst.playCenterCircle}>
+              <Icon name="play" size={large ? 26 : 18} color="#fff" style={{ marginLeft: 3 }} />
+            </View>
+          </Animated.View>
+        </View>
+      )}
 
       {/* Badge Reel + durée */}
       <View style={rst.topRow} pointerEvents="none">
@@ -858,9 +824,15 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   const { addListener, removeListener, lastLiveStarted, lastLiveEnded, lastLiveViewersUpdated, lastPresenceUpdate, unreadMessages, unreadActivity, unreadNotifications } = useWs();
   const headerNotifCount = unreadNotifications + unreadActivity;
   const { currentUser } = useUser();
-  // false — ne demande pas la permission localisation des l'arrivee sur le feed,
-  // uniquement la section secondaire "Pres de toi" en beneficie ici.
-  const userLocation = useUserLocation(false);
+  const { openSearchOverlay } = useSearchOverlayActions();
+  // true (2026-10) — le carrousel "Près de toi / dans ton pays" tout en haut
+  // du feed (voir feedListHeader) a besoin de la position dès l'arrivée sur
+  // l'écran, pas seulement via une section secondaire visitée plus tard.
+  // Avant ce fix, enabled=false signifiait que userLocation restait
+  // TOUJOURS null sur cet écran (rien ne basculait jamais ce flag ici), donc
+  // le carrousel ne se remplissait jamais en pratique.
+  const userLocation = useUserLocation(true);
+  const userCountry = useUserCountry(userLocation);
   const [filter,      setFilter]      = useState<FeedFilter>('all');
   const [items,       setItems]       = useState<FeedItem[]>([]);
   const [loading,     setLoading]     = useState(true);
@@ -889,7 +861,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   const feedListRef     = useRef<FlatList>(null);
   const [liveConcerts,    setLiveConcerts]    = useState<Concert[]>([]);
   const [spontLives,      setSpontLives]      = useState<LiveStream[]>([]);
-  const [nearbyEvents,    setNearbyEvents]    = useState<Event[]>([]);
+  const [nearbyItems,    setNearbyItems]    = useState<NearbyItem[]>([]);
   // Miroirs synchrones — lus par applySpontLivesUpdate quand on n'est pas au
   // sommet (le state peut être en retard d'un tick sur ce qu'on veut accumuler).
   const spontLivesRef   = useRef<LiveStream[]>([]);
@@ -988,13 +960,18 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
 
   const handleStartScreenAnswer = useCallback(async (choice: StartScreen) => {
     const labels: Record<StartScreen, string> = { feed: 'Accueil', reels: 'Reels', communities: 'Communautés' };
-    setCachedAppPreferences({ preferred_start_screen: choice });
+    // Objet complet, jamais juste { preferred_start_screen } : le PUT
+    // /app-preferences écrase TOUTES les colonnes avec ce qui est envoyé (cf.
+    // update_app_preferences côté backend) — un envoi partiel réinitialiserait
+    // silencieusement feed_autoplay_reels à sa valeur par défaut.
+    const updated = { ...getAppPreferences(), preferred_start_screen: choice };
+    setCachedAppPreferences(updated);
     // Laisse la coche de sélection visible un instant dans le sheet avant de
     // le refermer — une fermeture instantanée ne confirmait jamais le choix.
     setTimeout(() => releaseOverlaySlot('startScreenSurvey'), 450);
     toastService.success('Préférence enregistrée', `${labels[choice]} s'ouvrira au démarrage de l'app.`);
     try {
-      await apiClient.put(Endpoints.users.appPreferences, { preferred_start_screen: choice });
+      await apiClient.put(Endpoints.users.appPreferences, updated);
     } catch {
       // le cache local garde la préférence même si la sync échoue
     }
@@ -1015,49 +992,13 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   // pour toujours refléter les changements faits depuis les Paramètres).
   const [accounts, setAccounts] = useState<StoredAccount[]>([]);
   const [switchingAccountId, setSwitchingAccountId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
-  const [searching, setSearching] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchFilter, setSearchFilter] = useState<'all'|'users'|'events'|'concerts'|'reels'|'films'>('all');
-  const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
-  // Scroll infini — actif à la fois sur un filtre spécifique et en mode "Tout" (voir
-  // liveSearch/loadMoreSearch) : le backend applique la même page/limit à chaque
-  // catégorie en parallèle, donc avancer la page fonctionne aussi en mode "Tout",
-  // simplement sans total/has_more par catégorie (approximé côté client).
-  const [searchPage, setSearchPage] = useState(1);
-  const [searchHasMore, setSearchHasMore] = useState(false);
-  const [loadingMoreSearch, setLoadingMoreSearch] = useState(false);
-  const SEARCH_PAGE_LIMIT = 20;
-  const SEARCH_CATEGORIES = ['users', 'films', 'series', 'concerts', 'events', 'reels'] as const;
-  // Pub dédiée au placement "search" — une seule par recherche effectuée (pas de scroll
-  // infini dans les résultats, contrairement au feed principal, donc pas besoin de
-  // rotation par emplacement). Rechargée à chaque nouveau terme recherché.
-  const [searchAd, setSearchAd] = useState<AdData | null>(null);
-  const searchAdReqRef = useRef('');
-  const [popularContent, setPopularContent] = useState<any[]>([]);
-  const [popularLoading, setPopularLoading] = useState(false);
-  const popularLoadedRef = useRef(false);
-  const searchBarWidth = useSharedValue(0);
-  const searchBarOpacity = useSharedValue(0);
-
-  const searchInputRef = useRef<any>(null);
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const searchReqRef   = useRef('');
-
-  const refreshHistory = useCallback(() => {
-    setSearchHistory(searchHistoryService.getAll());
-  }, []);
-
-  // Suggestions historique filtrées en live selon le texte tapé
-  const historySuggestions = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return [];
-    return searchHistory.filter(h => h.query.toLowerCase().includes(q) && h.query.toLowerCase() !== q).slice(0, 5);
-  }, [searchQuery, searchHistory]);
-
-  // Reel actif dans le feed (autoplay)
+  // Reel actif dans le feed (autoplay) — le reel kind='reel' actuellement visible
+  // à l'écran (porté par onFeedViewableChanged), ou null si aucun. Combiné à
+  // autoplayEnabled (réglage utilisateur, Réglages > Contenu > "Lecture
+  // automatique") dans ReelSuggestionTile : jamais plus d'une vidéo ne joue à la
+  // fois, jamais de lecture du tout si le réglage est désactivé.
   const [activeReelId,      setActiveReelId]      = useState<string | null>(null);
+  const [autoplayEnabled,   setAutoplayEnabled]    = useState(() => getAppPreferences().feed_autoplay_reels);
   const [feedFocused,       setFeedFocused]        = useState(true);
   const [feedScrollEnabled, setFeedScrollEnabled]  = useState(true);
 
@@ -1283,7 +1224,13 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   };
 
   const onFeedViewableChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
-    setActiveReelId(null);
+    // Reel actif (autoplay) : au plus UN reel du feed joue à la fois — celui
+    // dont l'item kind='reel' est actuellement visible. S'il y en a
+    // plusieurs visibles simultanément (rare, tuile très compacte sur un
+    // grand écran), on ne garde que le premier rencontré ; aucun reel visible
+    // → null, ce qui coupe la lecture (cf. ReelSuggestionTile, shouldPlay).
+    const visibleReel = viewableItems.find(v => v.item?.kind === 'reel');
+    setActiveReelId(visibleReel?.item?.id ?? null);
 
     // Pub vidéo : ne joue que quand réellement visible à l'écran (coupe le stream sinon)
     setAdVisible(viewableItems.some(v => v.item?.kind === 'ad'));
@@ -1351,137 +1298,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   const [commentVisible, setCommentVisible] = useState(false);
   const commentCountChangeRef = useRef<((delta: number) => void) | null>(null);
   const commentCountLoadedRef = useRef<((count: number) => void) | null>(null);
-
-  // Recherche auto avec debounce 300ms
-  const liveSearch = useCallback((query: string, filter: typeof searchFilter = 'all') => {
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    const term = query.trim();
-    searchReqRef.current = term;
-    if (!term) { setSearchResults(null); setSearchAd(null); setSearching(false); setSearchHasMore(false); return; }
-    searchTimerRef.current = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const results = await searchService.searchAll({
-          q: term, limit: SEARCH_PAGE_LIMIT,
-          type: filter === 'all' ? undefined : filter,
-        });
-        // Ignore une réponse en retard (frappe rapide) qui ne correspond plus au terme actuel
-        if (searchReqRef.current === term) {
-          setSearchResults(results);
-          setSearchPage(1);
-          // En mode "Tout", chaque catégorie est paginée indépendamment côté backend (même
-          // page/limit appliqués à chacune) — tant qu'AU MOINS une catégorie est encore
-          // pleine, il reste potentiellement des résultats à charger sur celle-ci.
-          const hasMore = filter === 'all'
-            ? SEARCH_CATEGORIES.some(k => (results[k]?.length ?? 0) >= SEARCH_PAGE_LIMIT)
-            : (results[filter]?.length ?? 0) >= SEARCH_PAGE_LIMIT;
-          setSearchHasMore(hasMore);
-        }
-      } catch { /* silencieux */ }
-      finally { if (searchReqRef.current === term) setSearching(false); }
-
-      // Pub search — indépendante de searchAll, ne bloque jamais l'affichage des résultats
-      // si elle échoue ou tarde.
-      if (searchAdReqRef.current === term) return;
-      searchAdReqRef.current = term;
-      apiClient.get<AdData | null>('/api/v1/ads/feed/next?placement=search')
-        .then(r => { if (searchAdReqRef.current === term) setSearchAd(r.data ?? null); })
-        .catch(() => {});
-    }, 300);
-  }, []);
-
-  // Charge la page suivante — scroll infini sur l'overlay recherche, pour le filtre
-  // actif OU pour toutes les catégories en mode "Tout" (chacune avance de sa propre
-  // page en parallèle, fusionnée dans le state existant plutôt que remplacée).
-  const loadMoreSearch = useCallback(() => {
-    const term = searchQuery.trim();
-    if (!term || loadingMoreSearch || !searchHasMore) return;
-    setLoadingMoreSearch(true);
-    const nextPage = searchPage + 1;
-    searchService.searchAll({
-      q: term, page: nextPage, limit: SEARCH_PAGE_LIMIT,
-      type: searchFilter === 'all' ? undefined : searchFilter,
-    })
-      .then(results => {
-        const keys = searchFilter === 'all' ? SEARCH_CATEGORIES : [searchFilter];
-        setSearchResults(prev => {
-          if (!prev) return prev;
-          const next = { ...prev };
-          for (const k of keys) next[k] = [...(prev[k] ?? []), ...(results[k] ?? [])];
-          return next;
-        });
-        setSearchPage(nextPage);
-        const hasMore = keys.some(k => (results[k]?.length ?? 0) >= SEARCH_PAGE_LIMIT);
-        setSearchHasMore(hasMore);
-      })
-      .catch(() => setSearchHasMore(false))
-      .finally(() => setLoadingMoreSearch(false));
-  }, [searchQuery, searchFilter, searchPage, searchHasMore, loadingMoreSearch]);
-
-  const openSearch = useCallback(() => {
-    setSearchOpen(true);
-    refreshHistory();
-    // Précharge la pub "search" dès l'ouverture — avant, elle n'était demandée
-    // qu'à la première frappe (liveSearch), donc invisible tant que l'utilisateur
-    // n'avait rien tapé.
-    if (!searchAdReqRef.current) {
-      searchAdReqRef.current = '__initial__';
-      apiClient.get<AdData | null>('/api/v1/ads/feed/next?placement=search')
-        .then(r => setSearchAd(r.data ?? null))
-        .catch(() => {});
-    }
-    if (!popularLoadedRef.current) {
-      popularLoadedRef.current = true;
-      setPopularLoading(true);
-      Promise.allSettled([
-        searchService.getTrending(),
-        searchService.getUpcomingEvents(),
-      ]).then(([contentRes, eventsRes]) => {
-        const content = contentRes.status === 'fulfilled' ? contentRes.value.slice(0, 5).map(i => ({ ...i, __kind: 'content' })) : [];
-        const events  = eventsRes.status  === 'fulfilled' ? eventsRes.value.slice(0, 4).map(i  => ({ ...i, __kind: 'event'   })) : [];
-        // Mélange films/séries et événements plutôt que de tout concaténer d'un bloc
-        const merged: any[] = [];
-        const maxLen = Math.max(content.length, events.length);
-        for (let i = 0; i < maxLen; i++) {
-          if (content[i]) merged.push(content[i]);
-          if (events[i])  merged.push(events[i]);
-        }
-        setPopularContent(merged);
-      }).finally(() => setPopularLoading(false));
-    }
-    searchBarWidth.value  = withSpring(1, { damping: 18, stiffness: 200 });
-    searchBarOpacity.value = withTiming(1, { duration: 200 });
-    setTimeout(() => searchInputRef.current?.focus(), 250);
-  }, [refreshHistory]);
-
-  const closeSearch = useCallback(() => {
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    searchBarWidth.value   = withSpring(0, { damping: 18, stiffness: 200 });
-    searchBarOpacity.value = withTiming(0, { duration: 150 });
-    setTimeout(() => setSearchOpen(false), 180);
-    setSearchQuery('');
-    setSearchResults(null);
-    setSearchAd(null);
-    searchAdReqRef.current = '';
-    setSearchFilter('all');
-    setSearchPage(1);
-    setSearchHasMore(false);
-  }, []);
-
-  const commitSearch = useCallback((q: string) => {
-    const trimmed = q.trim();
-    if (!trimmed) return;
-    searchHistoryService.add(trimmed);
-    refreshHistory();
-  }, [refreshHistory]);
-
-  const animatedSearchBar = useAnimatedStyle(() => ({
-    flex: interpolate(searchBarWidth.value, [0, 1], [0, 1]),
-    opacity: searchBarOpacity.value,
-    overflow: 'hidden',
-  }));
-
-
 
   // ── Suggestions intelligentes : contacts + localisation ──────────────────────
   // Hash SHA-256 des contacts avant l'envoi (jamais de numéro/email en clair côté
@@ -2112,15 +1928,70 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   }, [filter, hasMoreFeed, loadMoreFollowing]);
   useEffect(() => { loadMoreFeedRef.current = loadMoreFeed; }, [loadMoreFeed]);
 
-  // Près de toi — chargé dès que la position est disponible
+  // Près de toi / dans ton pays — events ET concerts mélangés (2026-10,
+  // demande explicite), chargés dès que la position est disponible. D'abord
+  // un rayon serré (proximité réelle, 20km) ; si ça ne remonte pas assez
+  // d'items pour un carrousel qui vaille la peine d'être affiché (< 4), on
+  // complète avec un rayon large (500km, borne max acceptée par le backend —
+  // capte de facto tout le pays dans l'immense majorité des cas, le backend
+  // n'ayant pas de filtre pays natif) plutôt que de laisser le carrousel
+  // vide ou quasi vide. Classé par date de DÉBUT croissante (starts_at pour
+  // un event, scheduled_at pour un concert) — l'ordre brut renvoyé par le
+  // backend (distance/pertinence) ne garantit aucun classement
+  // chronologique. Les événements/concerts déjà passés sont exclus : seule
+  // la date de début compte ici (pas de notion de "fin" fiable pour un
+  // concert), donc "passé" = starts_at/scheduled_at strictement antérieur à
+  // maintenant.
   useEffect(() => {
     if (!userLocation) return;
-    eventService.list({
-      limit: 8, lat: userLocation.lat, lon: userLocation.lon,
-      radius_km: 20, status: 'published', noCache: true,
-    }).then(data => {
-      setNearbyEvents(Array.isArray(data) ? data : []);
-    }).catch(() => {});
+    let cancelled = false;
+
+    const isUpcoming = (item: NearbyItem) => {
+      const raw = nearbyItemStartDate(item);
+      if (!raw) return true; // pas de date connue : ne pas exclure à tort
+      const t = new Date(raw).getTime();
+      return isNaN(t) || t >= Date.now();
+    };
+
+    (async () => {
+      const [nearbyEv, nearbyConc] = await Promise.all([
+        eventService.list({
+          limit: 8, lat: userLocation.lat, lon: userLocation.lon,
+          radius_km: 20, status: 'published', noCache: true,
+        }).catch(() => [] as Event[]),
+        concertService.list({
+          limit: 8, lat: userLocation.lat, lon: userLocation.lon, radius_km: 20,
+        }).catch(() => [] as Concert[]),
+      ]);
+      if (cancelled) return;
+
+      let items: NearbyItem[] = [
+        ...nearbyEv.map(data => ({ kind: 'event' as const, data })),
+        ...nearbyConc.map(data => ({ kind: 'concert' as const, data })),
+      ].filter(isUpcoming);
+
+      if (items.length < 4) {
+        const [wideEv, wideConc] = await Promise.all([
+          eventService.list({
+            limit: 8, lat: userLocation.lat, lon: userLocation.lon,
+            radius_km: 500, status: 'published', noCache: true,
+          }).catch(() => [] as Event[]),
+          concertService.list({
+            limit: 8, lat: userLocation.lat, lon: userLocation.lon, radius_km: 500,
+          }).catch(() => [] as Concert[]),
+        ]);
+        if (cancelled) return;
+        const seen = new Set(items.map(i => `${i.kind}-${i.data.id}`));
+        const wide: NearbyItem[] = [
+          ...wideEv.map(data => ({ kind: 'event' as const, data })),
+          ...wideConc.map(data => ({ kind: 'concert' as const, data })),
+        ].filter(i => !seen.has(`${i.kind}-${i.data.id}`)).filter(isUpcoming);
+        items = [...items, ...wide];
+      }
+
+      setNearbyItems(sortByStartDate(items).slice(0, 8));
+    })();
+    return () => { cancelled = true; };
   }, [userLocation]);
 
   // Charger les lives en direct (appelé aussi depuis load('all') via Promise.all)
@@ -2250,6 +2121,14 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     }
   }, [theme.isDark]));
 
+  // Relit le réglage "Lecture automatique" à chaque retour sur l'écran — reflète
+  // immédiatement un changement fait dans Réglages > Contenu sans attendre un
+  // reload complet du feed (SettingsContenuScreen met déjà le cache local à jour
+  // via setCachedAppPreferences à chaque toggle, cf. getAppPreferences()).
+  useFocusEffect(useCallback(() => {
+    setAutoplayEnabled(getAppPreferences().feed_autoplay_reels);
+  }, []));
+
   // Focus : reprise vidéo + rechargement silencieux au retour (stale-while-revalidate)
   const didMountRef = useRef(false);
   useFocusEffect(useCallback(() => {
@@ -2265,13 +2144,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         clearTimeout(timer);
         setFeedFocused(false);
         setActiveReelId(null);
-        if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-        setSearchQuery('');
-        setSearchResults(null);
-        setSearchOpen(false);
-        setSearchFilter('all');
-        searchBarWidth.value = 0;
-        searchBarOpacity.value = 0;
       };
     }
     // Retour : refresh silencieux si données > 60s — forceRefresh=true pour
@@ -2285,14 +2157,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     return () => {
       setFeedFocused(false);
       setActiveReelId(null);
-      // Vider la recherche quand on quitte le tab
-      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-      setSearchQuery('');
-      setSearchResults(null);
-      setSearchOpen(false);
-      setSearchFilter('all');
-      searchBarWidth.value = 0;
-      searchBarOpacity.value = 0;
       clearSettleTimers();
     };
   }, [filter]));
@@ -2353,6 +2217,11 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   const onNavSpontStream = useCallback((id: string) => (nav as any).navigate('SimpleLiveStream', { liveId: id, isPrivate: false }), [nav]);
   const onNavSpontViewer = useCallback((id: string) => (nav as any).navigate('SimpleLiveViewer', { liveId: id }), [nav]);
   const onNavEvent       = useCallback((id: string) => nav.navigate('EventDetail', { eventId: id }), [nav]);
+  const onNavConcert     = useCallback((id: string) => (nav as any).navigate('ConcertDetail', { concertId: id }), [nav]);
+  const onNavNearbyItem  = useCallback((item: NearbyItem) => {
+    if (item.kind === 'concert') onNavConcert(item.data.id);
+    else onNavEvent(item.data.id);
+  }, [onNavEvent, onNavConcert]);
 
   const onNavMyStories   = useCallback(() => nav.navigate('MyStories'), [nav]);
   const onNavChat        = useCallback((partnerId: string, partnerName: string, avatarUrl?: string) =>
@@ -2364,7 +2233,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   // instantané — le contenu sous le header ne bouge plus tout seul quand un live
   // WS démarre/s'arrête ou que la géoloc arrive. La resync se fait dès qu'on
   // remonte (feedAtTop repasse à true).
-  const [frozenHeaderData, setFrozenHeaderData] = useState({ liveConcerts, spontLives, nearbyEvents });
+  const [frozenHeaderData, setFrozenHeaderData] = useState({ liveConcerts, spontLives, nearbyItems });
   useEffect(() => {
     if (!feedAtTop) return;
     // On est (re)monté au sommet : appliquer d'abord l'instantané "En direct"
@@ -2374,53 +2243,55 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
       pendingLiveHeaderRef.current = null;
       setLiveConcerts(p.liveConcerts);
       setSpontLives(p.spontLives);
-      setFrozenHeaderData({ liveConcerts: p.liveConcerts, spontLives: p.spontLives, nearbyEvents });
+      setFrozenHeaderData({ liveConcerts: p.liveConcerts, spontLives: p.spontLives, nearbyItems });
       return;
     }
-    setFrozenHeaderData({ liveConcerts, spontLives, nearbyEvents });
-  }, [feedAtTop, liveConcerts, spontLives, nearbyEvents]);
-
-  const goToCommunities = useCallback(() => {
-    (nav as any).navigate('Communities');
-  }, [nav]);
+    setFrozenHeaderData({ liveConcerts, spontLives, nearbyItems });
+  }, [feedAtTop, liveConcerts, spontLives, nearbyItems]);
 
   const feedListHeader = useMemo(() => (
     <>
-      {/* Bannière promo communautés — une seule fois par installation, pour
-          orienter les nouveaux utilisateurs vers l'onglet Découvrir dès leur
-          première arrivée sur le feed. */}
-      <CommunityPromoHint onPress={goToCommunities} />
-
-      {/* Stories scrollent avec le feed — style Instagram/WhatsApp */}
+      {/* Stories tout en haut du feed (2026-10, demande explicite : au-dessus
+          des événements), scrollent avec le feed — style Instagram/WhatsApp */}
       <StoryBar
         currentUser={currentUser}
         colors={colors}
         onNavigateToMyStories={onNavMyStories}
         onNavigateToChat={onNavChat}
       />
+
+      {/* Événements/concerts proches / dans ton pays — juste sous les stories.
+          Masqué hors du filtre "Général" — comme avant son extraction de
+          FeedListHeader. */}
+      {filter === 'all' && (
+        <NearbyEventsCarousel
+          items={frozenHeaderData.nearbyItems}
+          userCountry={userCountry}
+          colors={colors}
+          onSeeAll={onNavNearby}
+          onPress={onNavNearbyItem}
+        />
+      )}
+
       <FeedListHeader
         liveConcerts={frozenHeaderData.liveConcerts}
         spontLives={frozenHeaderData.spontLives}
-        nearbyEvents={frozenHeaderData.nearbyEvents}
         colors={colors}
         isDark={theme.isDark}
         currentUserId={currentUser?.id}
-        filter={filter}
         onNavLiveList={onNavLiveList}
         onNavSpontList={onNavSpontList}
-        onNavNearby={onNavNearby}
         onNavLiveStream={onNavLiveStream}
         onNavLiveViewer={onNavLiveViewer}
         onNavSpontStream={onNavSpontStream}
         onNavSpontViewer={onNavSpontViewer}
-        onNavEvent={onNavEvent}
       />
     </>
-  ), [frozenHeaderData, colors, theme.isDark,
+  ), [frozenHeaderData, colors, theme.isDark, userCountry,
       currentUser, currentUser?.id, filter,
-      onNavMyStories, onNavChat, goToCommunities,
+      onNavMyStories, onNavChat,
       onNavLiveList, onNavSpontList, onNavNearby, onNavLiveStream, onNavLiveViewer,
-      onNavSpontStream, onNavSpontViewer, onNavEvent]);
+      onNavSpontStream, onNavSpontViewer, onNavNearbyItem]);
 
 
   const closeComments = useCallback(() => {
@@ -2521,6 +2392,8 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
             width={tileW}
             height={Math.round(tileW * 1.4)}
             large
+            isActive={activeReelId === r.id}
+            autoplayEnabled={autoplayEnabled}
             onPress={() => (nav as any).navigate('Tabs', { screen: 'Reels', params: { initialReelId: r.id, initialReel: r } })}
           />
         </View>
@@ -2546,7 +2419,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         onHide={() => setItems(prev => prev.filter(i => !(i.kind === item.kind && i.id === item.id)))}
       />
     );
-  }, [colors, currentUser?.id, followingSet, handleToggleFollow, handlePostDeleted, openComments, nav, load, filter, handleAdImpression, handleAdPress]);
+  }, [colors, currentUser?.id, followingSet, handleToggleFollow, handlePostDeleted, openComments, nav, load, filter, handleAdImpression, handleAdPress, activeReelId, autoplayEnabled]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -2578,155 +2451,105 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
       <View style={{ paddingTop: insets.top + (Platform.OS === 'android' ? 8 : 6) }}>
         <View style={[s.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
         <View style={s.headerRow}>
-          {/* Gauche : avatar + pastille "en ligne" — masqué si recherche ouverte */}
-          {!searchOpen && (
-            !currentUser ? (
-              <View style={{ pointerEvents: 'none' }}>
-                <SkeletonBox width={36} height={36} borderRadius={18} />
+          {/* Gauche : avatar + pastille "en ligne" */}
+          {!currentUser ? (
+            <View style={{ pointerEvents: 'none' }}>
+              <SkeletonBox width={36} height={36} borderRadius={18} />
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={{ flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 3 }}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
+              onPress={() => {
+                if (!showProfilePanel) setAccounts(accountsService.listAccounts());
+                setShowProfilePanel(v => !v);
+              }}
+            >
+              <View>
+                {currentUser.avatar_url ? (
+                  <CachedImage uri={currentUser.avatar_url} style={s.avatar} />
+                ) : (
+                  <View style={[s.avatarFallback, { backgroundColor: colors.primary + '22' }]}>
+                    <Text style={[s.avatarText, { color: colors.primary }]}>{initials}</Text>
+                  </View>
+                )}
+                {/* Pastille présence — verte "en ligne" (l'utilisateur courant
+                    l'est par définition quand il consulte son feed). */}
+                <View style={{
+                  position: 'absolute', right: -1, bottom: -1,
+                  width: 9, height: 9, borderRadius: 5,
+                  backgroundColor: '#22C55E',
+                  borderWidth: 1.5, borderColor: colors.surface,
+                }} />
               </View>
-            ) : (
-              <TouchableOpacity
-                style={{ flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 3 }}
-                activeOpacity={0.7}
-                hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
-                onPress={() => {
-                  if (!showProfilePanel) setAccounts(accountsService.listAccounts());
-                  setShowProfilePanel(v => !v);
-                }}
-              >
-                <View>
-                  {currentUser.avatar_url ? (
-                    <CachedImage uri={currentUser.avatar_url} style={s.avatar} />
-                  ) : (
-                    <View style={[s.avatarFallback, { backgroundColor: colors.primary + '22' }]}>
-                      <Text style={[s.avatarText, { color: colors.primary }]}>{initials}</Text>
-                    </View>
-                  )}
-                  {/* Pastille présence — verte "en ligne" (l'utilisateur courant
-                      l'est par définition quand il consulte son feed). */}
-                  <View style={{
-                    position: 'absolute', right: -1, bottom: -1,
-                    width: 9, height: 9, borderRadius: 5,
-                    backgroundColor: '#22C55E',
-                    borderWidth: 1.5, borderColor: colors.surface,
-                  }} />
-                </View>
-                {/* Chevron — indique que l'avatar est cliquable (ouvre le panneau
-                    profil / multi-comptes). */}
-                <Icon
-                  name={showProfilePanel ? 'chevron-up' : 'chevron-down'}
-                  size={12}
-                  color={colors.textSecondary}
-                />
-              </TouchableOpacity>
-            )
+              {/* Chevron — indique que l'avatar est cliquable (ouvre le panneau
+                  profil / multi-comptes). */}
+              <Icon
+                name={showProfilePanel ? 'chevron-up' : 'chevron-down'}
+                size={12}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
           )}
 
           {/* Centre : barre de recherche permanente (remplace le logo). Au tap,
               ouvre l'overlay de recherche plein écran existant. */}
-          {!searchOpen && (
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={openSearch}
-              style={{
-                flex: 1, flexDirection: 'row', alignItems: 'center', gap: 7,
-                height: 32, borderRadius: 17, paddingHorizontal: 12,
-                marginHorizontal: 7,
-                backgroundColor: colors.backgroundSecondary,
-              }}
-            >
-              <Icon name="search" size={14} color={colors.textTertiary} />
-              <Text style={{ flex: 1, fontSize: FontSize.sm, color: colors.textTertiary }} numberOfLines={1}>
-                Rechercher une publication, un ami…
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Barre de recherche animée — apparaît quand searchOpen */}
-          {searchOpen && (
-            <Animated.View style={[animatedSearchBar, {
-              flexDirection: 'row', alignItems: 'center',
-              paddingHorizontal: 10, height: 32,
-              borderRadius: 17,
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => openSearchOverlay()}
+            style={{
+              flex: 1, flexDirection: 'row', alignItems: 'center', gap: 7,
+              height: 32, borderRadius: 17, paddingHorizontal: 12,
+              marginHorizontal: 7,
               backgroundColor: colors.backgroundSecondary,
-              gap: 7, flex: 1, marginRight: 7,
-            }]}>
-              <Icon name="search" size={14} color={colors.primary} />
-              <TextInput
-                ref={searchInputRef}
-                placeholder="Rechercher..."
-                placeholderTextColor={colors.textDisabled}
-                style={{ flex: 1, fontSize: FontSize.base, color: colors.textPrimary, padding: 0 }}
-                returnKeyType="search"
-                value={searchQuery}
-                onChangeText={(text) => { setSearchQuery(text); liveSearch(text, searchFilter); }}
-                onSubmitEditing={() => {
-                  if (!searchQuery.trim()) return;
-                  commitSearch(searchQuery);
-                  liveSearch(searchQuery, searchFilter);
-                }}
-              />
-              {searching && <ActivityIndicator size="small" color={colors.primary} />}
-              {searchQuery.length > 0 && !searching && (
-                <TouchableOpacity onPress={() => { setSearchQuery(''); setSearchResults(null); }}>
-                  <Icon name="x-circle" size={14} color={colors.textTertiary} />
-                </TouchableOpacity>
-              )}
-            </Animated.View>
-          )}
+            }}
+          >
+            <Icon name="search" size={14} color={colors.textTertiary} />
+            <Text style={{ flex: 1, fontSize: FontSize.sm, color: colors.textTertiary }} numberOfLines={1}>
+              Rechercher une publication, un ami…
+            </Text>
+          </TouchableOpacity>
 
-          {/* Droite : quand la recherche est ouverte → juste la croix pour fermer.
-              Sinon → notifications (cloche + badge) · messages (bulle + badge) ·
+          {/* Droite : notifications (cloche + badge) · messages (bulle + badge) ·
               menu (grille "apps", ouvre Explorer — plus qualitatif que le
               hamburger plat). Icônes nues, mêmes tailles que le reste de l'app. */}
           <View style={s.headerRight}>
-            {searchOpen ? (
-              <TouchableOpacity
-                style={[s.iconBtn, { backgroundColor: colors.primary + '18' }]}
-                onPress={closeSearch}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Icon name="x" size={19} color={colors.primary} />
-              </TouchableOpacity>
-            ) : (
-              <>
-                <TouchableOpacity
-                  style={s.iconBtn}
-                  onPress={goToNotifs}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <View style={{ position: 'relative' }}>
-                    <Icon name="bell" size={19} color={colors.textPrimary} />
-                    {headerNotifCount > 0 && (
-                      <View style={[badgeS.badge, { borderColor: colors.surface, backgroundColor: colors.primary }]}>
-                        <Text style={badgeS.badgeText}>{headerNotifCount > 99 ? '99+' : headerNotifCount}</Text>
-                      </View>
-                    )}
+            <TouchableOpacity
+              style={s.iconBtn}
+              onPress={goToNotifs}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <View style={{ position: 'relative' }}>
+                <Icon name="bell" size={19} color={colors.textPrimary} />
+                {headerNotifCount > 0 && (
+                  <View style={[badgeS.badge, { borderColor: colors.surface, backgroundColor: colors.primary }]}>
+                    <Text style={badgeS.badgeText}>{headerNotifCount > 99 ? '99+' : headerNotifCount}</Text>
                   </View>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={s.iconBtn}
-                  onPress={goToMessages}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <View style={{ position: 'relative' }}>
-                    <Icon name="message-circle" size={19} color={colors.textPrimary} />
-                    {unreadMessages > 0 && (
-                      <View style={[badgeS.badge, { borderColor: colors.surface }]}>
-                        <Text style={badgeS.badgeText}>{unreadMessages > 99 ? '99+' : unreadMessages}</Text>
-                      </View>
-                    )}
+                )}
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={s.iconBtn}
+              onPress={goToMessages}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <View style={{ position: 'relative' }}>
+                <Icon name="message-circle" size={19} color={colors.textPrimary} />
+                {unreadMessages > 0 && (
+                  <View style={[badgeS.badge, { borderColor: colors.surface }]}>
+                    <Text style={badgeS.badgeText}>{unreadMessages > 99 ? '99+' : unreadMessages}</Text>
                   </View>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={s.iconBtn}
-                  onPress={openMenu}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <MCIcon name="view-grid-outline" size={19} color={colors.textPrimary} />
-                </TouchableOpacity>
-              </>
-            )}
+                )}
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={s.iconBtn}
+              onPress={openMenu}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <MCIcon name="view-grid-outline" size={19} color={colors.textPrimary} />
+            </TouchableOpacity>
           </View>
         </View>
         </View>
@@ -2734,616 +2557,69 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
 
       {/* En dehors de la carte header (cf. référence) — sur le fond lavande
           de l'écran, pas dans la carte blanche. */}
-      {!searchOpen && (
-        <View style={[s.headerPills, { paddingHorizontal: 16 }]}>
-            {/* Mes amis — bascule le filtre du fil (Général ↔ Suivis). Pas de
-                chevron : c'est un filtre, pas une navigation. */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={handleToggleFriends}
-              style={[
-                s.headerPill,
-                { backgroundColor: colors.backgroundSecondary },
-                filter === 'following' && { backgroundColor: colors.primary + '18' },
-              ]}
-            >
-              <Icon
-                name="users"
-                size={14}
-                color={filter === 'following' ? colors.primary : colors.textSecondary}
-              />
-              <Text style={[
-                s.headerPillText,
-                { color: filter === 'following' ? colors.primary : colors.textSecondary,
-                  fontWeight: filter === 'following' ? '700' : '600' },
-              ]}>
-                {filter === 'following' ? 'Général' : 'Mes amis'}
-              </Text>
-            </TouchableOpacity>
+      <View style={[s.headerPills, { paddingHorizontal: 16 }]}>
+          {/* Mes amis — bascule le filtre du fil (Général ↔ Suivis). Pas de
+              chevron : c'est un filtre, pas une navigation. */}
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={handleToggleFriends}
+            style={[
+              s.headerPill,
+              { backgroundColor: colors.backgroundSecondary },
+              filter === 'following' && { backgroundColor: colors.primary + '18' },
+            ]}
+          >
+            <Icon
+              name="users"
+              size={14}
+              color={filter === 'following' ? colors.primary : colors.textSecondary}
+            />
+            <Text style={[
+              s.headerPillText,
+              { color: filter === 'following' ? colors.primary : colors.textSecondary,
+                fontWeight: filter === 'following' ? '700' : '600' },
+            ]}>
+              {filter === 'following' ? 'Général' : 'Mes amis'}
+            </Text>
+          </TouchableOpacity>
 
-            {/* Favoris — navigable : icône + libellé à gauche, chevron à droite */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => nav.navigate('Favorites')}
-              style={[s.headerPillNav, { backgroundColor: colors.backgroundSecondary }]}
-            >
-              <View style={s.headerPillNavInner}>
-                <Icon name="heart" size={14} color={colors.textSecondary} />
-                <Text style={[s.headerPillText, { color: colors.textSecondary }]}>Favoris</Text>
+          {/* Favoris — navigable : icône + libellé à gauche, chevron à droite */}
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => nav.navigate('Favorites')}
+            style={[s.headerPillNav, { backgroundColor: colors.backgroundSecondary }]}
+          >
+            <View style={s.headerPillNavInner}>
+              <Icon name="heart" size={14} color={colors.textSecondary} />
+              <Text style={[s.headerPillText, { color: colors.textSecondary }]}>Favoris</Text>
+            </View>
+            <Icon name="chevron-right" size={13} color={colors.textTertiary} />
+          </TouchableOpacity>
+
+          {/* Direct — même fonction que l'ancien bouton "En direct" : ouvre
+              l'écran de diffusion en direct (GoLive). Seul le design change. */}
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => nav.navigate('GoLive')}
+            style={[s.headerPillNav, { backgroundColor: colors.backgroundSecondary }]}
+          >
+            <View style={s.headerPillNavInner}>
+              <View style={{ position: 'relative' }}>
+                <Icon name="send" size={14} color={colors.textSecondary} />
+                <View style={{
+                  position: 'absolute', top: -1, right: -3,
+                  width: 6, height: 6, borderRadius: 3,
+                  backgroundColor: colors.liveTag,
+                  borderWidth: 1, borderColor: colors.backgroundSecondary,
+                }} />
               </View>
-              <Icon name="chevron-right" size={13} color={colors.textTertiary} />
-            </TouchableOpacity>
+              <Text style={[s.headerPillText, { color: colors.textSecondary }]}>Direct</Text>
+            </View>
+            <Icon name="chevron-right" size={13} color={colors.textTertiary} />
+          </TouchableOpacity>
+        </View>
 
-            {/* Direct — même fonction que l'ancien bouton "En direct" : ouvre
-                l'écran de diffusion en direct (GoLive). Seul le design change. */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => nav.navigate('GoLive')}
-              style={[s.headerPillNav, { backgroundColor: colors.backgroundSecondary }]}
-            >
-              <View style={s.headerPillNavInner}>
-                <View style={{ position: 'relative' }}>
-                  <Icon name="send" size={14} color={colors.textSecondary} />
-                  <View style={{
-                    position: 'absolute', top: -1, right: -3,
-                    width: 6, height: 6, borderRadius: 3,
-                    backgroundColor: colors.liveTag,
-                    borderWidth: 1, borderColor: colors.backgroundSecondary,
-                  }} />
-                </View>
-                <Text style={[s.headerPillText, { color: colors.textSecondary }]}>Direct</Text>
-              </View>
-              <Icon name="chevron-right" size={13} color={colors.textTertiary} />
-            </TouchableOpacity>
-          </View>
-        )}
-
-      {searchOpen ? (
-        /* ── Overlay recherche plein écran ──────────────────────────────── */
-        <Animated.View entering={FadeInDown.duration(180)} style={{ flex: 1, backgroundColor: colors.background }}>
-          {(() => {
-            const CATS: { key: 'all'|'users'|'events'|'concerts'|'reels'|'films'; label: string; icon: string; accent: string }[] = [
-              { key: 'all',      label: 'Tout',        icon: 'grid',     accent: colors.primary },
-              { key: 'users',    label: 'Personnes',   icon: 'users',    accent: '#7B3FF2' },
-              { key: 'events',   label: 'Événements',  icon: 'calendar', accent: '#0EA5E9' },
-              { key: 'concerts', label: 'Concerts',    icon: 'music',    accent: '#E0389A' },
-              { key: 'reels',    label: 'Reels',       icon: 'video',    accent: '#10B981' },
-              { key: 'films',    label: 'Films',       icon: 'film',     accent: '#F59E0B' },
-            ];
-
-            const SrThumb = ({ uri, icon, accent, round }: { uri?: string | null; icon: string; accent: string; round?: boolean }) =>
-              uri ? (
-                <CachedImage uri={uri} style={{ width: 52, height: 52, borderRadius: round ? 26 : 12 }} />
-              ) : (
-                <View style={{ width: 52, height: 52, borderRadius: round ? 26 : 12, backgroundColor: accent + '20', alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon name={icon} size={20} color={accent} />
-                </View>
-              );
-
-            const SrRow = ({ onPress, children, last }: { onPress?: () => void; children: React.ReactNode; last?: boolean }) => (
-              <TouchableOpacity
-                onPress={onPress}
-                activeOpacity={0.7}
-                style={{
-                  flexDirection: 'row', alignItems: 'center', gap: 14,
-                  paddingHorizontal: 16, paddingVertical: 12,
-                  borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth,
-                  borderBottomColor: colors.divider,
-                }}
-              >
-                {children}
-              </TouchableOpacity>
-            );
-
-            const SrSection = ({ icon, label, count, accent }: { icon: string; label: string; count: number; accent: string }) => (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 24, paddingBottom: 8 }}>
-                <LinearGradient colors={[accent, accent + 'AA']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon name={icon} size={13} color="#fff" />
-                </LinearGradient>
-                <Text style={{ flex: 1, fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold, color: colors.textPrimary, letterSpacing: 0.2, textTransform: 'uppercase' }}>{label}</Text>
-                <View style={{ backgroundColor: accent + '18', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 }}>
-                  <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, color: accent }}>{count}</Text>
-                </View>
-              </View>
-            );
-
-            // Card grille 9:16 — pour les résultats média (concerts, événements, reels, films, séries)
-            const SrGridCard = ({ uri, icon, accent, title, sub, onPress }: {
-              uri?: string | null; icon: string; accent: string; title: string; sub?: string; onPress: () => void;
-            }) => (
-              <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={{ width: '33%', padding: 4 }}>
-                <View style={{ aspectRatio: 9 / 16, borderRadius: 14, overflow: 'hidden', backgroundColor: accent + '15' }}>
-                  {uri ? (
-                    <CachedImage uri={uri} style={{ width: '100%', height: '100%' }} />
-                  ) : (
-                    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                      <Icon name={icon} size={26} color={accent} />
-                    </View>
-                  )}
-                  <LinearGradient
-                    colors={['transparent', 'rgba(0,0,0,0.85)']}
-                    style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '45%', justifyContent: 'flex-end', padding: 8 }}
-                  >
-                    <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.extraBold, color: '#fff' }} numberOfLines={2}>{title}</Text>
-                    {sub && <Text style={{ fontSize: FontSize.xs, color: 'rgba(255,255,255,0.75)', marginTop: 2 }} numberOfLines={1}>{sub}</Text>}
-                  </LinearGradient>
-                  <View style={{ position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' }}>
-                    <Icon name={icon} size={11} color="#fff" />
-                  </View>
-                </View>
-              </TouchableOpacity>
-            );
-
-            const SrGrid = ({ children }: { children: React.ReactNode }) => (
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12 }}>{children}</View>
-            );
-
-            // État idle — pas encore de query
-            if (!searchQuery.trim() && !searchResults) return (
-              <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-
-                {/* Pub — préchargée dès openSearch(), visible immédiatement à l'ouverture
-                    sans attendre la moindre frappe. */}
-                {searchAd && (
-                  <View style={{ paddingHorizontal: 12, paddingTop: 10 }}>
-                    <AdCard
-                      ad={searchAd}
-                      colors={colors}
-                      searchOverlay
-                      onImpression={handleAdImpression}
-                      onPress={handleAdPress}
-                      onOpenFullscreen={setFullscreenAd}
-                    />
-                  </View>
-                )}
-
-                {/* ── Historique ── */}
-                {searchHistory.length > 0 && (
-                  <View style={{ paddingTop: 20, paddingBottom: 4 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 10 }}>
-                      <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, color: colors.textTertiary, letterSpacing: 1, textTransform: 'uppercase' }}>Recherches récentes</Text>
-                      <TouchableOpacity
-                        onPress={() => { searchHistoryService.clear(); setSearchHistory([]); }}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      >
-                        <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, color: colors.primary }}>Tout effacer</Text>
-                      </TouchableOpacity>
-                    </View>
-                    {searchHistory.map((h, i) => (
-                      <View
-                        key={h.query}
-                        style={{
-                          flexDirection: 'row', alignItems: 'center',
-                          paddingHorizontal: 16, paddingVertical: 11,
-                          borderBottomWidth: i < searchHistory.length - 1 ? StyleSheet.hairlineWidth : 0,
-                          borderBottomColor: colors.divider,
-                        }}
-                      >
-                        <TouchableOpacity
-                          style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }}
-                          activeOpacity={0.7}
-                          onPress={() => {
-                            setSearchQuery(h.query);
-                            setSearchFilter('all');
-                            liveSearch(h.query, 'all');
-                            commitSearch(h.query);
-                          }}
-                        >
-                          <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
-                            <Icon name="clock" size={14} color={colors.textTertiary} />
-                          </View>
-                          <Text style={{ fontSize: FontSize.base, fontWeight: FontWeight.medium, color: colors.textPrimary, flex: 1 }} numberOfLines={1}>{h.query}</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          onPress={() => { searchHistoryService.remove(h.query); setSearchHistory(searchHistoryService.getAll()); }}
-                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        >
-                          <Icon name="x" size={14} color={colors.textTertiary} />
-                        </TouchableOpacity>
-                      </View>
-                    ))}
-                  </View>
-                )}
-
-                {/* Catégories rapides */}
-                <View style={{ paddingHorizontal: 16, paddingTop: searchHistory.length > 0 ? 20 : 24, paddingBottom: 8 }}>
-                  <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, color: colors.textTertiary, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 14 }}>Explorer</Text>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-                    {[
-                      { icon: 'calendar', label: 'Événements', accent: '#0EA5E9', nav: 'Events' },
-                      { icon: 'music',    label: 'Concerts',   accent: '#E0389A', nav: 'Concerts' },
-                      { icon: 'video',    label: 'Reels',      accent: '#10B981', nav: 'Tabs/Reels' },
-                      { icon: 'film',     label: 'Films',      accent: '#3B82F6', nav: 'Movies' },
-                      { icon: 'tv',       label: 'Séries',     accent: '#7B3FF2', nav: 'Series' },
-                      { icon: 'trending-up', label: 'Tendances', accent: '#6366F1', nav: 'Trending' },
-                      { icon: 'users',    label: 'Communautés', accent: '#7B3FF2', nav: 'Communities' },
-                    ].map(({ icon, label, accent, nav: navTarget }) => (
-                      <TouchableOpacity
-                        key={label}
-                        activeOpacity={0.75}
-                        onPress={() => {
-                          closeSearch();
-                          if (navTarget === 'Tabs/Reels') {
-                            (nav as any).navigate('Tabs', { screen: 'Reels' });
-                          } else {
-                            (nav as any).navigate(navTarget);
-                          }
-                        }}
-                        style={{
-                          flexDirection: 'row', alignItems: 'center', gap: 8,
-                          paddingHorizontal: 14, paddingVertical: 10,
-                          borderRadius: 14, borderWidth: StyleSheet.hairlineWidth,
-                          borderColor: colors.divider,
-                          backgroundColor: colors.surface,
-                        }}
-                      >
-                        <View style={{ width: 30, height: 30, borderRadius: 8, backgroundColor: accent + '18', alignItems: 'center', justifyContent: 'center' }}>
-                          <Icon name={icon} size={14} color={accent} />
-                        </View>
-                        <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.semiBold, color: colors.textPrimary }}>{label}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
-                {/* ── Suggestions (contenu populaire + événements à venir) ── */}
-                {(popularLoading || popularContent.length > 0) && (
-                  <View style={{ paddingTop: 24, paddingBottom: 4 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, marginBottom: 12 }}>
-                      <Icon name="trending-up" size={12} color={colors.textTertiary} />
-                      <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, color: colors.textTertiary, letterSpacing: 1, textTransform: 'uppercase' }}>
-                        Meilleures suggestions
-                      </Text>
-                    </View>
-                    {popularLoading ? (
-                      <View style={{ paddingHorizontal: 16 }}>
-                        <ActivityIndicator size="small" color={colors.primary} />
-                      </View>
-                    ) : (
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}>
-                        {popularContent.map(item => {
-                          const isEvent = item.__kind === 'event';
-                          const fmtV = (n: number) => n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n ?? 0);
-                          const fmtDate = (iso?: string) => {
-                            if (!iso) return null;
-                            const d = new Date(iso);
-                            return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
-                          };
-                          return (
-                            <TouchableOpacity
-                              key={`${item.__kind}-${item.id}`}
-                              activeOpacity={0.85}
-                              style={{ width: 120 }}
-                              onPress={() => {
-                                closeSearch();
-                                if (isEvent) {
-                                  (nav as any).navigate('EventDetail', { eventId: item.id });
-                                } else if (item.type === 'serie' || item.content_type === 'serie') {
-                                  (nav as any).navigate('SerieEpisodes', { item });
-                                } else {
-                                  (nav as any).navigate('FilmDetail', { item });
-                                }
-                              }}
-                            >
-                              <View style={{ width: 120, height: 170, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.backgroundSecondary }}>
-                                {item.thumbnail_url ? (
-                                  <Image source={{ uri: item.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                                ) : (
-                                  <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                                    <Icon name={isEvent ? 'calendar' : 'film'} size={26} color={colors.textTertiary} />
-                                  </View>
-                                )}
-                                <View style={{ position: 'absolute', top: 6, left: 6, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
-                                  <Text style={{ fontSize: FontSize['2xs'], fontWeight: FontWeight.bold, color: '#fff' }}>{isEvent ? 'Événement' : 'Populaire'}</Text>
-                                </View>
-                              </View>
-                              <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, color: colors.textPrimary, marginTop: 6 }} numberOfLines={1}>
-                                {item.title ?? 'Sans titre'}
-                              </Text>
-                              {isEvent ? (
-                                !!item.starts_at && (
-                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                                    <Icon name="calendar" size={10} color={colors.textTertiary} />
-                                    <Text style={{ fontSize: FontSize.xsPlus, color: colors.textTertiary }}>{fmtDate(item.starts_at)}</Text>
-                                  </View>
-                                )
-                              ) : (
-                                !!item.view_count && (
-                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                                    <Icon name="eye" size={10} color={colors.textTertiary} />
-                                    <Text style={{ fontSize: FontSize.xsPlus, color: colors.textTertiary }}>{fmtV(item.view_count)}</Text>
-                                  </View>
-                                )
-                              )}
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </ScrollView>
-                    )}
-                  </View>
-                )}
-
-                {/* Astuce */}
-                <View style={{ marginHorizontal: 16, marginTop: 28, borderRadius: 16, backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.divider, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                  <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary + '18', alignItems: 'center', justifyContent: 'center' }}>
-                    <Icon name="zap" size={18} color={colors.primary} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, color: colors.textPrimary }}>Recherche instantanée</Text>
-                    <Text style={{ fontSize: FontSize.sm, color: colors.textTertiary, marginTop: 2 }}>Tape un nom, un lieu ou un titre</Text>
-                  </View>
-                </View>
-              </ScrollView>
-            );
-
-            // Chargement — avec suggestions historique pendant l'attente API. La pub déjà
-            // chargée (searchAd n'est vidée que quand le champ redevient vide, jamais entre
-            // deux frappes) reste affichée ici pour ne pas clignoter/disparaître à chaque
-            // debounce de 300ms pendant que l'utilisateur tape.
-            if (searching) return (
-              <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                {searchAd && searchFilter === 'all' && (
-                  <View style={{ paddingHorizontal: 12, paddingTop: 10 }}>
-                    <AdCard
-                      ad={searchAd}
-                      colors={colors}
-                      searchOverlay
-                      onImpression={handleAdImpression}
-                      onPress={handleAdPress}
-                      onOpenFullscreen={setFullscreenAd}
-                    />
-                  </View>
-                )}
-                {historySuggestions.length > 0 && (
-                  <View style={{ paddingTop: 8, paddingBottom: 4 }}>
-                    <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, color: colors.textTertiary, letterSpacing: 1, textTransform: 'uppercase', paddingHorizontal: 16, marginBottom: 6 }}>Suggestions</Text>
-                    {historySuggestions.map((h) => (
-                      <TouchableOpacity
-                        key={h.query}
-                        activeOpacity={0.7}
-                        onPress={() => { setSearchQuery(h.query); setSearchFilter('all'); liveSearch(h.query, 'all'); commitSearch(h.query); }}
-                        style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}
-                      >
-                        <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center' }}>
-                          <Icon name="clock" size={14} color={colors.primary} />
-                        </View>
-                        <Text style={{ flex: 1, fontSize: FontSize.base, fontWeight: FontWeight.medium, color: colors.textPrimary }} numberOfLines={1}>{h.query}</Text>
-                        <Icon name="arrow-up-left" size={14} color={colors.textTertiary} />
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-                <View style={{ alignItems: 'center', paddingTop: historySuggestions.length > 0 ? 24 : 80, gap: 12 }}>
-                  <GofolyxLoader color={colors.primary} />
-                  <Text style={{ fontSize: FontSize.base, color: colors.textTertiary }}>Recherche en cours...</Text>
-                </View>
-              </ScrollView>
-            );
-
-            // Aucun résultat
-            const hasAny = searchResults && (
-              (searchResults.users?.length ?? 0) > 0 ||
-              (searchResults.films?.length ?? 0) > 0 ||
-              (searchResults.series?.length ?? 0) > 0 ||
-              (searchResults.concerts?.length ?? 0) > 0 ||
-              (searchResults.events?.length ?? 0) > 0 ||
-              (searchResults.reels?.length ?? 0) > 0
-            );
-
-            if (!hasAny) return (
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 32 }}>
-                <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
-                  <Icon name="search" size={30} color={colors.textTertiary} />
-                </View>
-                <Text style={{ fontSize: FontSize.lg, fontWeight: FontWeight.extraBold, color: colors.textPrimary, textAlign: 'center' }}>Aucun résultat</Text>
-                <Text style={{ fontSize: FontSize.base, color: colors.textTertiary, textAlign: 'center', lineHeight: 20 }}>Rien trouvé pour "{searchQuery}". Essaie un autre mot-clé.</Text>
-              </View>
-            );
-
-            // Filtres chips
-            const totalCounts: Record<string, number> = {
-              all:      (searchResults!.users?.length ?? 0) + (searchResults!.events?.length ?? 0) + (searchResults!.concerts?.length ?? 0) + (searchResults!.reels?.length ?? 0) + (searchResults!.films?.length ?? 0) + (searchResults!.series?.length ?? 0),
-              users:    searchResults!.users?.length ?? 0,
-              events:   searchResults!.events?.length ?? 0,
-              concerts: searchResults!.concerts?.length ?? 0,
-              reels:    searchResults!.reels?.length ?? 0,
-              films:    (searchResults!.films?.length ?? 0) + (searchResults!.series?.length ?? 0),
-            };
-
-            return (
-              <View style={{ flex: 1 }}>
-                {/* Suggestions historique au-dessus des résultats */}
-                {historySuggestions.length > 0 && (
-                  <View style={{ borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}>
-                    {historySuggestions.map((h) => (
-                      <TouchableOpacity
-                        key={h.query}
-                        activeOpacity={0.7}
-                        onPress={() => { setSearchQuery(h.query); setSearchFilter('all'); liveSearch(h.query, 'all'); commitSearch(h.query); }}
-                        style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}
-                      >
-                        <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center' }}>
-                          <Icon name="clock" size={13} color={colors.primary} />
-                        </View>
-                        <Text style={{ flex: 1, fontSize: FontSize.base, fontWeight: FontWeight.medium, color: colors.textPrimary }} numberOfLines={1}>{h.query}</Text>
-                        <Icon name="arrow-up-left" size={13} color={colors.textTertiary} />
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-
-                {/* Chips filtre — sticky */}
-                <View style={{ borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }}>
-                <ScrollView
-                  horizontal showsHorizontalScrollIndicator={false}
-                  style={{ flexGrow: 0 }}
-                  contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 10, gap: 8 }}
-                >
-                  {CATS.filter(c => c.key === 'all' || totalCounts[c.key] > 0).map(cat => {
-                    const active = searchFilter === cat.key;
-                    return (
-                      <TouchableOpacity
-                        key={cat.key}
-                        onPress={() => { setSearchFilter(cat.key); liveSearch(searchQuery, cat.key); }}
-                        activeOpacity={0.75}
-                        style={{
-                          flexDirection: 'row', alignItems: 'center', gap: 6,
-                          paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
-                          backgroundColor: active ? cat.accent : colors.backgroundSecondary,
-                          borderWidth: active ? 0 : StyleSheet.hairlineWidth,
-                          borderColor: colors.divider,
-                        }}
-                      >
-                        <Icon name={cat.icon} size={13} color={active ? '#fff' : colors.textSecondary} />
-                        <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, color: active ? '#fff' : colors.textSecondary }}>{cat.label}</Text>
-                        {totalCounts[cat.key] > 0 && (
-                          <View style={{ backgroundColor: active ? 'rgba(255,255,255,0.25)' : cat.accent + '22', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1 }}>
-                            <Text style={{ fontSize: FontSize.xs, fontWeight: FontWeight.extraBold, color: active ? '#fff' : cat.accent }}>{totalCounts[cat.key]}</Text>
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-                </View>
-
-                <ScrollView
-                  contentContainerStyle={{ paddingBottom: 120 }}
-                  showsVerticalScrollIndicator={false}
-                  keyboardShouldPersistTaps="handled"
-                  onScroll={({ nativeEvent }) => {
-                    const { contentOffset, contentSize, layoutMeasurement } = nativeEvent;
-                    if (contentOffset.y + layoutMeasurement.height >= contentSize.height - 300) loadMoreSearch();
-                  }}
-                  scrollEventThrottle={200}
-                >
-                  {/* Pub — placement "search", une seule en tête des résultats, seulement
-                      quand tous les types sont affichés (pas sur une recherche déjà filtrée). */}
-                  {searchAd && searchFilter === 'all' && (
-                    <View style={{ paddingHorizontal: 12, paddingTop: 10 }}>
-                      <AdCard
-                        ad={searchAd}
-                        colors={colors}
-                        searchOverlay
-                        onImpression={handleAdImpression}
-                        onPress={handleAdPress}
-                        onOpenFullscreen={setFullscreenAd}
-                      />
-                    </View>
-                  )}
-
-                  {/* Utilisateurs */}
-                  {(searchFilter === 'all' || searchFilter === 'users') && (searchResults!.users?.length ?? 0) > 0 && (
-                    <View>
-                      <SrSection icon="users" label="Personnes" count={searchResults!.users!.length} accent="#7B3FF2" />
-                      {searchResults!.users!.map((u: any, i: number) => (
-                        <SrRow key={u.id} onPress={() => { closeSearch(); (nav as any).navigate('UserProfile', { userId: u.id }); }} last={i === searchResults!.users!.length - 1}>
-                          <AvatarWithBadge
-                            avatarUrl={u.avatar_url}
-                            initials={((u.display_name ?? u.username ?? '?')[0] ?? '?').toUpperCase()}
-                            size={52}
-                            accentColor="#7B3FF2"
-                            isLive={u.is_live}
-                          />
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: FontSize.basePlus, fontWeight: FontWeight.bold, color: colors.textPrimary }} numberOfLines={1}>{u.display_name ?? u.username}</Text>
-                            <Text style={{ fontSize: FontSize.sm, color: colors.textTertiary, marginTop: 2 }}>@{u.username}</Text>
-                          </View>
-                          <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
-                            <Icon name="chevron-right" size={14} color={colors.textDisabled} />
-                          </View>
-                        </SrRow>
-                      ))}
-                    </View>
-                  )}
-
-                  {/* Événements — grille 9:16 */}
-                  {(searchFilter === 'all' || searchFilter === 'events') && (searchResults!.events?.length ?? 0) > 0 && (
-                    <View>
-                      <SrSection icon="calendar" label="Événements" count={searchResults!.events!.length} accent="#0EA5E9" />
-                      <SrGrid>
-                        {searchResults!.events!.map((e: any) => (
-                          <SrGridCard key={e.id} uri={e.thumbnail_url} icon="calendar" accent="#0EA5E9"
-                            title={e.title}
-                            sub={[e.type ?? e.event_type, e.venue_city].filter(Boolean).join(' · ') || 'Événement'}
-                            onPress={() => { closeSearch(); (nav as any).navigate('EventDetail', { eventId: e.id }); }} />
-                        ))}
-                      </SrGrid>
-                    </View>
-                  )}
-
-                  {/* Concerts — grille 9:16 */}
-                  {(searchFilter === 'all' || searchFilter === 'concerts') && (searchResults!.concerts?.length ?? 0) > 0 && (
-                    <View>
-                      <SrSection icon="music" label="Concerts" count={searchResults!.concerts!.length} accent="#E0389A" />
-                      <SrGrid>
-                        {searchResults!.concerts!.map((c: any) => (
-                          <SrGridCard key={c.id} uri={c.thumbnail_url} icon="music" accent="#E0389A"
-                            title={c.title}
-                            sub={[c.genre, c.venue_city].filter(Boolean).join(' · ') || 'Concert'}
-                            onPress={() => { closeSearch(); (nav as any).navigate('ConcertDetail', { concertId: c.id }); }} />
-                        ))}
-                      </SrGrid>
-                    </View>
-                  )}
-
-                  {/* Reels — grille 9:16 */}
-                  {(searchFilter === 'all' || searchFilter === 'reels') && (searchResults!.reels?.length ?? 0) > 0 && (
-                    <View>
-                      <SrSection icon="video" label="Reels" count={searchResults!.reels!.length} accent="#10B981" />
-                      <SrGrid>
-                        {searchResults!.reels!.map((r: any) => (
-                          <SrGridCard key={r.id} uri={r.thumbnail_url} icon="play" accent="#10B981"
-                            title={r.caption ?? 'Reel'}
-                            sub={`${(r.view_count ?? 0).toLocaleString('fr')} vues`}
-                            onPress={() => {
-                              closeSearch();
-                              const authorId = r.user_id ?? r.author_id ?? r.author?.id;
-                              (nav as any).navigate('SearchReelViewer', { reel: r, reelId: r.id, authorId });
-                            }} />
-                        ))}
-                      </SrGrid>
-                    </View>
-                  )}
-
-                  {/* Films — grille 9:16 */}
-                  {(searchFilter === 'all' || searchFilter === 'films') && (searchResults!.films?.length ?? 0) > 0 && (
-                    <View>
-                      <SrSection icon="film" label="Films" count={searchResults!.films!.length} accent="#F59E0B" />
-                      <SrGrid>
-                        {searchResults!.films!.map((c: any) => (
-                          <SrGridCard key={c.id} uri={c.thumbnail_url} icon="film" accent="#F59E0B"
-                            title={c.title} sub={c.year ? String(c.year) : 'Film'}
-                            onPress={() => { closeSearch(); (nav as any).navigate('FilmDetail', { item: c }); }} />
-                        ))}
-                      </SrGrid>
-                    </View>
-                  )}
-
-                  {/* Séries — grille 9:16 */}
-                  {(searchFilter === 'all' || searchFilter === 'films') && (searchResults!.series?.length ?? 0) > 0 && (
-                    <View>
-                      <SrSection icon="tv" label="Séries" count={searchResults!.series!.length} accent="#6366F1" />
-                      <SrGrid>
-                        {searchResults!.series!.map((c: any) => (
-                          <SrGridCard key={c.id} uri={c.thumbnail_url} icon="tv" accent="#6366F1"
-                            title={c.title} sub={`Série${c.year ? ` · ${c.year}` : ''}`}
-                            onPress={() => { closeSearch(); (nav as any).navigate('FilmDetail', { item: c }); }} />
-                        ))}
-                      </SrGrid>
-                    </View>
-                  )}
-
-                  {/* Indicateur de chargement — scroll infini sur le filtre actif */}
-                  {loadingMoreSearch && (
-                    <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />
-                  )}
-                </ScrollView>
-              </View>
-            );
-          })()}
-        </Animated.View>
-      ) : (loading || switchingFilter) ? (
+      {(loading || switchingFilter) ? (
         <SkeletonFeedScreen />
       ) : (
         <FlatList
@@ -3476,8 +2752,8 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         onCountLoaded={count => commentCountLoadedRef.current?.(count)}
       />
 
-      {/* Pub vidéo ouverte en plein écran avec son — clic sur une AdCard vidéo,
-          où qu'elle soit (feed principal ou overlay recherche). */}
+      {/* Pub vidéo ouverte en plein écran avec son — clic sur une AdCard vidéo
+          du feed (l'overlay recherche, global, gère la sienne). */}
       <Modal visible={!!fullscreenAd} animationType="slide" onRequestClose={() => setFullscreenAd(null)} statusBarTranslucent>
         {fullscreenAd && <AdFullscreenPlayer ad={fullscreenAd} onClose={() => setFullscreenAd(null)} />}
       </Modal>
@@ -4304,29 +3580,45 @@ const fc = StyleSheet.create({
   actionBtnSave:  { flex: 0, width: 44 },
 });
 
-const nbS = StyleSheet.create({
-  // Carte flottante "douce" — même modèle que le reste du feed.
-  wrap:     {
-    paddingTop:       14,
-    paddingBottom:    14,
-    marginHorizontal: FeedCardLayout.marginHorizontal,
-    marginBottom:     FeedCardLayout.gutter,
-    borderRadius:     FeedCardLayout.radius,
-    borderWidth:      FeedCardLayout.borderWidth,
-    overflow:         'hidden',
+const nb2 = StyleSheet.create({
+  wrap: { marginBottom: FeedCardLayout.gutter + 4 },
+  headerRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: FeedCardLayout.marginHorizontal + 4, marginBottom: 12,
   },
-  header:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 12 },
-  title:    { fontSize: FontSize.md, fontWeight: FontWeight.extraBold },
-  subtitle: { fontSize: FontSize.xsPlus, marginTop: 2 },
-  seeAll:   { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
-  list:     { paddingHorizontal: 16, gap: 10, paddingBottom: 4 },
-  card:     { borderRadius: FeedRadius.media, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
-  iconWrap: { width: 36, height: 36, borderRadius: FeedRadius.full, borderWidth: 3, alignItems: 'center', justifyContent: 'center', alignSelf: 'center' },
-  cardBody: { alignItems: 'center', paddingHorizontal: 12, paddingBottom: 14, gap: 3 },
-  name:     { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, textAlign: 'center' },
-  handle:   { fontSize: FontSize.xs, textAlign: 'center' },
-  goBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8, borderRadius: FeedRadius.chip, paddingVertical: 9, width: '100%' },
-  goBtnText:{ fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, color: '#fff' },
+  headerIconWrap: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: FontSize.md, fontWeight: FontWeight.extraBold },
+  headerSubtitle: { fontSize: FontSize.xsPlus, marginTop: 1 },
+  seeAllBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  seeAllTxt: { fontSize: FontSize.sm, fontWeight: FontWeight.bold },
+
+  list: { paddingHorizontal: FeedCardLayout.marginHorizontal + 4, gap: 12, paddingBottom: 4 },
+  card: {
+    borderRadius: 20, overflow: 'hidden', backgroundColor: '#1a1a1a',
+    shadowOpacity: 0.22, shadowRadius: 14, shadowOffset: { width: 0, height: 8 }, elevation: 6,
+  },
+  typeBadge: {
+    position: 'absolute', top: 8, left: 8,
+    width: 24, height: 24, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  pillBadge: {
+    position: 'absolute', top: 8, right: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    borderRadius: 9, paddingHorizontal: 7, paddingVertical: 3,
+  },
+  pillBadgeCountry: { backgroundColor: '#16A34A' },
+  pillBadgeTxt: { fontSize: FontSize.xs, fontWeight: FontWeight.extraBold, color: '#fff' },
+
+  cardFooter: { position: 'absolute', left: 12, right: 12, bottom: 10, gap: 2 },
+  dateChip: {
+    alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.22)',
+    borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, marginBottom: 1,
+  },
+  dateChipTxt: { fontSize: 10, fontWeight: FontWeight.extraBold, color: '#fff', letterSpacing: 0.4 },
+  cardTitle: { fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold, color: '#fff', lineHeight: 18 },
+  cardLocRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  cardLoc: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.8)', fontWeight: FontWeight.semiBold },
 });
 
 // ── Bouton flottant "remonter + rafraîchir" ───────────────────────────────────

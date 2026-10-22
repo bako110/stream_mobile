@@ -9,6 +9,7 @@ import type { Concert } from '../types/concert';
 import type { Reel } from '../types/reel';
 import type { Story } from '../types/story';
 import type { Post } from '../types/post';
+import type { AdData } from '../components/ads/types';
 
 // ── Helpers génériques ────────────────────────────────────────────────────────
 
@@ -79,6 +80,12 @@ export const saveService = {
   isCommunitysaved: (id: string)     => isItemSaved(SAVED_KEYS.COMMUNITIES, id),
   getSavedCommunities: ()            => loadList<{ id: string; name: string; avatar_url?: string | null; members_count?: number; description?: string | null }>(SAVED_KEYS.COMMUNITIES),
 
+  // Ads
+  saveAd:           (ad: AdData)       => addItem(SAVED_KEYS.ADS,   ad),
+  unsaveAd:         (id: string)       => removeItem(SAVED_KEYS.ADS, id),
+  isAdSaved:        (id: string)       => isItemSaved(SAVED_KEYS.ADS, id),
+  getSavedAds:      ()                 => loadList<AdData>(SAVED_KEYS.ADS),
+
   // Tout effacer
   clearAll: () => {
     storage.removeItem(SAVED_KEYS.EVENTS);
@@ -87,5 +94,6 @@ export const saveService = {
     storage.removeItem(SAVED_KEYS.STORIES);
     storage.removeItem(SAVED_KEYS.POSTS);
     storage.removeItem(SAVED_KEYS.COMMUNITIES);
+    storage.removeItem(SAVED_KEYS.ADS);
   },
 };

@@ -3,6 +3,7 @@ import { Text, TouchableOpacity, View, StyleSheet, Linking, StyleProp, TextStyle
 import { useNavigation } from '@react-navigation/native';
 import { LinkPreviewCard } from './LinkPreviewCard';
 import { openPhoneMenu } from '../../utils/phoneMenu';
+import { useSearchOverlayActions } from '../../context/SearchOverlayContext';
 
 // Matches URLs, @mentions, #hashtags, phone numbers, *bold* — in order. Le
 // numéro de téléphone exige soit un + international, soit au moins un
@@ -75,13 +76,16 @@ export const RichText: React.FC<Props> = ({
   maxLines = 0,
   textStyle,
   primaryColor,
-  moreLabel = '…',
-  lessLabel = '…',
+  moreLabel = 'Voir plus',
+  lessLabel = 'Voir moins',
   onMentionPress,
   onHashtagPress,
   showLinkPreview = true,
 }) => {
   const nav = useSafeNavigation();
+  // Actions stables uniquement (pas isOpen) : RichText est rendu en masse, il ne
+  // doit pas re-rendre à chaque ouverture/fermeture de l'overlay.
+  const { openSearchOverlay } = useSearchOverlayActions();
   const [expanded, setExpanded] = useState(false);
   const [isTruncated, setIsTruncated] = useState(false);
 
@@ -106,7 +110,7 @@ export const RichText: React.FC<Props> = ({
 
   const handleHashtag = (tag: string) => {
     if (onHashtagPress) { onHashtagPress(tag); return; }
-    try { nav?.navigate('Search', { query: tag }); } catch {}
+    openSearchOverlay(tag);
   };
 
   const handlePhone = (raw: string) => openPhoneMenu(raw);
@@ -164,11 +168,16 @@ export const RichText: React.FC<Props> = ({
     }
   });
 
+  // Jamais les deux à la fois : le bouton "Voir plus" est déjà l'indicateur de
+  // troncature — ellipsizeMode="tail" ajouterait en plus ses propres "…" natifs
+  // en fin de dernière ligne visible, donnant un rendu redondant du style
+  // "...texte...Voir plus". Le texte est donc coupé net (clipped) sans "…"
+  // quand le bouton prend déjà ce rôle.
   const textNode = (
     <Text
       style={textStyle}
       numberOfLines={expanded ? undefined : (maxLines || undefined)}
-      ellipsizeMode="tail"
+      ellipsizeMode={maxLines > 0 ? 'clip' : 'tail'}
       onPress={maxLines > 0 && isTruncated ? () => setExpanded(v => !v) : undefined}
       suppressHighlighting
     >

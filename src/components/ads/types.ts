@@ -24,6 +24,15 @@ export interface AdData {
   advertiser_id?: string;
   advertiser_name?: string;
   advertiser_logo?: string;
+  // Interactions sociales (2026-10) — même système que posts/events/concerts
+  // (Comment.ad_id / Reaction.ad_id côté backend), compteurs dénormalisés sur
+  // la pub elle-même.
+  like_count?: number;
+  comment_count?: number;
+  // Provenance — pub créée à partir d'un event/concert déjà publié par le
+  // même annonceur (au plus un des deux).
+  source_event_id?: string | null;
+  source_concert_id?: string | null;
 }
 
 /** La pub a un contact direct configuré (numéro + au moins un canal coché). */

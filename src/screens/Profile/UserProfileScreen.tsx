@@ -646,7 +646,8 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                       )}
                     </LinearGradient>
 
-                    {/* Avatar chevauchant */}
+                    {/* Avatar chevauchant — jamais de badge vérifié ici, un seul
+                        suffit (à côté du nom ci-dessous). */}
                     <View style={[styles.friendAvtWrap, {
                       width: FRIEND_AVT + 4, height: FRIEND_AVT + 4, borderRadius: (FRIEND_AVT + 4) / 2,
                       borderColor: colors.surface, marginTop: -(FRIEND_AVT / 2),
@@ -657,11 +658,6 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                         <LinearGradient colors={[colors.primary, colors.primary + 'AA']} style={[styles.friendAvtImg, { width: FRIEND_AVT, height: FRIEND_AVT, borderRadius: FRIEND_AVT / 2 }]}>
                           <Text style={[styles.friendInitial, { fontSize: FRIEND_AVT * 0.38 }]}>{initials2}</Text>
                         </LinearGradient>
-                      )}
-                      {f.is_verified && (
-                        <View style={[styles.friendVerified, { backgroundColor: colors.primary, borderColor: colors.surface }]}>
-                          <Icon name="check" size={7} color="#fff" />
-                        </View>
                       )}
                     </View>
 
@@ -1305,7 +1301,6 @@ const styles = StyleSheet.create({
   friendAvtWrap:   { borderWidth: 3, overflow: 'hidden', alignSelf: 'center' },
   friendAvtImg:    { alignItems: 'center', justifyContent: 'center' },
   friendInitial:   { color: '#fff', fontWeight: FontWeight.extraBold },
-  friendVerified:  { position: 'absolute', bottom: 1, right: 1, width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
 
   friendCardBody:  { alignItems: 'center', paddingHorizontal: 6, paddingBottom: 10, gap: 2 },
   friendName:      { fontSize: FontSize.xsPlus, fontWeight: FontWeight.bold, textAlign: 'center' },

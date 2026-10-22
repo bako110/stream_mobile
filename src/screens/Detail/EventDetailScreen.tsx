@@ -19,7 +19,7 @@ import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
-import { SkeletonDetail, CommentsBottomSheet, ExpandableText, BackButton, GofolyxLoader, FriendsWhoLiked, PriceWithLocal } from '../../components/common';
+import { SkeletonDetail, CommentsBottomSheet, ExpandableText, BackButton, GofolyxLoader, FriendsWhoLiked, PriceWithLocal, RepostBottomSheet } from '../../components/common';
 import { TicketPaymentSheet } from '../../components/wallet/TicketPaymentSheet';
 import { eventService, socialService, authService, toastService, showConfirm } from '../../services';
 import { favoriteService } from '../../services/favoriteService';
@@ -392,6 +392,9 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
   const [liked,        setLiked]        = useState(false);
   const [likeCount,    setLikeCount]    = useState(0);
   const [shareCount,   setShareCount]   = useState(0);
+  const [repostCount,  setRepostCount]  = useState(0);
+  const [reposting,    setReposting]    = useState(false);
+  const [repostSheetOpen, setRepostSheetOpen] = useState(false);
   const [saved,        setSaved]        = useState(false);
   const [reminded,     setReminded]     = useState(false);
   const [remindLoading,setRemindLoading]= useState(false);
@@ -413,6 +416,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
     try {
       const data = await eventService.getById(eventId);
       setEvent(data);
+      setRepostCount((data as any).repost_count ?? 0);
       favoriteService.check('event', eventId).then(setSaved).catch(() => {});
       if (data.status === 'completed' && data.live_id) {
         try {
@@ -494,6 +498,28 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
       socialService.share({ platform: 'external', event_id: eventId }).catch(() => setShareCount(c => Math.max(0, c - 1)));
     } catch { /**/ }
   };
+
+  // Repartager — republication dans le fil (avec attribution de source),
+  // distinct du partage natif ci-dessus. Aperçu + confirmation explicite.
+  const handleRepostPress = useCallback(() => {
+    if (reposting) return;
+    setRepostSheetOpen(true);
+  }, [reposting]);
+
+  const handleRepostConfirm = useCallback(async () => {
+    if (reposting) return;
+    setReposting(true);
+    try {
+      await eventService.repost(eventId);
+      setRepostCount(c => c + 1);
+      setRepostSheetOpen(false);
+      toastService.success('Repartagé', 'Cet événement a été republié sur votre profil.');
+    } catch {
+      toastService.error('Erreur', 'Impossible de repartager cet événement.');
+    } finally {
+      setReposting(false);
+    }
+  }, [eventId, reposting]);
 
   const handleViewTicket = async () => {
     setTicketLoading(true);
@@ -714,6 +740,15 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
             )}
           </TouchableOpacity>
           <View style={[ds.socialSep, { backgroundColor: colors.divider }]} />
+          <TouchableOpacity style={ds.socialBtn} onPress={handleRepostPress} disabled={reposting} activeOpacity={0.7}>
+            <Icon name="repeat" size={20} color={reposting ? colors.textTertiary : colors.textTertiary} />
+            {repostCount > 0 && (
+              <Text style={[ds.socialBtnText, { color: colors.textTertiary }]}>
+                {repostCount > 999 ? `${(repostCount / 1000).toFixed(1)}k` : repostCount}
+              </Text>
+            )}
+          </TouchableOpacity>
+          <View style={[ds.socialSep, { backgroundColor: colors.divider }]} />
           <TouchableOpacity style={[ds.socialBtn, { flex: 0, paddingHorizontal: 18 }]} onPress={handleSave} activeOpacity={0.7}>
             <Animated.View style={saveStyle}>
               <MCIcon name={saved ? 'bookmark' : 'bookmark-outline'} size={21} color={saved ? accent : colors.textTertiary} />
@@ -898,6 +933,18 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
         </TouchableOpacity>
       </Modal>
       <CommentsBottomSheet visible={showComments} onClose={() => setShowComments(false)} eventId={eventId} commentsDisabled={event?.comments_disabled ?? false} />
+      {repostSheetOpen && event && (
+        <RepostBottomSheet
+          visible
+          kind="event"
+          author={event.organizer}
+          title={event.title}
+          thumb={event.thumbnail_url ?? event.banner_url ?? null}
+          reposting={reposting}
+          onConfirm={handleRepostConfirm}
+          onClose={() => { if (!reposting) setRepostSheetOpen(false); }}
+        />
+      )}
     </View>
   );
 };

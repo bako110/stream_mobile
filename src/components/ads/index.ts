@@ -5,3 +5,5 @@ export {
 export { AdvertiserRow } from './AdvertiserRow';
 export { AdCTA } from './AdCTA';
 export { AdFullscreenPlayer } from './AdFullscreenPlayer';
+export { AdSocialBar } from './AdSocialBar';
+export { AdCard } from './AdCard';

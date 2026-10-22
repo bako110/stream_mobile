@@ -5,8 +5,10 @@ import {
   Animated, Pressable, Dimensions, TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { launchImageLibrary } from 'react-native-image-picker';
 import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
@@ -15,6 +17,8 @@ import { STORAGE_KEYS } from '../../utils/constants';
 import { useCommentsWebSocket } from '../../hooks/useCommentsWebSocket';
 import type { CommentWsEvent } from '../../hooks/useCommentsWebSocket';
 import { socialService, toastService, showConfirm } from '../../services';
+import { apiClient } from '../../api/client';
+import { Endpoints } from '../../api/endpoints';
 import { VerifiedBadge } from './VerifiedBadge';
 import { GofolyxLoader } from './FolixLoader';
 import { RichText } from './RichText';
@@ -32,6 +36,7 @@ interface Props {
   concertId?: string;
   eventId?: string;
   postId?: string;
+  adId?: string;
   commentsDisabled?: boolean;
   onCommentAdded?: () => void;
   onCommentCountChange?: (delta: number) => void;
@@ -174,6 +179,7 @@ const CommentRow: React.FC<RowProps> = ({
 }) => {
   const [showFullDate, setShowFullDate] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const nav = useNavigation<any>();
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -250,12 +256,24 @@ const CommentRow: React.FC<RowProps> = ({
             )}
           </View>
 
-          {/* Corps */}
-          <RichText
-            text={item.body}
-            textStyle={[st.commentText, { color: colors.textPrimary }]}
-            primaryColor={colors.primary}
-          />
+          {/* Corps — texte (si présent) puis image (si présente), jamais l'un
+              sans vérifier l'autre : un commentaire image seule n'a pas de body. */}
+          {item.body && (
+            <RichText
+              text={item.body}
+              textStyle={[st.commentText, { color: colors.textPrimary }]}
+              primaryColor={colors.primary}
+            />
+          )}
+          {item.image_url && (
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => nav.navigate('ImageViewer', { url: item.image_url })}
+              style={st.commentImageWrap}
+            >
+              <Image source={{ uri: item.image_url }} style={st.commentImage} resizeMode="cover" />
+            </TouchableOpacity>
+          )}
 
           {item.is_edited && (
             <Text style={[st.editedTag, { color: colors.textTertiary }]}>modifie</Text>
@@ -348,7 +366,7 @@ const CommentRow: React.FC<RowProps> = ({
 // ─── CommentsBottomSheet ──────────────────────────────────────────────────────
 
 export const CommentsBottomSheet: React.FC<Props> = ({
-  visible, onClose, reelId, contentId, concertId, eventId, postId,
+  visible, onClose, reelId, contentId, concertId, eventId, postId, adId,
   commentsDisabled = false,
   onCommentAdded, onCommentCountChange, onCountLoaded,
 }) => {
@@ -380,6 +398,14 @@ export const CommentsBottomSheet: React.FC<Props> = ({
   const [editingId,   setEditingId]   = useState<string | null>(null);
   const [editText,    setEditText]    = useState('');
   const [editSaving,  setEditSaving]  = useState(false);
+  // Image en attente d'envoi — commentaire image seule autorisé (pas de texte
+  // requis), comme WhatsApp/Messenger. pendingImageUri = aperçu local tout de
+  // suite (pas besoin d'attendre l'upload pour l'afficher), uploadedImageUrl =
+  // rempli une fois l'upload terminé, c'est lui qui part réellement dans le payload.
+  const [pendingImageUri,   setPendingImageUri]   = useState<string | null>(null);
+  const [uploadedImageUrl,  setUploadedImageUrl]  = useState<string | null>(null);
+  const [uploadingImage,    setUploadingImage]    = useState(false);
+  const pickingImageRef = useRef(false);
 
   const inputRef       = useRef<TextInput>(null);
   const listRef        = useRef<FlatList>(null);
@@ -408,11 +434,12 @@ export const CommentsBottomSheet: React.FC<Props> = ({
                      : concertId ? { concert_id: concertId }
                      : eventId   ? { event_id:   eventId   }
                      : postId    ? { post_id:    postId    }
+                     : adId      ? { ad_id:      adId      }
                      : null;
 
   const wsTargetType = reelId ? 'reel' : contentId ? 'content'
-    : concertId ? 'concert' : eventId ? 'event' : postId ? 'post' : null;
-  const wsTargetId = reelId ?? contentId ?? concertId ?? eventId ?? postId ?? null;
+    : concertId ? 'concert' : eventId ? 'event' : postId ? 'post' : adId ? 'ad' : null;
+  const wsTargetId = reelId ?? contentId ?? concertId ?? eventId ?? postId ?? adId ?? null;
 
   // WebSocket
   const handleWsEvent = useCallback((event: CommentWsEvent) => {
@@ -497,7 +524,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
       if (count > 0) onCountLoaded?.(count);
     } catch { setComments([]); setHasMore(false); }
     finally { setLoading(false); }
-  }, [reelId, contentId, concertId, eventId, postId]);
+  }, [reelId, contentId, concertId, eventId, postId, adId]);
 
   const loadMore = useCallback(async () => {
     if (!targetParams || loadingMore || !hasMore) return;
@@ -516,7 +543,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
       setHasMore(data.length === PAGE_LIMIT);
     } catch { /* silent */ }
     finally { setLoadingMore(false); }
-  }, [reelId, contentId, concertId, eventId, postId, loadingMore, hasMore, page]);
+  }, [reelId, contentId, concertId, eventId, postId, adId, loadingMore, hasMore, page]);
 
   useEffect(() => {
     if (visible) fetchComments();
@@ -545,15 +572,25 @@ export const CommentsBottomSheet: React.FC<Props> = ({
     }
   }, [comments]);
 
-  // Envoyer
+  // Envoyer — texte seul, image seule, ou les deux (jamais aucun des deux).
+  // Si une image est en cours d'upload, on attend qu'elle se termine (uploadingImage
+  // fait déjà partie de canSend, donc le bouton est désactivé pendant ce temps —
+  // ce garde est un filet de sécurité si handleSend était appelé autrement).
   const handleSend = async () => {
     const body = text.trim();
-    if (!body || sending || !targetParams) return;
+    const hasImage = !!pendingImageUri;
+    if ((!body && !hasImage) || sending || uploadingImage || !targetParams) return;
+    if (hasImage && !uploadedImageUrl) return; // upload pas encore terminé
     setSending(true);
     try {
+      const base = {
+        body: body || undefined,
+        image_url: uploadedImageUrl || undefined,
+        mention_ids: mentionIds.length ? mentionIds : undefined,
+      };
       const payload = replyTo
-        ? { body, mention_ids: mentionIds.length ? mentionIds : undefined, parent_id: replyTo.id, ...targetParams }
-        : { body, mention_ids: mentionIds.length ? mentionIds : undefined, ...targetParams };
+        ? { ...base, parent_id: replyTo.id, ...targetParams }
+        : { ...base, ...targetParams };
       const newComment = await socialService.createComment(payload);
 
       if (replyTo) {
@@ -578,6 +615,8 @@ export const CommentsBottomSheet: React.FC<Props> = ({
       }
       setText('');
       setMentionIds([]);
+      setPendingImageUri(null);
+      setUploadedImageUrl(null);
     } catch { toastService.error('Erreur', "Impossible d'envoyer le commentaire."); }
     finally { setSending(false); }
   };
@@ -629,7 +668,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
   // Modifier
   const startEdit = (item: CommentEx) => {
     setEditingId(item.id);
-    setEditText(item.body);
+    setEditText(item.body ?? '');
     setTimeout(() => inputRef.current?.focus(), 100);
   };
 
@@ -674,13 +713,54 @@ export const CommentsBottomSheet: React.FC<Props> = ({
     if (isEditMode) { setEditText(v); }
     else { setText(v); if (ids !== undefined) setMentionIds(ids); }
   };
-  const canSend       = isEditMode ? !!editText.trim() : !!text.trim();
+  // Édition texte-only (pas d'image sur un commentaire déjà posté, non demandé) —
+  // envoi normal : texte seul, image seule, ou les deux ensemble, jamais aucun des deux.
+  const canSend       = isEditMode
+    ? !!editText.trim()
+    : (!!text.trim() || !!pendingImageUri) && !uploadingImage;
 
   const handleSubmit = () => { if (isEditMode) saveEdit(); else handleSend(); };
   const cancelAction = () => {
     if (isEditMode) { setEditingId(null); setEditText(''); }
     else { setReplyTo(null); setText(''); }
   };
+
+  // Sélection + upload immédiat (comme CreateAdScreen) — l'aperçu local
+  // (pendingImageUri) s'affiche tout de suite, uploadedImageUrl se remplit en
+  // tâche de fond ; handleSend attend la fin de l'upload avant d'envoyer.
+  const pickCommentImage = useCallback(() => {
+    if (pickingImageRef.current || uploadingImage) return;
+    pickingImageRef.current = true;
+    launchImageLibrary({ mediaType: 'photo', selectionLimit: 1, quality: 0.8 }, async (resp) => {
+      pickingImageRef.current = false;
+      if (resp.didCancel || resp.errorCode || !resp.assets?.length) return;
+      const uri = resp.assets[0].uri!;
+      setPendingImageUri(uri);
+      setUploadedImageUrl(null);
+      setUploadingImage(true);
+      try {
+        const fd = new FormData();
+        fd.append('file', { uri, name: `comment_${Date.now()}.jpg`, type: 'image/jpeg' } as any);
+        const res = await apiClient.upload<{ uploaded: { url: string }[] }>(
+          Endpoints.upload.images('comments'),
+          fd,
+        );
+        const url = res.data?.uploaded?.[0]?.url ?? null;
+        if (!url) throw new Error('no url');
+        setUploadedImageUrl(url);
+      } catch {
+        toastService.error('Erreur', "Impossible d'envoyer l'image.");
+        setPendingImageUri(null);
+      } finally {
+        setUploadingImage(false);
+      }
+    });
+  }, [uploadingImage]);
+
+  const cancelPendingImage = useCallback(() => {
+    setPendingImageUri(null);
+    setUploadedImageUrl(null);
+  }, []);
 
   const insets = useSafeAreaInsets();
 
@@ -814,37 +894,71 @@ export const CommentsBottomSheet: React.FC<Props> = ({
                 <Text style={[st.disabledText, { color: colors.textTertiary }]}>Commentaires desactives</Text>
               </View>
             ) : (
-              <View style={st.inputRow}>
-                <View style={[st.inputWrap, {
-                  backgroundColor: colors.surfaceElevated ?? colors.surface,
-                  borderColor: (replyTo || isEditMode) ? colors.primary : colors.border,
-                }]}>
-                  <MentionInput
-                    value={inputValue}
-                    onChangeText={onChangeInput}
-                    colors={colors}
-                    placeholder={placeholder}
-                    maxLength={500}
-                    inputStyle={st.input}
-                    onSubmit={canSend ? handleSubmit : undefined}
-                  />
-                  {canSend && (
+              <>
+                {/* Aperçu de l'image en attente d'envoi — jamais en mode édition
+                    (pas d'ajout/retrait d'image sur un commentaire déjà posté). */}
+                {!isEditMode && pendingImageUri && (
+                  <View style={[st.imagePreviewRow, { backgroundColor: colors.surfaceElevated ?? colors.surface, borderTopColor: colors.border }]}>
+                    <View style={st.imagePreviewThumbWrap}>
+                      <Image source={{ uri: pendingImageUri }} style={st.imagePreviewThumb} />
+                      {uploadingImage && (
+                        <View style={st.imagePreviewLoading}>
+                          <GofolyxLoader variant="bar" color="#fff" />
+                        </View>
+                      )}
+                    </View>
                     <TouchableOpacity
-                      onPress={handleSubmit}
-                      disabled={sending || editSaving}
-                      style={[st.sendBtn, { backgroundColor: colors.primary }]}
-                      activeOpacity={0.8}
+                      onPress={cancelPendingImage}
+                      style={[st.imagePreviewRemove, { backgroundColor: colors.background }]}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      {(sending || editSaving)
-                        ? <GofolyxLoader variant="bar" color="#fff" />
-                        : isEditMode
-                          ? <Icon name="check" size={16} color="#fff" />
-                          : <MCIcon name="send" size={16} color="#fff" />
-                      }
+                      <Icon name="x" size={14} color={colors.textPrimary} />
+                    </TouchableOpacity>
+                  </View>
+                )}
+                <View style={st.inputRow}>
+                  {!isEditMode && (
+                    <TouchableOpacity
+                      onPress={pickCommentImage}
+                      disabled={uploadingImage}
+                      style={[st.imagePickBtn, { backgroundColor: colors.surfaceElevated ?? colors.surface }]}
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                    >
+                      <Icon name="image" size={19} color={uploadingImage ? colors.textTertiary : colors.textSecondary} />
                     </TouchableOpacity>
                   )}
+                  <View style={[st.inputWrap, {
+                    backgroundColor: colors.surfaceElevated ?? colors.surface,
+                    borderColor: (replyTo || isEditMode) ? colors.primary : colors.border,
+                  }]}>
+                    <MentionInput
+                      value={inputValue}
+                      onChangeText={onChangeInput}
+                      colors={colors}
+                      placeholder={placeholder}
+                      maxLength={500}
+                      inputStyle={st.input}
+                      onSubmit={canSend ? handleSubmit : undefined}
+                    />
+                    {canSend && (
+                      <TouchableOpacity
+                        onPress={handleSubmit}
+                        disabled={sending || editSaving}
+                        style={[st.sendBtn, { backgroundColor: colors.primary }]}
+                        activeOpacity={0.8}
+                      >
+                        {(sending || editSaving)
+                          ? <GofolyxLoader variant="bar" color="#fff" />
+                          : isEditMode
+                            ? <Icon name="check" size={16} color="#fff" />
+                            : <MCIcon name="send" size={16} color="#fff" />
+                        }
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 </View>
-              </View>
+              </>
             )}
           </View>
         </Animated.View>
@@ -953,6 +1067,47 @@ const st = StyleSheet.create({
     borderRadius: 12, borderWidth: StyleSheet.hairlineWidth,
   },
   loadMoreText: { fontSize: FontSize.smPlus, fontWeight: FontWeight.bold },
+
+  // Bouton "image" à côté du champ de saisie — même hauteur que inputWrap
+  // (minHeight: 44) pour un alignement propre.
+  imagePickBtn: {
+    width: 44, height: 44, borderRadius: 22,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  // Aperçu de l'image sélectionnée, au-dessus de la barre de saisie —
+  // coin arrondi + petite croix flottante pour l'annuler avant envoi.
+  imagePreviewRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 12, paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  imagePreviewThumbWrap: { position: 'relative' },
+  imagePreviewThumb: {
+    width: 64, height: 64, borderRadius: 12,
+  },
+  imagePreviewLoading: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  imagePreviewRemove: {
+    position: 'absolute', top: -6, right: -6,
+    width: 22, height: 22, borderRadius: 11,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 3, shadowOffset: { width: 0, height: 1 },
+    elevation: 3,
+  },
+  // Image jointe à un commentaire déjà posté — coin arrondi, ratio libre
+  // (resizeMode cover sur une hauteur fixe raisonnable, jamais plein écran
+  // dans la liste, l'ouverture plein écran se fait via ImageViewer au tap).
+  commentImageWrap: {
+    marginTop: 6, borderRadius: 14, overflow: 'hidden',
+    maxWidth: 220,
+  },
+  commentImage: {
+    width: 220, height: 220,
+  },
 
   // Commentaires desactives
   disabledBar: {

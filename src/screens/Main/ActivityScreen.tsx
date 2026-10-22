@@ -5,8 +5,9 @@ import {
 } from 'react-native';
 import Animated, {
   useSharedValue, useAnimatedStyle, withSpring,
-  interpolateColor, withTiming,
+  interpolateColor, withTiming, runOnJS, interpolate, Extrapolation,
 } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
@@ -17,6 +18,7 @@ import { activityService } from '../../services/activityService';
 import { userService } from '../../services/userService';
 import { authService } from '../../services/authService';
 import { useWs } from '../../context/WebSocketContext';
+import { toastService } from '../../services';
 import type { ActivityItem } from '../../services/activityService';
 import type { AppColors } from '../../theme/colors';
 
@@ -142,6 +144,22 @@ export const ActivityScreen: React.FC = () => {
     }
   }, []);
 
+  // Suppression définitive (DELETE /activity/feed/{id}) — jamais juste un
+  // masquage local : l'entrée disparaît du fil de tout le monde qui la
+  // voyait. Optimistic update (retrait immédiat de la liste, l'animation de
+  // swipe a déjà fait disparaître la carte visuellement) avec rollback si
+  // l'appel échoue, même pattern que handleFollow ci-dessus.
+  const handleDelete = useCallback(async (activityId: string) => {
+    const previous = items;
+    setItems(prev => prev.filter(i => i.id !== activityId));
+    try {
+      await activityService.deleteActivity(activityId);
+    } catch {
+      setItems(previous);
+      toastService.error('Erreur', 'Impossible de supprimer cette activité.');
+    }
+  }, [items]);
+
   const handlePress = useCallback((item: ActivityItem) => {
     if (!item.ref_id) {
       if (item.actor) nav.navigate('UserProfile', { userId: item.actor.id });
@@ -263,6 +281,7 @@ export const ActivityScreen: React.FC = () => {
               onPress={() => handlePress(item)}
               onAvatarPress={() => item.actor && nav.navigate('UserProfile', { userId: item.actor.id })}
               onFollow={() => item.actor && handleFollow(item.actor.id)}
+              onDelete={() => handleDelete(item.id)}
             />
           )}
         />
@@ -281,10 +300,17 @@ interface CardProps {
   onPress: () => void;
   onAvatarPress: () => void;
   onFollow: () => void;
+  onDelete: () => void;
 }
 
+// Swipe-to-delete — même pattern/seuil que NotifCard (NotificationsScreen.tsx) :
+// glissement vers la gauche uniquement (activeOffsetX évite de voler le scroll
+// vertical de la liste), seuil -80, fondu + translation avant de retirer l'item
+// du state parent via onDelete.
+const SWIPE_THRESHOLD = -80;
+
 const ActivityCard: React.FC<CardProps> = ({
-  item, colors, isRead, isFollowing, onPress, onAvatarPress, onFollow,
+  item, colors, isRead, isFollowing, onPress, onAvatarPress, onFollow, onDelete,
 }) => {
   const cfg       = CFG[item.activity_type] ?? CFG.follow;
   const actorName = item.actor?.display_name || item.actor?.username || 'Utilisateur';
@@ -292,17 +318,56 @@ const ActivityCard: React.FC<CardProps> = ({
   const isFollow  = item.activity_type === 'follow';
   const isBirthday = item.activity_type === 'birthday';
 
+  const translateX = useSharedValue(0);
+  const opacity     = useSharedValue(1);
+
+  const doDelete = useCallback(() => {
+    opacity.value = withTiming(0, { duration: 200 }, () => runOnJS(onDelete)());
+  }, [onDelete, opacity]);
+
+  const pan = Gesture.Pan()
+    .activeOffsetX([-10, Number.POSITIVE_INFINITY])
+    .failOffsetY([-10, 10])
+    .onUpdate(e => {
+      if (e.translationX < 0) translateX.value = e.translationX;
+    })
+    .onEnd(e => {
+      if (e.translationX < SWIPE_THRESHOLD) {
+        translateX.value = withTiming(-300, { duration: 200 }, () => { runOnJS(doDelete)(); });
+      } else {
+        translateX.value = withSpring(0);
+      }
+    });
+
+  const cardStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+    opacity:   opacity.value,
+  }));
+
+  const deleteReveal = useAnimatedStyle(() => ({
+    opacity: interpolate(translateX.value, [-20, -60], [0, 1], Extrapolation.CLAMP),
+  }));
+
   return (
-    <TouchableOpacity
-      style={[
-        s.card,
-        { backgroundColor: isRead ? colors.surfaceElevated : colors.primary + '0D',
-          borderColor: isRead ? 'transparent' : colors.primary + '30',
-          borderWidth: 1 },
-      ]}
-      onPress={onPress}
-      activeOpacity={0.75}
-    >
+    <Animated.View style={{ marginBottom: 8 }}>
+      {/* Fond rouge derrière, révélé par le glissement */}
+      <Animated.View style={[StyleSheet.absoluteFill, s.deleteBack, deleteReveal]}>
+        <Icon name="trash-2" size={20} color="#fff" />
+        <Text style={s.deleteBackText}>Supprimer</Text>
+      </Animated.View>
+
+      <GestureDetector gesture={pan}>
+        <Animated.View style={cardStyle}>
+          <TouchableOpacity
+            style={[
+              s.card,
+              { backgroundColor: isRead ? colors.surfaceElevated : colors.primary + '0D',
+                borderColor: isRead ? 'transparent' : colors.primary + '30',
+                borderWidth: 1 },
+            ]}
+            onPress={onPress}
+            activeOpacity={0.75}
+          >
       {/* Dot non-lu */}
       {!isRead && (
         <View style={[s.unreadDot, { backgroundColor: colors.primary }]} />
@@ -364,7 +429,10 @@ const ActivityCard: React.FC<CardProps> = ({
           <Text style={{ fontSize: 24 }}>🎂</Text>
         </View>
       )}
-    </TouchableOpacity>
+          </TouchableOpacity>
+        </Animated.View>
+      </GestureDetector>
+    </Animated.View>
   );
 };
 
@@ -407,9 +475,14 @@ const s = StyleSheet.create({
 
   card: {
     flexDirection: 'row', alignItems: 'center',
-    padding: 12, borderRadius: 16,
-    marginBottom: 8, gap: 12,
+    padding: 12, borderRadius: 16, gap: 12,
   },
+  deleteBack: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end',
+    gap: 6, borderRadius: 16,
+    backgroundColor: '#EF4444', paddingRight: 20,
+  },
+  deleteBackText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   unreadDot: {
     position: 'absolute', top: 14, left: 6,
     width: 7, height: 7, borderRadius: 3.5,

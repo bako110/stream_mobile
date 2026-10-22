@@ -544,11 +544,7 @@ export const RegisterScreen: React.FC<Props> = ({ onRegisterSuccess, onNeedsVeri
 
       {/* ── HERO ── */}
       <View style={[s.hero, { height: HERO_H }]}>
-        <LinearGradient
-          colors={[colors.gradientStart, colors.gradientEnd, colors.primary + 'CC']}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.primary }]} />
         <View style={[s.heroCircle1, { backgroundColor: 'rgba(255,255,255,0.10)' }]} />
         <View style={[s.heroCircle2, { backgroundColor: 'rgba(255,255,255,0.07)' }]} />
 

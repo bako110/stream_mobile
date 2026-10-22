@@ -280,7 +280,7 @@ export const Endpoints = {
 
   // ── Upload médias (Cloudinary) ────────────────────────────────────────────
   upload: {
-    images: (folder: 'concerts' | 'events' | 'avatars' | 'reels' | 'stories' | 'messages' | 'posts' | 'communities' | 'ads') =>
+    images: (folder: 'concerts' | 'events' | 'avatars' | 'reels' | 'stories' | 'messages' | 'posts' | 'communities' | 'ads' | 'comments') =>
       `${V1}/upload/images?folder=${folder}`,
     video: (folder: 'reels' | 'stories' | 'messages' | 'ads') =>
       `${V1}/upload/video?folder=${folder}`,
@@ -499,6 +499,7 @@ export const Endpoints = {
   // ── Activité sociale ──────────────────────────────────────────────────────
   activity: {
     feed: `${V1}/activity/feed`,
+    delete: (activityId: string) => `${V1}/activity/feed/${activityId}`,
   },
 
   // ── Signalements ──────────────────────────────────────────────────────────
@@ -552,6 +553,7 @@ export const Endpoints = {
   // ── Utilitaires ───────────────────────────────────────────────────────────
   utils: {
     linkPreview: (url: string) => `${V1}/utils/link-preview?url=${encodeURIComponent(url)}`,
+    geocodeCountry: (lat: number, lon: number) => `${V1}/utils/geocode/country?lat=${lat}&lon=${lon}`,
   },
 
   // ── Cable (partage de reel en DM ciblé) ──────────────────────────────────

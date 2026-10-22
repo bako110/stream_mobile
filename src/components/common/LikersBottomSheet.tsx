@@ -11,6 +11,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { postService, type PostLiker } from '../../services/postService';
 import { userService } from '../../services/userService';
+import { VerifiedBadge } from './VerifiedBadge';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 const SHEET_H = Math.round(SCREEN_H * 0.75);
@@ -74,17 +75,13 @@ const LikerRow: React.FC<{
       activeOpacity={0.7}
       onPress={() => onPress(user.id)}
     >
-      {/* Avatar */}
+      {/* Avatar — jamais de badge vérifié ici, un seul suffit (à côté du nom
+          ci-dessous), même convention que CommentsBottomSheet/PeopleSuggestions. */}
       <View style={[ls.avatarWrap, { backgroundColor: color + '22' }]}>
         {user.avatar_url ? (
           <Image source={{ uri: user.avatar_url }} style={ls.avatar} />
         ) : (
           <Text style={[ls.initials, { color }]}>{getInitials(user)}</Text>
-        )}
-        {user.is_verified && (
-          <View style={ls.verifiedBadge}>
-            <Icon name="check" size={8} color="#fff" />
-          </View>
         )}
       </View>
 
@@ -94,9 +91,7 @@ const LikerRow: React.FC<{
           <Text style={[ls.name, { color: colors.textPrimary }]} numberOfLines={1}>
             {getDisplayName(user)}
           </Text>
-          {user.is_verified && (
-            <Icon name="check-circle" size={12} color="#1D9BF0" />
-          )}
+          {user.is_verified && <VerifiedBadge size={13} />}
         </View>
         {user.username ? (
           <Text style={[ls.userHandle, { color: colors.textTertiary }]} numberOfLines={1}>
@@ -375,19 +370,6 @@ const ls = StyleSheet.create({
   },
   avatar: { width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_SIZE / 2 },
   initials: { fontSize: 16, fontWeight: '800' },
-  verifiedBadge: {
-    position:        'absolute',
-    bottom:          0,
-    right:           0,
-    width:           16,
-    height:          16,
-    borderRadius:    8,
-    backgroundColor: '#1D9BF0',
-    alignItems:      'center',
-    justifyContent:  'center',
-    borderWidth:     1.5,
-    borderColor:     '#fff',
-  },
   info:       { flex: 1, gap: 2 },
   name:       { fontSize: 14, fontWeight: '700' },
   userHandle: { fontSize: 12 },

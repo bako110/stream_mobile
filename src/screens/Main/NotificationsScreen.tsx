@@ -40,6 +40,7 @@ const CFG: Record<string, { icon: string; danger?: boolean }> = {
   community_joined:          { icon: 'users' },
   reel_posted:               { icon: 'film' },
   post_posted:               { icon: 'file-text' },
+  repost:                    { icon: 'repeat' },
   story_posted:              { icon: 'circle' },
   subscription:              { icon: 'star' },
   welcome:                   { icon: 'gift' },

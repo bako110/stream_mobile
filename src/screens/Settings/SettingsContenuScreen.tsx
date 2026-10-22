@@ -5,11 +5,10 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
-import { storage } from '../../utils/storage';
 import { Row, Card, PageHeader } from './_shared';
 import { GofolyxLoader } from '../../components/common';
 import { toastService } from '../../services';
-import { getAppPreferences, type StartScreen } from '../../hooks/useAppPreferences';
+import { getAppPreferences, setCachedAppPreferences, type StartScreen, type AppPreferences } from '../../hooks/useAppPreferences';
 
 interface FeedPrefs {
   feed_show_suggested_reels:       boolean;
@@ -22,8 +21,6 @@ const DEFAULT_FEED_PREFS: FeedPrefs = {
   feed_show_suggested_people:      true,
   feed_show_suggested_communities: true,
 };
-
-const APP_PREFS_STORAGE_KEY = 'app_preferences';
 
 const START_SCREEN_OPTIONS: { key: StartScreen; label: string; icon: string }[] = [
   { key: 'feed',        label: 'Accueil',      icon: 'home' },
@@ -39,8 +36,16 @@ export const SettingsContenuScreen: React.FC = () => {
   const [feedPrefs, setFeedPrefs] = useState<FeedPrefs>(DEFAULT_FEED_PREFS);
   const [loading,   setLoading]   = useState(true);
   const [saving,    setSaving]    = useState<string | null>(null);
-  const [startScreen,        setStartScreen]        = useState<StartScreen>(() => getAppPreferences().preferred_start_screen);
-  const [savingStartScreen,  setSavingStartScreen]   = useState(false);
+  // Un seul objet complet (pas des champs isolés) : le PUT /app-preferences
+  // attend tout AppPreferences et écrase TOUTES ses colonnes avec ce qui est
+  // envoyé (cf. update_app_preferences côté backend, data.model_dump()) — un
+  // appel qui n'enverrait que preferred_start_screen réinitialiserait
+  // silencieusement feed_autoplay_reels à sa valeur par défaut à chaque fois
+  // qu'on change l'écran de démarrage, et inversement. On garde donc toujours
+  // l'état complet en mémoire et on le renvoie intégralement à chaque PUT.
+  const [appPrefs,            setAppPrefs]            = useState<AppPreferences>(() => getAppPreferences());
+  const [savingStartScreen,   setSavingStartScreen]    = useState(false);
+  const [savingAutoplay,      setSavingAutoplay]       = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -55,11 +60,11 @@ export const SettingsContenuScreen: React.FC = () => {
         .finally(() => {
           if (!cancelled) setLoading(false);
         });
-      apiClient.get<{ preferred_start_screen: StartScreen }>(Endpoints.users.appPreferences)
+      apiClient.get<AppPreferences>(Endpoints.users.appPreferences)
         .then(res => {
-          if (cancelled || !res.data?.preferred_start_screen) return;
-          setStartScreen(res.data.preferred_start_screen);
-          storage.setItem(APP_PREFS_STORAGE_KEY, JSON.stringify({ preferred_start_screen: res.data.preferred_start_screen }));
+          if (cancelled || !res.data) return;
+          setAppPrefs(res.data);
+          setCachedAppPreferences(res.data);
         })
         .catch(() => {/* garder la préférence en cache */});
       return () => { cancelled = true; };
@@ -67,21 +72,42 @@ export const SettingsContenuScreen: React.FC = () => {
   );
 
   const selectStartScreen = useCallback(async (next: StartScreen) => {
-    if (savingStartScreen || next === startScreen) return;
-    const previous = startScreen;
-    setStartScreen(next);
-    storage.setItem(APP_PREFS_STORAGE_KEY, JSON.stringify({ preferred_start_screen: next }));
+    if (savingStartScreen || next === appPrefs.preferred_start_screen) return;
+    const previous = appPrefs;
+    const updated = { ...appPrefs, preferred_start_screen: next };
+    setAppPrefs(updated);
+    setCachedAppPreferences(updated);
     setSavingStartScreen(true);
     try {
-      await apiClient.put(Endpoints.users.appPreferences, { preferred_start_screen: next });
+      await apiClient.put(Endpoints.users.appPreferences, updated);
+      const labels: Record<StartScreen, string> = { feed: 'Accueil', reels: 'Reels', communities: 'Communautés' };
+      toastService.success('Préférence enregistrée', `${labels[next]} s'ouvrira au démarrage de l'app.`);
     } catch {
-      setStartScreen(previous);
-      storage.setItem(APP_PREFS_STORAGE_KEY, JSON.stringify({ preferred_start_screen: previous }));
+      setAppPrefs(previous);
+      setCachedAppPreferences(previous);
       toastService.error('Erreur', 'Impossible de sauvegarder la préférence.');
     } finally {
       setSavingStartScreen(false);
     }
-  }, [startScreen, savingStartScreen]);
+  }, [appPrefs, savingStartScreen]);
+
+  const toggleAutoplay = useCallback(async () => {
+    if (savingAutoplay) return;
+    const previous = appPrefs;
+    const updated = { ...appPrefs, feed_autoplay_reels: !appPrefs.feed_autoplay_reels };
+    setAppPrefs(updated);
+    setCachedAppPreferences(updated);
+    setSavingAutoplay(true);
+    try {
+      await apiClient.put(Endpoints.users.appPreferences, updated);
+    } catch {
+      setAppPrefs(previous);
+      setCachedAppPreferences(previous);
+      toastService.error('Erreur', 'Impossible de sauvegarder la préférence.');
+    } finally {
+      setSavingAutoplay(false);
+    }
+  }, [appPrefs, savingAutoplay]);
 
   const toggle = useCallback(async (field: keyof FeedPrefs) => {
     if (saving) return;
@@ -114,6 +140,10 @@ export const SettingsContenuScreen: React.FC = () => {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <PageHeader title="Contenu" onBack={() => nav.goBack()} />
       <ScrollView contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false}>
+        <Text style={[st.sectionLabel, { color: colors.textTertiary }]}>Navigation</Text>
+        <Text style={[st.sectionHint, { color: colors.textTertiary }]}>
+          Accède rapidement à tes concerts, événements, films et séries, et aux contenus tendance.
+        </Text>
         <Card>
           <Row icon="music"       label="Mes concerts"   color="#E0389A" onPress={() => nav.navigate('Concerts')} />
           <Row icon="calendar"    label="Mes événements" color="#FF9800" onPress={() => nav.navigate('Events')} />
@@ -127,7 +157,7 @@ export const SettingsContenuScreen: React.FC = () => {
         </Text>
         <View style={st.startScreenRow}>
           {START_SCREEN_OPTIONS.map(opt => {
-            const active = startScreen === opt.key;
+            const active = appPrefs.preferred_start_screen === opt.key;
             return (
               <TouchableOpacity
                 key={opt.key}
@@ -151,6 +181,29 @@ export const SettingsContenuScreen: React.FC = () => {
             );
           })}
         </View>
+
+        <Text style={[st.sectionLabel, { color: colors.textTertiary }]}>Reels dans le fil</Text>
+        <Card>
+          <Row
+            icon="play-circle"
+            label="Lecture automatique"
+            last
+            right={
+              savingAutoplay
+                ? <ActivityIndicator size="small" color={colors.primary} />
+                : <Switch
+                    value={appPrefs.feed_autoplay_reels}
+                    onValueChange={toggleAutoplay}
+                    disabled={savingAutoplay}
+                    trackColor={{ false: colors.divider ?? '#ccc', true: colors.primary }}
+                    thumbColor="#fff"
+                  />
+            }
+          />
+        </Card>
+        <Text style={[st.sectionHint, { color: colors.textTertiary, marginTop: -4 }]}>
+          Les reels rencontrés en scrollant dans l'accueil se lisent automatiquement (sans son).
+        </Text>
 
         <Text style={[st.sectionLabel, { color: colors.textTertiary }]}>Suggestions dans le fil</Text>
         {loading ? (

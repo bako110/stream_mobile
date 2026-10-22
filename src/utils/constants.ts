@@ -75,4 +75,5 @@ export const SAVED_KEYS = {
   STORIES:     'gofolyx_saved_stories',
   POSTS:       'gofolyx_saved_posts',
   COMMUNITIES: 'gofolyx_saved_communities',
+  ADS:         'gofolyx_saved_ads',
 } as const;

@@ -45,6 +45,7 @@ export { CommentsBottomSheet }  from './CommentsBottomSheet';
 export { ShareBottomSheet }     from './ShareBottomSheet';
 export { RepostBottomSheet }    from './RepostBottomSheet';
 export { HelpGuideSheet, HelpGuideButton, type HelpGuidePoint } from './HelpGuideSheet';
+export { StartScreenSurveySheet } from './StartScreenSurveySheet';
 export { NotificationToast }   from './NotificationToast';
 export { PeopleSuggestions }   from './PeopleSuggestions';
 export { VerifiedBadge, UserNameWithBadge } from './VerifiedBadge';

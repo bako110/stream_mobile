@@ -6,7 +6,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, Image,
+  ScrollView, Image, Modal, FlatList, ActivityIndicator,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { BackButton, GofolyxLoader, PriceWithLocal, CountryMultiSelect, HelpGuideSheet, HelpGuideButton } from '../../components/common';
@@ -15,6 +15,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { adService, type Ad, type AdPlacement, type AdFormat } from '../../services/adService';
+import { eventService } from '../../services/eventService';
+import { concertService } from '../../services/concertService';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -116,6 +118,15 @@ export const CreateAdScreen: React.FC = () => {
   const pickingRef  = useRef(false);
   const pollRef     = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Création depuis un contenu déjà publié (2026-10) — sélection d'un event/
+  // concert existant dont title/description/thumbnail_url pré-remplissent les
+  // champs correspondants ci-dessus (title/description/creativeUrl/localMedia),
+  // jamais une étape séparée : l'annonceur garde le même flux en 5 étapes, le
+  // choix de source n'est qu'un raccourci au-dessus de l'étape Média.
+  // Toujours null en mode édition (une campagne active a déjà son contenu).
+  const [sourceContent, setSourceContent] = useState<{ type: 'event' | 'concert'; id: string; title: string } | null>(null);
+  const [sourcePickerOpen, setSourcePickerOpen] = useState(false);
+
   // Charger le solde wallet
   useEffect(() => {
     apiClient.get<{ gogold_balance: number }>(Endpoints.wallet.balance)
@@ -126,6 +137,25 @@ export const CreateAdScreen: React.FC = () => {
   // Estimation impressions
   const budget = parseFloat(budgetEur) || 0;
   const estimatedImpressions = cpmEur > 0 ? Math.round((budget / cpmEur) * 1000) : 0;
+
+  // Applique le contenu choisi comme source — pré-remplit title/description/
+  // média (jamais écrasé si déjà renseigné manuellement par l'annonceur), et
+  // bascule format='native' + mediaType='image' puisque la source fournit
+  // toujours une image fixe (thumbnail), jamais une vidéo à transcoder.
+  const applySourceContent = useCallback((type: 'event' | 'concert', item: { id: string; title: string; description?: string | null; thumbnail_url?: string | null }) => {
+    setSourceContent({ type, id: item.id, title: item.title });
+    setSourcePickerOpen(false);
+    if (!title.trim()) setTitle(item.title);
+    if (!description.trim() && item.description) setDescription(item.description);
+    if (item.thumbnail_url) {
+      setCreativeUrl(item.thumbnail_url);
+      setLocalMedia(item.thumbnail_url);
+      setMediaType('image');
+      setFormat('native');
+    }
+  }, [title, description]);
+
+  const clearSourceContent = useCallback(() => setSourceContent(null), []);
 
   const pickCreative = () => {
     if (pickingRef.current || uploading) return;
@@ -331,6 +361,11 @@ export const CreateAdScreen: React.FC = () => {
           target_genders:   targetGenders.length ? targetGenders : undefined,
           target_age_min:   targetAgeMin.trim() ? parseInt(targetAgeMin, 10) : undefined,
           target_age_max:   targetAgeMax.trim() ? parseInt(targetAgeMax, 10) : undefined,
+          // Provenance — jamais en édition (une campagne active a déjà son
+          // contenu, source_event_id/source_concert_id n'a de sens qu'à la
+          // création, cf. AdCreate côté backend).
+          source_event_id:   sourceContent?.type === 'event'   ? sourceContent.id : undefined,
+          source_concert_id: sourceContent?.type === 'concert' ? sourceContent.id : undefined,
         }),
       };
 
@@ -406,6 +441,31 @@ export const CreateAdScreen: React.FC = () => {
 
         {/* ── Étape 1 : Média ──────────────────────────────────────────────── */}
         {step === 0 && (
+          <>
+          {!isEdit && (
+            <Field label="Créer à partir d'un contenu existant (optionnel)" textColor={colors.textSecondary}>
+              {sourceContent ? (
+                <View style={[s.sourcePickedRow, { backgroundColor: colors.backgroundSecondary, borderColor: '#7B3FF2' }]}>
+                  <Icon name={sourceContent.type === 'event' ? 'calendar' : 'music'} size={16} color="#7B3FF2" />
+                  <Text style={[s.sourcePickedTxt, { color: colors.textPrimary }]} numberOfLines={1}>{sourceContent.title}</Text>
+                  <TouchableOpacity onPress={clearSourceContent} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Icon name="x" size={16} color={colors.textTertiary} />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  onPress={() => setSourcePickerOpen(true)}
+                  activeOpacity={0.8}
+                  style={[s.sourcePickBtn, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}
+                >
+                  <Icon name="copy" size={16} color={colors.textSecondary} />
+                  <Text style={{ color: colors.textSecondary, fontSize: FontSize.sm, fontWeight: FontWeight.semiBold }}>
+                    Choisir un de mes événements ou concerts
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </Field>
+          )}
           <Field label="Image ou vidéo de la publicité" textColor={colors.textSecondary}>
             <TouchableOpacity
               onPress={pickCreative}
@@ -460,6 +520,7 @@ export const CreateAdScreen: React.FC = () => {
               )}
             </TouchableOpacity>
           </Field>
+          </>
         )}
 
         {/* ── Étape 2 : Contenu ────────────────────────────────────────────── */}
@@ -792,7 +853,108 @@ export const CreateAdScreen: React.FC = () => {
           { icon: 'credit-card',  title: 'Budget',       text: 'Le budget total en euros est débité en GoGold à la création. La campagne s\'arrête automatiquement une fois le budget épuisé.' },
         ]}
       />
+
+      <SourceContentPicker
+        visible={sourcePickerOpen}
+        onClose={() => setSourcePickerOpen(false)}
+        onPick={applySourceContent}
+      />
     </View>
+  );
+};
+
+// ── Sélecteur de contenu existant (événement/concert) ───────────────────────
+// Liste les propres contenus publiés de l'utilisateur courant uniquement
+// (getMyEvents/getMyConcerts, déjà scopés côté backend) — un annonceur ne
+// peut créer une pub qu'à partir de ce qu'il a lui-même publié.
+const SourceContentPicker: React.FC<{
+  visible: boolean;
+  onClose: () => void;
+  onPick: (type: 'event' | 'concert', item: { id: string; title: string; description?: string | null; thumbnail_url?: string | null }) => void;
+}> = ({ visible, onClose, onPick }) => {
+  const { theme: { colors } } = useTheme();
+  const insets = useSafeAreaInsets();
+  const [tab, setTab] = useState<'event' | 'concert'>('event');
+  const [events, setEvents] = useState<any[]>([]);
+  const [concerts, setConcerts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const loadedRef = useRef(false);
+
+  useEffect(() => {
+    if (!visible || loadedRef.current) return;
+    loadedRef.current = true;
+    setLoading(true);
+    Promise.all([
+      eventService.getMyEvents().catch(() => []),
+      concertService.getMyConcerts().catch(() => []),
+    ]).then(([e, c]) => { setEvents(e); setConcerts(c); }).finally(() => setLoading(false));
+  }, [visible]);
+
+  const items = tab === 'event' ? events : concerts;
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={[sp.overlay]}>
+        <View style={[sp.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + 16 }]}>
+          <View style={sp.handle} />
+          <View style={sp.header}>
+            <Text style={[sp.title, { color: colors.textPrimary }]}>Choisir un contenu</Text>
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Icon name="x" size={22} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={[sp.tabs, { borderColor: colors.divider }]}>
+            {(['event', 'concert'] as const).map(t => (
+              <TouchableOpacity
+                key={t}
+                onPress={() => setTab(t)}
+                style={[sp.tabBtn, tab === t && { borderBottomColor: '#7B3FF2', borderBottomWidth: 2 }]}
+              >
+                <Text style={{ color: tab === t ? '#7B3FF2' : colors.textTertiary, fontWeight: FontWeight.bold, fontSize: FontSize.sm }}>
+                  {t === 'event' ? 'Mes événements' : 'Mes concerts'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {loading ? (
+            <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+              <ActivityIndicator color={colors.primary} />
+            </View>
+          ) : items.length === 0 ? (
+            <View style={{ paddingVertical: 40, alignItems: 'center', paddingHorizontal: 24 }}>
+              <Text style={{ color: colors.textTertiary, fontSize: FontSize.sm, textAlign: 'center' }}>
+                {tab === 'event' ? "Tu n'as pas encore publié d'événement." : "Tu n'as pas encore publié de concert."}
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={items}
+              keyExtractor={item => item.id}
+              style={{ maxHeight: 420 }}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[sp.row, { borderBottomColor: colors.divider }]}
+                  onPress={() => onPick(tab, item)}
+                  activeOpacity={0.75}
+                >
+                  {item.thumbnail_url ? (
+                    <Image source={{ uri: item.thumbnail_url }} style={sp.thumb} />
+                  ) : (
+                    <View style={[sp.thumb, { backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }]}>
+                      <Icon name={tab === 'event' ? 'calendar' : 'music'} size={18} color={colors.textTertiary} />
+                    </View>
+                  )}
+                  <Text style={[sp.rowTitle, { color: colors.textPrimary }]} numberOfLines={2}>{item.title}</Text>
+                  <Icon name="chevron-right" size={18} color={colors.textTertiary} />
+                </TouchableOpacity>
+              )}
+            />
+          )}
+        </View>
+      </View>
+    </Modal>
   );
 };
 
@@ -853,4 +1015,27 @@ const s = StyleSheet.create({
     paddingVertical: 14, borderRadius: 16,
   },
   nextBtnText: { color: '#fff', fontWeight: FontWeight.extraBold, fontSize: FontSize.base },
+
+  sourcePickBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, borderWidth: 1,
+  },
+  sourcePickedRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5,
+  },
+  sourcePickedTxt: { flex: 1, fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
+});
+
+const sp = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 10, paddingHorizontal: 16 },
+  handle: { width: 38, height: 4, borderRadius: 2, backgroundColor: 'rgba(128,128,128,0.4)', alignSelf: 'center', marginBottom: 12 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  title: { fontSize: FontSize.lg, fontWeight: FontWeight.extraBold },
+  tabs: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, marginBottom: 4 },
+  tabBtn: { flex: 1, alignItems: 'center', paddingVertical: 12, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  thumb: { width: 44, height: 44, borderRadius: 10 },
+  rowTitle: { flex: 1, fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
 });

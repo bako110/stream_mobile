@@ -71,7 +71,9 @@ export interface Comment {
   concert_id: string | null;
   reel_id: string | null;
   event_id: string | null;
-  body: string;
+  // Nullable (2026-10) : un commentaire peut être une image seule, sans texte.
+  body: string | null;
+  image_url?: string | null;
   is_edited: boolean;
   like_count: number;
   dislike_count?: number;
@@ -96,12 +98,15 @@ export interface Reaction {
 }
 
 export interface CommentCreate {
-  body: string;
+  // Au moins un des deux (body/image_url) requis — validé côté backend.
+  body?: string;
+  image_url?: string;
   reel_id?: string;
   content_id?: string;
   concert_id?: string;
   event_id?: string;
   post_id?: string;
+  ad_id?: string;
   parent_id?: string;
 }
 

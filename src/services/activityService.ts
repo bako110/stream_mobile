@@ -30,4 +30,12 @@ export const activityService = {
     );
     return res.data;
   },
+
+  // Supprime une entrée d'activité du fil (autorisé pour l'acteur ou le
+  // destinataire, cf. DELETE /activity/feed/{id} côté backend). Ne "masque"
+  // pas juste côté client : l'entrée disparaît du fil de tout le monde qui la
+  // voyait (l'activité elle-même est détruite en base, pas seulement filtrée).
+  async deleteActivity(activityId: string): Promise<void> {
+    await apiClient.delete(Endpoints.activity.delete(activityId));
+  },
 };

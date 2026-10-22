@@ -29,6 +29,7 @@ export const socialService = {
     concert_id?: string;
     event_id?: string;
     post_id?: string;
+    ad_id?: string;
     page?: number;
     limit?: number;
   }): Promise<Comment[]> {
@@ -77,7 +78,9 @@ export const socialService = {
     content_id?: string;
     concert_id?: string;
     event_id?: string;
+    post_id?: string;
     comment_id?: string;
+    ad_id?: string;
   }): Promise<{ action: string }> {
     const res = await apiClient.post<{ action: string }>(Endpoints.social.toggleReaction, data);
     // Invalider le cache pour cet item après un toggle
@@ -91,6 +94,8 @@ export const socialService = {
     content_id?: string;
     concert_id?: string;
     event_id?: string;
+    post_id?: string;
+    ad_id?: string;
   }): Promise<{ reaction_type: ReactionType | null }> {
     const cacheKey = _reactionCacheKey(params);
     const cached = _reactionCache.get(cacheKey);
@@ -114,6 +119,8 @@ export const socialService = {
     content_id?: string;
     concert_id?: string;
     event_id?: string;
+    post_id?: string;
+    ad_id?: string;
   }): Promise<ReactionCounts> {
     const q = new URLSearchParams(
       Object.entries(params)
@@ -150,6 +157,7 @@ export const socialService = {
     concert_id?: string;
     reel_id?: string;
     post_id?: string;
+    ad_id?: string;
     page?: number;
     limit?: number;
   }): Promise<PostLiker[]> {
