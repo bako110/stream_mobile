@@ -450,6 +450,28 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
   };
 
   const handleEdit   = () => nav.navigate('CreateConcert' as any, { concertId });
+
+  const handleBuyTicket = () => {
+    if (!concert) return;
+    // Repost — celui qui a republié n'est pas l'artiste original et ne peut
+    // pas vendre de billets dessus (demande explicite : renvoyer vers le
+    // vrai artiste). Même pattern que EventDetailScreen.handleBuyTicket.
+    if (concert.remix_type === 'repost' && concert.source_concert?.artist) {
+      const original = concert.source_concert.artist;
+      const name = original.display_name ?? original.username ?? 'l\'artiste original';
+      showConfirm(
+        'Billets non disponibles ici',
+        `Ceci est une republication. Pour acheter un billet, rends-toi sur le profil de ${name}, l'artiste original de ce concert.`,
+        [
+          { text: 'Fermer', style: 'cancel' },
+          { text: 'Voir le profil', onPress: () => nav.navigate('UserProfile' as any, { userId: original.id }) },
+        ],
+      );
+      return;
+    }
+    setPaySheetOpen(true);
+  };
+
   const handleDelete = () => {
     showConfirm('Supprimer', 'Cette action est irréversible.', [
       { text: 'Annuler', style: 'cancel' },
@@ -748,7 +770,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
             </TouchableOpacity>
           </View>
         ) : isFree ? null : (
-          <TouchableOpacity onPress={isRegistered ? undefined : () => setPaySheetOpen(true)}
+          <TouchableOpacity onPress={isRegistered ? undefined : handleBuyTicket}
             disabled={isRegistered} activeOpacity={isRegistered ? 1 : 0.85}>
             <LinearGradient
               colors={isRegistered ? ['#555', '#444'] : [colors.gradientStart, colors.gradientEnd]}

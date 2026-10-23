@@ -541,6 +541,24 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
 
   const handleBuyTicket = () => {
     if (!event) return;
+    // Repost — celui qui a republié n'est pas l'organisateur original et ne
+    // peut pas vendre de billets dessus (demande explicite : "ceux qui ont
+    // republié ne peuvent pas revendre les billets", renvoyer vers le vrai
+    // organisateur). Détecté via remix_type/source_event, même pattern que
+    // le reste du système de repost.
+    if (event.remix_type === 'repost' && event.source_event?.organizer) {
+      const original = event.source_event.organizer;
+      const name = original.display_name ?? original.username ?? 'l\'organisateur original';
+      showConfirm(
+        'Billets non disponibles ici',
+        `Ceci est une republication. Pour acheter un billet, rends-toi sur le profil de ${name}, l'organisateur original de cet événement.`,
+        [
+          { text: 'Fermer', style: 'cancel' },
+          { text: 'Voir le profil', onPress: () => nav.navigate('UserProfile' as any, { userId: original.id }) },
+        ],
+      );
+      return;
+    }
     if (event.access_type === 'invite_only') {
       toastService.info('Accès sur invitation', 'Contactez l\'organisateur pour obtenir une invitation.');
       return;
