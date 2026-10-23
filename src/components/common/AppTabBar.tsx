@@ -70,6 +70,13 @@ export const AppTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, nav
   };
 
   return (
+    // left/right/borderRadius répétés explicitement ici (déjà dans
+    // styles.container, mais en dernier dans le tableau pour qu'aucune valeur
+    // de la branche isReelsScreen ne puisse jamais les écraser) — un flash
+    // bref au retour de Reels (pilule carrée collée aux bords, fond
+    // transparent) a été signalé ; aucune cause certaine identifiée, mais ce
+    // conteneur ne doit JAMAIS pouvoir perdre sa forme pilule détachée,
+    // transitoirement ou non.
     <View style={[
       styles.container,
       isReelsScreen
@@ -79,6 +86,7 @@ export const AppTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, nav
             shadowOpacity: 0, elevation: 0,
           }
         : { backgroundColor: colors.surface, height: barHeight, bottom: Math.max(bottomPad - 8, 4) },
+      { left: 8, right: 8, borderRadius: 24 },
     ]}>
       {isReelsScreen ? (
         /* Dégradé sombre (bas → haut) plutôt qu'un fond opaque — garantit la

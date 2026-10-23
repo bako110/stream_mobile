@@ -389,6 +389,7 @@ export const Endpoints = {
   // ── Lives simples (spontanés) ─────────────────────────────────────────────
   lives: {
     list:   `${V1}/lives`,
+    recommendedQueue: `${V1}/lives/recommended-queue`,
     me:     `${V1}/lives/me`,
     cost:   `${V1}/lives/cost`,
     start:  `${V1}/lives/start`,

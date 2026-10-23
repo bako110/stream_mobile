@@ -253,6 +253,7 @@ export const ReelsScreen: React.FC = () => {
   }, [uiScale]);
   const { theme, isDark } = useTheme();
   const { colors }        = theme;
+
   const nav    = useNavigation<Nav>();
   const route  = useRoute();
   const params = (route.params ?? {}) as { initialReelId?: string; initialReel?: Reel; reelPublished?: boolean; userId?: string; initialReels?: Reel[] };
@@ -921,23 +922,37 @@ export const ReelsScreen: React.FC = () => {
       awaitingTargetIdRef.current = targetId;
       setAwaitingTarget(true);
 
-      const existingIdx = reelsRef.current.findIndex(r => r.id === targetId);
-      if (existingIdx >= 0) {
-        // Reel déjà dans la liste → scroll direct ; currentIndex doit refléter
-        // la position dans la liste RENDUE (avec pubs), jamais l'index dans
-        // reels seul — voir le commentaire détaillé de toRenderedIndex.
-        const scrollIdx = toRenderedIndex(existingIdx);
-        currentIdxRef.current = scrollIdx;
-        setCurrentIndex(scrollIdx);
-        isScrollingRef.current = true;
-        if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
-        scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 1200);
-        listRef.current?.scrollToOffset({ offset: SCREEN_H * scrollIdx, animated: false });
-      } else if (targetReel?.hls_url || targetReel?.mp4_url) {
-        // Reel absent mais on a l'objet → injecter en tête. toRenderedIndex(0) :
-        // peut se retrouver à un index > 0 dans feedWithAds si une pub a sa
+      if (targetReel?.hls_url || targetReel?.mp4_url) {
+        // Même logique que Facebook/Instagram : le reel cliqué DEPUIS LE FEED
+        // devient toujours le point de départ en position 0, qu'une version de
+        // lui existe déjà ailleurs dans reelsRef ou non — jamais de recherche
+        // par id (findIndex) dont le résultat servirait à choisir QUOI jouer.
+        // Une ancienne entrée (ex: préchargée en arrière-plan, potentiellement
+        // avec un autre hls_url/mp4_url ou une autre miniature) ne doit jamais
+        // pouvoir se substituer à l'objet réellement cliqué ("mauvaise vidéo
+        // qui joue") — on la retire simplement pour éviter un doublon, la
+        // valeur AFFICHÉE est toujours targetReel. toRenderedIndex(0) : peut
+        // se retrouver à un index > 0 dans feedWithAds si une pub a sa
         // position figée à 0 — jamais supposer index 0 rendu == index 0 reels.
-        const injected = [targetReel, ...reelsRef.current.filter(r => r.id !== targetId)];
+        //
+        // Liste repartie à [targetReel] SEUL (pas fusionnée avec reelsRef.current) :
+        // le Tab.Navigator garde ReelsScreen monté en arrière-plan entre deux
+        // visites (pas de vrai démontage) — fusionner avec l'ancienne liste
+        // accumulait les reels d'un aller-retour au suivant (Feed→Reel A→Feed→
+        // Reel B gardait A derrière B, puis un 3e passage gardait A et B, etc.).
+        // Un clic depuis le feed est TOUJOURS un nouveau départ, comme sur
+        // Facebook/Instagram — la file suivante se reconstruit derrière via
+        // load(true) juste en dessous, jamais à partir de l'ancienne session.
+        //
+        // adSlots/adSlotPositionsRef réinitialisés pour la même raison : une
+        // position de pub figée pour l'ancienne liste ne correspond plus à
+        // rien de cohérent dans la nouvelle, et toRenderedIndex(0) calculé
+        // avec ces positions périmées renvoyait un index faux ("perte de
+        // l'index").
+        setAdSlots(new Map());
+        adSlotPositionsRef.current = new Map();
+        servedAdIdsRef.current = new Set();
+        const injected = [targetReel];
         reelsRef.current = injected;
         setReels(injected);
         const scrollIdx = toRenderedIndex(0);
@@ -947,6 +962,11 @@ export const ReelsScreen: React.FC = () => {
         if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
         scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 1200);
         listRef.current?.scrollToOffset({ offset: SCREEN_H * scrollIdx, animated: false });
+        // File suivante chargée en arrière-plan derrière ce premier reel — pas
+        // besoin d'attendre pour afficher/jouer celui-ci. silent=true (comme
+        // le CAS FEED existant) : enrichit la liste sans toucher à l'index ni
+        // au scroll déjà positionnés ci-dessus.
+        load(true);
       } else {
         // Pas d'objet reel — charger en background
         pendingTargetRef.current = { id: targetId };
@@ -1576,10 +1596,14 @@ export const ReelsScreen: React.FC = () => {
   // ── Render: Feed principal ────────────────────────────────────────────────
   return (
     <View style={{ width: SCREEN_W, height: SCREEN_H, backgroundColor: '#000', overflow: 'hidden' }}>
-      {/* translucent — cohérent avec les autres variantes de cet écran (chargement,
-          vide, mes reels) : la status bar doit s'adapter au contenu qui passe
-          dessous (vidéo plein écran ici, donc toujours sombre en pratique), pas
-          rester figée en noir opaque indépendamment de ce qui est affiché. */}
+      {/* translucent — la status bar reste barStyle="light-content" (icônes
+          blanches) en permanence, peu importe le contenu vidéo du reel —
+          détecter la luminosité réelle frame par frame serait trop coûteux.
+          Le dégradé de protection est monté APRÈS la FlatList plus bas (pas
+          ici) : la surface vidéo native (VideoView) ignore le zIndex React
+          Native habituel et passe toujours au-dessus, peu importe sa valeur —
+          seul l'ORDRE DE MONTAGE dans l'arbre JSX fait foi pour un élément
+          natif comme celui-ci. */}
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
       <FlatList
@@ -1675,13 +1699,33 @@ export const ReelsScreen: React.FC = () => {
         initialNumToRender={3}
       />
 
+      {/* Dégradé de protection pour les icônes système (zone status bar) —
+          garantit un fond assez sombre pour qu'elles restent lisibles même
+          sur une vidéo claire (visage, fond blanc...), où elles étaient
+          invisibles/recouvertes par la vidéo auparavant. Monté ICI, après la
+          FlatList, pas avant : la surface vidéo native passe toujours
+          au-dessus d'un élément monté avant elle, zIndex ou non.
+          Conditionné à screenFocused : le Tab.Navigator GARDE cet écran monté
+          en arrière-plan au changement d'onglet (pas de démontage réel), donc
+          sans cette garde ce calque restait dans l'arbre après avoir quitté
+          Reels et pouvait repasser visuellement au-dessus de l'écran suivant
+          (même défaut de layering natif que la vidéo elle-même) — effet
+          "tout grisé" sur Accueil au retour. */}
+      {screenFocused && (
+        <LinearGradient
+          colors={['rgba(0,0,0,0.55)', 'transparent']}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insets.top + 24 }}
+          pointerEvents="none"
+        />
+      )}
+
       {/* Masque plein écran pendant la navigation depuis un reel suggéré du
           feed — tant qu'awaitingTarget est vrai, isActive est forcé à false
           sur TOUS les slides (cf. renderVideoSlide), donc rien ne joue en
           dessous ; cet overlay évite juste que l'utilisateur voie la frame
           figée d'un autre reel pendant la course scroll/injection. */}
       {awaitingTarget && (
-        <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: '#000', zIndex: 50, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', zIndex: 50, alignItems: 'center', justifyContent: 'center' }]}>
           <GofolyxLoader variant="reel" color="#ffffff" />
         </View>
       )}

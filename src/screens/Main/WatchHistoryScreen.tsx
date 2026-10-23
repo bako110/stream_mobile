@@ -201,7 +201,7 @@ export const WatchHistoryScreen: React.FC<Props> = ({ navigation }) => {
 const s = StyleSheet.create({
   container:    { flex: 1 },
   header:       {
-    flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12,
     marginHorizontal: 10, borderRadius: 24, borderWidth: 1,
     shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
     shadowOffset: { width: 0, height: 5 }, elevation: 8,

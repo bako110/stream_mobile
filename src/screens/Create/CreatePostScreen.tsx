@@ -21,6 +21,7 @@ import { toastService } from '../../services';
 
 const { width: W } = Dimensions.get('window');
 const MAX_IMAGES   = 30; // aligné sur la limite Facebook pour un post multi-photos
+const MAX_POST_VIDEO_DURATION_SEC = 20 * 60;
 
 // Première URL http(s) trouvée dans un texte
 const URL_RE = /https?:\/\/[^\s<>"')\]]+/i;
@@ -128,12 +129,23 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
       toastService.warning('Photos déjà sélectionnées', 'Retire les photos pour ajouter une vidéo.');
       return;
     }
+    // Pas de durationLimit ici : cette option n'existe que pour launchCamera
+    // (CameraOptions), pas pour une sélection depuis la bibliothèque — la
+    // vérification explicite ci-dessous est donc la seule limite possible.
     launchImageLibrary(
       { mediaType: 'video', selectionLimit: 1 },
       res => {
         if (res.didCancel || res.errorCode) return;
-        const uri = res.assets?.[0]?.uri;
-        if (uri) setVideoUri(uri);
+        const asset = res.assets?.[0];
+        if (!asset?.uri) return;
+        if (asset.duration && asset.duration > MAX_POST_VIDEO_DURATION_SEC) {
+          toastService.warning(
+            'Vidéo trop longue',
+            `Maximum ${Math.round(MAX_POST_VIDEO_DURATION_SEC / 60)} minutes pour une vidéo de publication.`,
+          );
+          return;
+        }
+        setVideoUri(asset.uri);
       },
     );
   };

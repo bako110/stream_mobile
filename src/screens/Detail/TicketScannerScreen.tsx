@@ -107,7 +107,7 @@ export const TicketScannerScreen: React.FC<Props> = ({ eventId, eventTitle, onBa
         colors={[colors.gradientStart, colors.gradientEnd]}
         style={[st.header, { paddingTop: Platform.OS === 'ios' ? 56 : 42 }]}
       >
-        <BackButton onPress={onBack} transparent />
+        <BackButton onPress={onBack} transparent color="#fff" />
         <View style={{ flex: 1, marginHorizontal: 12 }}>
           <Text style={st.headerTitle} numberOfLines={1}>Scanner les billets</Text>
           <Text style={st.headerSub} numberOfLines={1}>{eventTitle}</Text>

@@ -274,7 +274,7 @@ const s = StyleSheet.create({
   root:        { flex: 1 },
   header:       {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingBottom: 14, paddingHorizontal: 16,
+    paddingTop: 14, paddingBottom: 14, paddingHorizontal: 16,
     marginHorizontal: 10, borderRadius: 24, borderWidth: 1,
     shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
     shadowOffset: { width: 0, height: 5 }, elevation: 8,

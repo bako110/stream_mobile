@@ -95,6 +95,19 @@ async function getLivesPage(page: number, limit = 20): Promise<LivesPage> {
   return r.data ?? { items: [], total: 0, page, has_more: false };
 }
 
+/** File de lecture recommandée pour le scroll vertical entre lives (façon
+ * TikTok) — exclude = IDs déjà vus dans cette session de scroll, pour ne
+ * jamais reproposer deux fois le même créateur. */
+async function getRecommendedQueue(excludeIds: string[], limit = 10): Promise<LiveStream[]> {
+  // Borné aux 200 plus récents — une session de scroll très longue ne doit pas
+  // faire grossir l'URL indéfiniment (les plus anciens exclus ont de toute
+  // façon le plus de chances d'avoir déjà fini leur live entre-temps).
+  const recent = excludeIds.slice(-200);
+  const qs = recent.length ? `?exclude=${recent.join(',')}&limit=${limit}` : `?limit=${limit}`;
+  const r = await apiClient.get<{ items: LiveStream[] }>(`${Endpoints.lives.recommendedQueue}${qs}`);
+  return r.data?.items ?? [];
+}
+
 async function getById(id: string): Promise<LiveStream> {
   const r = await apiClient.get<LiveStream>(Endpoints.lives.byId(id));
   return r.data;
@@ -198,7 +211,7 @@ async function getRanking(liveId: string): Promise<LiveRanking> {
 }
 
 export const liveService = {
-  getLives, getLivesPage, getById, recordView, startLive, stopLive, getToken, getStatus, stopAllMine,
+  getLives, getLivesPage, getRecommendedQueue, getById, recordView, startLive, stopLive, getToken, getStatus, stopAllMine,
   blockUserFromLives, unblockUserFromLives, listBans, unban,
   invite, demote, ban, globalBan, getLiveCost, getRanking,
   sendGiftForAccess, payGoGoldForAccess, checkAccess,

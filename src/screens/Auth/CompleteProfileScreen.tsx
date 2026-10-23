@@ -31,7 +31,7 @@ const GENDER_OPTIONS: { key: Gender; label: string }[] = [
  */
 export const CompleteProfileScreen: React.FC<Props> = ({ onDone }) => {
   const { theme } = useTheme();
-  const { colors } = theme;
+  const { colors, isDark } = theme;
   const insets = useSafeAreaInsets();
 
   const [dateOfBirth, setDateOfBirth] = useState('');
@@ -71,7 +71,7 @@ export const CompleteProfileScreen: React.FC<Props> = ({ onDone }) => {
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={colors.background === '#FFFFFF' ? 'dark-content' : 'light-content'} backgroundColor="transparent" translucent />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
 
       <View style={{ paddingTop: insets.top + 24, paddingHorizontal: 28, flex: 1 }}>
         <Animated.View entering={FadeInDown.delay(60).springify()} style={{ alignItems: 'center', marginBottom: 24 }}>

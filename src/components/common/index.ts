@@ -51,6 +51,7 @@ export { PeopleSuggestions }   from './PeopleSuggestions';
 export { VerifiedBadge, UserNameWithBadge } from './VerifiedBadge';
 export { AvatarWithBadge } from './AvatarWithBadge';
 export { LiveThumbnailBackground } from './LiveThumbnailBackground';
+export { LiveCardVideoPreview } from './LiveCardVideoPreview';
 export { ReportModal } from './ReportModal';
 export { CreatePostBox } from './CreatePostBox';
 export { PostCard } from './PostCard';

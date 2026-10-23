@@ -32,7 +32,7 @@ export const ImageViewerScreen: React.FC<Props> = ({ route, navigation }) => {
 
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
-        <BackButton onPress={() => navigation.goBack()} transparent />
+        <BackButton onPress={() => navigation.goBack()} transparent color="#fff" />
         {label ? <Text style={s.label}>{label}</Text> : null}
         {!isMine && (
           <TouchableOpacity style={s.dlBtn} onPress={handleDownload} disabled={downloading}>

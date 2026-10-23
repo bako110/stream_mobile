@@ -14,9 +14,27 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { useUserLocation } from '../../hooks/useUserLocation';
-import { eventService } from '../../services';
+import { eventService, concertService } from '../../services';
 import type { Event } from '../../types/event';
+import type { Concert } from '../../types/concert';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
+
+// ── Item unifié événement/concert ───────────────────────────────────────────
+// Mélange des deux types sur cet écran (comme le carrousel "Près de chez toi"
+// du feed principal) — un concert est une forme d'événement pour l'utilisateur
+// final, il n'y a pas de raison de les séparer en deux listes.
+type NearbyItem = { kind: 'event'; data: Event } | { kind: 'concert'; data: Concert };
+
+function itemStartDate(item: NearbyItem): string {
+  return item.kind === 'event' ? (item.data.starts_at ?? '') : item.data.scheduled_at;
+}
+function sortByStartDate(items: NearbyItem[]): NearbyItem[] {
+  return [...items].sort((a, b) => {
+    const ta = new Date(itemStartDate(a)).getTime();
+    const tb = new Date(itemStartDate(b)).getTime();
+    return (isNaN(ta) ? Infinity : ta) - (isNaN(tb) ? Infinity : tb);
+  });
+}
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
@@ -205,40 +223,198 @@ const EventCard: React.FC<{ item: Event; index: number; colors: any; onPress: ()
   );
 };
 
+// Carte concert — même design que EventCard (cover/badges/body/footer), champs
+// adaptés (scheduled_at au lieu de starts_at, pas de participants/jauge, genre
+// au lieu de event_type).
+const ConcertCard: React.FC<{ item: Concert; colors: any; onPress: () => void }> = ({
+  item, colors, onPress,
+}) => {
+  const grad = [colors.primary, colors.primaryLight] as [string, string];
+  const dist = item.distance_km;
+  const distLabel = formatDist(dist);
+  const isFree = item.access_type === 'free' || (item.ticket_price == null && item.access_type !== 'ticket');
+
+  const scale = useSharedValue(1);
+  const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+  const allPrices = [item.ticket_price, item.ticket_price_vip, item.ticket_price_vvip, item.ticket_price_vvvip]
+    .filter((p): p is number => p != null && p > 0);
+  const minPrice = allPrices.length > 0 ? Math.min(...allPrices) : null;
+
+  return (
+    <Animated.View style={animStyle}>
+      <TouchableOpacity
+        activeOpacity={1}
+        onPressIn={() => { scale.value = withSpring(0.97); }}
+        onPressOut={() => { scale.value = withSpring(1); }}
+        onPress={onPress}
+      >
+        <View style={[st.card, { backgroundColor: colors.surface }]}>
+          {/* ── Cover ─────────────────────────────────────────────────── */}
+          <View style={{ height: COVER_H, width: '100%', overflow: 'hidden', borderTopLeftRadius: 20, borderTopRightRadius: 20 }}>
+            {item.thumbnail_url ? (
+              <Image source={{ uri: item.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            ) : (
+              <LinearGradient colors={grad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill}>
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="music" size={52} color="rgba(255,255,255,0.25)" />
+                </View>
+              </LinearGradient>
+            )}
+
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.72)']}
+              style={[StyleSheet.absoluteFill, { top: '30%' }]}
+            />
+
+            <View style={{ position: 'absolute', top: 12, left: 12 }}>
+              <LinearGradient colors={grad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.typePill}>
+                <Icon name="music" size={10} color="#fff" />
+                <Text style={st.typePillText}>{(item.genre || 'CONCERT').toUpperCase()}</Text>
+              </LinearGradient>
+            </View>
+
+            {distLabel ? (
+              <LinearGradient
+                colors={[colors.primary, colors.primaryLight]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[st.distPill, { position: 'absolute', top: 12, right: 12 }]}
+              >
+                <Icon name="map-pin" size={10} color="#fff" />
+                <Text style={st.distTxt}>{distLabel}</Text>
+              </LinearGradient>
+            ) : null}
+
+            <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: 14 }}>
+              <Text style={st.coverTitle} numberOfLines={2}>{item.title}</Text>
+              {item.scheduled_at && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
+                  <Icon name="clock" size={11} color="rgba(255,255,255,0.7)" />
+                  <Text style={st.coverDate}>
+                    {formatDate(item.scheduled_at)} · {formatTime(item.scheduled_at)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* ── Body ──────────────────────────────────────────────────── */}
+          <View style={st.body}>
+            {(item.venue_name || item.venue_city) && (
+              <View style={st.bodyRow}>
+                <View style={[st.bodyIconWrap, { backgroundColor: grad[0] + '22' }]}>
+                  <Icon name="map-pin" size={13} color={grad[0]} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  {item.venue_name && (
+                    <Text style={[st.bodyMain, { color: colors.textPrimary }]} numberOfLines={1}>{item.venue_name}</Text>
+                  )}
+                  {item.venue_city && (
+                    <Text style={[st.bodySub, { color: colors.textTertiary }]}>{item.venue_city}{item.venue_country ? `, ${item.venue_country}` : ''}</Text>
+                  )}
+                </View>
+              </View>
+            )}
+
+            {item.current_viewers > 0 && (
+              <View style={st.bodyRow}>
+                <View style={[st.bodyIconWrap, { backgroundColor: grad[1] + '22' }]}>
+                  <Icon name="eye" size={13} color={grad[1]} />
+                </View>
+                <Text style={[st.bodyMain, { color: colors.textPrimary }]}>
+                  {item.current_viewers} spectateur{item.current_viewers > 1 ? 's' : ''}
+                </Text>
+              </View>
+            )}
+
+            <View style={[st.footer, { borderTopColor: colors.divider }]}>
+              <View>
+                {isFree ? (
+                  <View style={[st.freeBadge, { borderColor: colors.success }]}>
+                    <Icon name="gift" size={11} color={colors.success} />
+                    <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, color: colors.success }}>Entrée gratuite</Text>
+                  </View>
+                ) : minPrice != null ? (
+                  <View>
+                    <Text style={[st.priceLabel, { color: colors.textTertiary }]}>À partir de</Text>
+                    <PriceWithLocal amountEur={minPrice} style={[st.priceValue, { color: colors.primary }]} />
+                  </View>
+                ) : null}
+              </View>
+
+              <LinearGradient colors={grad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.goBtn}>
+                <Text style={st.goBtnText}>Voir</Text>
+                <Icon name="arrow-right" size={13} color="#fff" />
+              </LinearGradient>
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 export const NearbyEventsScreen: React.FC = () => {
-  const { theme: { colors } } = useTheme();
+  const { theme } = useTheme();
+  const { colors, isDark } = theme;
   const nav = useNavigation<Nav>();
   const location = useUserLocation();
 
-  const [radius, setRadius] = useState<Radius>(10);
-  const [events, setEvents] = useState<Event[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [noGeo, setNoGeo] = useState(false);
+  const PAGE_LIMIT = 20;
 
-  const load = useCallback(async (r: Radius) => {
+  const [radius, setRadius] = useState<Radius>(10);
+  const [items, setItems] = useState<NearbyItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [noGeo, setNoGeo] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+
+  // Charge une page d'events + concerts en parallèle, fusionne et trie par
+  // date de début croissante (le backend trie déjà chaque liste séparément
+  // par date, mais le mélange des deux types doit être re-trié côté client).
+  // hasMore = au moins l'un des deux a rendu une page pleine (on ne sait pas
+  // lequel des deux a encore des résultats sans le redemander).
+  const loadPage = useCallback(async (p: number, r: Radius, replace: boolean) => {
     if (!location) { setNoGeo(true); setLoading(false); return; }
     setNoGeo(false);
-    setLoading(true);
     try {
-      const data = await eventService.list({
-        limit: 50, lat: location.lat, lon: location.lon,
-        radius_km: r, status: 'published', noCache: true,
-      });
-      setEvents(Array.isArray(data) ? data : []);
-    } catch {
-      setEvents([]);
+      const [ev, conc] = await Promise.all([
+        eventService.list({
+          page: p, limit: PAGE_LIMIT, lat: location.lat, lon: location.lon,
+          radius_km: r, status: 'published', noCache: true,
+        }).catch(() => [] as Event[]),
+        concertService.list({
+          page: p, limit: PAGE_LIMIT, lat: location.lat, lon: location.lon, radius_km: r,
+        }).catch(() => [] as Concert[]),
+      ]);
+      const fresh: NearbyItem[] = [
+        ...ev.map(data => ({ kind: 'event' as const, data })),
+        ...conc.map(data => ({ kind: 'concert' as const, data })),
+      ];
+      setItems(prev => sortByStartDate(replace ? fresh : [...prev, ...fresh]));
+      setHasMore(ev.length >= PAGE_LIMIT || conc.length >= PAGE_LIMIT);
+      setPage(p);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, [location]);
 
-  useEffect(() => { load(radius); }, [radius, location]);
+  useEffect(() => { setLoading(true); loadPage(1, radius, true); }, [radius, location]);
+
+  const loadMore = useCallback(() => {
+    if (loading || loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    loadPage(page + 1, radius, false);
+  }, [loading, loadingMore, hasMore, page, radius, loadPage]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <StatusBar translucent backgroundColor="transparent" barStyle={colors.background === '#FFFFFF' ? 'dark-content' : 'light-content'} />
+      <StatusBar translucent backgroundColor="transparent" barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       {/* ── Header ───────────────────────────────────────────────────── */}
       <View style={{ paddingTop: Platform.OS === 'ios' ? 56 : 44 }}>
@@ -252,15 +428,15 @@ export const NearbyEventsScreen: React.FC = () => {
                 {location
                   ? loading
                     ? 'Recherche en cours...'
-                    : `${events.length} événement${events.length > 1 ? 's' : ''} · ${radius} km`
+                    : `${items.length} résultat${items.length > 1 ? 's' : ''} · ${radius} km`
                   : 'Localisation non disponible'}
               </Text>
             </View>
 
-            {!loading && events.length > 0 && (
+            {!loading && items.length > 0 && (
               <View style={[st.statPill, { backgroundColor: colors.primary + '18' }]}>
                 <Icon name="map-pin" size={11} color={colors.primary} />
-                <Text style={[st.statPillText, { color: colors.primary }]}>{events.length}</Text>
+                <Text style={[st.statPillText, { color: colors.primary }]}>{items.length}</Text>
               </View>
             )}
           </View>
@@ -306,12 +482,12 @@ export const NearbyEventsScreen: React.FC = () => {
             Recherche d'événements à {radius} km...
           </Text>
         </View>
-      ) : events.length === 0 ? (
+      ) : items.length === 0 ? (
         <View style={st.empty}>
           <View style={[st.emptyIconWrap, { backgroundColor: colors.primary + '18' }]}>
             <Icon name="calendar" size={38} color={colors.primary} />
           </View>
-          <Text style={[st.emptyTitle, { color: colors.textPrimary }]}>Aucun événement</Text>
+          <Text style={[st.emptyTitle, { color: colors.textPrimary }]}>Rien à proximité</Text>
           <Text style={[st.emptySub, { color: colors.textTertiary }]}>
             Rien dans un rayon de {radius} km.{'\n'}Essaie d'augmenter le rayon.
           </Text>
@@ -327,18 +503,33 @@ export const NearbyEventsScreen: React.FC = () => {
         </View>
       ) : (
         <FlatList
-          data={events}
-          keyExtractor={e => e.id}
+          data={items}
+          keyExtractor={it => `${it.kind}-${it.data.id}`}
           renderItem={({ item, index }) => (
-            <EventCard
-              item={item}
-              index={index}
-              colors={colors}
-              onPress={() => nav.navigate('EventDetail', { eventId: item.id })}
-            />
+            item.kind === 'event' ? (
+              <EventCard
+                item={item.data}
+                index={index}
+                colors={colors}
+                onPress={() => nav.navigate('EventDetail', { eventId: item.data.id })}
+              />
+            ) : (
+              <ConcertCard
+                item={item.data}
+                colors={colors}
+                onPress={() => nav.navigate('ConcertDetail', { concertId: item.data.id })}
+              />
+            )
           )}
           contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 48 }}
           showsVerticalScrollIndicator={false}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.4}
+          ListFooterComponent={loadingMore ? (
+            <View style={{ paddingVertical: 20 }}>
+              <GofolyxLoader color={colors.primary} />
+            </View>
+          ) : null}
         />
       )}
     </View>

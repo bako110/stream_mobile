@@ -258,7 +258,7 @@ const s = StyleSheet.create({
   center:       { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header:       {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingBottom: 16, paddingHorizontal: 16,
+    paddingTop: 16, paddingBottom: 16, paddingHorizontal: 16,
     marginHorizontal: 10, borderRadius: 24, borderWidth: 1,
     shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
     shadowOffset: { width: 0, height: 5 }, elevation: 8,

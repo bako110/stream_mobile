@@ -15,6 +15,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { AvatarWithBadge } from '../../components/common/AvatarWithBadge';
 import { LiveThumbnailBackground } from '../../components/common/LiveThumbnailBackground';
+import { LiveCardVideoPreview } from '../../components/common/LiveCardVideoPreview';
 import { liveService } from '../../services/liveService';
 import type { MonetizationType, LiveStream } from '../../services/liveService';
 import { toastService } from '../../services';
@@ -399,18 +400,33 @@ export const GoLiveScreen: React.FC = () => {
               <ActivityIndicator color="#F0365A" style={{ marginTop: 20 }} />
             ) : (
               <View style={st.discoverGrid}>
-                {discoverLives.map(live => (
+                {discoverLives.map((live, idx) => (
                   <View key={live.id} style={st.discoverCard}>
                   <TouchableOpacity
                     style={[st.discoverCardInner, { backgroundColor: colors.surface }]}
                     activeOpacity={0.88}
                     onPress={() => nav.navigate('SimpleLiveViewer', { liveId: live.id })}
                   >
-                    <LiveThumbnailBackground
-                      thumbnailUrl={live.thumbnail_url}
-                      avatarUrl={live.user?.avatar_url}
-                      initials={(live.user?.display_name || live.user?.username || '?')[0].toUpperCase()}
-                    />
+                    {/* Vraie vidéo en direct seulement pour les premières cartes
+                        (visibles sans scroll) — pas de FlatList/viewability ici
+                        (simple .map dans une ScrollView), donc pas de moyen de
+                        savoir quelles cartes sont réellement à l'écran plus bas ;
+                        ouvrir une connexion LiveKit pour toute la grille serait
+                        trop coûteux en batterie/réseau. */}
+                    {idx < 4 ? (
+                      <LiveCardVideoPreview
+                        liveId={live.id}
+                        thumbnailUrl={live.thumbnail_url}
+                        avatarUrl={live.user?.avatar_url}
+                        initials={(live.user?.display_name || live.user?.username || '?')[0].toUpperCase()}
+                      />
+                    ) : (
+                      <LiveThumbnailBackground
+                        thumbnailUrl={live.thumbnail_url}
+                        avatarUrl={live.user?.avatar_url}
+                        initials={(live.user?.display_name || live.user?.username || '?')[0].toUpperCase()}
+                      />
+                    )}
                     <LinearGradient
                       colors={['transparent', 'rgba(0,0,0,0.75)']}
                       style={st.discoverThumbGrad}

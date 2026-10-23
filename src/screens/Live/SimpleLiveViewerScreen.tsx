@@ -9,10 +9,11 @@
  * - Indicateur "Sur scène" visible quand on est invité
  */
 import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import {
   View, Text, StyleSheet, TouchableOpacity, TouchableWithoutFeedback,
   StatusBar, Platform, FlatList, TextInput, KeyboardAvoidingView,
-  ActivityIndicator, Image, AppState, AppStateStatus, Modal,
+  ActivityIndicator, Image, AppState, AppStateStatus, Modal, Dimensions,
 } from 'react-native';
 import Animated, {
   FadeIn, FadeOut, SlideInUp, SlideOutDown, SlideInDown,
@@ -76,7 +77,6 @@ const VIEWER_ROOM_OPTIONS = {
 };
 
 type Nav    = NativeStackNavigationProp<MainStackParamList>;
-type RouteT = RouteProp<MainStackParamList, 'SimpleLiveViewer'>;
 
 interface ChatMsg {
   id:      string;
@@ -378,11 +378,26 @@ const MultiVideoView: React.FC<{
   // lettre du nom (Av) même quand une vraie photo de profil était disponible.
   const spotlightAvatarUrl = spotlightTrack ? participantAvatarUrl(spotlightTrack.participant.metadata) : null;
 
-  // Pas encore connecté du tout
+  // Gesture.Tap() (react-native-gesture-handler) plutôt qu'un Touchable* plein
+  // écran : ce viewer est un item d'une FlatList verticale paginée (feed de
+  // lives, scroll façon TikTok) sous GestureHandlerRootView (App.tsx). Un
+  // Touchable* core OU GHTouchableOpacity plein écran réclame le responder dès
+  // onStartShouldSetResponder et empêche la FlatList parente de recevoir le
+  // pan de scroll — pire, GHTouchableOpacity enveloppait aussi VideoTrack
+  // (surface vidéo native LiveKit) dans un wrapper qui cassait son rendu natif
+  // (vidéo invisible pour les clients sur cette version, visible pour les
+  // autres). Gesture.Tap() seul, sans mouvement, ne concurrence jamais un pan
+  // vertical — déjà le pattern validé pour ce cas précis dans ReelsScreen.tsx.
+  const tapGesture = Gesture.Tap().maxDuration(300).runOnJS(true).onEnd(onTap);
+
+  // Connecté à la room LiveKit (token validé) mais aucun flux vidéo reçu
+  // encore — handshake WebRTC (ICE/DTLS) en cours, délai réseau réel qui ne
+  // dépend pas du préchargement des métadonnées fait en amont par le feed.
   if (participants.length === 0) {
     return (
       <View style={[StyleSheet.absoluteFill, mv.noVideo]}>
         <GofolyxLoader variant="reel" color="#F0365A" />
+        <Text style={mv.noVideoText}>Chargement de la vidéo...</Text>
       </View>
     );
   }
@@ -390,7 +405,7 @@ const MultiVideoView: React.FC<{
   // Connecté mais aucune caméra active — afficher avatar du host style TikTok
   if (allTracks.length === 0) {
     return (
-      <TouchableWithoutFeedback onPress={onTap}>
+      <GestureDetector gesture={tapGesture}>
         <View style={[StyleSheet.absoluteFill, mv.noCamBg]}>
           {hostAvatarUrl
             ? <Image source={{ uri: hostAvatarUrl }} style={mv.noCamAvatar} />
@@ -402,12 +417,12 @@ const MultiVideoView: React.FC<{
             <Text style={mv.noCamMicText}>Audio uniquement</Text>
           </View>
         </View>
-      </TouchableWithoutFeedback>
+      </GestureDetector>
     );
   }
 
   return (
-    <TouchableWithoutFeedback onPress={onTap}>
+    <GestureDetector gesture={tapGesture}>
       <View style={StyleSheet.absoluteFill}>
         {/* Spotlight — "contain" (pas "cover") : un host connecté depuis le web
             filme en paysage (webcam standard, ratio large) alors que l'écran
@@ -446,16 +461,10 @@ const MultiVideoView: React.FC<{
         <View style={mv.stageRowWrap} pointerEvents="box-none">
           <StageTileRow
             tiles={[
-              {
-                identity:  spotlightTrack?.participant.identity ?? 'host',
-                name:      hostName,
-                track:     spotlightTrack,
-                camOn:     spotlightCamOn,
-                avatarUrl: hostAvatarUrl,
-                badge:     'host' as StageBadge,
-                micOn:     spotlightCamOn,
-                isSpeaking: spotlightTrack ? !!participants.find(p => p.identity === spotlightTrack.participant.identity)?.isSpeaking : false,
-              },
+              // L'hôte n'apparaît plus ici — déjà visible en plein écran
+              // (spotlight), une tuile dupliquée dans ce bandeau était
+              // redondante. Seuls les invités réellement montés sur scène
+              // (thumbnailTracks + soi-même ci-dessous) y figurent.
               ...thumbnailTracks.map(t => ({
                 identity: t.participant.identity,
                 name:     t.participant.name || t.participant.identity,
@@ -487,7 +496,7 @@ const MultiVideoView: React.FC<{
           />
         </View>
       </View>
-    </TouchableWithoutFeedback>
+    </GestureDetector>
   );
 };
 
@@ -718,10 +727,13 @@ const RoomContent: React.FC<{
         onTap={() => likeRef.current?.trigger()}
       />
 
-      {/* Zone tap coeur */}
-      <TouchableWithoutFeedback onPress={() => likeRef.current?.trigger()}>
+      {/* Zone tap coeur — Gesture.Tap() (voir note MultiVideoView plus haut) :
+          un Touchable* plein écran, RN core ou gesture-handler, empêchait la
+          FlatList de scroll vertical entre lives (parente de cet écran) de
+          jamais détecter le pan. */}
+      <GestureDetector gesture={Gesture.Tap().maxDuration(300).runOnJS(true).onEnd(() => likeRef.current?.trigger())}>
         <View style={[StyleSheet.absoluteFill, { zIndex: 1 }]} />
-      </TouchableWithoutFeedback>
+      </GestureDetector>
 
       {/* Floaters réactions */}
       <ReactionFloaters floaters={floaters} />
@@ -743,8 +755,10 @@ const RoomContent: React.FC<{
 
       {/* ── HEADER PREMIUM ────────────────────────────────────────────── */}
       <View style={st.header}>
-        {/* Bouton retour */}
-        <BackButton onPress={onLeave} transparent />
+        {/* Bouton retour — icône blanche fixe (overlay sur vidéo, jamais de thème
+            clair/sombre ici) : BackButton par défaut utilise colors.textPrimary,
+            invisible en thème clair sur fond vidéo sombre/translucide. */}
+        <BackButton onPress={onLeave} transparent color="#fff" />
 
         {/* Host info : avatar (point live pulsant) + nom + timer en dessous */}
         <View style={st.hostInfo}>
@@ -828,12 +842,14 @@ const RoomContent: React.FC<{
         }))}
       />
 
-      {/* ── BADGE SUR SCÈNE ───────────────────────────────────────────── */}
+      {/* ── INDICATEUR SUR SCÈNE ──────────────────────────────────────────
+          Icône seule (pas de texte) — ancrée sous le header à droite, une
+          zone dégagée qui ne coupe jamais la vue sur la vidéo, contrairement
+          à l'ancien pill flottant "Tu es sur scène" centré en plein écran. */}
       {onStage && !isHost && (
         <Animated.View entering={SlideInUp.duration(350)} exiting={SlideOutDown.duration(250)} style={st.onStageBadge}>
-          <LinearGradient colors={['#3FEDB6', '#22d3a5']} style={st.onStagePill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-            <View style={st.onStageDot} />
-            <Text style={st.onStageText}>Tu es sur scène</Text>
+          <LinearGradient colors={['#3FEDB6', '#22d3a5']} style={st.onStagePill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+            <Icon name="mic" size={14} color="#fff" />
           </LinearGradient>
         </Animated.View>
       )}
@@ -1144,11 +1160,30 @@ const RoomContent: React.FC<{
 
 // ── Page principale ────────────────────────────────────────────────────────────
 
-export const SimpleLiveViewerScreen: React.FC = () => {
+/** Métadonnées + token LiveKit résolus par avance pour un liveId — permet au
+ * feed de scroll vertical (SimpleLiveViewerScreen) de précharger le prochain
+ * live pendant que l'utilisateur regarde encore le courant, pour que seul le
+ * handshake WebRTC (rapide) reste à faire au moment du swipe, pas les appels
+ * réseau getById/getToken qui le précèdent normalement. */
+export interface PreloadedLiveData {
+  live: LiveStream;
+  token: string;
+  wsUrl: string;
+}
+
+interface SimpleLiveViewerContentProps {
+  liveId: string;
+  /** Ferme tout le feed de lives (swipe vertical) — défaut : nav.goBack(). */
+  onLeave?: () => void;
+  /** Si fourni, saute les appels réseau getById/getToken initiaux — voir
+   * PreloadedLiveData. Ignoré pour un live monétisé (l'accès doit toujours
+   * être vérifié au moment réel de l'ouverture, pas en avance). */
+  preloaded?: PreloadedLiveData;
+}
+
+const SimpleLiveViewerContent: React.FC<SimpleLiveViewerContentProps> = ({ liveId, onLeave: onLeaveProp, preloaded }) => {
   useKeepAwake();
   const nav   = useNavigation<Nav>();
-  const route = useRoute<RouteT>();
-  const { liveId } = route.params;
 
   useEffect(() => { configureLiveAudioSession(); }, []);
 
@@ -1204,7 +1239,15 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   useEffect(() => {
     (async () => {
       try {
-        const l = await liveService.getById(liveId);
+        // preloaded : le wrapper feed (SimpleLiveViewerScreen) a déjà résolu
+        // getById + getToken pendant que ce live était encore le suivant dans
+        // la queue — on saute ces deux appels réseau, seule la connexion
+        // LiveKit (GestureDetector→LiveKitRoom plus bas) reste à faire au
+        // montage. Jamais utilisé pour un live monétisé : l'accès doit être
+        // vérifié au moment réel de l'ouverture, pas en avance pendant qu'un
+        // autre live est affiché.
+        const usingPreload = !!preloaded && preloaded.live.id === liveId && !preloaded.live.is_monetized;
+        const l = usingPreload ? preloaded!.live : await liveService.getById(liveId);
         setLive(l);
         liveService.recordView(liveId);
         if (l.status !== 'active') { setEnded(true); setLoading(false); return; }
@@ -1245,9 +1288,14 @@ export const SimpleLiveViewerScreen: React.FC = () => {
           return; // ne pas charger le token LiveKit encore
         }
 
-        const t = await liveService.getToken(liveId);
-        setToken(t.token);
-        setWsUrl(t.livekit_url);
+        if (usingPreload) {
+          setToken(preloaded!.token);
+          setWsUrl(preloaded!.wsUrl);
+        } else {
+          const t = await liveService.getToken(liveId);
+          setToken(t.token);
+          setWsUrl(t.livekit_url);
+        }
 
         const storedUserId = storage.getItem(STORAGE_KEYS.LAST_USER_ID);
         if (storedUserId) setMyIdentity(storedUserId);
@@ -1472,8 +1520,9 @@ export const SimpleLiveViewerScreen: React.FC = () => {
   const handleLeave = useCallback(() => {
     try { wsRef.current?.close(); } catch {}
     if (elapsedRef.current) clearInterval(elapsedRef.current);
-    nav.goBack();
-  }, [nav]);
+    if (onLeaveProp) onLeaveProp();
+    else nav.goBack();
+  }, [nav, onLeaveProp]);
 
   const handleDeleteMsg = useCallback(async (id: string) => {
     // Suppression optimiste locale immédiate
@@ -1562,8 +1611,15 @@ export const SimpleLiveViewerScreen: React.FC = () => {
     catch {}
   }, [liveId]);
 
+  // Étape 1/2 : chargement des infos du live (titre, host, accès...) — avant
+  // même de savoir si on peut rejoindre (live monétisé ? toujours actif ?).
   if (loading) {
-    return <View style={[st.root, st.center]}><GofolyxLoader variant="reel" color="#F0365A" /></View>;
+    return (
+      <View style={[st.root, st.center]}>
+        <GofolyxLoader variant="reel" color="#F0365A" />
+        <Text style={st.connectText}>Chargement du live...</Text>
+      </View>
+    );
   }
 
   if (ended) {
@@ -1614,11 +1670,14 @@ export const SimpleLiveViewerScreen: React.FC = () => {
     );
   }
 
+  // Étape 2/2 : adhésion au live (récupération du token d'accès LiveKit) —
+  // distincte du chargement de la vidéo elle-même (cf. MultiVideoView,
+  // participants.length === 0, une fois réellement connecté à la room).
   if (!token || !wsUrl) {
     return (
       <View style={[st.root, st.center]}>
         <GofolyxLoader variant="reel" color="#F0365A" />
-        <Text style={st.connectText}>Connexion...</Text>
+        <Text style={st.connectText}>Connexion au live...</Text>
       </View>
     );
   }
@@ -1663,6 +1722,123 @@ export const SimpleLiveViewerScreen: React.FC = () => {
         onStopLive={handleStopLive}
       />
     </LiveKitRoom>
+  );
+};
+
+// ── Feed vertical entre lives (façon TikTok) ──────────────────────────────────
+//
+// Une seule connexion LiveKit active à la fois : on ne monte jamais deux
+// SimpleLiveViewerContent en parallèle — swiper démonte le live courant
+// (LiveKitRoom se déconnecte proprement) puis monte le suivant, choisi par
+// l'algo de recommandation backend (GET /lives/recommended-queue), pas par
+// simple ordre de liste. Le live initial (ouvert depuis le feed principal,
+// une notif, etc.) reste en position 0 ; swiper vers le bas ajoute les
+// recommandations à la file au fur et à mesure.
+
+const { height: FEED_SCREEN_H } = Dimensions.get('window');
+
+interface LiveQueueEntry { liveId: string }
+
+export const SimpleLiveViewerScreen: React.FC = () => {
+  const nav = useNavigation<Nav>();
+  const route = useRoute<RouteProp<MainStackParamList, 'SimpleLiveViewer'>>();
+  const initialLiveId = route.params.liveId;
+
+  const [queue, setQueue] = useState<LiveQueueEntry[]>([{ liveId: initialLiveId }]);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const seenIdsRef = useRef<Set<string>>(new Set([initialLiveId]));
+  const listRef = useRef<FlatList<LiveQueueEntry>>(null);
+
+  const fetchMore = useCallback(async () => {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const next = await liveService.getRecommendedQueue(Array.from(seenIdsRef.current), 10);
+      if (next.length) {
+        const entries = next.map(l => ({ liveId: l.id }));
+        entries.forEach(e => seenIdsRef.current.add(e.liveId));
+        setQueue(prev => [...prev, ...entries]);
+      }
+    } catch {} finally { setLoadingMore(false); }
+  }, [loadingMore]);
+
+  // Charge une première réserve de lives recommandés dès l'ouverture, pour
+  // qu'un swipe immédiat trouve déjà un suivant prêt (pas d'attente réseau
+  // perceptible au premier swipe).
+  useEffect(() => { fetchMore(); }, []);
+
+  const onMomentumEnd = useCallback((e: any) => {
+    const idx = Math.round(e.nativeEvent.contentOffset.y / FEED_SCREEN_H);
+    setActiveIndex(idx);
+    // Réserve épuisée aux 3/4 → recharge en arrière-plan avant d'y arriver,
+    // pour ne jamais présenter de fin de liste brutale pendant un swipe.
+    if (idx >= queue.length - 3) fetchMore();
+  }, [queue.length, fetchMore]);
+
+  const handleCloseFeed = useCallback(() => nav.goBack(), [nav]);
+
+  // Préchargement des métadonnées (pas la connexion LiveKit elle-même — une
+  // seule connexion active à la fois, demande explicite) du live juste après
+  // l'actif : getById + getToken se font pendant que l'utilisateur regarde
+  // encore le live courant, pour qu'au moment du swipe seul le handshake
+  // WebRTC (rapide) reste à faire, au lieu d'attendre aussi ces deux appels
+  // réseau séquentiels après coup. Map en ref (pas de re-render à chaque
+  // préchargement) ; jamais pour un live monétisé (SimpleLiveViewerContent
+  // l'ignore de toute façon dans ce cas).
+  const preloadCacheRef = useRef<Map<string, PreloadedLiveData>>(new Map());
+  useEffect(() => {
+    const nextEntry = queue[activeIndex + 1];
+    if (!nextEntry || preloadCacheRef.current.has(nextEntry.liveId)) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const live = await liveService.getById(nextEntry.liveId);
+        if (cancelled || live.status !== 'active' || live.is_monetized) return;
+        const t = await liveService.getToken(nextEntry.liveId);
+        if (cancelled) return;
+        preloadCacheRef.current.set(nextEntry.liveId, { live, token: t.token, wsUrl: t.livekit_url });
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [queue, activeIndex]);
+
+  // Une seule connexion LiveKit à la fois (demande explicite — impact batterie/
+  // réseau) : seul l'item actif monte SimpleLiveViewerContent, les voisins
+  // restent une View vide.
+  const renderItem = useCallback(({ item, index }: { item: LiveQueueEntry; index: number }) => (
+    <View style={{ height: FEED_SCREEN_H, width: '100%' }}>
+      {index === activeIndex ? (
+        <SimpleLiveViewerContent
+          key={item.liveId}
+          liveId={item.liveId}
+          onLeave={handleCloseFeed}
+          preloaded={preloadCacheRef.current.get(item.liveId)}
+        />
+      ) : null}
+    </View>
+  ), [activeIndex, handleCloseFeed]);
+
+  return (
+    <FlatList
+      ref={listRef}
+      data={queue}
+      keyExtractor={item => item.liveId}
+      renderItem={renderItem}
+      pagingEnabled
+      showsVerticalScrollIndicator={false}
+      onMomentumScrollEnd={onMomentumEnd}
+      getItemLayout={(_, index) => ({ length: FEED_SCREEN_H, offset: FEED_SCREEN_H * index, index })}
+      windowSize={3}
+      maxToRenderPerBatch={2}
+      // removeClippedSubviews désactivé : bug connu RN sur Android avec des
+      // vues vidéo natives (LiveKit/VideoTrack utilise des surfaces natives) —
+      // la vue peut être retirée de la hiérarchie native alors que React la
+      // croit toujours montée, ce qui coupait l'affichage vidéo du host même
+      // pour l'item actif (un seul live monté à la fois de toute façon, le
+      // gain mémoire de cette option est négligeable ici).
+      style={{ flex: 1, backgroundColor: '#050010' }}
+    />
   );
 };
 
@@ -1782,18 +1958,17 @@ const st = StyleSheet.create({
   },
   settingsBadgeText: { color: '#fff', fontSize: 8, fontWeight: FontWeight.black },
 
-  // ── Badge sur scène ──────────────────────────────────────────────────────
+  // ── Indicateur sur scène — icône seule, sous le header à droite ──────────
   onStageBadge: {
-    position: 'absolute', zIndex: 30,
-    top: Platform.OS === 'ios' ? 116 : 96,
-    alignSelf: 'center',
+    position: 'absolute', zIndex: 30, right: 10,
+    top: Platform.OS === 'ios' ? 112 : 92,
   },
   onStagePill: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    borderRadius: 20, paddingHorizontal: 16, paddingVertical: 7,
+    width: 32, height: 32, borderRadius: 16,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 4, shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
   },
-  onStageDot:  { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
-  onStageText: { color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.extraBold, letterSpacing: 0.5 },
 
   // ── Zone bas (chat + barre actions) ─────────────────────────────────────
   // paddingBottom réel appliqué inline (base + insets.bottom, voir usage)

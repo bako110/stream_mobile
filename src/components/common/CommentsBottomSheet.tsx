@@ -195,16 +195,19 @@ const CommentRow: React.FC<RowProps> = ({
 
   const showMenu = () => {
     if (!isOwn) return;
+    // "Modifier" n'a de sens que s'il y a un texte à éditer — l'édition reste
+    // texte-only (jamais d'ajout/retrait d'image après coup, non demandé) :
+    // un commentaire image seule ne propose donc que "Supprimer".
     showConfirm('Votre commentaire', undefined, [
-      { text: 'Modifier', onPress: () => onEdit(item) },
+      ...(item.body ? [{ text: 'Modifier', onPress: () => onEdit(item) }] : []),
       {
-        text: 'Supprimer', style: 'destructive', onPress: () =>
+        text: 'Supprimer', style: 'destructive' as const, onPress: () =>
           showConfirm('Supprimer', 'Supprimer ce commentaire ?', [
-            { text: 'Annuler', style: 'cancel' },
-            { text: 'Supprimer', style: 'destructive', onPress: () => onDelete(item.id) },
+            { text: 'Annuler', style: 'cancel' as const },
+            { text: 'Supprimer', style: 'destructive' as const, onPress: () => onDelete(item.id) },
           ]),
       },
-      { text: 'Annuler', style: 'cancel' },
+      { text: 'Annuler', style: 'cancel' as const },
     ]);
   };
 
@@ -1098,15 +1101,15 @@ const st = StyleSheet.create({
     shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 3, shadowOffset: { width: 0, height: 1 },
     elevation: 3,
   },
-  // Image jointe à un commentaire déjà posté — coin arrondi, ratio libre
-  // (resizeMode cover sur une hauteur fixe raisonnable, jamais plein écran
-  // dans la liste, l'ouverture plein écran se fait via ImageViewer au tap).
+  // Image jointe à un commentaire déjà posté — vignette compacte (pas une
+  // pleine carte), jamais plein écran dans la liste, l'ouverture plein écran
+  // se fait via ImageViewer au tap.
   commentImageWrap: {
-    marginTop: 6, borderRadius: 14, overflow: 'hidden',
-    maxWidth: 220,
+    marginTop: 6, borderRadius: 10, overflow: 'hidden',
+    maxWidth: 110,
   },
   commentImage: {
-    width: 220, height: 220,
+    width: 110, height: 110,
   },
 
   // Commentaires desactives

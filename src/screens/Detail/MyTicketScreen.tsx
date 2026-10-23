@@ -123,7 +123,7 @@ export const MyTicketScreen: React.FC<Props> = ({ ticket, onBack }) => {
 
       {/* Header */}
       <LinearGradient colors={th.gradient} style={[st.header, { paddingTop: Platform.OS === 'ios' ? 52 : 38 }]}>
-        <BackButton onPress={onBack} transparent />
+        <BackButton onPress={onBack} transparent color="#fff" />
         <View style={{ alignItems: 'center' }}>
           <Text style={st.hTitle}>Mon billet</Text>
           <Text style={st.hSub}>{th.label}</Text>

@@ -29,7 +29,7 @@ const HANDLE_W = 20;
 // Durée max d'un reel après découpage — alignée sur MAX_VIDEO_DURATION_SEC
 // (CreateReelScreen.tsx, limite de la source avant édition). Les stories ont
 // leur propre limite indépendante de 90s (StoryCreator.tsx), non affectée ici.
-const MAX_TRIM = 600;
+const MAX_TRIM = 900;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types exportés

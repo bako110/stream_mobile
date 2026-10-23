@@ -93,7 +93,7 @@ export const QRScannerScreen: React.FC<Props> = ({ onLoginSuccess, onClose }) =>
 
         {/* Barre haute */}
         <View style={[styles.topBar, { paddingTop: insets.top + 16 }]}>
-          <BackButton onPress={onClose} transparent />
+          <BackButton onPress={onClose} transparent color="#fff" />
           <Text style={styles.headerTitle}>Scanner le QR</Text>
           <View style={{ width: 40 }} />
         </View>
@@ -120,7 +120,7 @@ export const QRScannerScreen: React.FC<Props> = ({ onLoginSuccess, onClose }) =>
         style={[styles.root, { backgroundColor: colors.background }]}
       >
         <View style={[styles.root, { backgroundColor: colors.background, justifyContent: 'center', paddingHorizontal: 28 }]}>
-          <BackButton onPress={retry} transparent />
+          <BackButton onPress={retry} />
 
           <Animated.View entering={FadeInDown} style={{ alignItems: 'center', gap: 16 }}>
             <View style={[styles.resultCircle, { backgroundColor: colors.primary + '18' }]}>

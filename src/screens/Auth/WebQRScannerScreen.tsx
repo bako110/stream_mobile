@@ -112,7 +112,7 @@ export const WebQRScannerScreen: React.FC = () => {
 
         {/* Barre haute */}
         <View style={[st.topBar, { paddingTop: insets.top + 16 }]}>
-          <BackButton onPress={() => navigation.goBack()} transparent />
+          <BackButton onPress={() => navigation.goBack()} transparent color="#fff" />
           <Text style={st.topTitle}>Scanner le QR web</Text>
           <View style={{ width: 40 }} />
         </View>

@@ -27,9 +27,10 @@ import { CreateRecapScreen } from './CreateRecapScreen';
 import Sound from 'react-native-sound';
 
 // Limites d'upload — le fichier source, avant trim/édition ; ReelEditorScreen
-// limite ensuite le clip final à 90s via MAX_TRIM, mais la source elle-même
-// doit déjà être rejetée avant tout traitement pour ne pas gaspiller réseau/mémoire.
-const MAX_VIDEO_DURATION_SEC = 10 * 60;
+// limite ensuite le clip final à la même durée via MAX_TRIM, mais la source
+// elle-même doit déjà être rejetée avant tout traitement pour ne pas gaspiller
+// réseau/mémoire.
+const MAX_VIDEO_DURATION_SEC = 15 * 60;
 const MAX_VIDEO_SIZE_BYTES   = 500 * 1024 * 1024;
 
 type Step = 'camera' | 'edit' | 'caption' | 'recap';

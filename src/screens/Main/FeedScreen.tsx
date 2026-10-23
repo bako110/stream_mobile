@@ -39,6 +39,7 @@ import { AdCard, AdFullscreenPlayer, adIsPhone, type AdData } from '../../compon
 import { BoostPromptBottomSheet, type BoostSuggestion } from '../../components/ads/BoostPromptBottomSheet';
 import { StartScreenSurveySheet } from '../../components/common/StartScreenSurveySheet';
 import { startScreenSurveyService } from '../../services/startScreenSurveyService';
+import { onboardingDelayService } from '../../services/onboardingDelayService';
 import { getAppPreferences, setCachedAppPreferences, type StartScreen } from '../../hooks/useAppPreferences';
 import { boostPromptService } from '../../services/boostPromptService';
 import { openPhoneMenu } from '../../utils/phoneMenu';
@@ -831,6 +832,12 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   // Avant ce fix, enabled=false signifiait que userLocation restait
   // TOUJOURS null sur cet écran (rien ne basculait jamais ce flag ici), donc
   // le carrousel ne se remplissait jamais en pratique.
+  //
+  // Toujours activé immédiatement (pas de délai onboardingDelayService ici) :
+  // le carrousel "événements proches" est une fonctionnalité centrale du feed,
+  // nécessaire dès la première ouverture — contrairement aux contacts/sondage
+  // écran de démarrage, elle n'est pas juste une sollicitation secondaire à
+  // étaler dans le temps.
   const userLocation = useUserLocation(true);
   const userCountry = useUserCountry(userLocation);
   const [filter,      setFilter]      = useState<FeedFilter>('all');
@@ -949,10 +956,12 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   }, [maybeShowBoostPrompt]));
 
   // ── Sondage "Qu'est-ce qui t'amène sur Gofolyx ?" ──────────────────────────
-  // Affiché au démarrage, pas plus d'une fois toutes les 48h (répondu ou
-  // fermé sans répondre). Passe son tour dans la file si contacts/boost sont
-  // déjà en attente ou affichés.
+  // Jamais avant quelques jours d'ancienneté du compte sur l'appareil, puis
+  // pas plus d'une fois toutes les 48h (répondu ou fermé sans répondre).
+  // Passe son tour dans la file si contacts/boost sont déjà en attente ou
+  // affichés.
   useFocusEffect(useCallback(() => {
+    if (!onboardingDelayService.canShowStartScreenSurvey()) return;
     if (!startScreenSurveyService.shouldShow()) return;
     startScreenSurveyService.markShown();
     requestOverlaySlot('startScreenSurvey');
@@ -1343,6 +1352,9 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   // Au premier chargement du feed : si la permission Contacts a déjà été
   // accordée, synchronise en silence. Sinon, montre UNE FOIS une explication
   // claire avant le popup système (jamais de popup système sans contexte).
+  // La demande elle-même (requestOverlaySlot) attend quelques jours après la
+  // première ouverture de l'app — pas obligatoire tout de suite, un tout
+  // nouveau compte n'a pas besoin de trancher ça dès sa première session.
   useEffect(() => {
     (async () => {
       const contactsPerm = Platform.OS === 'ios' ? PERMISSIONS.IOS.CONTACTS : PERMISSIONS.ANDROID.READ_CONTACTS;
@@ -1350,7 +1362,11 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
 
       if (contactsStatus === RESULTS.GRANTED) {
         syncContactsForSuggestions();
-      } else if (contactsStatus === RESULTS.DENIED && !storage.getBoolean(CONTACTS_PROMPT_SEEN_KEY)) {
+      } else if (
+        contactsStatus === RESULTS.DENIED &&
+        !storage.getBoolean(CONTACTS_PROMPT_SEEN_KEY) &&
+        onboardingDelayService.canAskContacts()
+      ) {
         // showConfirm est une alerte native immédiate (pas un composant React
         // contrôlable par `visible`) — on réserve donc son tour dans la file
         // et on attend que ce soit son créneau pour l'afficher réellement,
@@ -2102,24 +2118,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
       if (feedUpdatedDebounceRef.current) clearTimeout(feedUpdatedDebounceRef.current);
     };
   }, [filter, load, addListener, removeListener]);
-
-  // Restauration explicite de la status bar à chaque prise de focus — le
-  // composant <StatusBar> déclaratif plus bas ne suffit pas seul : un écran
-  // visité entre-temps (masquant la status bar via son propre <StatusBar
-  // hidden />) peut, selon le timing de démontage de React Navigation, laisser
-  // la barre système masquée/opaque au retour sur le Feed. On la reforce donc
-  // explicitement ici, à chaque fois que cet écran redevient actif. translucent
-  // obligatoire — le header gère lui-même l'espace de la status bar via
-  // paddingTop: insets.top ; sans ça la barre devient une bande opaque qui
-  // recouvre les icônes système au lieu de laisser le fond du header dessous.
-  useFocusEffect(useCallback(() => {
-    StatusBar.setHidden(false, 'none');
-    StatusBar.setBarStyle(theme.isDark ? 'light-content' : 'dark-content', true);
-    if (Platform.OS === 'android') {
-      StatusBar.setTranslucent(true);
-      StatusBar.setBackgroundColor('transparent', true);
-    }
-  }, [theme.isDark]));
 
   // Relit le réglage "Lecture automatique" à chaque retour sur l'écran — reflète
   // immédiatement un changement fait dans Réglages > Contenu sans attendre un

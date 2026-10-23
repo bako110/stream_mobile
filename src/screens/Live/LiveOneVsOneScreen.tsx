@@ -1,8 +1,9 @@
 /**
  * LiveOneVsOneScreen — "1 vs 1", ecran dedie (Explorer) listant les battles en
  * direct. Extrait de l'ancien LiveMatchesScreen (onglets fusionnes en deux
- * ecrans separes, navigables independamment). Design haut de gamme : fond
- * degrade sombre, header a bordure lumineuse, box de resume en tete de liste.
+ * ecrans separes, navigables independamment). S'adapte au theme clair/sombre
+ * de l'utilisateur (2026-10) — avant, tout etait code en dur en sombre/violet,
+ * seul ecran de l'app a ne jamais suivre le reglage Apparence.
  */
 import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
@@ -14,8 +15,9 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../../hooks/useTheme';
 import { BackButton } from '../../components/common';
+import { STATUS_BAR_HEIGHT, HEADER_HEIGHT } from '../../styles';
 import { BattleCard } from '../../components/live/LiveMatchCards';
 import { MatchResultModal, type MatchResultData } from '../../components/live/MatchResultModal';
 import { battleService } from '../../services/battleService';
@@ -30,8 +32,9 @@ type Nav = NativeStackNavigationProp<MainStackParamList>;
 export const LiveOneVsOneScreen: React.FC = () => {
   const nav = useNavigation<Nav>();
   const { addListener, removeListener } = useWs();
-  const insets = useSafeAreaInsets();
   const { currentUser } = useUser();
+  const { theme } = useTheme();
+  const { colors } = theme;
 
   const [battles, setBattles] = useState<ActiveBattle[]>([]);
   // Résultat annoncé à qui reste sur cette liste (n'a pas ouvert BattleScreen) au
@@ -128,18 +131,19 @@ export const LiveOneVsOneScreen: React.FC = () => {
   const totalViewers = battles.reduce((sum, b) => sum + (b.viewer_count ?? 0), 0);
 
   return (
-    <View style={st.root}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      <LinearGradient colors={['#1C1033', '#0B0812', '#0B0812']} style={StyleSheet.absoluteFill} />
+    <View style={[st.root, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
 
-      <View style={[st.header, { paddingTop: insets.top + 16 }]}>
-        <BackButton onPress={() => nav.goBack()} color="#fff" transparent />
-        <Text style={st.headerTitle}>1 vs 1</Text>
-        <View style={{ width: 38 }} />
+      <View style={st.headerOuterWrap}>
+        <View style={[st.header, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+          <BackButton onPress={() => nav.goBack()} />
+          <Text style={[st.headerTitle, { color: colors.textPrimary }]}>1 vs 1</Text>
+          <View style={{ width: 40 }} />
+        </View>
       </View>
 
       {loading ? (
-        <View style={st.center}><ActivityIndicator color="#9B65F5" /></View>
+        <View style={st.center}><ActivityIndicator color={colors.primary} /></View>
       ) : (
         <FlatList
           data={battles}
@@ -148,20 +152,20 @@ export const LiveOneVsOneScreen: React.FC = () => {
           contentContainerStyle={st.list}
           ListHeaderComponent={battles.length > 0 ? (
             <Animated.View entering={FadeInDown.duration(400).springify()}>
-              <LinearGradient colors={['#9B65F522', '#7B3FF210']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={st.summaryCard}>
-                <View style={st.summaryIconWrap}>
-                  <Icon name="zap" size={20} color="#9B65F5" />
+              <LinearGradient colors={[colors.primary + '22', colors.primary + '10']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[st.summaryCard, { borderColor: colors.primary + '30' }]}>
+                <View style={[st.summaryIconWrap, { backgroundColor: colors.primary + '18' }]}>
+                  <Icon name="zap" size={20} color={colors.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={st.summaryTitle}>
+                  <Text style={[st.summaryTitle, { color: colors.textPrimary }]}>
                     {battles.length} match{battles.length > 1 ? 's' : ''} en direct
                   </Text>
-                  <Text style={st.summarySub}>
+                  <Text style={[st.summarySub, { color: colors.textTertiary }]}>
                     {totalViewers.toLocaleString('fr-FR')} spectateur{totalViewers > 1 ? 's' : ''} en ce moment
                   </Text>
                 </View>
                 <View style={st.liveDotOuter}>
-                  <View style={st.liveDot} />
+                  <View style={[st.liveDot, { backgroundColor: colors.liveTag }]} />
                 </View>
               </LinearGradient>
             </Animated.View>
@@ -169,16 +173,16 @@ export const LiveOneVsOneScreen: React.FC = () => {
           renderItem={({ item }) => (
             <BattleCard battle={item} onWatch={() => handleWatch(item)} />
           )}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#9B65F5" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
           onEndReached={loadMore}
           onEndReachedThreshold={0.4}
-          ListFooterComponent={loadingMore ? <ActivityIndicator color="#9B65F5" style={{ marginVertical: 16 }} /> : null}
+          ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.primary} style={{ marginVertical: 16 }} /> : null}
           ListEmptyComponent={
             <View style={st.empty}>
-              <View style={st.emptyIconWrap}>
-                <Icon name="zap" size={30} color="#9B65F5" />
+              <View style={[st.emptyIconWrap, { backgroundColor: colors.primary + '12' }]}>
+                <Icon name="zap" size={30} color={colors.primary} />
               </View>
-              <Text style={st.emptyText}>Aucun match 1 vs 1 en direct pour le moment.</Text>
+              <Text style={[st.emptyText, { color: colors.textTertiary }]}>Aucun match 1 vs 1 en direct pour le moment.</Text>
             </View>
           }
         />
@@ -188,35 +192,47 @@ export const LiveOneVsOneScreen: React.FC = () => {
   );
 };
 
+// Couleurs retirées des styles statiques (2026-10) — toutes appliquées en
+// inline depuis `colors` du thème courant, voir le rendu ci-dessus.
 const st = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0B0812' },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingBottom: 16, paddingHorizontal: 16,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(155,101,245,0.25)',
-    backgroundColor: 'rgba(28,16,51,0.55)',
+  root: { flex: 1 },
+  // Header flottant en carte arrondie — même design que AppHeader (voir
+  // components/common/AppHeader.tsx), au lieu d'une barre plate à bord inférieur.
+  headerOuterWrap: {
+    paddingTop: STATUS_BAR_HEIGHT,
+    zIndex: 100,
   },
-  headerTitle: { fontSize: 18, fontWeight: '800', color: '#F0EFF8' },
+  header: {
+    height: HEADER_HEIGHT,
+    marginHorizontal: 10,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    borderRadius: 24,
+    borderWidth: 1,
+    shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14, shadowOffset: { width: 0, height: 5 },
+    elevation: 8,
+  },
+  headerTitle: { fontSize: 18, fontWeight: '800' },
 
   summaryCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 8, marginTop: 8, marginBottom: 6,
-    borderRadius: 18, borderWidth: 1, borderColor: 'rgba(155,101,245,0.3)', padding: 15,
+    borderRadius: 18, borderWidth: 1, padding: 15,
   },
   summaryIconWrap: {
-    width: 42, height: 42, borderRadius: 13, backgroundColor: 'rgba(155,101,245,0.18)',
+    width: 42, height: 42, borderRadius: 13,
     alignItems: 'center', justifyContent: 'center',
   },
-  summaryTitle: { color: '#F0EFF8', fontSize: 14, fontWeight: '800' },
-  summarySub: { color: '#9390AB', fontSize: 12, fontWeight: '600', marginTop: 2 },
+  summaryTitle: { fontSize: 14, fontWeight: '800' },
+  summarySub: { fontSize: 12, fontWeight: '600', marginTop: 2 },
   liveDotOuter: { width: 10, height: 10 },
-  liveDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#EF4444' },
+  liveDot: { width: 10, height: 10, borderRadius: 5 },
 
   list: { padding: 8 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   empty: { alignItems: 'center', paddingTop: 60, gap: 14 },
   emptyIconWrap: {
-    width: 64, height: 64, borderRadius: 20, backgroundColor: 'rgba(155,101,245,0.12)',
+    width: 64, height: 64, borderRadius: 20,
     alignItems: 'center', justifyContent: 'center',
   },
-  emptyText: { fontSize: 13, textAlign: 'center', paddingHorizontal: 32, color: '#9390AB', fontWeight: '600' },
+  emptyText: { fontSize: 13, textAlign: 'center', paddingHorizontal: 32, fontWeight: '600' },
 });

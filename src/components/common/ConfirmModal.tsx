@@ -50,8 +50,18 @@ export const ConfirmModal: React.FC = () => {
 
   const handlePress = async (button: ConfirmButton, index: number) => {
     if (loadingIndex !== null) return;
+    // Capturé AVANT d'exécuter onPress — si onPress ouvre lui-même un second
+    // showConfirm de façon synchrone (menu → sous-confirmation, ex: "Supprimer"
+    // qui ré-ouvre "Supprimer ce commentaire ?"), confirmService._current a déjà
+    // changé par le temps qu'on atteint le finally. dismiss(stateId) sans id
+    // fermait alors INCONDITIONNELLEMENT ce nouvel état tout juste ouvert (le
+    // id === undefined contourne la garde dans confirmService.dismiss), donnant
+    // l'impression que le bouton "Supprimer" de la sous-confirmation ne
+    // déclenchait jamais rien — en réalité elle se fermait avant que l'utilisateur
+    // ne puisse taper dessus.
+    const stateId = state.id;
     if (!button.onPress) {
-      confirmService.dismiss();
+      confirmService.dismiss(stateId);
       return;
     }
     setLoadingIndex(index);
@@ -60,7 +70,7 @@ export const ConfirmModal: React.FC = () => {
     } catch {
       // l'écran appelant gère ses propres erreurs
     } finally {
-      confirmService.dismiss();
+      confirmService.dismiss(stateId);
     }
   };
 
@@ -75,7 +85,7 @@ export const ConfirmModal: React.FC = () => {
         <TouchableOpacity
           style={StyleSheet.absoluteFill}
           activeOpacity={1}
-          onPress={() => confirmService.dismiss()}
+          onPress={() => confirmService.dismiss(state.id)}
         />
       </Animated.View>
 

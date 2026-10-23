@@ -454,7 +454,7 @@ export const AdsScreen: React.FC = () => {
 const s = StyleSheet.create({
   header:       {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingHorizontal: 16, paddingBottom: 12,
+    paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12,
     marginHorizontal: 10, marginBottom: 10, borderRadius: 24, borderWidth: 1,
     shadowColor: '#5B45B5', shadowOpacity: 0.10, shadowRadius: 14,
     shadowOffset: { width: 0, height: 5 }, elevation: 8,

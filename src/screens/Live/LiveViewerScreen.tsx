@@ -263,7 +263,7 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
 
         {/* Top overlay */}
         <LinearGradient colors={['rgba(0,0,0,0.7)', 'transparent']} style={styles.topOverlay}>
-          <BackButton onPress={handleLeave} transparent />
+          <BackButton onPress={handleLeave} transparent color="#fff" />
           <View style={styles.topCenter}>
             <View style={styles.liveBadge}>
               <View style={styles.liveDot} />

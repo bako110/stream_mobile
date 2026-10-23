@@ -318,6 +318,7 @@ const styles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     paddingHorizontal: 16,
+    paddingTop: 12,
     paddingBottom: 12,
     marginHorizontal: 10,
     borderRadius: 24,
