@@ -136,26 +136,32 @@ const formatCount = (n: number): string => {
 // tomber sur une vidéo jamais préchargée (démarrage à froid, latence visible). Le coût
 // data supplémentaire (~2 voisins × 6s × 400kbps ≈ 600 Ko) est faible face au gain de
 // fluidité perçu.
-const PRELOAD_WINDOW = 2;
+//
+// Élargi 2 → 4 (2026-10, demande explicite) : couvre un scroll rapide sur
+// plusieurs reels d'affilée sans jamais de chargement visible, pas seulement
+// un swipe isolé — reste loin du préchargement de TOUTE la liste chargée en
+// mémoire (coûteux, non retenu), juste une fenêtre plus large autour de
+// l'index courant.
+const PRELOAD_WINDOW = 4;
 // Fenêtre du CACHE DISQUE — volontairement plus étroite que PRELOAD_WINDOW.
 // Le buffer vidéo (PRELOAD_WINDOW) est léger et coexiste bien avec le player
 // actif, mais un téléchargement cache est un flux réseau complet à lui seul :
-// avec PRELOAD_WINDOW=2, jusqu'à 4 reels (2 avant + 2 après) lançaient chacun
-// leur propre téléchargement en même temps que le reel actif chargeait son
-// flux — surtout sensible à l'ouverture de l'écran, où currentIndex=0 fait
-// démarrer plusieurs downloads cache d'un coup pile quand l'utilisateur
-// attend que la première vidéo démarre. 1 seul voisin (le suivant) suffit à
-// garder le bénéfice du cache pour un swipe normal, sans jamais saturer la
-// bande passante au moment critique du premier chargement.
-const CACHE_PRELOAD_WINDOW = 1;
+// avec PRELOAD_WINDOW large, trop de reels lançant chacun leur propre
+// téléchargement en même temps que le reel actif charge son flux — surtout
+// sensible à l'ouverture de l'écran, où currentIndex=0 fait démarrer
+// plusieurs downloads cache d'un coup pile quand l'utilisateur attend que la
+// première vidéo démarre. 2 voisins (échelonnés, cf. CACHE_STAGGER_DELAY_MS)
+// gardent le bénéfice du cache pour un scroll rapide, sans saturer la bande
+// passante au moment critique du premier chargement.
+const CACHE_PRELOAD_WINDOW = 2;
 // En wifi (2026-09) : le risque ci-dessus est un risque de TIMING (plusieurs
 // downloads démarrant au même instant précis, surtout à l'ouverture), pas un
 // risque de bande passante insuffisante — en wifi, la bande passante n'est
-// justement plus la contrainte. Élargi à 2 voisins (le suivant + le 2e
-// suivant), mais le 2e reste ÉCHELONNÉ dans le temps (cf. CACHE_STAGGER_DELAY_MS
-// dans VideoSlide) pour ne jamais redémarrer 2 téléchargements cache au même
-// instant, même en wifi. Reste à 1 en cellulaire (coût data réel à limiter).
-const CACHE_PRELOAD_WINDOW_WIFI = 2;
+// justement plus la contrainte. Élargi à 3 voisins, chacun ÉCHELONNÉ dans le
+// temps (cf. CACHE_STAGGER_DELAY_MS dans VideoSlide) pour ne jamais redémarrer
+// plusieurs téléchargements cache au même instant, même en wifi. Reste plus
+// restreint en cellulaire (coût data réel à limiter).
+const CACHE_PRELOAD_WINDOW_WIFI = 3;
 // Délai avant de démarrer le cache disque du 2e voisin (distance 2), pour
 // laisser le temps au 1er voisin (distance 1, sans délai) de bien démarrer
 // avant de lancer un 2e flux réseau complet en parallèle.
@@ -360,11 +366,13 @@ export const ReelsScreen: React.FC = () => {
         .then(r => {
           if (!mountedRef.current) return;
           // Aucune campagne restante hors exclusion (stock de pubs actives épuisé pour
-          // cette session) — plutôt que de laisser le slot vide en permanence, on
-          // recommence le cycle sans exclusion : mieux vaut revoir une pub déjà vue
-          // que ne plus jamais afficher aucune publicité après quelques scrolls.
+          // cette session) — on retente UNE SEULE FOIS sans exclusion (repeat=true,
+          // mieux vaut revoir une pub déjà vue que ne jamais en afficher), jamais plus :
+          // sans ce garde-fou, un serveur qui n'a VRAIMENT aucune pub à offrir (campagnes
+          // épuisées, même sans exclusion) faisait boucler cet appel indéfiniment et
+          // immédiatement — des dizaines de requêtes par seconde vues dans les logs.
           if (!r.data) {
-            if (excludeIds) return fetchOne(true);
+            if (excludeIds && !repeat) return fetchOne(true);
             return;
           }
           servedAdIdsRef.current.add(r.data.id);
@@ -2649,11 +2657,15 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   // normal sans jamais concurrencer le chargement initial ou actif.
   //
   // Échelonnement (2026-09) : en wifi, le 2e voisin (preloadDistance === 2)
-  // attend CACHE_STAGGER_DELAY_MS avant de démarrer SON téléchargement cache
-  // complet — le 1er voisin (distance 1) démarre toujours immédiatement.
+  // attend (distance - 1) × CACHE_STAGGER_DELAY_MS avant de démarrer SON
+  // téléchargement cache complet — le 1er voisin (distance 1) démarre
+  // toujours immédiatement, le 2e après 1 délai, le 3e après 2 délais, etc.
   // Reprend le même principe que le préchargement vidéo léger (cf.
-  // preloadReady plus haut) : étale la charge réseau au lieu de lancer 2
-  // téléchargements complets au même instant, annulé proprement si le slide
+  // preloadReady plus haut) : étale la charge réseau au lieu de lancer
+  // plusieurs téléchargements complets au même instant — nécessaire
+  // maintenant que CACHE_PRELOAD_WINDOW_WIFI couvre jusqu'à 3 voisins (un
+  // délai fixe pour "tout ce qui n'est pas distance 1" aurait fait démarrer
+  // les distances 2 ET 3 au même instant). Annulé proprement si le slide
   // sort de la fenêtre de cache avant la fin du délai.
   useEffect(() => {
     if (cachedLocalUriRef.current || !reel.mp4_url) return; // déjà en cache, rien à faire
@@ -2664,7 +2676,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
     }
     const timer = setTimeout(() => {
       reelVideoCache.cacheInBackground(reel.mp4_url!).catch(() => {});
-    }, CACHE_STAGGER_DELAY_MS);
+    }, (preloadDistance - 1) * CACHE_STAGGER_DELAY_MS);
     return () => clearTimeout(timer);
   }, [reel.mp4_url, isCachePriority, preloadDistance]);
 
