@@ -118,6 +118,7 @@ export const Endpoints = {
     adminAll:   `${V1}/concerts/admin/all`,
     byId:       (id: string) => `${V1}/concerts/${id}`,
     publish:    (id: string) => `${V1}/concerts/${id}/publish`,
+    monetize:   (id: string) => `${V1}/concerts/${id}/monetize`,
     startLive:  (id: string) => `${V1}/concerts/${id}/start-live`,
     endLive:    (id: string) => `${V1}/concerts/${id}/end-live`,
     // Billets concert
@@ -136,6 +137,7 @@ export const Endpoints = {
     stop:      (concertId: string) => `${V1}/stream/${concertId}/stop`,
     status:    (concertId: string) => `${V1}/stream/${concertId}/status`,
     analytics: (concertId: string) => `${V1}/stream/${concertId}/analytics`,
+    ticketsSold: (concertId: string) => `${V1}/stream/${concertId}/tickets-sold`,
     recording: (concertId: string) => `${V1}/stream/${concertId}/recording`,
     // VOD progress
     progress:  (videoId: string) => `${V1}/stream/${videoId}/progress`,
@@ -147,6 +149,7 @@ export const Endpoints = {
     me:        `${V1}/events/me`,
     byId:      (id: string) => `${V1}/events/${id}`,
     publish:   (id: string) => `${V1}/events/${id}/publish`,
+    monetize:  (id: string) => `${V1}/events/${id}/monetize`,
     // Rappel + masquer (feed_actions router)
     remind:    (id: string) => `${V1}/events/${id}/remind`,
     hide:      (id: string) => `${V1}/events/${id}/hide`,
@@ -394,6 +397,7 @@ export const Endpoints = {
     cost:   `${V1}/lives/cost`,
     start:  `${V1}/lives/start`,
     byId:   (id: string) => `${V1}/lives/${id}`,
+    goLive: (id: string) => `${V1}/lives/${id}/go-live`,
     stop:   (id: string) => `${V1}/lives/${id}/stop`,
     token:  (id: string) => `${V1}/lives/${id}/token`,
     status: (id: string) => `${V1}/lives/${id}/status`,

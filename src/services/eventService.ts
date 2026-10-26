@@ -61,6 +61,13 @@ export const eventService = {
     return res.data;
   },
 
+  /** Bascule un événement GRATUIT en payant — y compris en plein live (l'organisateur
+   * décide de commercialiser l'accès une fois le direct démarré). */
+  async monetize(id: string, ticketPrice: number, tier: string = 'simple'): Promise<Event> {
+    const res = await apiClient.patch<Event>(Endpoints.events.monetize(id), { ticket_price: ticketPrice, tier });
+    return res.data;
+  },
+
   async getMyEvents(): Promise<Event[]> {
     const res = await apiClient.get<Event[]>(Endpoints.events.me);
     return Array.isArray(res.data) ? res.data : [];

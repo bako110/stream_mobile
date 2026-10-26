@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
-import { concertService } from '../../services';
+import { concertService, liveService, toastService } from '../../services';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { WS_BASE_URL, STORAGE_KEYS } from '../../utils/constants';
@@ -27,6 +27,10 @@ import { useKeepAwake } from '../../hooks/useKeepAwake';
 import { configureLiveAudioSession } from '../../utils/liveAudioSession';
 import type { Concert } from '../../types';
 import { BackButton, GofolyxLoader } from '../../components/common';
+import { StageTileRow } from '../../components/live/StageTileRow';
+import type { StageTile, StageBadge } from '../../components/live/StageTileRow';
+import { LiveGiftBar } from '../../components/wallet/LiveGiftBar';
+import { TicketPaymentSheet } from '../../components/wallet/TicketPaymentSheet';
 
 interface Props {
   concertId: string;
@@ -51,11 +55,16 @@ const VIEWER_ROOM_OPTIONS = {
 };
 
 // ── Video view inside the room ────────────────────────────────────────────────
+// Spotlight (artiste ou invité mis en avant) + bandeau "Sur scène" pour les
+// autres invités — même pattern que SimpleLiveViewerScreen, adapté au concert.
 
-const ArtistVideoView: React.FC = () => {
+const ArtistVideoView: React.FC<{
+  hostId: string;
+  spotlightId: string | null;
+  onTapTile: (identity: string) => void;
+}> = ({ hostId, spotlightId, onTapTile }) => {
   const remoteParticipants = useRemoteParticipants();
   const allCamTracks = useTracks([Track.Source.Camera]);
-  const artistTrack = allCamTracks[0] ?? null;
 
   if (remoteParticipants.length === 0) {
     return (
@@ -66,16 +75,36 @@ const ArtistVideoView: React.FC = () => {
     );
   }
 
-  if (!artistTrack) {
-    return (
-      <View style={styles.noVideoCenter}>
-        <GofolyxLoader variant="reel" color="#E53E3E" />
-        <Text style={styles.connectingText}>En attente de la vidéo...</Text>
-      </View>
-    );
-  }
+  const spotlightTrack = allCamTracks.find(t => t.participant.identity === (spotlightId ?? hostId))
+    ?? allCamTracks[0] ?? null;
+  const thumbnailTracks = allCamTracks.filter(t => t !== spotlightTrack);
 
-  return <VideoTrack trackRef={artistTrack} style={StyleSheet.absoluteFill} objectFit="cover" />;
+  const stageTiles: StageTile[] = thumbnailTracks.map(t => ({
+    identity: t.participant.identity,
+    name:     t.participant.name || t.participant.identity,
+    track:    t,
+    camOn:    !t.publication?.isMuted,
+    badge:    (t.participant.identity === hostId ? 'host' : 'star') as StageBadge,
+    micOn:    !t.publication?.isMuted,
+  }));
+
+  return (
+    <>
+      {spotlightTrack
+        ? <VideoTrack trackRef={spotlightTrack} style={StyleSheet.absoluteFill} objectFit="cover" />
+        : (
+          <View style={styles.noVideoCenter}>
+            <GofolyxLoader variant="reel" color="#E53E3E" />
+            <Text style={styles.connectingText}>En attente de la vidéo...</Text>
+          </View>
+        )}
+      {stageTiles.length > 0 && (
+        <View style={styles.stageRowWrap} pointerEvents="box-none">
+          <StageTileRow tiles={stageTiles} onTapTile={onTapTile} />
+        </View>
+      )}
+    </>
+  );
 };
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -95,48 +124,60 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
   const [chatInput, setChatInput] = useState('');
   const [showChat, setShowChat] = useState(true);
   const [sending, setSending] = useState(false);
+  const [spotlightId, setSpotlightId] = useState<string | null>(null);
   // Le backend renvoie 402 quand access_type nécessite un ticket/abonnement
   // actif (streaming.py::get_viewer_token) — avant ce fix, l'erreur était
   // avalée silencieusement (catch {}) et l'utilisateur restait bloqué sur
   // "Connexion au live..." indéfiniment, sans jamais savoir qu'un abonnement
   // etait requis.
   const [accessDenied, setAccessDenied] = useState<string | null>(null);
+  const [showBuySheet, setShowBuySheet] = useState(false);
 
   const chatListRef = useRef<FlatList>(null);
   const pollRef     = useRef<ReturnType<typeof setInterval> | null>(null);
   const wsRef       = useRef<WebSocket | null>(null);
 
-  // Load concert + get viewer token
-  useEffect(() => {
-    (async () => {
-      let c: Concert | null = null;
-      try {
-        c = await concertService.getById(concertId);
-        setConcert(c);
-        if (c.status !== 'live') {
-          setStreamEnded(true);
-          setLoading(false);
-          return;
-        }
+  // Charge le concert + récupère le token viewer — réutilisée au montage ET
+  // après un achat de billet réussi (retry sans recharger tout l'écran).
+  const loadConcertAndToken = useCallback(async () => {
+    let c: Concert | null = null;
+    try {
+      c = await concertService.getById(concertId);
+      setConcert(c);
+      if (c.status !== 'live') {
+        setStreamEnded(true);
+        setLoading(false);
+        return;
+      }
+      // Chemin unifié (Live) quand disponible — seul lui donne accès à la
+      // scène/cadeaux (room "live-{id}"), sinon fallback ancien streaming.py.
+      if (c.live_id) {
+        const result = await liveService.getToken(c.live_id);
+        setToken(result.token);
+        setWsUrl(result.livekit_url);
+      } else {
         const result = await concertService.getStreamToken(concertId);
         setToken(result.token);
         setWsUrl(result.livekit_url);
-        setViewerCount(c.current_viewers + 1);
-      } catch (e: any) {
-        const status = e?.status ?? e?.response?.status;
-        if (status === 402) {
-          setAccessDenied(
-            c?.access_type === 'subscription'
-              ? 'Un abonnement actif est requis pour accéder à ce live.'
-              : 'Un billet est requis pour accéder à ce live.'
-          );
-        } else {
-          setAccessDenied('Impossible de rejoindre ce live.');
-        }
       }
-      setLoading(false);
-    })();
+      setViewerCount(c.current_viewers + 1);
+      setAccessDenied(null);
+    } catch (e: any) {
+      const status = e?.status ?? e?.response?.status;
+      if (status === 402) {
+        setAccessDenied(
+          c?.access_type === 'subscription'
+            ? 'Un abonnement actif est requis pour accéder à ce live.'
+            : 'Un billet est requis pour accéder à ce live.'
+        );
+      } else {
+        setAccessDenied('Impossible de rejoindre ce live.');
+      }
+    }
+    setLoading(false);
   }, [concertId]);
+
+  useEffect(() => { loadConcertAndToken(); }, [loadConcertAndToken]);
 
   // Poll viewer count + check if stream ended
   useEffect(() => {
@@ -222,6 +263,14 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
   }
 
   if (accessDenied) {
+    const _p = (v: any) => { const n = Number(v); return isFinite(n) && n > 0 ? n : null; };
+    const allTiers = [
+      { key: 'simple' as const, label: 'Simple', icon: 'tag',   color: '#E53E3E', price: _p(concert?.ticket_price),       sub: 'Accès standard' },
+      { key: 'vip'    as const, label: 'VIP',    icon: 'star',  color: '#F59E0B', price: _p(concert?.ticket_price_vip),   sub: 'Accès prioritaire' },
+      { key: 'vvip'   as const, label: 'VVIP',   icon: 'award', color: '#8B5CF6', price: _p(concert?.ticket_price_vvip),  sub: 'Expérience premium' },
+      { key: 'vvvip'  as const, label: 'VVVIP',  icon: 'zap',   color: '#EF4444', price: _p(concert?.ticket_price_vvvip), sub: 'All-inclusive' },
+    ].filter(t => t.price !== null) as { key: 'simple'|'vip'|'vvip'|'vvvip'; label: string; icon: string; color: string; price: number; sub: string }[];
+
     return (
       <View style={[styles.container, styles.center]}>
         <StatusBar barStyle="light-content" backgroundColor="#000" />
@@ -232,6 +281,29 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
           <TouchableOpacity style={styles.leaveBtn} onPress={() => nav.navigate('SubscriptionPlans' as never)}>
             <Text style={styles.leaveBtnText}>Voir les abonnements</Text>
           </TouchableOpacity>
+        ) : concert?.access_type === 'ticket' && allTiers.length > 0 ? (
+          <>
+            <TouchableOpacity style={[styles.leaveBtn, styles.buyTicketBtn]} onPress={() => setShowBuySheet(true)}>
+              <Text style={styles.buyTicketBtnText}>Acheter un billet — {allTiers[0].price}€</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.leaveBtn} onPress={handleLeave}>
+              <Text style={styles.leaveBtnText}>Retour</Text>
+            </TouchableOpacity>
+            {concert && (
+              <TicketPaymentSheet
+                visible={showBuySheet} onClose={() => setShowBuySheet(false)}
+                onSuccess={() => { setShowBuySheet(false); setLoading(true); loadConcertAndToken(); }}
+                itemId={concertId} title={concert.title}
+                accessType={concert.access_type as any}
+                ticketPrice={concert.ticket_price ?? null}
+                thumbnail={concert.thumbnail_url ?? null}
+                kind="concert"
+                tiers={allTiers}
+                selectedTierKey="simple"
+                onBuy={(tierKey) => concertService.buyTicket(concertId, tierKey)}
+              />
+            )}
+          </>
         ) : (
           <TouchableOpacity style={styles.leaveBtn} onPress={handleLeave}>
             <Text style={styles.leaveBtnText}>Retour</Text>
@@ -259,7 +331,11 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
         <StatusBar barStyle="light-content" backgroundColor="#000" />
 
         {/* Artist video — full screen */}
-        <ArtistVideoView />
+        <ArtistVideoView
+          hostId={concert?.artist_id ?? ''}
+          spotlightId={spotlightId}
+          onTapTile={setSpotlightId}
+        />
 
         {/* Top overlay */}
         <LinearGradient colors={['rgba(0,0,0,0.7)', 'transparent']} style={styles.topOverlay}>
@@ -293,6 +369,13 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
               style={styles.chatList}
               showsVerticalScrollIndicator={false}
             />
+            {!!concert?.live_id && (
+              <LiveGiftBar
+                liveId={concert.live_id}
+                receiverId={concert.artist_id}
+                onGiftSent={(emoji) => toastService.success(`Cadeau envoyé ${emoji}`)}
+              />
+            )}
             <View style={styles.chatInputRow}>
               <TextInput
                 value={chatInput}
@@ -326,6 +409,7 @@ const styles = StyleSheet.create({
   center: { justifyContent: 'center', alignItems: 'center' },
   noVideoCenter: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#111' },
   connectingText: { color: '#999', marginTop: 12, fontSize: 14 },
+  stageRowWrap: { position: 'absolute', left: 12, right: 12, bottom: 160, zIndex: 8 },
   topOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0,
     paddingTop: Platform.OS === 'ios' ? 54 : 36,
@@ -382,4 +466,6 @@ const styles = StyleSheet.create({
     borderRadius: 24, paddingHorizontal: 32, paddingVertical: 12,
   },
   leaveBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  buyTicketBtn: { backgroundColor: '#3FEDB6', marginTop: 24, marginBottom: 0 },
+  buyTicketBtnText: { color: '#0A0A0A', fontWeight: '800', fontSize: 15 },
 });

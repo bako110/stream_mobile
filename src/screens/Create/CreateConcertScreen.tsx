@@ -271,8 +271,8 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
     const needsLive = (concertType === 'live' || concertType === 'live_and_replay') && !isEditing;
     if (needsLive) {
       try {
-        const cost = await apiClient.get('/api/v1/lives/cost') as any;
-        const { cost_gogold, balance, sufficient } = cost;
+        const costRes = await apiClient.get<{ cost_gogold: number; balance: number; sufficient: boolean }>('/api/v1/lives/cost');
+        const { cost_gogold, balance, sufficient } = costRes.data;
         if (!sufficient) {
           showConfirm(
             'Solde insuffisant',

@@ -132,6 +132,15 @@ async function startLive(payload: {
   return r.data;
 }
 
+/** Démarre un live déjà programmé (créé à la planification d'un concert/événement
+ * is_online — voir concert.live_id / event.live_id) : pas de nouveau débit GoGold,
+ * active l'entrée Live existante. À la différence de startLive() qui en crée une. */
+async function goLive(liveId: string, record?: boolean): Promise<{ live: LiveStream; token: string; room_name: string; livekit_url: string }> {
+  const qs = record !== undefined ? `?record=${record}` : '';
+  const r = await apiClient.post<{ live: LiveStream; token: string; room_name: string; livekit_url: string }>(`${Endpoints.lives.goLive(liveId)}${qs}`);
+  return r.data;
+}
+
 async function sendGiftForAccess(liveId: string, giftId: string): Promise<{ access_granted: boolean }> {
   const r = await apiClient.post<{ access_granted: boolean }>(`/api/v1/lives/${liveId}/access/gift`, { gift_id: giftId });
   return r.data;
@@ -211,7 +220,7 @@ async function getRanking(liveId: string): Promise<LiveRanking> {
 }
 
 export const liveService = {
-  getLives, getLivesPage, getRecommendedQueue, getById, recordView, startLive, stopLive, getToken, getStatus, stopAllMine,
+  getLives, getLivesPage, getRecommendedQueue, getById, recordView, startLive, goLive, stopLive, getToken, getStatus, stopAllMine,
   blockUserFromLives, unblockUserFromLives, listBans, unban,
   invite, demote, ban, globalBan, getLiveCost, getRanking,
   sendGiftForAccess, payGoGoldForAccess, checkAccess,

@@ -21,7 +21,7 @@ import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { SkeletonDetail, CommentsBottomSheet, ExpandableText, BackButton, GofolyxLoader, FriendsWhoLiked, PriceWithLocal, RepostBottomSheet } from '../../components/common';
 import { TicketPaymentSheet } from '../../components/wallet/TicketPaymentSheet';
-import { eventService, socialService, authService, toastService, showConfirm } from '../../services';
+import { eventService, socialService, authService, toastService, showConfirm, liveService } from '../../services';
 import { favoriteService } from '../../services/favoriteService';
 import type { Event } from '../../types/event';
 import type { AppColors } from '../../theme/colors';
@@ -567,6 +567,23 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
   };
 
   const handleEdit   = () => nav.navigate('CreateEvent' as any, { eventId });
+  const [goingLive, setGoingLive] = useState(false);
+  const handleGoLive = async () => {
+    if (!event?.live_id || goingLive) return;
+    setGoingLive(true);
+    try {
+      const result = await liveService.goLive(event.live_id);
+      nav.navigate('SimpleLiveStream' as any, {
+        liveId: event.live_id,
+        publisherToken: result.token,
+        livekitUrl: result.livekit_url,
+      });
+    } catch (e: any) {
+      toastService.error('Erreur', e?.message ?? 'Impossible de démarrer le direct.');
+    } finally {
+      setGoingLive(false);
+    }
+  };
   const handleDelete = () => {
     showConfirm('Supprimer', 'Cette action est irréversible.', [
       { text: 'Annuler', style: 'cancel' },
@@ -660,7 +677,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
           <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4, gap: 10 }}>
             {isLiveNow && (
               <TouchableOpacity activeOpacity={0.88}
-                onPress={() => nav.navigate('LiveViewer' as any, { liveId: event.live_id })}>
+                onPress={() => nav.navigate('SimpleLiveViewer' as any, { liveId: event.live_id })}>
                 <LinearGradient colors={['#EF4444', '#DC2626']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                   style={ds.ctaGradient}>
                   <Icon name="radio" size={20} color="#fff" />
@@ -861,6 +878,15 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
       <View style={[ds.ctaBar, { backgroundColor: colors.surface, borderTopColor: colors.divider, paddingBottom: (Platform.OS === 'ios' ? 32 : 16) + insets.bottom }]}>
         {isOwner ? (
           <View style={{ flexDirection: 'row', gap: 10 }}>
+            {!!event.live_id && !isCompleted && (
+              <TouchableOpacity onPress={handleGoLive} disabled={goingLive}
+                style={[ds.ctaSecondary, { flex: 1, backgroundColor: '#EF444414' }]}>
+                {goingLive ? <ActivityIndicator size="small" color="#EF4444" /> : <Icon name="radio" size={16} color="#EF4444" />}
+                <Text style={{ fontSize: FontSize.base, fontWeight: FontWeight.bold, color: '#EF4444' }}>
+                  {isLiveNow ? 'Rejoindre' : 'Go Live'}
+                </Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               onPress={() => nav.navigate('Attendees' as any, { eventId, eventTitle: event.title })}
               style={[ds.ctaSecondary, { flex: 1, backgroundColor: '#10B98114' }]}>

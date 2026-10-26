@@ -313,8 +313,8 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
     const needsLive = isOnline && !isEditing;
     if (needsLive) {
       try {
-        const cost = await apiClient.get('/api/v1/lives/cost') as any;
-        const { cost_gogold, balance, sufficient } = cost;
+        const costRes = await apiClient.get<{ cost_gogold: number; balance: number; sufficient: boolean }>('/api/v1/lives/cost');
+        const { cost_gogold, balance, sufficient } = costRes.data;
         if (!sufficient) {
           showConfirm(
             'Solde insuffisant',
@@ -605,11 +605,11 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
                     <Icon name="video" size={18} color={colors.primary} style={{ marginTop: 1 }} />
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold, color: colors.primary, marginBottom: 3 }}>
-                        Live automatique
+                        Live réservé
                       </Text>
                       <Text style={{ fontSize: FontSize.sm, color: colors.textSecondary, lineHeight: 18 }}>
-                        Un live sera programmé à la date de début de l'événement.
-                        Il démarrera automatiquement et le replay sera disponible après.
+                        Un live est réservé pour cet événement. Tu pourras le démarrer
+                        toi-même depuis la fiche événement, quand tu seras prêt.
                       </Text>
                     </View>
                   </View>

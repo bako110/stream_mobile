@@ -4,11 +4,12 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, StatusBar,
-  Platform, PermissionsAndroid, ActivityIndicator, Animated,
+  Platform, PermissionsAndroid, ActivityIndicator, Animated, TextInput,
 } from 'react-native';
 import {
   LiveKitRoom,
   useLocalParticipant,
+  useRemoteParticipants,
   useTracks,
   VideoTrack,
 } from '@livekit/react-native';
@@ -17,14 +18,26 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
-import { concertService, toastService, showConfirm } from '../../services';
+import { concertService, liveService, toastService, showConfirm } from '../../services';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
 import { configureLiveAudioSession } from '../../utils/liveAudioSession';
-import type { Concert } from '../../types';
+import type { Concert, TicketsSold } from '../../types';
+import { StageTileRow } from '../../components/live/StageTileRow';
+import type { StageTile, StageBadge } from '../../components/live/StageTileRow';
 
 interface Props {
   concertId: string;
   onBack?: () => void;
+}
+
+// Participants déjà autorisés à publier (invités sur scène) — identifiés via
+// leur permission LiveKit can_publish plutôt qu'un state serveur séparé, pour
+// rester cohérent instantanément avec invite_participant côté backend.
+function useOnStageIdentities(): Set<string> {
+  const remoteParticipants = useRemoteParticipants();
+  return new Set(
+    remoteParticipants.filter(p => p.permissions?.canPublish).map(p => p.identity),
+  );
 }
 
 // ── LiveKit quality config ─────────────────────────────────────────────────────
@@ -63,9 +76,34 @@ const LocalCameraPreview: React.FC<{ mirror: boolean }> = ({ mirror }) => {
 const StreamControls: React.FC<{
   concert: Concert | null;
   concertId: string;
+  liveId: string | null;
   onEnd: () => void;
-}> = ({ concert, concertId, onEnd }) => {
+}> = ({ concert, concertId, liveId, onEnd }) => {
   const { localParticipant } = useLocalParticipant();
+  const remoteParticipants = useRemoteParticipants();
+  const onStageIdentities = useOnStageIdentities();
+  const allCamTracks = useTracks([Track.Source.Camera], { onlySubscribed: false });
+  const [showInvite, setShowInvite] = useState(false);
+  const [showMonetize, setShowMonetize] = useState(false);
+  const [ticketPriceInput, setTicketPriceInput] = useState('');
+  const [monetizing, setMonetizing] = useState(false);
+  const [accessType, setAccessType] = useState(concert?.access_type ?? 'free');
+  useEffect(() => { setAccessType(concert?.access_type ?? 'free'); }, [concert?.access_type]);
+  const [ticketsSold, setTicketsSold] = useState<TicketsSold | null>(null);
+  const [showSalesPanel, setShowSalesPanel] = useState(false);
+  useEffect(() => {
+    if (accessType !== 'ticket') return;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const data = await concertService.getTicketsSold(concertId);
+        if (!cancelled) setTicketsSold(data);
+      } catch {}
+    };
+    poll();
+    const interval = setInterval(poll, 10000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [accessType, concertId]);
   const insets = useSafeAreaInsets();
   const [muted,       setMuted]       = useState(false);
   const [videoOff,    setVideoOff]    = useState(false);
@@ -156,6 +194,51 @@ const StreamControls: React.FC<{
     ]);
   }, [onEnd]);
 
+  const handleInvite = useCallback(async (identity: string) => {
+    if (!liveId) return;
+    try {
+      await liveService.invite(liveId, identity);
+      toastService.success('Invité ajouté sur scène');
+    } catch {
+      toastService.error('Impossible d\'inviter ce participant');
+    } finally {
+      setShowInvite(false);
+    }
+  }, [liveId]);
+
+  const handleMonetize = useCallback(async () => {
+    const price = parseFloat(ticketPriceInput.replace(',', '.'));
+    if (!price || price <= 0) {
+      toastService.error('Entre un prix valide');
+      return;
+    }
+    setMonetizing(true);
+    try {
+      await concertService.monetize(concertId, price);
+      setAccessType('ticket');
+      toastService.success(`Billetterie activée à ${price}€`);
+      setShowMonetize(false);
+      setTicketPriceInput('');
+    } catch (e: any) {
+      toastService.error('Erreur', e?.response?.data?.detail ?? 'Impossible d\'activer la billetterie');
+    } finally {
+      setMonetizing(false);
+    }
+  }, [concertId, ticketPriceInput]);
+
+  const invitableParticipants = remoteParticipants.filter(p => !onStageIdentities.has(p.identity));
+
+  const stageTiles: StageTile[] = allCamTracks
+    .filter(t => !t.participant.isLocal && onStageIdentities.has(t.participant.identity))
+    .map(t => ({
+      identity: t.participant.identity,
+      name:     t.participant.name || t.participant.identity,
+      track:    t,
+      camOn:    !t.publication?.isMuted,
+      badge:    'star' as StageBadge,
+      micOn:    !t.publication?.isMuted,
+    }));
+
   const formatTime = (sec: number) => {
     const h = Math.floor(sec / 3600);
     const m = Math.floor((sec % 3600) / 60);
@@ -207,8 +290,39 @@ const StreamControls: React.FC<{
         </View>
       )}
 
+      {/* Carte compacte "ventes en temps réel" — visible uniquement si le
+          concert est payant, ouvre le détail par tier au tap. */}
+      {accessType === 'ticket' && ticketsSold && (
+        <TouchableOpacity style={styles.salesCard} onPress={() => setShowSalesPanel(true)} activeOpacity={0.85}>
+          <Icon name="tag" size={14} color="#3FEDB6" />
+          <Text style={styles.salesCardText}>
+            {ticketsSold.total_sold} billet{ticketsSold.total_sold > 1 ? 's' : ''} vendu{ticketsSold.total_sold > 1 ? 's' : ''} — {ticketsSold.total_revenue_eur.toFixed(0)}€
+          </Text>
+          <Icon name="chevron-right" size={14} color="rgba(255,255,255,0.6)" />
+        </TouchableOpacity>
+      )}
+
       {/* Bottom controls */}
       <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={[styles.bottomOverlay, { paddingBottom: (Platform.OS === 'ios' ? 40 : 24) + insets.bottom }]}>
+        {stageTiles.length > 0 && (
+          <View style={styles.stageRowWrap}>
+            <StageTileRow tiles={stageTiles} onInvite={liveId ? () => setShowInvite(true) : undefined} />
+          </View>
+        )}
+        <View style={styles.quickActionsRow}>
+          {stageTiles.length === 0 && !!liveId && (
+            <TouchableOpacity onPress={() => setShowInvite(true)} style={styles.inviteStandaloneBtn}>
+              <Icon name="user-plus" size={16} color="#fff" />
+              <Text style={styles.inviteStandaloneText}>Inviter sur scène</Text>
+            </TouchableOpacity>
+          )}
+          {accessType === 'free' && (
+            <TouchableOpacity onPress={() => setShowMonetize(true)} style={styles.monetizeBtn}>
+              <Icon name="tag" size={16} color="#fff" />
+              <Text style={styles.inviteStandaloneText}>Vendre des billets</Text>
+            </TouchableOpacity>
+          )}
+        </View>
         <View style={styles.controls}>
           <TouchableOpacity onPress={toggleMute} style={styles.controlBtn}>
             <Icon name={muted ? 'mic-off' : 'mic'} size={22} color="#fff" />
@@ -234,6 +348,112 @@ const StreamControls: React.FC<{
           </TouchableOpacity>
         </View>
       </LinearGradient>
+
+      {/* Inviter un participant connecté sur scène — liste simple, pas de demande
+          payante préalable requise (invite_participant accepte un identity libre). */}
+      {showInvite && (
+        <View style={styles.inviteOverlay}>
+          <View style={styles.inviteSheet}>
+            <View style={styles.inviteSheetHeader}>
+              <Text style={styles.inviteSheetTitle}>Inviter sur scène</Text>
+              <TouchableOpacity onPress={() => setShowInvite(false)}>
+                <Icon name="x" size={22} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            {invitableParticipants.length === 0 ? (
+              <Text style={styles.inviteEmptyText}>Aucun spectateur connecté pour l'instant.</Text>
+            ) : (
+              invitableParticipants.map(p => (
+                <TouchableOpacity key={p.identity} style={styles.inviteRow} onPress={() => handleInvite(p.identity)}>
+                  <Icon name="user" size={16} color="#fff" />
+                  <Text style={styles.inviteRowText} numberOfLines={1}>{p.name || p.identity}</Text>
+                  <Icon name="plus-circle" size={18} color="#3FEDB6" />
+                </TouchableOpacity>
+              ))
+            )}
+          </View>
+        </View>
+      )}
+
+      {/* Commercialiser l'accès en plein live — bascule l'event/concert gratuit
+          en payant (PATCH .../monetize), les nouveaux viewers devront payer. */}
+      {showMonetize && (
+        <View style={styles.inviteOverlay}>
+          <View style={styles.inviteSheet}>
+            <View style={styles.inviteSheetHeader}>
+              <Text style={styles.inviteSheetTitle}>Vendre des billets</Text>
+              <TouchableOpacity onPress={() => setShowMonetize(false)}>
+                <Icon name="x" size={22} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.monetizeHint}>
+              Les spectateurs déjà connectés restent gratuitement. Les nouveaux devront acheter un billet.
+            </Text>
+            <View style={styles.monetizeInputRow}>
+              <Text style={styles.monetizeCurrency}>€</Text>
+              <TextInput
+                value={ticketPriceInput}
+                onChangeText={setTicketPriceInput}
+                placeholder="Prix du billet"
+                placeholderTextColor="#999"
+                keyboardType="decimal-pad"
+                style={styles.monetizeInput}
+                autoFocus
+              />
+            </View>
+            <TouchableOpacity
+              style={[styles.monetizeConfirmBtn, monetizing && styles.disabledBtn]}
+              onPress={handleMonetize}
+              disabled={monetizing}
+            >
+              {monetizing
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={styles.monetizeConfirmText}>Activer la vente</Text>}
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* Panneau détaillé des ventes — ouvert depuis la carte compacte. */}
+      {showSalesPanel && ticketsSold && (
+        <View style={styles.inviteOverlay}>
+          <View style={styles.inviteSheet}>
+            <View style={styles.inviteSheetHeader}>
+              <Text style={styles.inviteSheetTitle}>Vente de billets</Text>
+              <TouchableOpacity onPress={() => setShowSalesPanel(false)}>
+                <Icon name="x" size={22} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.salesSummaryRow}>
+              <View style={styles.salesSummaryBox}>
+                <Text style={styles.salesSummaryValue}>{ticketsSold.total_sold}</Text>
+                <Text style={styles.salesSummaryLabel}>Billets vendus</Text>
+              </View>
+              <View style={styles.salesSummaryBox}>
+                <Text style={[styles.salesSummaryValue, { color: '#3FEDB6' }]}>{ticketsSold.total_revenue_eur.toFixed(0)}€</Text>
+                <Text style={styles.salesSummaryLabel}>Revenu brut</Text>
+              </View>
+            </View>
+            {ticketsSold.tiers.map(t => {
+              const max = ticketsSold.max_attendees;
+              const pct = max ? Math.min(100, Math.round((t.sold / max) * 100)) : null;
+              return (
+                <View key={t.tier} style={styles.tierRow}>
+                  <View style={styles.tierRowHeader}>
+                    <Text style={styles.tierRowLabel}>{t.tier.toUpperCase()} — {t.price_eur}€</Text>
+                    <Text style={styles.tierRowCount}>{t.sold}{max ? ` / ${max}` : ''}</Text>
+                  </View>
+                  {pct !== null && (
+                    <View style={styles.tierProgressTrack}>
+                      <View style={[styles.tierProgressFill, { width: `${pct}%` }]} />
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      )}
     </View>
   );
 };
@@ -247,6 +467,7 @@ export const LiveStreamScreen: React.FC<Props> = ({ concertId, onBack }) => {
   const [concert,  setConcert]  = useState<Concert | null>(null);
   const [token,    setToken]    = useState<string | null>(null);
   const [wsUrl,    setWsUrl]    = useState<string | null>(null);
+  const [liveId,   setLiveId]   = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [isLive,   setIsLive]   = useState(false);
 
@@ -256,8 +477,16 @@ export const LiveStreamScreen: React.FC<Props> = ({ concertId, onBack }) => {
         const data = await concertService.getById(concertId);
         setConcert(data);
         if (data.status === 'live') {
-          const result = await concertService.getStreamToken(concertId).catch(() => null);
-          if (result) { setToken(result.token); setWsUrl(result.livekit_url); setIsLive(true); }
+          // Préférer le nouveau chemin unifié (Live) quand le concert en a un —
+          // seul lui permet la scène/cadeaux (room "live-{id}"). Fallback sur
+          // l'ancien streaming.py pour les concerts créés avant cette bascule.
+          if (data.live_id) {
+            const result = await liveService.getToken(data.live_id).catch(() => null);
+            if (result) { setToken(result.token); setWsUrl(result.livekit_url); setLiveId(data.live_id); setIsLive(true); }
+          } else {
+            const result = await concertService.getStreamToken(concertId).catch(() => null);
+            if (result) { setToken(result.token); setWsUrl(result.livekit_url); setIsLive(true); }
+          }
         }
       } catch {}
     })();
@@ -273,28 +502,39 @@ export const LiveStreamScreen: React.FC<Props> = ({ concertId, onBack }) => {
     if (starting) return;
     setStarting(true);
     try {
-      const result = await concertService.startLive(concertId);
-      setToken(result.token);
-      setWsUrl(result.livekit_url);
-      setIsLive(true);
+      if (concert?.live_id) {
+        const result = await liveService.goLive(concert.live_id);
+        setToken(result.token);
+        setWsUrl(result.livekit_url);
+        setLiveId(concert.live_id);
+        setIsLive(true);
+      } else {
+        const result = await concertService.startLive(concertId);
+        setToken(result.token);
+        setWsUrl(result.livekit_url);
+        setIsLive(true);
+      }
     } catch (e: any) {
       toastService.error('Erreur', e?.response?.data?.detail || 'Impossible de démarrer le live');
     } finally {
       setStarting(false);
     }
-  }, [concertId, starting]);
+  }, [concertId, concert?.live_id, starting]);
 
   const handleEnd = useCallback(async () => {
-    try { await concertService.endLive(concertId); } catch {}
+    try {
+      if (liveId) await liveService.stopLive(liveId);
+      else await concertService.endLive(concertId);
+    } catch {}
     setIsLive(false);
     setToken(null);
     if (onBack) onBack(); else nav.goBack();
-  }, [concertId, nav, onBack]);
+  }, [concertId, liveId, nav, onBack]);
 
   if (isLive && token && wsUrl) {
     return (
       <LiveKitRoom serverUrl={wsUrl} token={token} connect options={CREATOR_ROOM_OPTIONS}>
-        <StreamControls concert={concert} concertId={concertId} onEnd={handleEnd} />
+        <StreamControls concert={concert} concertId={concertId} liveId={liveId} onEnd={handleEnd} />
       </LiveKitRoom>
     );
   }
@@ -328,6 +568,71 @@ export const LiveStreamScreen: React.FC<Props> = ({ concertId, onBack }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
+  stageRowWrap: { marginBottom: 14 },
+  quickActionsRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
+  inviteStandaloneBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: 18,
+    paddingHorizontal: 12, paddingVertical: 7,
+  },
+  monetizeBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(63,237,182,0.22)', borderRadius: 18,
+    paddingHorizontal: 12, paddingVertical: 7,
+  },
+  inviteStandaloneText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  monetizeHint: { color: '#999', fontSize: 13, marginBottom: 16, lineHeight: 18 },
+  monetizeInputRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14,
+    paddingHorizontal: 14, paddingVertical: 4, marginBottom: 16,
+  },
+  monetizeCurrency: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  monetizeInput: { flex: 1, color: '#fff', fontSize: 16, paddingVertical: 12 },
+  monetizeConfirmBtn: {
+    backgroundColor: '#3FEDB6', borderRadius: 24,
+    paddingVertical: 14, alignItems: 'center', justifyContent: 'center',
+  },
+  monetizeConfirmText: { color: '#0A0A0A', fontSize: 15, fontWeight: '800' },
+  salesCard: {
+    position: 'absolute', top: Platform.OS === 'ios' ? 128 : 108, left: 16, right: 16, zIndex: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: 'rgba(20,16,31,0.75)', borderRadius: 14,
+    borderWidth: 1, borderColor: 'rgba(63,237,182,0.35)',
+    paddingHorizontal: 12, paddingVertical: 9,
+  },
+  salesCardText: { flex: 1, color: '#fff', fontSize: 12.5, fontWeight: '700' },
+  salesSummaryRow: { flexDirection: 'row', gap: 10, marginBottom: 18 },
+  salesSummaryBox: {
+    flex: 1, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 14,
+    paddingVertical: 14, alignItems: 'center', gap: 2,
+  },
+  salesSummaryValue: { color: '#fff', fontSize: 22, fontWeight: '900' },
+  salesSummaryLabel: { color: '#999', fontSize: 11, fontWeight: '600' },
+  tierRow: { marginBottom: 14 },
+  tierRowHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  tierRowLabel: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  tierRowCount: { color: '#999', fontSize: 13, fontWeight: '600' },
+  tierProgressTrack: { height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' },
+  tierProgressFill: { height: '100%', borderRadius: 3, backgroundColor: '#3FEDB6' },
+  inviteOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end', zIndex: 30,
+  },
+  inviteSheet: {
+    backgroundColor: '#161221', borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32, maxHeight: '60%',
+  },
+  inviteSheetHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14,
+  },
+  inviteSheetTitle: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  inviteEmptyText: { color: '#999', fontSize: 14, paddingVertical: 12 },
+  inviteRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  inviteRowText: { flex: 1, color: '#fff', fontSize: 14, fontWeight: '600' },
   preLive:   { justifyContent: 'center', alignItems: 'center', gap: 16, paddingHorizontal: 32 },
   preTitle:  { color: '#fff', fontSize: 22, fontWeight: '700', textAlign: 'center', marginTop: 12 },
   preSub:    { color: '#999', fontSize: 15 },

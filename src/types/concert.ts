@@ -98,3 +98,17 @@ export interface StreamStatus {
   started_at: string | null;
   livekit_url: string | null;
 }
+
+export interface TicketsSoldTier {
+  tier: 'simple' | 'vip' | 'vvip' | 'vvvip';
+  price_eur: number;
+  sold: number;
+  revenue_eur: number;
+}
+
+export interface TicketsSold {
+  tiers: TicketsSoldTier[];
+  total_sold: number;
+  total_revenue_eur: number;
+  max_attendees: number | null;
+}

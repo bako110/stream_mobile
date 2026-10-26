@@ -1,5 +1,5 @@
 import { apiClient, Endpoints } from '../api';
-import type { Concert, StreamToken, StreamStatus, ConcertCreate, ConcertUpdate } from '../types';
+import type { Concert, StreamToken, StreamStatus, TicketsSold, ConcertCreate, ConcertUpdate } from '../types';
 import { DEFAULT_PAGE_LIMIT } from '../utils/constants';
 
 export const concertService = {
@@ -54,6 +54,11 @@ export const concertService = {
     return res.data;
   },
 
+  async getTicketsSold(concertId: string): Promise<TicketsSold> {
+    const res = await apiClient.get<TicketsSold>(Endpoints.streaming.ticketsSold(concertId));
+    return res.data;
+  },
+
   // ── Création & édition (artiste) ──────────────────────────────────────────
 
   async create(data: ConcertCreate): Promise<Concert> {
@@ -68,6 +73,13 @@ export const concertService = {
 
   async publish(id: string): Promise<Concert> {
     const res = await apiClient.patch<Concert>(Endpoints.concerts.publish(id));
+    return res.data;
+  },
+
+  /** Bascule un concert GRATUIT en payant — y compris en plein live (l'artiste
+   * décide de commercialiser l'accès une fois le direct démarré). */
+  async monetize(id: string, ticketPrice: number, tier: string = 'simple'): Promise<Concert> {
+    const res = await apiClient.patch<Concert>(Endpoints.concerts.monetize(id), { ticket_price: ticketPrice, tier });
     return res.data;
   },
 
