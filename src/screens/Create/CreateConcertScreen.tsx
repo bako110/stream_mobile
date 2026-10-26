@@ -409,7 +409,7 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={90}
       >
         <ScrollView

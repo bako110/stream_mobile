@@ -1,10 +1,10 @@
 /**
  * LiveListScreen — Liste des concerts en direct
  */
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, Image, RefreshControl,
-  StyleSheet, StatusBar, Platform, Dimensions,
+  StyleSheet, StatusBar, Platform, Dimensions, TextInput,
 } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
@@ -13,15 +13,32 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
-import { SkeletonLiveList, BackButton } from '../../components/common';
-import { concertService } from '../../services';
+import { SkeletonLiveList, BackButton, GofolyxLoader } from '../../components/common';
+import { concertService, eventService } from '../../services';
 import { useUser } from '../../context/UserContext';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
-import type { Concert } from '../../types/concert';
+import type { Concert, UpcomingLiveMixedItem } from '../../types/concert';
+import type { Event } from '../../types/event';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 const { width: SCREEN_W } = Dimensions.get('window');
 const CARD_W = (SCREEN_W - 48) / 2;
+
+type LiveItem =
+  | { kind: 'concert'; data: Concert }
+  | { kind: 'event'; data: Event };
+
+type DateFilter = 'all' | 'today' | 'week';
+
+function isSameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function isWithinNext7Days(d: Date): boolean {
+  const now = new Date();
+  const in7days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  return d >= now && d <= in7days;
+}
 
 export const LiveListScreen: React.FC = () => {
   const { theme } = useTheme();
@@ -31,33 +48,79 @@ export const LiveListScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
 
   const [liveConcerts, setLiveConcerts] = useState<Concert[]>([]);
-  const [upcomingConcerts, setUpcomingConcerts] = useState<Concert[]>([]);
+  const [liveEvents, setLiveEvents] = useState<Event[]>([]);
+  const [upcoming, setUpcoming] = useState<UpcomingLiveMixedItem[]>([]);
+  const [upcomingPage, setUpcomingPage] = useState(1);
+  const [upcomingHasMore, setUpcomingHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [search, setSearch] = useState('');
+  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+
+  const loadUpcomingPage = useCallback(async (page: number, replace: boolean) => {
+    const res = await concertService.getUpcomingLiveMixed(page, 20);
+    setUpcoming(prev => replace ? res.items : [...prev, ...res.items]);
+    setUpcomingPage(res.page);
+    setUpcomingHasMore(res.has_more);
+  }, []);
 
   const load = useCallback(async () => {
     try {
-      const [live, upcoming] = await Promise.all([
+      const [live, liveEv] = await Promise.all([
         concertService.getLive().catch(() => []),
-        concertService.getUpcoming().catch(() => []),
+        eventService.getLive().catch(() => []),
       ]);
       setLiveConcerts(Array.isArray(live) ? live : []);
-      setUpcomingConcerts(Array.isArray(upcoming) ? upcoming : []);
+      setLiveEvents(Array.isArray(liveEv) ? liveEv : []);
+      await loadUpcomingPage(1, true).catch(() => {});
     } catch { /* silencieux */ }
     finally { setLoading(false); setRefreshing(false); }
-  }, []);
+  }, [loadUpcomingPage]);
 
   useEffect(() => { load(); }, [load]);
 
   // Polling toutes les 15s pour MAJ des lives
   useEffect(() => {
     const interval = setInterval(() => {
-      concertService.getLive()
-        .then(live => setLiveConcerts(Array.isArray(live) ? live : []))
-        .catch(() => {});
+      concertService.getLive().then(live => setLiveConcerts(Array.isArray(live) ? live : [])).catch(() => {});
+      eventService.getLive().then(ev => setLiveEvents(Array.isArray(ev) ? ev : [])).catch(() => {});
     }, 15000);
     return () => clearInterval(interval);
   }, []);
+
+  const loadMoreUpcoming = useCallback(() => {
+    if (loadingMore || !upcomingHasMore) return;
+    setLoadingMore(true);
+    loadUpcomingPage(upcomingPage + 1, false).finally(() => setLoadingMore(false));
+  }, [loadingMore, upcomingHasMore, upcomingPage, loadUpcomingPage]);
+
+  // Recherche par titre (concerts + événements en direct, côté client — pas
+  // besoin d'un nouvel endpoint pour filtrer une poignée de lives actifs).
+  const filteredLiveConcerts = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return q ? liveConcerts.filter(c => c.title.toLowerCase().includes(q)) : liveConcerts;
+  }, [liveConcerts, search]);
+  const filteredLiveEvents = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return q ? liveEvents.filter(e => e.title.toLowerCase().includes(q)) : liveEvents;
+  }, [liveEvents, search]);
+
+  // Filtre de date pour "Prochainement" — Aujourd'hui / Cette semaine / Tout
+  // — appliqué côté client sur la page déjà chargée (le scroll infini reste
+  // géré par le serveur, ce filtre affine juste l'affichage courant).
+  const filteredUpcoming = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return upcoming.filter(({ kind, data }) => {
+      if (q && !data.title.toLowerCase().includes(q)) return false;
+      if (dateFilter === 'all') return true;
+      const d = new Date(kind === 'concert' ? data.scheduled_at : data.starts_at);
+      if (dateFilter === 'today') return isSameDay(d, new Date());
+      return isWithinNext7Days(d);
+    });
+  }, [upcoming, search, dateFilter]);
+
+  const liveTotal = filteredLiveConcerts.length + filteredLiveEvents.length;
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -77,11 +140,47 @@ export const LiveListScreen: React.FC = () => {
     }
   };
 
-  const renderLiveCard = ({ item, index }: { item: Concert; index: number }) => {
-    const artist = item.artist;
-    const artistName = artist?.display_name ?? artist?.username ?? 'Artiste';
-    const initial = artistName[0]?.toUpperCase() ?? '?';
+  const handleEventPress = (event: Event) => {
+    nav.navigate('EventDetail', { eventId: event.id });
+  };
 
+  const renderLiveEventCard = ({ item }: { item: Event }) => (
+    <TouchableOpacity
+      style={[st.liveCard, { backgroundColor: colors.surface }]}
+      activeOpacity={0.85}
+      onPress={() => handleEventPress(item)}
+    >
+      <View style={st.liveThumbWrap}>
+        {item.thumbnail_url ? (
+          <Image source={{ uri: item.thumbnail_url }} style={st.liveThumb} />
+        ) : (
+          <LinearGradient colors={['#7B3FF2', '#E0389A']} style={st.liveThumb} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+            <Icon name="calendar" size={36} color="#fff" />
+          </LinearGradient>
+        )}
+        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.7)']} style={st.liveOverlay} />
+        <View style={st.liveBadge}>
+          <View style={st.liveDot} />
+          <Text style={st.liveBadgeText}>LIVE</Text>
+        </View>
+        {/* Distingue un événement en live d'un concert — même carrousel. */}
+        <View style={[st.eventBadge, { backgroundColor: '#F59E0B' }]}>
+          <Text style={st.eventBadgeText}>ÉVÉNEMENT</Text>
+        </View>
+      </View>
+      <View style={st.liveInfo}>
+        <Text style={[st.liveTitle, { color: colors.textPrimary }]} numberOfLines={1}>{item.title}</Text>
+        {!!item.venue_city && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Icon name="map-pin" size={11} color={colors.textTertiary} />
+            <Text style={[st.liveArtist, { color: colors.textSecondary }]} numberOfLines={1}>{item.venue_city}</Text>
+          </View>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderLiveCard = ({ item }: { item: Concert }) => {
     return (
       <TouchableOpacity
           style={[st.liveCard, { backgroundColor: colors.surface }]}
@@ -112,6 +211,11 @@ export const LiveListScreen: React.FC = () => {
               <View style={st.liveDot} />
               <Text style={st.liveBadgeText}>LIVE</Text>
             </View>
+            {/* Distingue un concert d'un live simple créateur — c'est le
+                CONCERT qui est en direct, pas une personne. */}
+            <View style={st.eventBadge}>
+              <Text style={st.eventBadgeText}>CONCERT</Text>
+            </View>
             {/* Viewers */}
             <View style={st.viewersBadge}>
               <Icon name="eye" size={12} color="#fff" />
@@ -121,23 +225,9 @@ export const LiveListScreen: React.FC = () => {
 
           {/* Info */}
           <View style={st.liveInfo}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              {artist?.avatar_url ? (
-                <Image source={{ uri: artist.avatar_url }} style={st.liveAvatar} />
-              ) : (
-                <View style={[st.liveAvatar, { backgroundColor: '#7B3FF2' + '22', alignItems: 'center', justifyContent: 'center' }]}>
-                  <Text style={{ color: '#7B3FF2', fontWeight: '800', fontSize: 12 }}>{initial}</Text>
-                </View>
-              )}
-              <View style={{ flex: 1 }}>
-                <Text style={[st.liveTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-                  {item.title}
-                </Text>
-                <Text style={[st.liveArtist, { color: colors.textSecondary }]} numberOfLines={1}>
-                  {artistName}
-                </Text>
-              </View>
-            </View>
+            <Text style={[st.liveTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+              {item.title}
+            </Text>
             {item.genre && (
               <View style={[st.genrePill, { backgroundColor: colors.primary + '15' }]}>
                 <Text style={[st.genreText, { color: colors.primary }]}>{item.genre}</Text>
@@ -148,43 +238,38 @@ export const LiveListScreen: React.FC = () => {
     );
   };
 
-  const renderUpcomingCard = ({ item, index }: { item: Concert; index: number }) => {
-    const artist = item.artist;
-    const artistName = artist?.display_name ?? artist?.username ?? 'Artiste';
-    const initial = artistName[0]?.toUpperCase() ?? '?';
-    const scheduledDate = new Date(item.scheduled_at).toLocaleDateString('fr-FR', {
+  const renderUpcomingCard = ({ item }: { item: UpcomingLiveMixedItem }) => {
+    const { kind, data } = item;
+    const scheduledAt = kind === 'concert' ? data.scheduled_at : data.starts_at;
+    const scheduledDate = new Date(scheduledAt).toLocaleDateString('fr-FR', {
       day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
     });
+    const onPress = () => kind === 'concert' ? handlePress(data) : handleEventPress(data);
 
     return (
       <TouchableOpacity
           style={[st.upcomingCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
           activeOpacity={0.85}
-          onPress={() => handlePress(item)}
+          onPress={onPress}
         >
-          {item.thumbnail_url ? (
-            <Image source={{ uri: item.thumbnail_url }} style={st.upcomingThumb} />
+          {data.thumbnail_url ? (
+            <Image source={{ uri: data.thumbnail_url }} style={st.upcomingThumb} />
           ) : (
             <View style={[st.upcomingThumb, { backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }]}>
-              <Icon name="music" size={24} color={colors.textTertiary} />
+              <Icon name={kind === 'concert' ? 'music' : 'calendar'} size={24} color={colors.textTertiary} />
             </View>
           )}
           <View style={st.upcomingInfo}>
-            <Text style={[st.upcomingTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-              {item.title}
-            </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              {artist?.avatar_url ? (
-                <Image source={{ uri: artist.avatar_url }} style={{ width: 18, height: 18, borderRadius: 9 }} />
-              ) : (
-                <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: colors.primary + '22', alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 9 }}>{initial}</Text>
-                </View>
-              )}
-              <Text style={[st.upcomingArtist, { color: colors.textSecondary }]} numberOfLines={1}>
-                {artistName}
-              </Text>
+              <View style={[st.upcomingKindPill, { backgroundColor: kind === 'concert' ? '#8B5CF622' : '#F59E0B22' }]}>
+                <Text style={[st.upcomingKindText, { color: kind === 'concert' ? '#8B5CF6' : '#F59E0B' }]}>
+                  {kind === 'concert' ? 'CONCERT' : 'ÉVÉNEMENT'}
+                </Text>
+              </View>
             </View>
+            <Text style={[st.upcomingTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+              {data.title}
+            </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
               <Icon name="clock" size={12} color={colors.textTertiary} />
               <Text style={{ fontSize: 11, color: colors.textTertiary }}>{scheduledDate}</Text>
@@ -234,8 +319,42 @@ export const LiveListScreen: React.FC = () => {
         renderItem={null}
         ListHeaderComponent={
           <>
-            {/* ── Section LIVE NOW ─────────────────────────────────────── */}
-            {liveConcerts.length > 0 ? (
+            {/* ── Recherche + filtres de date ──────────────────────────── */}
+            <View style={[st.searchWrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Icon name="search" size={16} color={colors.textTertiary} />
+              <TextInput
+                value={search}
+                onChangeText={setSearch}
+                placeholder="Rechercher un concert ou un événement…"
+                placeholderTextColor={colors.textTertiary}
+                style={[st.searchInput, { color: colors.textPrimary }]}
+              />
+              {!!search && (
+                <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Icon name="x" size={16} color={colors.textTertiary} />
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={st.dateFilterRow}>
+              {([['all', 'Tout'], ['today', "Aujourd'hui"], ['week', 'Cette semaine']] as const).map(([key, label]) => {
+                const active = dateFilter === key;
+                return (
+                  <TouchableOpacity
+                    key={key}
+                    onPress={() => setDateFilter(key)}
+                    style={[
+                      st.dateFilterPill,
+                      { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border },
+                    ]}
+                  >
+                    <Text style={[st.dateFilterText, { color: active ? '#fff' : colors.textSecondary }]}>{label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* ── Section LIVE NOW — concerts + événements fusionnés ───── */}
+            {liveTotal > 0 ? (
               <View style={st.section}>
                 <View style={st.sectionHeader}>
                   <View style={st.sectionLiveDot} />
@@ -243,13 +362,18 @@ export const LiveListScreen: React.FC = () => {
                     En direct maintenant
                   </Text>
                   <Text style={[st.sectionCount, { color: colors.primary }]}>
-                    {liveConcerts.length}
+                    {liveTotal}
                   </Text>
                 </View>
                 <FlatList
-                  data={liveConcerts}
-                  keyExtractor={c => c.id}
-                  renderItem={renderLiveCard}
+                  data={[
+                    ...filteredLiveConcerts.map(c => ({ kind: 'concert' as const, data: c })),
+                    ...filteredLiveEvents.map(e => ({ kind: 'event' as const, data: e })),
+                  ]}
+                  keyExtractor={item => `${item.kind}-${item.data.id}`}
+                  renderItem={({ item }) => item.kind === 'concert'
+                    ? renderLiveCard({ item: item.data })
+                    : renderLiveEventCard({ item: item.data })}
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
@@ -266,13 +390,13 @@ export const LiveListScreen: React.FC = () => {
                   Aucun live en cours
                 </Text>
                 <Text style={[st.emptyLiveDesc, { color: colors.textTertiary }]}>
-                  Personne n'est en direct pour le moment.{'\n'}Reviens plus tard !
+                  {search ? 'Aucun résultat pour cette recherche.' : "Personne n'est en direct pour le moment.\nReviens plus tard !"}
                 </Text>
               </Animated.View>
             )}
 
             {/* ── Section UPCOMING ────────────────────────────────────── */}
-            {upcomingConcerts.length > 0 && (
+            {filteredUpcoming.length > 0 && (
               <View style={st.section}>
                 <View style={st.sectionHeader}>
                   <Icon name="clock" size={16} color={colors.textSecondary} />
@@ -280,15 +404,22 @@ export const LiveListScreen: React.FC = () => {
                     Prochainement
                   </Text>
                 </View>
-                {upcomingConcerts.map((item, index) => (
-                  <View key={item.id}>
-                    {renderUpcomingCard({ item, index })}
+                {filteredUpcoming.map(item => (
+                  <View key={`${item.kind}-${item.data.id}`}>
+                    {renderUpcomingCard({ item })}
                   </View>
                 ))}
+                {loadingMore && (
+                  <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+                    <GofolyxLoader variant="reel" color={colors.primary} />
+                  </View>
+                )}
               </View>
             )}
           </>
         }
+        onEndReached={search ? undefined : loadMoreUpcoming}
+        onEndReachedThreshold={0.4}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -322,6 +453,22 @@ const st = StyleSheet.create({
   headerTitle: { fontSize: 18, fontWeight: '800' },
 
   // Sections
+  searchWrap: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginHorizontal: 16, marginTop: 16,
+    borderWidth: 1, borderRadius: 14,
+    paddingHorizontal: 14, paddingVertical: 11,
+  },
+  searchInput: { flex: 1, fontSize: 14 },
+  dateFilterRow: {
+    flexDirection: 'row', gap: 8,
+    marginHorizontal: 16, marginTop: 12,
+  },
+  dateFilterPill: {
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: 12, borderWidth: 1,
+  },
+  dateFilterText: { fontSize: 12.5, fontWeight: '700' },
   section: { marginTop: 20 },
   sectionHeader: {
     flexDirection: 'row',
@@ -383,6 +530,21 @@ const st = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.5,
+  },
+  eventBadge: {
+    position: 'absolute',
+    top: 10,
+    left: 62,
+    backgroundColor: '#8B5CF6',
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  eventBadgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
   viewersBadge: {
     position: 'absolute',
@@ -451,6 +613,16 @@ const st = StyleSheet.create({
   },
   upcomingArtist: {
     fontSize: 12,
+  },
+  upcomingKindPill: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 7, paddingVertical: 2,
+    borderRadius: 6,
+  },
+  upcomingKindText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
 
   // Empty state

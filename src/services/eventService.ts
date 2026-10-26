@@ -34,6 +34,11 @@ export const eventService = {
     return res.data;
   },
 
+  async getLive(): Promise<Event[]> {
+    const res = await apiClient.get<Event[]>(Endpoints.events.live);
+    return Array.isArray(res.data) ? res.data : [];
+  },
+
   /** Capture analytics — best-effort, ne bloque jamais l'affichage si ça échoue. */
   async recordView(id: string): Promise<void> {
     try { await apiClient.post(Endpoints.events.view(id)); } catch { /* silencieux */ }

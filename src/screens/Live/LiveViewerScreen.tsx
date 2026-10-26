@@ -4,7 +4,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, StatusBar,
-  Platform, FlatList, TextInput, KeyboardAvoidingView,
+  Platform, FlatList, TextInput, KeyboardAvoidingView, Dimensions, Image,
 } from 'react-native';
 import {
   LiveKitRoom,
@@ -31,6 +31,8 @@ import { StageTileRow } from '../../components/live/StageTileRow';
 import type { StageTile, StageBadge } from '../../components/live/StageTileRow';
 import { LiveGiftBar } from '../../components/wallet/LiveGiftBar';
 import { TicketPaymentSheet } from '../../components/wallet/TicketPaymentSheet';
+import { Images } from '../../assets';
+import Orientation from 'react-native-orientation-locker';
 
 interface Props {
   concertId: string;
@@ -41,6 +43,15 @@ interface LiveChat {
   id: string;
   username: string;
   text: string;
+}
+
+/** Un concert/événement se regarde TOUJOURS en paysage — jamais en vertical,
+ * symétrique à useForceLandscape côté LiveStreamScreen (host). */
+function useForceLandscape() {
+  useEffect(() => {
+    Orientation.lockToLandscape();
+    return () => { Orientation.lockToPortrait(); };
+  }, []);
 }
 
 // ── LiveKit quality config ─────────────────────────────────────────────────────
@@ -68,7 +79,7 @@ const ArtistVideoView: React.FC<{
 
   if (remoteParticipants.length === 0) {
     return (
-      <View style={styles.noVideoCenter}>
+      <View style={styles.playerFrameFull}>
         <GofolyxLoader variant="reel" color="#E53E3E" />
         <Text style={styles.connectingText}>En attente du stream...</Text>
       </View>
@@ -89,27 +100,28 @@ const ArtistVideoView: React.FC<{
   }));
 
   return (
-    <>
+    <View style={styles.playerFrameFull}>
       {spotlightTrack
         ? <VideoTrack trackRef={spotlightTrack} style={StyleSheet.absoluteFill} objectFit="cover" />
         : (
-          <View style={styles.noVideoCenter}>
+          <>
             <GofolyxLoader variant="reel" color="#E53E3E" />
             <Text style={styles.connectingText}>En attente de la vidéo...</Text>
-          </View>
+          </>
         )}
       {stageTiles.length > 0 && (
         <View style={styles.stageRowWrap} pointerEvents="box-none">
           <StageTileRow tiles={stageTiles} onTapTile={onTapTile} />
         </View>
       )}
-    </>
+    </View>
   );
 };
 
 // ── Main component ────────────────────────────────────────────────────────────
 export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
   useKeepAwake();
+  useForceLandscape();
   useEffect(() => { configureLiveAudioSession(); }, []);
   const nav = useNavigation();
   const insets = useSafeAreaInsets();
@@ -272,23 +284,66 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
     ].filter(t => t.price !== null) as { key: 'simple'|'vip'|'vvip'|'vvvip'; label: string; icon: string; color: string; price: number; sub: string }[];
 
     return (
-      <View style={[styles.container, styles.center]}>
-        <StatusBar barStyle="light-content" backgroundColor="#000" />
-        <Icon name="lock" size={48} color="#666" />
-        <Text style={styles.endedTitle}>Accès restreint</Text>
-        <Text style={styles.endedSub}>{accessDenied}</Text>
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+
+        {/* Lecteur — poster statique + verrou plein écran, flux non accessible
+            tant que le billet n'est pas acheté. */}
+        <View style={styles.playerFrameFull}>
+          {concert?.thumbnail_url && (
+            <Image source={{ uri: concert.thumbnail_url }} style={StyleSheet.absoluteFill as any} blurRadius={14} />
+          )}
+          <View style={styles.playerLockOverlay}>
+            <Icon name="lock" size={32} color="#fff" />
+            <Text style={styles.playerLockText}>{accessDenied}</Text>
+          </View>
+        </View>
+
+        {/* Header — overlay, logo + titre, badges */}
+        <View style={[
+          styles.header, styles.headerOverlay,
+          { paddingTop: 10 + insets.top, paddingLeft: 16 + insets.left, paddingRight: 16 + insets.right },
+        ]}>
+          <View style={styles.headerLeft}>
+            <TouchableOpacity onPress={handleLeave} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Icon name="arrow-left" size={20} color="#fff" />
+            </TouchableOpacity>
+            <Image source={Images.logoDark} style={styles.headerLogo} resizeMode="contain" />
+            <View>
+              <Text style={styles.titleText} numberOfLines={1}>{concert?.title ?? ''}</Text>
+              <Text style={styles.artistText} numberOfLines={1}>Artiste : {concert?.artist?.display_name ?? concert?.artist?.username ?? ''}</Text>
+            </View>
+          </View>
+          <View style={styles.headerRight}>
+            <View style={styles.liveBadge}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveText}>EN DIRECT</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Bandeau "Billet en vente" — overlay bas, icône/texte/bouton d'achat. */}
         {concert?.access_type === 'subscription' ? (
-          <TouchableOpacity style={styles.leaveBtn} onPress={() => nav.navigate('SubscriptionPlans' as never)}>
-            <Text style={styles.leaveBtnText}>Voir les abonnements</Text>
-          </TouchableOpacity>
+          <View style={[styles.bottomOverlayBar, { paddingBottom: 14 + insets.bottom, paddingLeft: 16 + insets.left, paddingRight: 16 + insets.right }]}>
+            <TouchableOpacity style={[styles.leaveBtn, styles.buyTicketBtn]} onPress={() => nav.navigate('SubscriptionPlans' as never)}>
+              <Text style={styles.buyTicketBtnText}>Voir les abonnements</Text>
+            </TouchableOpacity>
+          </View>
         ) : concert?.access_type === 'ticket' && allTiers.length > 0 ? (
-          <>
-            <TouchableOpacity style={[styles.leaveBtn, styles.buyTicketBtn]} onPress={() => setShowBuySheet(true)}>
-              <Text style={styles.buyTicketBtnText}>Acheter un billet — {allTiers[0].price}€</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.leaveBtn} onPress={handleLeave}>
-              <Text style={styles.leaveBtnText}>Retour</Text>
-            </TouchableOpacity>
+          <View style={[styles.bottomOverlayBar, { paddingBottom: 14 + insets.bottom, paddingLeft: 16 + insets.left, paddingRight: 16 + insets.right }]}>
+            <View style={styles.ticketBanner}>
+              <View style={styles.ticketBannerIconWrap}>
+                <Icon name="tag" size={18} color="#4FA8FF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.ticketBannerTitle}>Billet en vente</Text>
+                <Text style={styles.ticketBannerSub}>Accédez au direct et vivez le concert !</Text>
+              </View>
+              <TouchableOpacity style={styles.ticketBannerBtn} onPress={() => setShowBuySheet(true)}>
+                <Icon name="tag" size={14} color="#fff" />
+                <Text style={styles.ticketBannerBtnText}>Acheter — {allTiers[0].price}€</Text>
+              </TouchableOpacity>
+            </View>
             {concert && (
               <TicketPaymentSheet
                 visible={showBuySheet} onClose={() => setShowBuySheet(false)}
@@ -303,12 +358,8 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
                 onBuy={(tierKey) => concertService.buyTicket(concertId, tierKey)}
               />
             )}
-          </>
-        ) : (
-          <TouchableOpacity style={styles.leaveBtn} onPress={handleLeave}>
-            <Text style={styles.leaveBtnText}>Retour</Text>
-          </TouchableOpacity>
-        )}
+          </View>
+        ) : null}
       </View>
     );
   }
@@ -326,36 +377,53 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
     <LiveKitRoom serverUrl={wsUrl} token={token} connect options={VIEWER_ROOM_OPTIONS}>
       <KeyboardAvoidingView
         style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <StatusBar barStyle="light-content" backgroundColor="#000" />
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-        {/* Artist video — full screen */}
+        {/* Lecteur — plein écran paysage */}
         <ArtistVideoView
           hostId={concert?.artist_id ?? ''}
           spotlightId={spotlightId}
           onTapTile={setSpotlightId}
         />
 
-        {/* Top overlay */}
-        <LinearGradient colors={['rgba(0,0,0,0.7)', 'transparent']} style={styles.topOverlay}>
-          <BackButton onPress={handleLeave} transparent color="#fff" />
-          <View style={styles.topCenter}>
+        {/* Header — overlay, logo + titre à gauche, badges EN DIRECT/vues à droite */}
+        <View style={[
+          styles.header, styles.headerOverlay,
+          { paddingTop: 10 + insets.top, paddingLeft: 16 + insets.left, paddingRight: 16 + insets.right },
+        ]}>
+          <View style={styles.headerLeft}>
+            <TouchableOpacity onPress={handleLeave} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Icon name="arrow-left" size={20} color="#fff" />
+            </TouchableOpacity>
+            <Image source={Images.logoDark} style={styles.headerLogo} resizeMode="contain" />
+            <View>
+              <Text style={styles.titleText} numberOfLines={1}>{concert?.title}</Text>
+              <Text style={styles.artistText} numberOfLines={1}>Artiste : {concert?.artist?.display_name ?? concert?.artist?.username ?? ''}</Text>
+            </View>
+          </View>
+          <View style={styles.headerRight}>
             <View style={styles.liveBadge}>
               <View style={styles.liveDot} />
-              <Text style={styles.liveText}>LIVE</Text>
+              <Text style={styles.liveText}>EN DIRECT</Text>
             </View>
-            <Text style={styles.titleText} numberOfLines={1}>{concert?.title}</Text>
+            <View style={styles.viewerBadge}>
+              <Icon name="eye" size={13} color="#fff" />
+              <Text style={styles.viewerText}>{viewerCount}</Text>
+            </View>
           </View>
-          <View style={styles.viewerBadge}>
-            <Icon name="eye" size={14} color="#fff" />
-            <Text style={styles.viewerText}>{viewerCount}</Text>
-          </View>
-        </LinearGradient>
+        </View>
 
         {/* Chat */}
         {showChat && (
-          <View style={[styles.chatContainer, { paddingBottom: (Platform.OS === 'ios' ? 34 : 16) + insets.bottom }]}>
+          <View style={[
+            styles.chatContainer,
+            {
+              paddingBottom: (Platform.OS === 'ios' ? 34 : 16) + insets.bottom,
+              paddingLeft: 12 + insets.left, paddingRight: 12 + insets.right,
+            },
+          ]}>
             <FlatList
               ref={chatListRef}
               data={chatMessages}
@@ -409,29 +477,68 @@ const styles = StyleSheet.create({
   center: { justifyContent: 'center', alignItems: 'center' },
   noVideoCenter: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#111' },
   connectingText: { color: '#999', marginTop: 12, fontSize: 14 },
-  stageRowWrap: { position: 'absolute', left: 12, right: 12, bottom: 160, zIndex: 8 },
-  topOverlay: {
-    position: 'absolute', top: 0, left: 0, right: 0,
-    paddingTop: Platform.OS === 'ios' ? 54 : 36,
-    paddingHorizontal: 16, paddingBottom: 20,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    zIndex: 10,
+  stageRowWrap: { position: 'absolute', left: 12, right: 12, bottom: 12, zIndex: 8 },
+  // Écran toujours en paysage (useForceLandscape) : header/bandeau en overlay
+  // flottant par-dessus la vidéo plein écran, comme LiveStreamScreen (host).
+  header: {
+    flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
+    paddingBottom: 14, gap: 10,
   },
-  topCenter: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, marginHorizontal: 8 },
+  headerOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  bottomOverlayBar: {
+    position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10,
+    paddingTop: 10,
+  },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerLogo: { width: 28, height: 28 },
   liveBadge: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#E53E3E', borderRadius: 4,
-    paddingHorizontal: 8, paddingVertical: 3,
+    backgroundColor: '#E53E3E', borderRadius: 7,
+    paddingHorizontal: 9, paddingVertical: 4, gap: 5,
   },
-  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff', marginRight: 5 },
-  liveText: { color: '#fff', fontWeight: '700', fontSize: 12 },
-  titleText: { color: '#fff', fontSize: 14, fontWeight: '600', flex: 1 },
+  liveDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#fff' },
+  liveText: { color: '#fff', fontWeight: '800', fontSize: 11, letterSpacing: 0.5 },
+  titleText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  artistText: { color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '500', marginTop: 1 },
   viewerBadge: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4, gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderRadius: 12, paddingHorizontal: 9, paddingVertical: 5, gap: 5,
   },
-  viewerText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  viewerText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  playerFrameFull: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: '#0A0A0A', alignItems: 'center', justifyContent: 'center',
+  },
+  playerLockOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 24,
+  },
+  playerLockText: { color: '#fff', fontSize: 13, fontWeight: '600', textAlign: 'center' },
+  ticketBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    marginHorizontal: 16, marginTop: 18,
+    backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 16,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+    paddingHorizontal: 14, paddingVertical: 12,
+  },
+  ticketBannerIconWrap: {
+    width: 38, height: 38, borderRadius: 12,
+    backgroundColor: 'rgba(79,168,255,0.15)', alignItems: 'center', justifyContent: 'center',
+  },
+  ticketBannerTitle: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  ticketBannerSub: { color: 'rgba(255,255,255,0.55)', fontSize: 11.5, marginTop: 1 },
+  ticketBannerBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: '#4FA8FF', borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 10,
+  },
+  ticketBannerBtnText: { color: '#fff', fontSize: 12.5, fontWeight: '800' },
   chatContainer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     maxHeight: '45%', paddingHorizontal: 12,

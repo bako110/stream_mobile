@@ -160,6 +160,7 @@ export const HomeScreen: React.FC = () => {
   const searchReqRef = useRef('');
   const [currentUser,   setCurrentUser]   = useState<User | null>(null);
   const [liveConcerts,  setLiveConcerts]  = useState<Concert[]>([]);
+  const [liveEvents,    setLiveEvents]    = useState<Event[]>([]);
   const [spontLives,    setSpontLives]    = useState<LiveStream[]>([]);
   const [commentsSheet, setCommentsSheet] = useState<{ kind: FeedKind; id: string; commentsDisabled: boolean } | null>(null);
   const [suggestions,    setSuggestions]    = useState<UserPublic[]>([]);
@@ -251,15 +252,18 @@ export const HomeScreen: React.FC = () => {
 
   const loadLive = useCallback(async () => {
     try {
-      const [concerts, spont] = await Promise.all([
+      const [concerts, events, spont] = await Promise.all([
         concertService.getLive(),
+        eventService.getLive(),
         liveService.getLives(),
       ]);
       setLiveConcerts(Array.isArray(concerts) ? concerts : []);
+      setLiveEvents(Array.isArray(events) ? events : []);
       setSpontLives(Array.isArray(spont) ? spont : []);
     } catch (e) {
       if (__DEV__) console.warn('[HomeScreen] loadLive error:', e);
       setLiveConcerts([]);
+      setLiveEvents([]);
       setSpontLives([]);
     }
   }, []);
@@ -540,8 +544,8 @@ export const HomeScreen: React.FC = () => {
         </View>
       )}
 
-      {/* ── Lives concerts programmés ────────────────────────────────────── */}
-      {liveConcerts.length > 0 && (
+      {/* ── Concerts & événements en direct ─────────────────────────────── */}
+      {(liveConcerts.length > 0 || liveEvents.length > 0) && (
         <View style={s.liveBanner}>
           <ScrollView
             horizontal
@@ -550,7 +554,7 @@ export const HomeScreen: React.FC = () => {
           >
             {liveConcerts.map(c => (
               <TouchableOpacity
-                key={c.id}
+                key={`concert-${c.id}`}
                 style={s.liveCard}
                 activeOpacity={0.88}
                 onPress={() => nav.navigate('ConcertDetail', { concertId: c.id })}
@@ -572,6 +576,34 @@ export const HomeScreen: React.FC = () => {
                   <Text style={s.liveCardTitle} numberOfLines={1}>{c.title}</Text>
                   <Text style={s.liveCardSub} numberOfLines={1}>
                     {c.current_viewers} spectateurs · {c.venue_city ?? ''}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+            {liveEvents.map(ev => (
+              <TouchableOpacity
+                key={`event-${ev.id}`}
+                style={s.liveCard}
+                activeOpacity={0.88}
+                onPress={() => nav.navigate('EventDetail', { eventId: ev.id })}
+              >
+                {ev.thumbnail_url ? (
+                  <Image source={{ uri: ev.thumbnail_url }} style={s.liveCardImg} />
+                ) : (
+                  <View style={[s.liveCardImg, { backgroundColor: colors.primary + '55' }]} />
+                )}
+                <LinearGradient
+                  colors={['transparent', 'rgba(0,0,0,0.75)']}
+                  style={s.liveCardGrad}
+                />
+                <View style={s.liveCardContent}>
+                  <View style={s.livePill}>
+                    <View style={s.liveDot} />
+                    <Text style={s.livePillText}>EN DIRECT</Text>
+                  </View>
+                  <Text style={s.liveCardTitle} numberOfLines={1}>{ev.title}</Text>
+                  <Text style={s.liveCardSub} numberOfLines={1}>
+                    {ev.venue_city ?? 'Événement en ligne'}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -690,7 +722,7 @@ export const HomeScreen: React.FC = () => {
         })}
       </ScrollView>
     </View>
-  ), [colors, filter, liveConcerts, spontLives, nearbyEvents]);
+  ), [colors, filter, liveConcerts, liveEvents, spontLives, nearbyEvents]);
 
   // ── Loading ──────────────────────────────────────────────────────────────────
 

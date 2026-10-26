@@ -2083,7 +2083,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
             activeOpacity={1}
             onPress={() => !vrLoading && setVrModalOpen(false)}
           />
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ width: '100%' }}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ width: '100%' }}>
             <View style={[s.vrBox, { backgroundColor: colors.surface }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 }}>
                 <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#1D9BF020', alignItems: 'center', justifyContent: 'center' }}>

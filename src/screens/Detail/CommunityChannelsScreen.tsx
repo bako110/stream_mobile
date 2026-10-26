@@ -375,7 +375,7 @@ export const CommunityChannelsScreen: React.FC = () => {
           <Pressable style={S.overlay} onPress={() => { if (!saving) setCreateOpen(false); }} />
           <KeyboardAvoidingView
             style={{ width: '100%', maxHeight: SCREEN_HEIGHT * 0.92 }}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           >
             <View style={[S.sheet, { backgroundColor: colors.surface, maxHeight: SCREEN_HEIGHT * 0.92 }]}>
               <View style={[S.sheetHandle, { backgroundColor: colors.divider }]} />
@@ -575,7 +575,7 @@ export const CommunityChannelsScreen: React.FC = () => {
           <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setJoinChannel(null)} />
           <KeyboardAvoidingView
             style={{ width: '100%' }}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           >
             <View style={[S.joinSheet, { backgroundColor: colors.surface, paddingBottom: 24 + insets.bottom }]}>
               <View style={[S.joinSheetHandle, { backgroundColor: colors.divider }]} />

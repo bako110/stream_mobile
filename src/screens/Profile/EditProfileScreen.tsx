@@ -13,7 +13,6 @@ import Icon from 'react-native-vector-icons/Feather';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useTheme } from '../../hooks/useTheme';
 import { BackButton, SkeletonEditProfile, GofolyxLoader } from '../../components/common';
 import { toastService, showConfirm } from '../../services';
@@ -59,8 +58,20 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
     refreshUser().then(me => {
       if (!me) return;
       setUser(me);
-      setFirstName(me.first_name ?? '');
-      setLastName(me.last_name ?? '');
+      // Repli sur display_name si first_name/last_name sont vides (compte
+      // créé avant que l'inscription sépare prénom/nom, ou rempli une seule
+      // fois via display_name) — sans ça, les deux champs arrivaient vides
+      // alors que le profil a bien un nom affiché, et handleSave bloque la
+      // sauvegarde tant qu'aucun des deux n'est rempli (cf. plus bas),
+      // donnant l'impression que "Enregistrer" ne répond pas.
+      if (!me.first_name && !me.last_name && me.display_name) {
+        const [guessedFirst, ...rest] = me.display_name.trim().split(/\s+/);
+        setFirstName(guessedFirst ?? '');
+        setLastName(rest.join(' '));
+      } else {
+        setFirstName(me.first_name ?? '');
+        setLastName(me.last_name ?? '');
+      }
       setUsername(me.username ?? '');
       setBio(me.bio ?? '');
       setLocation(me.location ?? '');
@@ -267,98 +278,92 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
           </View>
 
           {/* ══ INFORMATIONS PERSONNELLES ══ */}
-          <Animated.View entering={FadeInDown.duration(260).delay(40)}>
-            <Section title="Informations personnelles" icon="user" colors={colors}>
-              <FieldRow>
-                <Field label="Prénom" value={firstName} onChange={setFirstName} colors={colors} placeholder="Prénom" style={{ flex: 1 }} />
-                <Field label="Nom" value={lastName} onChange={setLastName} colors={colors} placeholder="Nom" style={{ flex: 1 }} />
-              </FieldRow>
-              <Field label="Username" value={username} onChange={setUsername} colors={colors} placeholder="username" icon="at-sign" autoCapitalize="none" />
-              <View>
-                <View style={styles.fieldLabelRow}>
-                  <Text style={[styles.fieldLabel, { color: colors.textTertiary }]}>Bio</Text>
-                  <Text style={[styles.charCount, { color: bioLength > 1000 ? colors.error : colors.textDisabled }]}>{bioLength}/1000</Text>
-                </View>
-                <FieldInput value={bio} onChange={setBio} colors={colors} placeholder="Parle de toi en quelques mots…" multiline maxLength={1000} />
+          <Section title="Informations personnelles" icon="user" colors={colors}>
+            <FieldRow>
+              <Field label="Prénom" value={firstName} onChange={setFirstName} colors={colors} placeholder="Prénom" style={{ flex: 1 }} />
+              <Field label="Nom" value={lastName} onChange={setLastName} colors={colors} placeholder="Nom" style={{ flex: 1 }} />
+            </FieldRow>
+            <Field label="Username" value={username} onChange={setUsername} colors={colors} placeholder="username" icon="at-sign" autoCapitalize="none" />
+            <View>
+              <View style={styles.fieldLabelRow}>
+                <Text style={[styles.fieldLabel, { color: colors.textTertiary }]}>Bio</Text>
+                <Text style={[styles.charCount, { color: bioLength > 1000 ? colors.error : colors.textDisabled }]}>{bioLength}/1000</Text>
               </View>
-            </Section>
-          </Animated.View>
+              <FieldInput value={bio} onChange={setBio} colors={colors} placeholder="Parle de toi en quelques mots…" multiline maxLength={1000} />
+            </View>
+          </Section>
 
           {/* ══ À PROPOS ══ */}
-          <Animated.View entering={FadeInDown.duration(260).delay(90)}>
-            <Section title="À propos" icon="info" colors={colors}>
-              <View>
-                <Text style={[styles.fieldLabel, { color: colors.textTertiary, marginBottom: 6 }]}>Date de naissance</Text>
-                <TouchableOpacity
-                  onPress={() => setShowDatePicker(true)}
-                  style={[styles.inputWrap, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
-                  activeOpacity={0.7}
-                >
-                  <Icon name="gift" size={16} color={colors.textTertiary} />
-                  <Text style={{ flex: 1, fontSize: 14, color: dateOfBirth ? colors.textPrimary : colors.textDisabled, paddingVertical: 12 }}>
-                    {dateOfBirth
-                      ? new Date(dateOfBirth).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
-                      : 'Sélectionner une date'}
-                  </Text>
-                  <Icon name="calendar" size={16} color={colors.textTertiary} />
-                </TouchableOpacity>
-              </View>
-              {showDatePicker && (
-                <DateTimePicker
-                  value={dateOfBirth ? new Date(dateOfBirth) : new Date(2000, 0, 1)}
-                  mode="date"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  maximumDate={new Date()}
-                  minimumDate={new Date(1920, 0, 1)}
-                  onChange={(_event: any, selected?: Date) => {
-                    setShowDatePicker(Platform.OS === 'ios');
-                    if (selected) {
-                      const yyyy = selected.getFullYear();
-                      const mm = String(selected.getMonth() + 1).padStart(2, '0');
-                      const dd = String(selected.getDate()).padStart(2, '0');
-                      setDateOfBirth(`${yyyy}-${mm}-${dd}`);
-                    }
-                  }}
-                />
-              )}
+          <Section title="À propos" icon="info" colors={colors}>
+            <View>
+              <Text style={[styles.fieldLabel, { color: colors.textTertiary, marginBottom: 6 }]}>Date de naissance</Text>
+              <TouchableOpacity
+                onPress={() => setShowDatePicker(true)}
+                style={[styles.inputWrap, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+                activeOpacity={0.7}
+              >
+                <Icon name="gift" size={16} color={colors.textTertiary} />
+                <Text style={{ flex: 1, fontSize: 14, color: dateOfBirth ? colors.textPrimary : colors.textDisabled, paddingVertical: 12 }}>
+                  {dateOfBirth
+                    ? new Date(dateOfBirth).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+                    : 'Sélectionner une date'}
+                </Text>
+                <Icon name="calendar" size={16} color={colors.textTertiary} />
+              </TouchableOpacity>
+            </View>
+            {showDatePicker && (
+              <DateTimePicker
+                value={dateOfBirth ? new Date(dateOfBirth) : new Date(2000, 0, 1)}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                maximumDate={new Date()}
+                minimumDate={new Date(1920, 0, 1)}
+                onChange={(_event: any, selected?: Date) => {
+                  setShowDatePicker(Platform.OS === 'ios');
+                  if (selected) {
+                    const yyyy = selected.getFullYear();
+                    const mm = String(selected.getMonth() + 1).padStart(2, '0');
+                    const dd = String(selected.getDate()).padStart(2, '0');
+                    setDateOfBirth(`${yyyy}-${mm}-${dd}`);
+                  }
+                }}
+              />
+            )}
 
-              <View>
-                <Text style={[styles.fieldLabel, { color: colors.textTertiary, marginBottom: 8 }]}>Genre</Text>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  {GENDER_OPTIONS.map(opt => {
-                    const selected = gender === opt.key;
-                    return (
-                      <TouchableOpacity
-                        key={opt.key}
-                        onPress={() => setGender(selected ? '' : opt.key)}
-                        activeOpacity={0.8}
-                        style={{ flex: 1 }}
-                      >
-                        {selected ? (
-                          <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} style={styles.genderPill}>
-                            <Text style={styles.genderTxtActive}>{opt.label}</Text>
-                          </LinearGradient>
-                        ) : (
-                          <View style={[styles.genderPill, { backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border }]}>
-                            <Text style={[styles.genderTxt, { color: colors.textSecondary }]}>{opt.label}</Text>
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+            <View>
+              <Text style={[styles.fieldLabel, { color: colors.textTertiary, marginBottom: 8 }]}>Genre</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {GENDER_OPTIONS.map(opt => {
+                  const selected = gender === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      onPress={() => setGender(selected ? '' : opt.key)}
+                      activeOpacity={0.8}
+                      style={{ flex: 1 }}
+                    >
+                      {selected ? (
+                        <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} style={styles.genderPill}>
+                          <Text style={styles.genderTxtActive}>{opt.label}</Text>
+                        </LinearGradient>
+                      ) : (
+                        <View style={[styles.genderPill, { backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border }]}>
+                          <Text style={[styles.genderTxt, { color: colors.textSecondary }]}>{opt.label}</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
-            </Section>
-          </Animated.View>
+            </View>
+          </Section>
 
           {/* ══ CONTACT ══ */}
-          <Animated.View entering={FadeInDown.duration(260).delay(140)}>
-            <Section title="Contact" icon="mail" colors={colors}>
-              <Field label="Localisation" value={location} onChange={setLocation} colors={colors} placeholder="Ville, Pays" icon="map-pin" />
-              <Field label="Site web" value={website} onChange={setWebsite} colors={colors} placeholder="https://..." icon="link" autoCapitalize="none" />
-              <Field label="Téléphone" value={phone} onChange={setPhone} colors={colors} placeholder="+33 6 12 34 56 78" icon="phone" keyboardType="phone-pad" />
-            </Section>
-          </Animated.View>
+          <Section title="Contact" icon="mail" colors={colors}>
+            <Field label="Localisation" value={location} onChange={setLocation} colors={colors} placeholder="Ville, Pays" icon="map-pin" />
+            <Field label="Site web" value={website} onChange={setWebsite} colors={colors} placeholder="https://..." icon="link" autoCapitalize="none" />
+            <Field label="Téléphone" value={phone} onChange={setPhone} colors={colors} placeholder="+33 6 12 34 56 78" icon="phone" keyboardType="phone-pad" />
+          </Section>
         </ScrollView>
       )}
     </KeyboardAvoidingView>
@@ -410,30 +415,38 @@ const FieldInput: React.FC<Omit<FieldProps, 'label' | 'style'> & { multiline?: b
   value, onChange, colors, placeholder, icon, autoCapitalize, keyboardType, multiline, maxLength,
 }) => {
   const [focused, setFocused] = useState(false);
+  const handleFocus = () => setFocused(true);
+  const handleBlur = () => setFocused(false);
   return (
     <View style={[
       styles.inputWrap,
       { backgroundColor: colors.surfaceElevated, borderColor: focused ? colors.primary : colors.border },
-      focused && { borderWidth: 1.5, shadowColor: colors.primary, shadowOpacity: 0.15, shadowRadius: 6, shadowOffset: { width: 0, height: 0 }, elevation: focused ? 2 : 0 },
-      multiline && { alignItems: 'flex-start', paddingVertical: 10, minHeight: 90 },
+      multiline && styles.inputWrapMultiline,
     ]}>
-      {icon && <Icon name={icon as any} size={16} color={focused ? colors.primary : colors.textTertiary} style={{ marginTop: multiline ? 3 : 0 }} />}
+      {icon && (
+        <Icon
+          name={icon as any}
+          size={16}
+          color={focused ? colors.primary : colors.textTertiary}
+          style={multiline ? styles.inputIconMultiline : undefined}
+        />
+      )}
       <TextInput
         value={value}
         onChangeText={onChange}
         placeholder={placeholder}
         placeholderTextColor={colors.textDisabled}
-        style={{
-          flex: 1, fontSize: 14.5, color: colors.textPrimary,
-          paddingVertical: multiline ? 0 : 12, minHeight: multiline ? 70 : undefined,
-          textAlignVertical: multiline ? 'top' : 'center',
-        }}
+        style={[
+          styles.inputText,
+          { color: colors.textPrimary },
+          multiline && styles.inputTextMultiline,
+        ]}
         autoCapitalize={autoCapitalize ?? 'sentences'}
         keyboardType={keyboardType ?? 'default'}
         multiline={multiline}
         maxLength={maxLength}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
       />
     </View>
   );
@@ -482,7 +495,17 @@ const styles = StyleSheet.create({
 
   inputWrap: {
     flexDirection: 'row', alignItems: 'center', gap: 9,
-    borderRadius: 12, paddingHorizontal: 13, minHeight: 46, borderWidth: 1,
+    borderRadius: 12, paddingHorizontal: 13, minHeight: 46, borderWidth: 1.5,
+  },
+  inputWrapMultiline: {
+    alignItems: 'flex-start', paddingVertical: 10, minHeight: 90,
+  },
+  inputIconMultiline: { marginTop: 3 },
+  inputText: {
+    flex: 1, fontSize: 14.5, paddingVertical: 12,
+  },
+  inputTextMultiline: {
+    paddingVertical: 0, minHeight: 70, textAlignVertical: 'top',
   },
 
   genderPill: { paddingVertical: 11, borderRadius: 12, alignItems: 'center' },

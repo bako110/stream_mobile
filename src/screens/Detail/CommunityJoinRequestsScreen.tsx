@@ -240,7 +240,7 @@ export const CommunityJoinRequestsScreen: React.FC<Props> = ({ route }) => {
             activeOpacity={1}
             onPress={() => !rejecting && setRejectModal(false)}
           />
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ width: '100%' }}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ width: '100%' }}>
             <View style={[s.modalBox, { backgroundColor: colors.surface }]}>
               <View style={s.modalHeader}>
                 <View style={[s.modalIcon, { backgroundColor: '#EF444418' }]}>

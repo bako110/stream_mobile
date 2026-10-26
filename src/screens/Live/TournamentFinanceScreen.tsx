@@ -150,7 +150,7 @@ export const TournamentFinanceScreen: React.FC = () => {
       </ScrollView>
 
       <Modal visible={!!rewardTarget} transparent animationType="slide" onRequestClose={() => setRewardTarget(null)} statusBarTranslucent>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={st.modalOverlay}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={st.modalOverlay}>
           <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setRewardTarget(null)} />
           <View style={[st.modalCard, { paddingBottom: 20 + insets.bottom }]}>
             <View style={st.modalHandle} />

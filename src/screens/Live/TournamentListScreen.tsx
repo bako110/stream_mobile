@@ -314,7 +314,7 @@ export const TournamentListScreen: React.FC = () => {
       <Modal visible={showCreate} transparent animationType="slide" onRequestClose={() => setShowCreate(false)} statusBarTranslucent>
         <KeyboardAvoidingView
           style={styles.modalBackdrop}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setShowCreate(false)} />
           <View style={[styles.modalCard, { backgroundColor: colors.surface, paddingBottom: 20 + insets.bottom }]}>

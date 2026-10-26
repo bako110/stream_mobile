@@ -3956,7 +3956,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         {/* Edit caption sheet */}
         <Modal visible={showEditCaption} transparent animationType="slide" onRequestClose={() => setShowEditCaption(false)}>
           <TouchableOpacity style={s.modalBackdrop} activeOpacity={1} onPress={() => setShowEditCaption(false)}>
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
               <TouchableOpacity activeOpacity={1} onPress={e => e.stopPropagation()}>
                 <View style={[s.editSheet, { backgroundColor: colors.surface }]}>
                   <View style={[s.editHandle, { backgroundColor: colors.divider }]} />

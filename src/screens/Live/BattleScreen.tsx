@@ -1276,7 +1276,7 @@ const BattleContent: React.FC<{
           lui, n'a pas de overflow:hidden et laisse l'ombre se dessiner. */}
       <View style={styles.bottomZoneShadow}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.bottomZone}
       >
         {!ended && (

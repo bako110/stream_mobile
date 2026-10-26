@@ -149,7 +149,7 @@ export const WalletPinScreen: React.FC = () => {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <PageHeader title="Code PIN" onBack={back} />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={st.scroll} keyboardShouldPersistTaps="handled">
 
           {/* ── Menu (PIN déjà défini) ── */}

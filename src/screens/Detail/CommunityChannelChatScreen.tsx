@@ -828,7 +828,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
         </LinearGradient>
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         {loading ? (
           <View style={{ flex: 1, backgroundColor: colors.background ?? '#0a0a0f' }}>
             <GofolyxLoader />
@@ -986,7 +986,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
         animationType="slide"
         onRequestClose={() => { if (!fileUploading) { setFilePreviewOpen(false); setFilePreview(null); setFileCaption(''); } }}
       >
-        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#1a1a1a' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#1a1a1a' }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <StatusBar hidden />
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingTop: insets.top + 12, paddingHorizontal: 16, paddingBottom: 12 }}>
             <TouchableOpacity
@@ -1123,7 +1123,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
       {/* Preview images avant envoi */}
       <Modal visible={mediaPreviewOpen} transparent={false} statusBarTranslucent animationType="slide"
         onRequestClose={() => { if (!mediaUploading) { setMediaPreviewOpen(false); setMediaPreview([]); } }}>
-        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#000' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#000' }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <StatusBar hidden />
           <View style={[MP.header, { paddingTop: insets.top + 12 }]}>
             <TouchableOpacity onPress={() => { if (!mediaUploading) { setMediaPreviewOpen(false); setMediaPreview([]); } }} style={MP.closeBtn}>

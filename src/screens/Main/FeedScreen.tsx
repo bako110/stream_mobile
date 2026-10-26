@@ -160,9 +160,6 @@ interface LiveConcertCardProps {
 const LiveConcertCard: React.FC<LiveConcertCardProps> = React.memo(({
   concert: c, isOwn, surfaceColor, onNavLiveStream, onNavLiveViewer,
 }) => {
-  const artist = c.artist;
-  const artistName = artist?.display_name ?? artist?.username ?? 'Artiste';
-  const initial = (artistName || 'A')[0].toUpperCase();
   const onPress = useCallback(() => {
     if (isOwn) onNavLiveStream(c.id);
     else onNavLiveViewer(c.id);
@@ -175,23 +172,24 @@ const LiveConcertCard: React.FC<LiveConcertCardProps> = React.memo(({
           : <View style={{ width: FeedCarousel.cardW, height: FeedCarousel.cardH, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2A2A38' }}><Icon name="radio" size={28} color="#fff" /></View>
         }
         <LinearGradient colors={['transparent', 'rgba(0,0,0,0.7)']} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 64 }} />
-        <View style={{ position: 'absolute', top: 6, left: 6, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F0365A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-          <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#fff' }} />
-          <Text style={{ color: '#fff', fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold }}>LIVE</Text>
+        <View style={{ position: 'absolute', top: 6, left: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F0365A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+            <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#fff' }} />
+            <Text style={{ color: '#fff', fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold }}>LIVE</Text>
+          </View>
+          {/* Distingue d'un live simple créateur — c'est le CONCERT qui est en
+              direct, pas une personne. */}
+          <View style={{ backgroundColor: '#8B5CF6', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+            <Text style={{ color: '#fff', fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold }}>CONCERT</Text>
+          </View>
         </View>
         <View style={{ position: 'absolute', top: 6, right: 6, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 }}>
           <Icon name="eye" size={10} color="#fff" />
           <Text style={{ color: '#fff', fontSize: FontSize['2xs'], fontWeight: FontWeight.bold }}>{c.current_viewers ?? 0}</Text>
         </View>
-        <View style={{ position: 'absolute', bottom: 6, left: 6, right: 6 }}>
-          <Text style={{ color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.bold }} numberOfLines={1}>{c.title}</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-            {artist?.avatar_url
-              ? <CachedImage uri={artist.avatar_url} style={{ width: 14, height: 14, borderRadius: 7 }} />
-              : <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: '#fff', fontSize: 7, fontWeight: FontWeight.extraBold }}>{initial}</Text></View>
-            }
-            <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: FontSize.xs, fontWeight: FontWeight.semiBold }} numberOfLines={1}>{artistName}</Text>
-          </View>
+        <View style={{ position: 'absolute', bottom: 6, left: 6, right: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Icon name="music" size={11} color="#fff" />
+          <Text style={{ flex: 1, color: '#fff', fontSize: FontSize.sm, fontWeight: FontWeight.bold }} numberOfLines={1}>{c.title}</Text>
         </View>
       </View>
     </TouchableOpacity>

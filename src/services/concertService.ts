@@ -1,5 +1,5 @@
 import { apiClient, Endpoints } from '../api';
-import type { Concert, StreamToken, StreamStatus, TicketsSold, ConcertCreate, ConcertUpdate } from '../types';
+import type { Concert, StreamToken, StreamStatus, TicketsSold, UpcomingLiveMixedPage, ConcertCreate, ConcertUpdate } from '../types';
 import { DEFAULT_PAGE_LIMIT } from '../utils/constants';
 
 export const concertService = {
@@ -26,6 +26,13 @@ export const concertService = {
   async getUpcoming(): Promise<Concert[]> {
     const res = await apiClient.get<Concert[]>(Endpoints.concerts.upcoming);
     return res.data;
+  },
+
+  /** Concerts + événements à venir, fusionnés et triés par date, paginés
+   * côté serveur — alimente le scroll infini de "Prochainement". */
+  async getUpcomingLiveMixed(page: number, limit = 20): Promise<UpcomingLiveMixedPage> {
+    const res = await apiClient.get<UpcomingLiveMixedPage>(Endpoints.concerts.upcomingLiveMixed(page, limit));
+    return res.data ?? { items: [], page, has_more: false };
   },
 
   async getById(id: string): Promise<Concert> {

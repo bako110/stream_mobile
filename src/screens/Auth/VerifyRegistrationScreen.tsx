@@ -84,7 +84,7 @@ export const VerifyRegistrationScreen: React.FC<Props> = ({
   }, [resendTimer, userId]);
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <LinearGradient
         colors={isDark ? ['#0a0a0a', '#111827'] : ['#f8fafc', '#e2e8f0']}
         style={{ flex: 1 }}

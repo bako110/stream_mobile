@@ -713,7 +713,7 @@ const RoomContent: React.FC<{
   const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
   return (
-    <KeyboardAvoidingView style={st.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={st.root} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
       {/* ── VIDÉO PLEIN ÉCRAN ──────────────────────────────────────────── */}

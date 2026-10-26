@@ -88,7 +88,7 @@ export const NewConversationScreen: React.FC = () => {
   return (
     <KeyboardAvoidingView
       style={[styles.root, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <StatusBar
         barStyle={isDark ? 'light-content' : 'dark-content'}

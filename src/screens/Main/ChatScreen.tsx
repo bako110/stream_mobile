@@ -1424,7 +1424,7 @@ export const ChatScreen: React.FC = () => {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: colors.background }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       {/* Fond décoratif de la zone messages */}
       <Image
@@ -1947,7 +1947,7 @@ export const ChatScreen: React.FC = () => {
         animationType="slide"
         onRequestClose={() => { if (!fileUploading) { setFilePreviewOpen(false); setFilePreview(null); setFileCaption(''); } }}
       >
-        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#1a1a1a' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#1a1a1a' }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <StatusBar hidden />
           <View style={[CP.header, { paddingTop: insets.top + 12 }]}>
             <TouchableOpacity
@@ -2016,7 +2016,7 @@ export const ChatScreen: React.FC = () => {
         animationType="slide"
         onRequestClose={() => { if (!imgUploading) { setImgPreviewOpen(false); setImgPreviewUri(null); setImgCaption(''); } }}
       >
-        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#000' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#000' }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <StatusBar hidden />
 
           {/* Header */}

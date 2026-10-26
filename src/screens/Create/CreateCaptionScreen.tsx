@@ -41,7 +41,7 @@ export const CreateCaptionScreen: React.FC<Props> = ({
       <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(6,4,14,0.72)' }]} />
       <LinearGradient colors={['rgba(0,0,0,0.65)', 'transparent']} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 160 }} pointerEvents="none" />
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         {/* ══ HEADER ══ */}
         <View style={[s.header, { paddingTop: insets.top + 8 }]}>
           <TouchableOpacity style={s.headerBtn} onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>

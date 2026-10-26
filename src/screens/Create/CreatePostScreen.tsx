@@ -336,7 +336,7 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
   return (
     <KeyboardAvoidingView
       style={[s.root, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
 

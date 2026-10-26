@@ -115,6 +115,7 @@ export const Endpoints = {
     me:         `${V1}/concerts/me`,
     live:       `${V1}/concerts/live`,
     upcoming:   `${V1}/concerts/upcoming`,
+    upcomingLiveMixed: (page: number, limit: number) => `${V1}/concerts/upcoming-live?page=${page}&limit=${limit}`,
     adminAll:   `${V1}/concerts/admin/all`,
     byId:       (id: string) => `${V1}/concerts/${id}`,
     publish:    (id: string) => `${V1}/concerts/${id}/publish`,
@@ -146,6 +147,7 @@ export const Endpoints = {
   // ── Events (prefix: /api/v1/events) ───────────────────────────────────────
   events: {
     list:      `${V1}/events`,
+    live:      `${V1}/events/live`,
     me:        `${V1}/events/me`,
     byId:      (id: string) => `${V1}/events/${id}`,
     publish:   (id: string) => `${V1}/events/${id}/publish`,

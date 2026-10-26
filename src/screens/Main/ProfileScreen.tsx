@@ -1008,7 +1008,7 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
 
       {/* Édition rapide d'un post (texte) */}
       <Modal visible={!!editingPost} transparent animationType="slide" onRequestClose={() => setEditingPost(null)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{ flex: 1, justifyContent: 'flex-end' }}>
           <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setEditingPost(null)} />
           <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 }}>

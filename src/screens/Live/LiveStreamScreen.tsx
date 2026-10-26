@@ -4,7 +4,8 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, StatusBar,
-  Platform, PermissionsAndroid, ActivityIndicator, Animated, TextInput,
+  Platform, PermissionsAndroid, ActivityIndicator, TextInput, Image,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import {
   LiveKitRoom,
@@ -20,15 +21,37 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { concertService, liveService, toastService, showConfirm } from '../../services';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
+import { useAutoHideControls } from '../../hooks/useAutoHideControls';
 import { configureLiveAudioSession } from '../../utils/liveAudioSession';
 import type { Concert, TicketsSold } from '../../types';
 import { StageTileRow } from '../../components/live/StageTileRow';
 import type { StageTile, StageBadge } from '../../components/live/StageTileRow';
+import Orientation from 'react-native-orientation-locker';
+import { Images } from '../../assets';
 
 interface Props {
   concertId: string;
   onBack?: () => void;
 }
+
+/** Un concert/événement se diffuse TOUJOURS en paysage (scène large) —
+ * jamais en vertical, contrairement au live simple créateur qui reste
+ * toujours en portrait. On force le paysage dès l'entrée de cet écran et on
+ * reverrouille le portrait à la sortie, pour ne pas perturber le reste de
+ * l'app (verrouillée portrait par défaut). */
+function useForceLandscape() {
+  useEffect(() => {
+    Orientation.lockToLandscape();
+    return () => { Orientation.lockToPortrait(); };
+  }, []);
+}
+
+const TIER_COLORS: Record<string, string> = {
+  simple: '#3FEDB6',
+  vip:    '#4FA8FF',
+  vvip:   '#B07CFF',
+  vvvip:  '#F59E0B',
+};
 
 // Participants déjà autorisés à publier (invités sur scène) — identifiés via
 // leur permission LiveKit can_publish plutôt qu'un state serveur séparé, pour
@@ -63,12 +86,16 @@ const LocalCameraPreview: React.FC<{ mirror: boolean }> = ({ mirror }) => {
 
   if (!camTrack) {
     return (
-      <View style={[StyleSheet.absoluteFill, styles.noVideo]}>
+      <View style={[styles.videoFrameFull, styles.noVideo]}>
         <Icon name="video-off" size={48} color="#666" />
       </View>
     );
   }
-  return <VideoTrack trackRef={camTrack} style={StyleSheet.absoluteFill} mirror={mirror} />;
+  return (
+    <View style={styles.videoFrameFull}>
+      <VideoTrack trackRef={camTrack} style={StyleSheet.absoluteFill} mirror={mirror} objectFit="cover" />
+    </View>
+  );
 };
 
 // ── Contrôles live ─────────────────────────────────────────────────────────────
@@ -83,6 +110,8 @@ const StreamControls: React.FC<{
   const remoteParticipants = useRemoteParticipants();
   const onStageIdentities = useOnStageIdentities();
   const allCamTracks = useTracks([Track.Source.Camera], { onlySubscribed: false });
+  useForceLandscape();
+  const { controlsVisible, onTapVideo } = useAutoHideControls();
   const [showInvite, setShowInvite] = useState(false);
   const [showMonetize, setShowMonetize] = useState(false);
   const [ticketPriceInput, setTicketPriceInput] = useState('');
@@ -107,7 +136,11 @@ const StreamControls: React.FC<{
   const insets = useSafeAreaInsets();
   const [muted,       setMuted]       = useState(false);
   const [videoOff,    setVideoOff]    = useState(false);
-  const [cameraFront, setCameraFront] = useState(true);
+  // Caméra arrière par défaut — un live concert/événement filme la scène,
+  // pas l'artiste/organisateur face à son téléphone (contrairement au live
+  // simple créateur-à-créateur). L'utilisateur peut toujours basculer en
+  // avant via le bouton Flip.
+  const [cameraFront, setCameraFront] = useState(false);
   const [viewerCount, setViewerCount] = useState(0);
   const [elapsed,     setElapsed]     = useState(0);
   const [isRecording, setIsRecording] = useState(!!concert?.is_recording);
@@ -115,20 +148,16 @@ const StreamControls: React.FC<{
   useEffect(() => { setIsRecording(!!concert?.is_recording); }, [concert?.is_recording]);
   const timerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollRef     = useRef<ReturnType<typeof setInterval> | null>(null);
-  const bannerY     = useRef(new Animated.Value(-80)).current;
-  const bannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Banner de lancement — slide down, disparaît après 4s
-  useEffect(() => {
-    Animated.spring(bannerY, { toValue: 0, useNativeDriver: true, speed: 14, bounciness: 6 }).start();
-    bannerTimer.current = setTimeout(() => {
-      Animated.timing(bannerY, { toValue: -80, duration: 350, useNativeDriver: true }).start();
-    }, 4000);
-    return () => { if (bannerTimer.current) clearTimeout(bannerTimer.current); };
-  }, []);
 
   useEffect(() => {
-    localParticipant.setCameraEnabled(true).catch(() => {});
+    // Concert/événement : flux filmé en PAYSAGE (scène, public), contrairement
+    // au live simple créateur-à-créateur qui reste en portrait. On force la
+    // résolution de capture en 16:9 horizontal — le téléphone peut rester tenu
+    // en portrait, seul le flux envoyé aux viewers est en paysage.
+    localParticipant.setCameraEnabled(true, {
+      facingMode: 'environment',
+      resolution: { width: 1280, height: 720 },
+    }).catch(() => {});
     localParticipant.setMicrophoneEnabled(true).catch(() => {});
 
     const start = Date.now();
@@ -168,6 +197,7 @@ const StreamControls: React.FC<{
       await localParticipant.setCameraEnabled(false);
       await localParticipant.setCameraEnabled(true, {
         facingMode: next ? 'user' : 'environment',
+        resolution: { width: 1280, height: 720 },
       });
     } catch {}
   }, [cameraFront, localParticipant]);
@@ -250,60 +280,99 @@ const StreamControls: React.FC<{
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#000" />
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      {!videoOff ? (
-        <LocalCameraPreview mirror={cameraFront} />
-      ) : (
-        <View style={[StyleSheet.absoluteFill, styles.noVideo]}>
-          <Icon name="video-off" size={48} color="#666" />
+      {/* Zone centrale — flux plein écran, toujours en paysage réel (écran
+          verrouillé via useForceLandscape). Un tap affiche/masque les
+          overlays (header, dashboard, contrôles) — comme un lecteur vidéo. */}
+      <TouchableWithoutFeedback onPress={onTapVideo}>
+        <View style={styles.videoZoneFull}>
+          {!videoOff ? (
+            <LocalCameraPreview mirror={cameraFront} />
+          ) : (
+            <View style={styles.videoFrameFull}>
+              <Icon name="video-off" size={48} color="#666" />
+            </View>
+          )}
         </View>
-      )}
+      </TouchableWithoutFeedback>
 
-      {/* Banner lancement — slide down, auto-dismiss 4s */}
-      <Animated.View style={[styles.launchBanner, { transform: [{ translateY: bannerY }] }]}>
-        <View style={styles.launchDot} />
-        <Text style={styles.launchTxt}>🎙 Live lancé · tu es en direct !</Text>
-      </Animated.View>
-
-      {/* Top overlay */}
-      <LinearGradient colors={['rgba(0,0,0,0.7)', 'transparent']} style={styles.topOverlay}>
-        <TouchableOpacity onPress={handleEndLive} style={styles.backBtn}>
-          <Icon name="arrow-left" size={24} color="#fff" />
-        </TouchableOpacity>
-        <View style={styles.topCenter}>
-          <View style={styles.liveBadge}>
-            <View style={styles.liveDot} />
-            <Text style={styles.liveText}>LIVE</Text>
+      {/* Zone du haut — overlay semi-transparent par-dessus la vidéo plein
+          écran (comme TikTok/Instagram Live en paysage). Même structure que
+          LiveViewerScreen : logo + titre/artiste à gauche, badges à droite.
+          Masquée après quelques secondes d'inactivité. */}
+      {controlsVisible && (
+      <View style={[
+        styles.topZone, styles.topZoneOverlay,
+        { paddingLeft: 16 + insets.left, paddingRight: 16 + insets.right, paddingTop: 10 + insets.top },
+      ]}>
+        <View style={styles.headerRow}>
+          <View style={styles.headerLeft}>
+            <TouchableOpacity onPress={handleEndLive} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Icon name="arrow-left" size={20} color="#fff" />
+            </TouchableOpacity>
+            <Image source={Images.logoDark} style={styles.headerLogo} resizeMode="contain" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.concertTitle} numberOfLines={1}>{concert?.title ?? ''}</Text>
+              <Text style={styles.artistText}>Toi — {formatTime(elapsed)}</Text>
+            </View>
           </View>
-          <Text style={styles.timerText}>{formatTime(elapsed)}</Text>
+          <View style={styles.headerRight}>
+            <LinearGradient colors={['#F0365A', '#C01942']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.liveBadge}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveText}>EN DIRECT</Text>
+            </LinearGradient>
+            <View style={styles.viewerBadge}>
+              <Icon name="eye" size={13} color="#fff" />
+              <Text style={styles.viewerText}>{viewerCount}</Text>
+            </View>
+          </View>
         </View>
-        <View style={styles.viewerBadge}>
-          <Icon name="eye" size={14} color="#fff" />
-          <Text style={styles.viewerText}>{viewerCount}</Text>
-        </View>
-      </LinearGradient>
 
-      {concert && (
-        <View style={styles.titleBar}>
-          <Text style={styles.concertTitle} numberOfLines={1}>{concert.title}</Text>
-        </View>
+        {/* Mini-dashboard "ventes en temps réel" — toujours visible dès que le
+            concert est payant (pas caché derrière un tap), inspiré du panneau
+            web artiste : total + un chip par tier, couleur dédiée. Tap ouvre
+            le détail complet (barres de progression, revenu net). */}
+        {accessType === 'ticket' && ticketsSold && (
+          <TouchableOpacity style={styles.salesDash} onPress={() => setShowSalesPanel(true)} activeOpacity={0.9}>
+            <View style={styles.salesDashHeader}>
+              <View style={styles.salesDashTotals}>
+                <Text style={styles.salesDashBig}>{ticketsSold.total_sold}</Text>
+                <Text style={styles.salesDashBigLabel}>vendus</Text>
+              </View>
+              <View style={styles.salesDashDivider} />
+              <View style={styles.salesDashTotals}>
+                <Text style={[styles.salesDashBig, { color: '#3FEDB6' }]}>{ticketsSold.total_revenue_eur.toFixed(0)}€</Text>
+                <Text style={styles.salesDashBigLabel}>encaissés</Text>
+              </View>
+              <Icon name="chevron-right" size={16} color="rgba(255,255,255,0.5)" style={{ marginLeft: 'auto' }} />
+            </View>
+            {ticketsSold.tiers.length > 0 && (
+              <View style={styles.salesDashChips}>
+                {ticketsSold.tiers.map(t => (
+                  <View key={t.tier} style={[styles.salesChip, { borderColor: TIER_COLORS[t.tier] + '55', backgroundColor: TIER_COLORS[t.tier] + '15' }]}>
+                    <View style={[styles.salesChipDot, { backgroundColor: TIER_COLORS[t.tier] }]} />
+                    <Text style={[styles.salesChipText, { color: TIER_COLORS[t.tier] }]}>{t.tier.toUpperCase()} {t.sold}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </TouchableOpacity>
+        )}
+      </View>
       )}
 
-      {/* Carte compacte "ventes en temps réel" — visible uniquement si le
-          concert est payant, ouvre le détail par tier au tap. */}
-      {accessType === 'ticket' && ticketsSold && (
-        <TouchableOpacity style={styles.salesCard} onPress={() => setShowSalesPanel(true)} activeOpacity={0.85}>
-          <Icon name="tag" size={14} color="#3FEDB6" />
-          <Text style={styles.salesCardText}>
-            {ticketsSold.total_sold} billet{ticketsSold.total_sold > 1 ? 's' : ''} vendu{ticketsSold.total_sold > 1 ? 's' : ''} — {ticketsSold.total_revenue_eur.toFixed(0)}€
-          </Text>
-          <Icon name="chevron-right" size={14} color="rgba(255,255,255,0.6)" />
-        </TouchableOpacity>
-      )}
-
-      {/* Bottom controls */}
-      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={[styles.bottomOverlay, { paddingBottom: (Platform.OS === 'ios' ? 40 : 24) + insets.bottom }]}>
+      {/* Zone du bas — overlay semi-transparent par-dessus la vidéo plein
+          écran. Masquée après quelques secondes d'inactivité. */}
+      {controlsVisible && (
+      <View style={[
+        styles.bottomZone,
+        styles.bottomZoneOverlay,
+        {
+          paddingBottom: (Platform.OS === 'ios' ? 24 : 16) + insets.bottom,
+          paddingLeft: 16 + insets.left, paddingRight: 16 + insets.right,
+        },
+      ]}>
         {stageTiles.length > 0 && (
           <View style={styles.stageRowWrap}>
             <StageTileRow tiles={stageTiles} onInvite={liveId ? () => setShowInvite(true) : undefined} />
@@ -325,29 +394,40 @@ const StreamControls: React.FC<{
         </View>
         <View style={styles.controls}>
           <TouchableOpacity onPress={toggleMute} style={styles.controlBtn}>
-            <Icon name={muted ? 'mic-off' : 'mic'} size={22} color="#fff" />
+            <View style={[styles.controlIconWrap, muted && styles.controlIconWrapActive]}>
+              <Icon name={muted ? 'mic-off' : 'mic'} size={20} color="#fff" />
+            </View>
             <Text style={styles.controlLabel}>{muted ? 'Unmute' : 'Mute'}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={toggleVideo} style={styles.controlBtn}>
-            <Icon name={videoOff ? 'video-off' : 'video'} size={22} color="#fff" />
+            <View style={[styles.controlIconWrap, videoOff && styles.controlIconWrapActive]}>
+              <Icon name={videoOff ? 'video-off' : 'video'} size={20} color="#fff" />
+            </View>
             <Text style={styles.controlLabel}>{videoOff ? 'Cam On' : 'Cam Off'}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={flipCamera} style={styles.controlBtn}>
-            <Icon name="refresh-cw" size={22} color="#fff" />
+            <View style={styles.controlIconWrap}>
+              <Icon name="refresh-cw" size={20} color="#fff" />
+            </View>
             <Text style={styles.controlLabel}>Flip</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={toggleRecording} disabled={recordingLoading} style={styles.controlBtn}>
-            {recordingLoading
-              ? <ActivityIndicator size="small" color="#fff" />
-              : <Icon name={isRecording ? 'check-circle' : 'video'} size={22} color={isRecording ? '#F0365A' : '#fff'} />}
+            <View style={[styles.controlIconWrap, isRecording && styles.controlIconWrapRecording]}>
+              {recordingLoading
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Icon name={isRecording ? 'check-circle' : 'video'} size={20} color="#fff" />}
+            </View>
             <Text style={styles.controlLabel}>{isRecording ? 'Stop rec' : 'Enregistrer'}</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleEndLive} style={[styles.controlBtn, styles.endBtn]}>
-            <Icon name="square" size={22} color="#fff" />
-            <Text style={styles.controlLabel}>End</Text>
+          <TouchableOpacity onPress={handleEndLive} style={styles.controlBtn}>
+            <View style={styles.endIconWrap}>
+              <Icon name="square" size={18} color="#fff" />
+            </View>
+            <Text style={styles.controlLabel}>Terminer</Text>
           </TouchableOpacity>
         </View>
-      </LinearGradient>
+      </View>
+      )}
 
       {/* Inviter un participant connecté sur scène — liste simple, pas de demande
           payante préalable requise (invite_participant accepte un identity libre). */}
@@ -594,14 +674,24 @@ const styles = StyleSheet.create({
     paddingVertical: 14, alignItems: 'center', justifyContent: 'center',
   },
   monetizeConfirmText: { color: '#0A0A0A', fontSize: 15, fontWeight: '800' },
-  salesCard: {
-    position: 'absolute', top: Platform.OS === 'ios' ? 128 : 108, left: 16, right: 16, zIndex: 10,
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: 'rgba(20,16,31,0.75)', borderRadius: 14,
-    borderWidth: 1, borderColor: 'rgba(63,237,182,0.35)',
-    paddingHorizontal: 12, paddingVertical: 9,
+  salesDash: {
+    marginTop: 10,
+    backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 18,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+    paddingHorizontal: 14, paddingVertical: 12, gap: 10,
   },
-  salesCardText: { flex: 1, color: '#fff', fontSize: 12.5, fontWeight: '700' },
+  salesDashHeader: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  salesDashTotals: { alignItems: 'flex-start' },
+  salesDashBig: { color: '#fff', fontSize: 20, fontWeight: '900', lineHeight: 22 },
+  salesDashBigLabel: { color: 'rgba(255,255,255,0.55)', fontSize: 10.5, fontWeight: '600' },
+  salesDashDivider: { width: 1, height: 28, backgroundColor: 'rgba(255,255,255,0.14)' },
+  salesDashChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  salesChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    borderWidth: 1, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4,
+  },
+  salesChipDot: { width: 6, height: 6, borderRadius: 3 },
+  salesChipText: { fontSize: 10.5, fontWeight: '800' },
   salesSummaryRow: { flexDirection: 'row', gap: 10, marginBottom: 18 },
   salesSummaryBox: {
     flex: 1, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 14,
@@ -646,52 +736,70 @@ const styles = StyleSheet.create({
   cancelBtn:     { marginTop: 4 },
   cancelText:    { color: '#999', fontSize: 15 },
   noVideo: { justifyContent: 'center', alignItems: 'center', backgroundColor: '#111' },
-  topOverlay: {
-    position: 'absolute', top: 0, left: 0, right: 0,
-    paddingTop: Platform.OS === 'ios' ? 54 : 36,
-    paddingHorizontal: 16, paddingBottom: 20,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    zIndex: 10,
+  // Écran toujours en paysage (useForceLandscape) : header/contrôles en
+  // overlay flottant par-dessus la vidéo plein écran, comme TikTok/Instagram
+  // Live — la vidéo occupe tout l'espace, rien ne lui vole de place.
+  topZone: {
+    paddingBottom: 14,
+    gap: 10,
   },
-  backBtn:   { padding: 8 },
-  topCenter: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  topZoneOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    paddingTop: 14, paddingBottom: 10,
+  },
+  bottomZoneOverlay: {
+    position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    flex: 0, paddingTop: 10,
+  },
+  videoZoneFull: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  videoFrameFull: {
+    width: '100%', height: '100%',
+    backgroundColor: '#0A0A0A', overflow: 'hidden',
+  },
+  backBtn:   { padding: 8, alignSelf: 'flex-start' },
+  headerRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
+  headerLeft:  { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerLogo: { width: 26, height: 26 },
   liveBadge: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#E53E3E', borderRadius: 4,
-    paddingHorizontal: 8, paddingVertical: 3,
+    borderRadius: 7, paddingHorizontal: 9, paddingVertical: 4, gap: 5,
+    shadowColor: '#F0365A', shadowOpacity: 0.5, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
   },
-  liveDot:   { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff', marginRight: 5 },
-  liveText:  { color: '#fff', fontWeight: '700', fontSize: 12 },
-  timerText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  liveDot:   { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#fff' },
+  liveText:  { color: '#fff', fontWeight: '800', fontSize: 11, letterSpacing: 0.5 },
   viewerBadge: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4, gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderRadius: 12, paddingHorizontal: 9, paddingVertical: 5, gap: 5,
   },
-  viewerText: { color: '#fff', fontSize: 12, fontWeight: '600' },
-  titleBar: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 100 : 80,
-    left: 16, right: 16, zIndex: 10,
-  },
-  concertTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  bottomOverlay: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    paddingTop: 40, paddingHorizontal: 16, zIndex: 10,
+  viewerText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  concertTitle: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  artistText: { color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '500', marginTop: 1 },
+  bottomZone: {
+    flex: 1,
+    paddingTop: 18,
+    justifyContent: 'flex-end',
   },
   controls:     { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' },
-  controlBtn:   { alignItems: 'center', gap: 4 },
-  controlLabel: { color: '#fff', fontSize: 11 },
-  endBtn:       { backgroundColor: '#E53E3E', borderRadius: 24, padding: 12 },
-  launchBanner: {
-    position: 'absolute', top: Platform.OS === 'ios' ? 54 : 36,
-    left: 20, right: 20, zIndex: 99,
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: 'rgba(229,62,62,0.92)',
-    borderRadius: 14, paddingVertical: 11, paddingHorizontal: 16,
-    shadowColor: '#E53E3E', shadowOpacity: 0.5, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
+  controlBtn:   { alignItems: 'center', gap: 6 },
+  controlIconWrap: {
+    width: 46, height: 46, borderRadius: 23,
+    backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center',
   },
-  launchDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#fff' },
-  launchTxt: { color: '#fff', fontSize: 14, fontWeight: '700', flex: 1 },
+  controlIconWrapActive:    { backgroundColor: 'rgba(240,54,90,0.55)' },
+  controlIconWrapRecording: { backgroundColor: 'rgba(240,54,90,0.85)' },
+  endIconWrap: {
+    width: 46, height: 46, borderRadius: 23,
+    backgroundColor: '#F0365A', alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#F0365A', shadowOpacity: 0.5, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
+    elevation: 5,
+  },
+  controlLabel: { color: 'rgba(255,255,255,0.85)', fontSize: 10.5, fontWeight: '600' },
 });

@@ -31,7 +31,9 @@ const H_PAD   = 14;
 const GUTTER  = 8;
 const CARD_W  = (SW - H_PAD * 2 - GUTTER) / 2;
 const CARD_W_H = Math.round(SW * 0.40);
-const HERO_H  = Math.round(SH * 0.58);
+const HERO_H  = Math.round(SH * 0.58
+  
+);
 
 const PAGE_LIMIT = 20;
 const PURPLE = '#7B3FF2';

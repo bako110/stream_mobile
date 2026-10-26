@@ -112,3 +112,13 @@ export interface TicketsSold {
   total_revenue_eur: number;
   max_attendees: number | null;
 }
+
+export type UpcomingLiveMixedItem =
+  | { kind: 'concert'; data: Concert }
+  | { kind: 'event'; data: import('./event').Event };
+
+export interface UpcomingLiveMixedPage {
+  items: UpcomingLiveMixedItem[];
+  page: number;
+  has_more: boolean;
+}

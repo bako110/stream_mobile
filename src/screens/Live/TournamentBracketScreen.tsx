@@ -908,7 +908,7 @@ export const TournamentBracketScreen: React.FC = () => {
       </ScrollView>
 
       <Modal visible={showJoin} transparent animationType="slide" onRequestClose={() => setShowJoin(false)} statusBarTranslucent>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setShowJoin(false)} />
           <View style={[styles.modalCard, { backgroundColor: colors.surface, paddingBottom: 20 + insets.bottom }]}>
             <View style={[styles.modalHandle, { backgroundColor: colors.divider }]} />
@@ -948,7 +948,7 @@ export const TournamentBracketScreen: React.FC = () => {
       </Modal>
 
       <Modal visible={showEdit} transparent animationType="slide" onRequestClose={() => setShowEdit(false)} statusBarTranslucent>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setShowEdit(false)} />
           <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }} keyboardShouldPersistTaps="handled">
             <View style={[styles.modalCard, { backgroundColor: colors.surface, paddingBottom: 20 + insets.bottom }]}>

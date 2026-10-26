@@ -626,7 +626,7 @@ export const PlanningScreen: React.FC = () => {
 
       {/* Create Modal */}
       <Modal visible={showCreate} animationType="slide" transparent>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.modalOverlay}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={s.modalOverlay}>
           <View style={[s.modalSheet, { backgroundColor: colors.surface }]}>
             <View style={s.modalHandle} />
             <View style={s.modalHeader}>

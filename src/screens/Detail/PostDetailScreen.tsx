@@ -900,7 +900,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
 
       {/* Édition rapide d'un post (texte) — même pattern que ProfileScreen */}
       <Modal visible={editingPost} transparent animationType="slide" onRequestClose={() => setEditingPost(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{ flex: 1, justifyContent: 'flex-end' }}>
           <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setEditingPost(false)} />
           <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 }}>

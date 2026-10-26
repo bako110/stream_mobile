@@ -2060,7 +2060,7 @@ export const CommunityChatScreen: React.FC = () => {
       )}
 
       {/* ── Contenu principal ── */}
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={0}>
         {loading ? (
           <GofolyxLoader fullScreen color={colors.primary} />
         ) : activeTab === 'media' ? renderMediaTab() : (
@@ -2379,7 +2379,7 @@ export const CommunityChatScreen: React.FC = () => {
         animationType="slide"
         onRequestClose={() => { if (!fileUploading) { setFilePreviewOpen(false); setFilePreview(null); setFileCaption(''); } }}
       >
-        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#1a1a1a' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#1a1a1a' }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <StatusBar hidden />
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingTop: insets.top + 12, paddingHorizontal: 16, paddingBottom: 12 }}>
             <TouchableOpacity
@@ -2475,7 +2475,7 @@ export const CommunityChatScreen: React.FC = () => {
         animationType="slide"
         onRequestClose={() => { if (!editAnnounceSaving) setEditAnnounceMsg(null); }}
       >
-        <KeyboardAvoidingView style={{ flex: 1, justifyContent: 'flex-end' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={{ flex: 1, justifyContent: 'flex-end' }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <Pressable style={S.overlay} onPress={() => { if (!editAnnounceSaving) setEditAnnounceMsg(null); }} />
           <View style={[S.bottomSheet, { backgroundColor: colors.surface, maxHeight: '75%' }]}>
             <View style={[S.sheetHandle, { backgroundColor: colors.divider }]} />
@@ -2546,7 +2546,7 @@ export const CommunityChatScreen: React.FC = () => {
 
       {/* ── Créer sondage ── */}
       <Modal visible={pollModal} transparent animationType="slide" onRequestClose={() => setPollModal(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Pressable style={S.overlay} onPress={() => setPollModal(false)} />
           <View style={[S.bottomSheet, { backgroundColor: colors.surface, maxHeight: H * 0.88 }]}>
             <View style={[S.sheetHandle, { backgroundColor: colors.divider }]} />
@@ -2621,7 +2621,7 @@ export const CommunityChatScreen: React.FC = () => {
         animationType="slide"
         onRequestClose={() => { if (!mediaUploading) { setMediaPreviewOpen(false); setMediaPreview([]); setMediaCaption(''); } }}
       >
-        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#000' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#000' }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <StatusBar hidden />
 
           {/* Header */}
