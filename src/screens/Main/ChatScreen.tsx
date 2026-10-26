@@ -1745,7 +1745,7 @@ export const ChatScreen: React.FC = () => {
         && requestStatus !== 'blocked'
         && requestStatus !== 'blocked_by_me'
         && (
-        <View style={[styles.inputBar, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
+        <View style={[styles.inputBar, { backgroundColor: colors.surface, borderTopColor: colors.divider, paddingBottom: 8 + insets.bottom }]}>
           <View style={styles.inputRow}>
             {/* Emoji */}
             <TouchableOpacity
@@ -1815,7 +1815,7 @@ export const ChatScreen: React.FC = () => {
           vrai statut de la conversation (bloqué / demande en attente), pour
           éviter que le composer n'apparaisse puis disparaisse. */}
       {!statusReady && (
-        <View style={[styles.inputBar, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
+        <View style={[styles.inputBar, { backgroundColor: colors.surface, borderTopColor: colors.divider, paddingBottom: 8 + insets.bottom }]}>
           <View style={styles.inputRow}>
             <View style={[styles.inputSkeletonWrap, { backgroundColor: colors.backgroundSecondary }]} />
             <View style={[styles.inputSkeletonSend, { backgroundColor: colors.backgroundSecondary }]}>

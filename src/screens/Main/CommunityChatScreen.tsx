@@ -2193,7 +2193,7 @@ export const CommunityChatScreen: React.FC = () => {
                     </Text>
                   </View>
                 )}
-                <View style={[S.inputBar, { backgroundColor: colors.surface, borderTopColor: (editingMsg || replyingTo) ? 'transparent' : colors.divider }]}>
+                <View style={[S.inputBar, { backgroundColor: colors.surface, borderTopColor: (editingMsg || replyingTo) ? 'transparent' : colors.divider, paddingBottom: 10 + insets.bottom }]}>
                   <View style={[S.inputRow, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
                     {activeTab === 'discussion' && (
                       <TouchableOpacity onPress={() => setAttachOpen(true)} disabled={sending || locating} style={S.inputIconBtn}>

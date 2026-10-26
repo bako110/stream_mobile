@@ -924,7 +924,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
                     </Text>
                   </View>
                 )}
-              <View style={[C.inputBar, { backgroundColor: colors.surface, borderTopColor: (editingMsg || replyingTo) ? 'transparent' : colors.divider }]}>
+              <View style={[C.inputBar, { backgroundColor: colors.surface, borderTopColor: (editingMsg || replyingTo) ? 'transparent' : colors.divider, paddingBottom: 10 + insets.bottom }]}>
                 {/* Bouton pièces jointes */}
                 {!editingMsg && (
                   <TouchableOpacity onPress={() => setAttachOpen(true)} disabled={sending || locating} style={C.inputIconBtn}>
