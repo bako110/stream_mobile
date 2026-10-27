@@ -25,7 +25,6 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import RNContacts from 'react-native-contacts';
 import { sha256 } from 'js-sha256';
-import Geolocation from '@react-native-community/geolocation';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { useTheme } from '../../hooks/useTheme';
 import { useUserLocation } from '../../hooks/useUserLocation';
@@ -402,13 +401,11 @@ const NearbyEventsCarousel: React.FC<NearbyEventsCarouselProps> = React.memo(({
                 {d.thumbnail_url ? (
                   <CachedImage uri={d.thumbnail_url} style={StyleSheet.absoluteFill} resizeMode="cover" />
                 ) : (
-                  <LinearGradient
-                    colors={[colors.primary, colors.primary + 'AA']}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                    style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}
+                  <View
+                    style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }]}
                   >
                     <Icon name={typeIcon} size={34} color="rgba(255,255,255,0.55)" />
-                  </LinearGradient>
+                  </View>
                 )}
 
                 {/* Dégradé bas — garantit la lisibilité du texte quel que soit le fond */}
@@ -753,10 +750,8 @@ const CommunitiesInlineCard: React.FC<{
                 {c.banner_url ? (
                   <CachedImage uri={c.banner_url} style={{ width: '100%', height: COMM_COVER_H }} resizeMode="cover" />
                 ) : (
-                  <LinearGradient
-                    colors={[colors.gradientStart ?? colors.primary, colors.gradientEnd ?? colors.primary]}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                    style={{ width: '100%', height: COMM_COVER_H }}
+                  <View
+                    style={{ width: '100%', height: COMM_COVER_H, backgroundColor: colors.gradientStart ?? colors.primary }}
                   />
                 )}
               </TouchableOpacity>
@@ -1330,22 +1325,10 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     } catch { /* silencieux — les suggestions restent utilisables sans contacts */ }
   }, []);
 
-  const syncLocationForSuggestions = useCallback(() => {
-    Geolocation.getCurrentPosition(
-      pos => {
-        userService.updateLocation(pos.coords.latitude, pos.coords.longitude).catch(() => {});
-      },
-      () => {},
-      { enableHighAccuracy: false, timeout: 8000, maximumAge: 300_000 },
-    );
-  }, []);
-
-  const requestLocationForSuggestions = useCallback(async () => {
-    const perm = Platform.OS === 'ios' ? PERMISSIONS.IOS.LOCATION_WHEN_IN_USE : PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION;
-    let status = await check(perm);
-    if (status === RESULTS.DENIED) status = await request(perm);
-    if (status === RESULTS.GRANTED) syncLocationForSuggestions();
-  }, [syncLocationForSuggestions]);
+  // La synchronisation de la position vers le backend (PUT /me/location) est
+  // maintenant geree directement par useUserLocation(true) ci-dessus — une
+  // seule source de verite partagee par tous les ecrans qui l'appellent
+  // (voir hooks/useUserLocation.ts), plus besoin de la dupliquer ici.
 
   // Au premier chargement du feed : si la permission Contacts a déjà été
   // accordée, synchronise en silence. Sinon, montre UNE FOIS une explication
@@ -1372,11 +1355,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         requestOverlaySlot('contacts');
       }
 
-      // Localisation : même logique, permission déjà tranchée par ailleurs
-      // dans l'app (écran "Près de toi") réutilisée sans redemander ici.
-      const locationPerm = Platform.OS === 'ios' ? PERMISSIONS.IOS.LOCATION_WHEN_IN_USE : PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION;
-      const locationStatus = await check(locationPerm);
-      if (locationStatus === RESULTS.GRANTED) syncLocationForSuggestions();
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -3410,11 +3388,11 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
             </TouchableOpacity>
           ) : (
             <TouchableOpacity onPress={onPress} activeOpacity={0.95} style={StyleSheet.absoluteFill}>
-              <LinearGradient colors={[accent + 'EE', accent + '55']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill}>
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: accent + 'EE' }]}>
                 <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
                   <Icon name={cardIcon} size={48} color="rgba(255,255,255,0.18)" />
                 </View>
-              </LinearGradient>
+              </View>
             </TouchableOpacity>
           )}
         </View>
