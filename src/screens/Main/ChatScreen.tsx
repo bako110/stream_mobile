@@ -351,13 +351,21 @@ export const ChatScreen: React.FC = () => {
     }).catch(() => {});
   }, []);
 
-  // Le statut de la demande de conversation n'est plus vérifié par avance à
-  // l'ouverture — ça ralentissait l'apparition de la barre de saisie à chaque
-  // clic sur une conversation (squelette de chargement le temps de l'appel
-  // réseau). La barre de saisie s'affiche désormais immédiatement ; le vrai
-  // statut (bloqué / en attente d'acceptation) n'est révélé que si l'envoi
-  // échoue réellement, via l'alerte dans send() et le listener WebSocket
-  // ci-dessus (conversation_blocked / pending_limit).
+  // Le vrai statut est récupéré en arrière-plan dès l'ouverture, sans jamais
+  // bloquer l'affichage de la barre de saisie le temps de la réponse
+  // (statusReady reste true pendant l'appel). Indispensable : sans ce
+  // rechargement, requestStatus restait bloqué sur sa valeur initiale 'none'
+  // pour toute conversation déjà acceptée de longue date, et l'envoi d'un
+  // nouveau message la faisait basculer à tort sur 'pending_outgoing' (voir
+  // `prev === 'none' ? 'pending_outgoing' : ...` dans send()) — la bannière
+  // "en attente d'autorisation" s'affichait alors que le message venait de
+  // partir avec succès et que le partenaire avait déjà répondu depuis
+  // longtemps.
+  useEffect(() => {
+    messageService.getRequestStatus(partnerId)
+      .then(({ status }) => setRequestStatus(status))
+      .catch(() => {});
+  }, [partnerId]);
 
   const loadMessages = useCallback(async (p = 1) => {
     try {
@@ -456,11 +464,11 @@ export const ChatScreen: React.FC = () => {
       // vient de taper), pas besoin de le déchiffrer depuis le blob.
       const resolved = msg.encrypted ? { ...msg, content, decrypted: true } : msg;
       setMessages(prev => prev.map(m => m.id === tempId ? resolved : m));
-      setRequestStatus(prev =>
-        prev === 'none' ? 'pending_outgoing' :
-        prev === 'pending_incoming' ? 'accepted' :
-        prev
-      );
+      // Un envoi réussi (pas d'exception pending_limit/blocked) prouve que le
+      // serveur a accepté ce message quel que soit l'état local encore pas
+      // chargé — ne jamais régresser vers pending_outgoing ici : seule
+      // l'erreur pending_limit (catch ci-dessous) doit l'imposer.
+      setRequestStatus(prev => prev === 'pending_incoming' ? 'accepted' : prev);
     } catch (e: any) {
       setMessages(prev => prev.filter(m => m.id !== tempId));
       const code = (e?.data as any)?.detail?.code;
