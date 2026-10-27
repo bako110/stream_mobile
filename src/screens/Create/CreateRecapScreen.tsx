@@ -190,7 +190,7 @@ export const CreateRecapScreen: React.FC<Props> = ({
       {/* ══ CTA PUBLIER ══ */}
       <Animated.View entering={FadeInUp.duration(320)} style={[s.footer, { paddingBottom: Math.max(insets.bottom, 16) + 10 }]}>
         <TouchableOpacity onPress={onPublish} activeOpacity={0.88} disabled={publishing} style={[s.publishBtnWrap, publishing && { opacity: 0.7 }]}>
-          <LinearGradient colors={['#7B3FF2', '#C026D3', '#E0389A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.publishBtn}>
+          <View style={[{ backgroundColor: '#7B3FF2' }, s.publishBtn]}>
             {publishing ? (
               <>
                 <ActivityIndicator size="small" color="#fff" />
@@ -202,7 +202,7 @@ export const CreateRecapScreen: React.FC<Props> = ({
                 <Text style={s.publishBtnTxt}>{isRemix ? 'Publier le remix' : 'Publier'}</Text>
               </>
             )}
-          </LinearGradient>
+          </View>
         </TouchableOpacity>
       </Animated.View>
     </View>

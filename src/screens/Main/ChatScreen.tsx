@@ -14,7 +14,6 @@ import {
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import EmojiKeyboard from 'rn-emoji-keyboard';
 import Icon from 'react-native-vector-icons/Feather';
-import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
@@ -1354,10 +1353,8 @@ export const ChatScreen: React.FC = () => {
             delayLongPress={400}
         >
           {mine ? (
-            <LinearGradient
-              colors={[colors.gradientStart, colors.gradientEnd]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={[styles.bubbleInner, styles.bubbleInnerMine, isImageNoCaption && { padding: 0 }]}
+            <View
+              style={[styles.bubbleInner, styles.bubbleInnerMine, isImageNoCaption && { padding: 0 }, { backgroundColor: colors.gradientStart }]}
             >
               {item.forwarded_from_id && (
                 <View style={styles.forwardedLabel}>
@@ -1390,7 +1387,7 @@ export const ChatScreen: React.FC = () => {
                   </View>
                 </View>
               )}
-            </LinearGradient>
+            </View>
           ) : (
             <View style={[styles.bubbleInner, styles.bubbleInnerTheirs, { backgroundColor: colors.surface }, isImageNoCaption && { padding: 0 }]}>
               {item.forwarded_from_id && (
@@ -1785,16 +1782,14 @@ export const ChatScreen: React.FC = () => {
                 onPress={() => (editingMsg ? confirmEdit() : send())}
                 disabled={sending}
               >
-                <LinearGradient
-                  colors={[colors.gradientStart, colors.gradientEnd]}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                  style={styles.sendBtnInner}
+                <View
+                  style={[styles.sendBtnInner, { backgroundColor: colors.gradientStart }]}
                 >
                   {sending
                     ? <ActivityIndicator color="#fff" size="small" />
                     : <Icon name={editingMsg ? 'check' : 'send'} size={17} color="#fff" />
                   }
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
             ) : (
               <>
@@ -1805,13 +1800,11 @@ export const ChatScreen: React.FC = () => {
                   <Icon name="camera" size={21} color={colors.textTertiary} />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.sendBtn} onPress={startRecording}>
-                  <LinearGradient
-                    colors={[colors.gradientStart, colors.gradientEnd]}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                    style={styles.sendBtnInner}
+                  <View
+                    style={[styles.sendBtnInner, { backgroundColor: colors.gradientStart }]}
                   >
                     <Icon name="mic" size={19} color="#fff" />
-                  </LinearGradient>
+                  </View>
                 </TouchableOpacity>
               </>
             )}

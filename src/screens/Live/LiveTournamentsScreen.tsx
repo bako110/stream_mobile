@@ -10,7 +10,6 @@ import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
   ActivityIndicator, StatusBar, RefreshControl,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
@@ -125,7 +124,7 @@ export const LiveTournamentsScreen: React.FC = () => {
           contentContainerStyle={st.list}
           ListHeaderComponent={tournaments.length > 0 ? (
             <Animated.View entering={FadeInDown.duration(400).springify()}>
-              <LinearGradient colors={[colors.primary + '22', colors.primary + '10']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[st.summaryCard, { borderColor: colors.primary + '30' }]}>
+              <View style={[st.summaryCard, { borderColor: colors.primary + '30', backgroundColor: colors.primary + '22' }]}>
                 <View style={[st.summaryIconWrap, { backgroundColor: colors.primary + '18' }]}>
                   <Icon name="award" size={20} color={colors.primary} />
                 </View>
@@ -137,7 +136,7 @@ export const LiveTournamentsScreen: React.FC = () => {
                     {totalParticipants.toLocaleString('fr-FR')} participant{totalParticipants > 1 ? 's' : ''} au total
                   </Text>
                 </View>
-              </LinearGradient>
+              </View>
             </Animated.View>
           ) : null}
           renderItem={({ item }) => (
@@ -154,10 +153,10 @@ export const LiveTournamentsScreen: React.FC = () => {
               </View>
               <Text style={[st.emptyText, { color: colors.textTertiary }]}>Aucun tournoi en cours pour le moment.</Text>
               <TouchableOpacity onPress={() => setShowCreate(true)} activeOpacity={0.85} style={{ marginTop: 4 }}>
-                <LinearGradient colors={[colors.primary, colors.primaryDark]} style={st.emptyCreateBtn}>
+                <View style={[st.emptyCreateBtn, { backgroundColor: colors.primary }]}>
                   <Icon name="plus" size={14} color="#fff" />
                   <Text style={st.emptyCreateBtnText}>Créer un tournoi</Text>
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
             </View>
           }

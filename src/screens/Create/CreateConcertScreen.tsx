@@ -9,7 +9,6 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import Animated, {
   FadeInDown, useSharedValue, useAnimatedStyle, withSpring,
 } from 'react-native-reanimated';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
 import { useCurrency } from '../../hooks/useCurrency';
@@ -422,10 +421,8 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
           {step === 0 && (
             <Animated.View entering={FadeInDown.springify()}>
               {/* Hero */}
-              <LinearGradient
-                colors={[colors.gradientStart + 'DD', colors.gradientEnd + 'AA']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                style={s.heroBanner}
+              <View
+                style={[s.heroBanner, { backgroundColor: colors.gradientStart + 'DD' }]}
               >
                 <Icon name="music" size={44} color={colors.textOnBrand + 'CC'} />
                 <Text style={[s.heroTitle, { color: colors.textOnBrand }]}>
@@ -440,7 +437,7 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
                     <Text style={[s.liveText, { color: colors.textOnBrand }]}>LIVE</Text>
                   </View>
                 )}
-              </LinearGradient>
+              </View>
 
               {/* Titre & description */}
               <View style={s.section}>
@@ -751,10 +748,8 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
           {step === 4 && (
             <Animated.View entering={FadeInDown.springify()}>
               {/* Hero récap */}
-              <LinearGradient
-                colors={[colors.gradientStart + 'DD', colors.gradientEnd + 'AA']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                style={[s.heroBanner, { marginBottom: 24 }]}
+              <View
+                style={[s.heroBanner, { marginBottom: 24, backgroundColor: colors.gradientStart + 'DD' }]}
               >
                 <Icon name="music" size={40} color={colors.textOnBrand + 'CC'} />
                 <Text style={[s.heroTitle, { color: colors.textOnBrand }]} numberOfLines={1}>
@@ -769,7 +764,7 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
                     <Text style={[s.liveText, { color: colors.textOnBrand }]}>LIVE</Text>
                   </View>
                 )}
-              </LinearGradient>
+              </View>
 
               {/* Bloc infos */}
               <ReviewBlock title="Informations" colors={colors}>
@@ -842,10 +837,8 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
               onPress={step < STEPS.length - 1 ? goNext : handlePublish}
               disabled={saving || publishing}
             >
-              <LinearGradient
-                colors={[colors.gradientStart, colors.gradientEnd]}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={s.publishBtnInner}
+              <View
+                style={[s.publishBtnInner, { backgroundColor: colors.gradientStart }]}
               >
                 {publishing
                   ? <ActivityIndicator size="small" color="#fff" />
@@ -854,7 +847,7 @@ export const CreateConcertScreen: React.FC<Props> = ({ onBack, concertId }) => {
                 <Text style={s.publishBtnText}>
                   {publishing ? 'Publication...' : step < STEPS.length - 1 ? 'Suivant' : 'Publier'}
                 </Text>
-              </LinearGradient>
+              </View>
             </TouchableOpacity>
           </Animated.View>
         </View>

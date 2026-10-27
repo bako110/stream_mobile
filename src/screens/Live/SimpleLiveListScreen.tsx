@@ -208,10 +208,10 @@ export const SimpleLiveListScreen: React.FC = () => {
           </View>
           <View style={[st.headerSide, st.headerSideRight]}>
             <TouchableOpacity style={st.goLiveBtn} onPress={() => nav.navigate('GoLive')} activeOpacity={0.85}>
-              <LinearGradient colors={['#F0365A', '#C91C47']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={st.goLiveBtnGrad}>
+              <View style={[st.goLiveBtnGrad, { backgroundColor: '#F0365A' }]}>
                 <Icon name="radio" size={14} color="#fff" />
                 <Text style={st.goLiveBtnText}>Go Live</Text>
-              </LinearGradient>
+              </View>
             </TouchableOpacity>
           </View>
         </View>
@@ -251,10 +251,10 @@ export const SimpleLiveListScreen: React.FC = () => {
                 Sois le premier à démarrer un live !
               </Text>
               <TouchableOpacity activeOpacity={0.85} onPress={() => nav.navigate('GoLive')}>
-                <LinearGradient colors={['#F0365A', '#C91C47']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={st.startBtn}>
+                <View style={[st.startBtn, { backgroundColor: '#F0365A' }]}>
                   <Icon name="radio" size={16} color="#fff" />
                   <Text style={st.startBtnText}>Démarrer un live</Text>
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
             </Animated.View>
           }

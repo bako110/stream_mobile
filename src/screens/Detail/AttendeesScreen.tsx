@@ -10,7 +10,6 @@ const TIER_COLORS: Record<string, string> = {
 const TIER_LABELS: Record<string, string> = {
   simple: 'STD', vip: 'VIP', vvip: 'VVIP', vvvip: 'VVVIP',
 };
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -106,9 +105,9 @@ export const AttendeesScreen: React.FC<Props> = ({ eventId, eventTitle, onBack, 
       {item.avatar_url ? (
         <Image source={{ uri: item.avatar_url }} style={at.avatar} />
       ) : (
-        <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} style={at.avatar}>
+        <View style={[at.avatar, { backgroundColor: colors.gradientStart }]}>
           <Text style={at.avatarTxt}>{getInitials(item.display_name ?? item.username)}</Text>
-        </LinearGradient>
+        </View>
       )}
 
       {/* Infos */}

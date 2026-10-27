@@ -3,7 +3,6 @@ import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, RefreshControl, TextInput, ScrollView, StatusBar,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { BackButton, CONTENT_CATEGORIES, CategoryIcon } from '../../components/common';
 import { useNavigation, useRoute } from '@react-navigation/native';

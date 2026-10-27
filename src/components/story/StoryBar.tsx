@@ -181,7 +181,7 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
           {/* ── Ma story ── */}
           {myGroup ? (
             // A déjà une story : carte "photo de fond" classique, comme les autres.
-            <LinearGradient colors={brandGrad} style={s.cardBorderWrap}>
+            <View style={[s.cardBorderWrap, { backgroundColor: brandGrad[0] }]}>
               <TouchableOpacity
                 activeOpacity={0.85}
                 style={s.card}
@@ -203,7 +203,7 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
 
                 <View style={s.cardAvatarWrap}>
                   {!isUploading ? (
-                    <LinearGradient colors={brandGrad} style={s.cardAvatarRing}>
+                    <View style={[s.cardAvatarRing, { backgroundColor: brandGrad[0] }]}>
                       <View style={s.cardAvatarInner}>
                         {currentUser?.avatar_url
                           ? <CachedImage uri={currentUser.avatar_url} style={s.cardAvatar} />
@@ -212,7 +212,7 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
                             </View>
                         }
                       </View>
-                    </LinearGradient>
+                    </View>
                   ) : (
                     <View style={s.cardAvatarInner}>
                       {currentUser?.avatar_url
@@ -238,7 +238,7 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
                   <Text style={s.cardCount}>{myGroup.stories.length} stories</Text>
                 )}
               </TouchableOpacity>
-            </LinearGradient>
+            </View>
           ) : (
             // Pas encore de story : carte "Ajouter" — même liseré de bordure que les
             // autres cartes (cardBorderWrap SANS padding:0, sinon le contour externe
@@ -248,10 +248,8 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
             // rendait l'avatar/texte blancs illisibles sur fond clair).
             <View style={[s.cardBorderWrap, { width: ADD_CARD_W + 2, backgroundColor: colors.border ?? '#ccc' }]}>
               <TouchableOpacity activeOpacity={0.85} style={[s.card, { width: ADD_CARD_W }]} onPress={() => setCreatorOpen(true)}>
-                <LinearGradient
-                  colors={brandGrad}
-                  start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
-                  style={[s.cardBg, { width: ADD_CARD_W, opacity: 0.55 }]}
+                <View
+                  style={[s.cardBg, { width: ADD_CARD_W, opacity: 0.55, backgroundColor: brandGrad[0] }]}
                 />
 
                 <View style={s.addCardBody}>
@@ -316,10 +314,9 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
                     resizeMode="cover"
                   />
                 ) : noMedia ? (
-                  // Aucun média : gradient déterministe depuis le nom (style WhatsApp)
-                  <LinearGradient
-                    colors={seen ? ['#555', '#444', '#333'] : fallbackGrad}
-                    style={s.cardBg}
+                  // Aucun média : couleur déterministe depuis le nom (style WhatsApp)
+                  <View
+                    style={[s.cardBg, { backgroundColor: seen ? '#555' : fallbackGrad[0] }]}
                   />
                 ) : (
                   <View style={[s.cardBg, { backgroundColor: bg!, opacity: seen ? 0.65 : 1 }]} />
@@ -351,7 +348,7 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
                     que l'app web. */}
                 <View style={s.cardAvatarWrap}>
                   {!seen ? (
-                    <LinearGradient colors={['#7B3FF2', '#5B2EC4']} style={s.cardMiniAvatarRing}>
+                    <View style={[s.cardMiniAvatarRing, { backgroundColor: '#7B3FF2' }]}>
                       <View style={s.cardMiniAvatarInner}>
                         {user.avatar_url
                           ? <CachedImage uri={user.avatar_url} style={s.cardAvatar} />
@@ -360,7 +357,7 @@ export const StoryBar: React.FC<Props> = ({ currentUser, colors, onNavigateToCha
                             </View>
                         }
                       </View>
-                    </LinearGradient>
+                    </View>
                   ) : (
                     <View style={[s.cardMiniAvatarRing, { backgroundColor: 'rgba(255,255,255,0.4)' }]}>
                       <View style={s.cardMiniAvatarInner}>

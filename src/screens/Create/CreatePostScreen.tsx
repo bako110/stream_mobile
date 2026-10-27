@@ -6,7 +6,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { launchImageLibrary } from 'react-native-image-picker';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import { FontSize, FontWeight } from '../../theme';
@@ -352,13 +351,11 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
           <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Créer un post</Text>
           <TouchableOpacity onPress={handlePost} disabled={!canPost || posting} activeOpacity={0.85}>
             {(canPost && !posting) ? (
-              <LinearGradient
-                colors={[colors.primary, colors.primary + 'CC']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                style={s.publishBtn}
+              <View
+                style={[s.publishBtn, { backgroundColor: colors.primary }]}
               >
                 <Text style={s.publishBtnText}>Publier</Text>
-              </LinearGradient>
+              </View>
             ) : (
               <View style={[s.publishBtn, { backgroundColor: colors.primary + '33' }]}>
                 <Text style={[s.publishBtnText, { color: colors.primary + '99' }]}>Publier</Text>
@@ -490,23 +487,19 @@ export const CreatePostScreen: React.FC<Props> = ({ onBack, onPostCreated }) => 
         {/* Etat vide — invite premium a ajouter un media, jamais d'ecran vide */}
         {!videoUri && localUris.length === 0 && (
           <TouchableOpacity style={s.emptyMediaWrap} onPress={handlePickMixed} activeOpacity={0.9}>
-            <LinearGradient
-              colors={[colors.primary + '14', colors.primary + '05']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={[s.emptyMediaCard, { borderColor: colors.primary + '30' }]}
+            <View
+              style={[s.emptyMediaCard, { borderColor: colors.primary + '30', backgroundColor: colors.primary + '14' }]}
             >
-              <LinearGradient
-                colors={[colors.primary, colors.primary + 'CC']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                style={s.emptyMediaIcon}
+              <View
+                style={[s.emptyMediaIcon, { backgroundColor: colors.primary }]}
               >
                 <Icon name="image" size={22} color="#fff" />
-              </LinearGradient>
+              </View>
               <Text style={[s.emptyMediaTitle, { color: colors.textPrimary }]}>Ajouter des photos ou une vidéo</Text>
               <Text style={[s.emptyMediaSub, { color: colors.textTertiary }]}>
                 Touche pour choisir dans ta galerie
               </Text>
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         )}
 

@@ -9,7 +9,6 @@ import {
   View, Text, ScrollView, TouchableOpacity,
   Image, StyleSheet, ActivityIndicator,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { StoryViewer } from './StoryViewer';
 import { StoryCreator } from './StoryCreator';
@@ -189,9 +188,8 @@ export const ConversationStoryBar: React.FC<Props> = ({ currentUser, colors, con
               : () => setCreatorOpen(true)
             }
           >
-            <LinearGradient
-              colors={myGroup ? ['#7B3FF2', '#E0389A'] : ['transparent', 'transparent']}
-              style={[s.ring, !myGroup && { backgroundColor: colors.border ?? '#ddd' }]}
+            <View
+              style={[s.ring, { backgroundColor: myGroup ? '#7B3FF2' : (colors.border ?? '#ddd') }]}
             >
               <View style={[s.avatarInner, { borderColor: colors.background ?? '#fff' }]}>
                 {myThumb ? (
@@ -209,7 +207,7 @@ export const ConversationStoryBar: React.FC<Props> = ({ currentUser, colors, con
                   </View>
                 )}
               </View>
-            </LinearGradient>
+            </View>
             <TouchableOpacity
               style={[s.addBtn, { backgroundColor: colors.primary ?? '#7B3FF2', borderColor: colors.background ?? '#fff' }]}
               onPress={() => setCreatorOpen(true)}
@@ -236,9 +234,8 @@ export const ConversationStoryBar: React.FC<Props> = ({ currentUser, colors, con
                 style={s.item}
                 onPress={() => openViewer(idx)}
               >
-                <LinearGradient
-                  colors={seen ? [colors.border ?? '#ccc', colors.border ?? '#ccc'] : ['#7B3FF2', '#E0389A']}
-                  style={s.ring}
+                <View
+                  style={[s.ring, { backgroundColor: seen ? (colors.border ?? '#ccc') : '#7B3FF2' }]}
                 >
                   <View style={[s.avatarInner, { borderColor: colors.background ?? '#fff' }]}>
                     {user.avatar_url ? (
@@ -249,7 +246,7 @@ export const ConversationStoryBar: React.FC<Props> = ({ currentUser, colors, con
                       </View>
                     )}
                   </View>
-                </LinearGradient>
+                </View>
                 <Text style={[s.label, { color: colors.textSecondary ?? '#666' }, seen && { opacity: 0.7 }]} numberOfLines={1}>
                   {name.split(' ')[0]}
                 </Text>

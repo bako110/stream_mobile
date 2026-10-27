@@ -23,7 +23,6 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import LinearGradient from 'react-native-linear-gradient';
 import { BackButton, GofolyxLoader, PriceWithLocal } from '../../components/common';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -249,9 +248,9 @@ const CreatorDashboardScreen: React.FC = () => {
         <View style={s.card}>
           <View style={{ flex: 1, gap: 4 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <LinearGradient colors={['#9B65F5', '#E85DAD']} style={s.monoIcon}>
+              <View style={[s.monoIcon, { backgroundColor: '#9B65F5' }]}>
                 <MaterialCommunityIcons name="currency-eur" size={18} color="#FFF" />
-              </LinearGradient>
+              </View>
               <Text style={s.cardTitle}>Monétisation</Text>
             </View>
             <Text style={s.cardSubtitle}>
@@ -393,11 +392,8 @@ const CreatorDashboardScreen: React.FC = () => {
             disabled={(stats?.available_balance ?? 0) < 500}
             activeOpacity={0.85}
           >
-            <LinearGradient
-              colors={(stats?.available_balance ?? 0) >= 500 ? ['#9B65F5', '#E85DAD'] : [colors.border, colors.border]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={s.withdrawBtn}
+            <View
+              style={[s.withdrawBtn, { backgroundColor: (stats?.available_balance ?? 0) >= 500 ? '#9B65F5' : colors.border }]}
             >
               <Icon name="arrow-up-right" size={18} color={
                 (stats?.available_balance ?? 0) >= 500 ? '#FFF' : colors.textTertiary
@@ -407,7 +403,7 @@ const CreatorDashboardScreen: React.FC = () => {
               }]}>
                 Retirer
               </Text>
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
           {(stats?.available_balance ?? 0) < 1000 && (
             <Text style={s.withdrawMin}>

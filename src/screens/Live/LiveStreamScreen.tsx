@@ -17,9 +17,8 @@ import {
 import { Track, VideoPresets } from 'livekit-client';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
-import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
-import { concertService, liveService, toastService, showConfirm } from '../../services';
+import { concertService, liveService, socialService, toastService, showConfirm } from '../../services';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
 import { useAutoHideControls } from '../../hooks/useAutoHideControls';
 import { configureLiveAudioSession } from '../../utils/liveAudioSession';
@@ -217,6 +216,27 @@ const StreamControls: React.FC<{
     }
   }, [concertId, isRecording, recordingLoading]);
 
+  // Visibilité des commentaires — même réglage serveur que le toggle de
+  // ConcertDetailScreen (comments_disabled), accessible ici pendant le live
+  // lui-même : couper/rouvrir le chat sans quitter la diffusion.
+  const [commentsDisabled, setCommentsDisabled] = useState(!!concert?.comments_disabled);
+  const [commentsToggling, setCommentsToggling] = useState(false);
+  useEffect(() => { setCommentsDisabled(!!concert?.comments_disabled); }, [concert?.comments_disabled]);
+
+  const toggleComments = useCallback(async () => {
+    if (commentsToggling) return;
+    setCommentsToggling(true);
+    try {
+      const r = await socialService.toggleEntityComments('concert', concertId);
+      setCommentsDisabled(r.comments_disabled);
+      toastService.success(r.comments_disabled ? 'Commentaires désactivés' : 'Commentaires activés');
+    } catch {
+      toastService.error('Impossible de modifier les commentaires pour le moment');
+    } finally {
+      setCommentsToggling(false);
+    }
+  }, [concertId, commentsToggling]);
+
   const handleEndLive = useCallback(() => {
     showConfirm('Terminer le live ?', 'Tous les viewers seront déconnectés.', [
       { text: 'Annuler', style: 'cancel' },
@@ -318,10 +338,10 @@ const StreamControls: React.FC<{
             </View>
           </View>
           <View style={styles.headerRight}>
-            <LinearGradient colors={['#F0365A', '#C01942']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.liveBadge}>
+            <View style={[styles.liveBadge, { backgroundColor: '#F0365A' }]}>
               <View style={styles.liveDot} />
               <Text style={styles.liveText}>EN DIRECT</Text>
-            </LinearGradient>
+            </View>
             <View style={styles.viewerBadge}>
               <Icon name="eye" size={13} color="#fff" />
               <Text style={styles.viewerText}>{viewerCount}</Text>
@@ -418,6 +438,14 @@ const StreamControls: React.FC<{
                 : <Icon name={isRecording ? 'check-circle' : 'video'} size={20} color="#fff" />}
             </View>
             <Text style={styles.controlLabel}>{isRecording ? 'Stop rec' : 'Enregistrer'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={toggleComments} disabled={commentsToggling} style={styles.controlBtn}>
+            <View style={[styles.controlIconWrap, commentsDisabled && styles.controlIconWrapActive]}>
+              {commentsToggling
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Icon name={commentsDisabled ? 'message-square' : 'message-circle'} size={20} color="#fff" />}
+            </View>
+            <Text style={styles.controlLabel}>{commentsDisabled ? 'Chat off' : 'Chat on'}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={handleEndLive} style={styles.controlBtn}>
             <View style={styles.endIconWrap}>

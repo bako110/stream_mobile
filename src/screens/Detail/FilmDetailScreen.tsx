@@ -371,16 +371,18 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               disabled={(!isSerie && !hasVideo && !videosLoading) || accessLoading || launching}
               style={s.ctaPrimaryOuter}
             >
-              <LinearGradient
-                colors={
-                  item.is_premium && !hasAccess
-                    ? ['#E8501A', '#C93D10']
-                    : hasVideo || isSerie
-                    ? [colors.gradientStart ?? '#7B3FF2', colors.gradientEnd ?? '#5B8DEF']
-                    : ['#555', '#444']
-                }
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={s.ctaPrimary}
+              <View
+                style={[
+                  s.ctaPrimary,
+                  {
+                    backgroundColor:
+                      item.is_premium && !hasAccess
+                        ? '#E8501A'
+                        : hasVideo || isSerie
+                        ? (colors.gradientStart ?? '#7B3FF2')
+                        : '#555',
+                  },
+                ]}
               >
                 {accessLoading || (videosLoading && !isSerie) || launching ? (
                   <ActivityIndicator size="small" color="#fff" />
@@ -409,7 +411,7 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                       : 'Vidéo non disponible'}
                   </Text>
                 )}
-              </LinearGradient>
+              </View>
             </TouchableOpacity>
 
             {isResumable && (

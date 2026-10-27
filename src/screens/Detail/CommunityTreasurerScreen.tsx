@@ -10,7 +10,6 @@ import {
   ActivityIndicator, RefreshControl, Modal,
   TextInput, ScrollView, KeyboardAvoidingView, Platform, Image, StatusBar,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { BackButton, GofolyxLoader, PriceWithLocal } from '../../components/common';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -362,7 +361,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
               </Text>
               {treasurer ? (
                 <View style={[st.treasurerCard, { backgroundColor: colors.surface, borderColor: '#7B3FF240' }]}>
-                  <LinearGradient colors={['#7B3FF2', '#E0389A']} style={{ width: 4, borderRadius: 2 }} />
+                  <View style={{ width: 4, borderRadius: 2, backgroundColor: '#7B3FF2' }} />
                   <View style={{ paddingHorizontal: 12, flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                     {treasurer.avatar_url ? (
                       <Image source={{ uri: treasurer.avatar_url }} style={st.avatar} />
@@ -469,8 +468,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
                 {election && (
                   <View style={[{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.divider, overflow: 'hidden' }]}>
                     {/* Barre top */}
-                    <LinearGradient colors={['#7B3FF2', '#E0389A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                      style={{ height: 3 }} />
+                    <View style={{ height: 3, backgroundColor: '#7B3FF2' }} />
                     <View style={{ padding: 14, gap: 10 }}>
                       {/* Stats */}
                       <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -573,8 +571,7 @@ export const CommunityTreasurerScreen: React.FC = () => {
           return (
             <View style={[st.reqCard, { backgroundColor: colors.surface, borderColor: needsMyApproval ? '#F59E0B60' : colors.divider }]}>
               {needsMyApproval && (
-                <LinearGradient colors={['#F59E0B', '#D97706']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  style={{ height: 3, borderTopLeftRadius: 14, borderTopRightRadius: 14 }} />
+                <View style={{ height: 3, borderTopLeftRadius: 14, borderTopRightRadius: 14, backgroundColor: '#F59E0B' }} />
               )}
               <View style={{ padding: 14, gap: 10 }}>
                 {/* Header */}
@@ -645,15 +642,14 @@ export const CommunityTreasurerScreen: React.FC = () => {
                       disabled={actionLoading === req.id}
                       style={{ flex: 1, borderRadius: 10, overflow: 'hidden' }}
                     >
-                      <LinearGradient colors={['#10B981', '#059669']}
-                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                      <View
                         style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-                          gap: 6, paddingVertical: 11 }}>
+                          gap: 6, paddingVertical: 11, backgroundColor: '#10B981' }}>
                         {actionLoading === req.id
                           ? <ActivityIndicator size="small" color="#fff" />
                           : <><Icon name="check" size={14} color="#fff" /><Text style={{ color: '#fff', fontWeight: FontWeight.extraBold, fontSize: FontSize.smPlus }}>Approuver</Text></>
                         }
-                      </LinearGradient>
+                      </View>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => handleReject(req)}

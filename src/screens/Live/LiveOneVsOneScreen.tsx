@@ -10,7 +10,6 @@ import {
   View, Text, StyleSheet, FlatList,
   ActivityIndicator, StatusBar, RefreshControl,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
@@ -152,7 +151,7 @@ export const LiveOneVsOneScreen: React.FC = () => {
           contentContainerStyle={st.list}
           ListHeaderComponent={battles.length > 0 ? (
             <Animated.View entering={FadeInDown.duration(400).springify()}>
-              <LinearGradient colors={[colors.primary + '22', colors.primary + '10']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[st.summaryCard, { borderColor: colors.primary + '30' }]}>
+              <View style={[st.summaryCard, { borderColor: colors.primary + '30', backgroundColor: colors.primary + '22' }]}>
                 <View style={[st.summaryIconWrap, { backgroundColor: colors.primary + '18' }]}>
                   <Icon name="zap" size={20} color={colors.primary} />
                 </View>
@@ -167,7 +166,7 @@ export const LiveOneVsOneScreen: React.FC = () => {
                 <View style={st.liveDotOuter}>
                   <View style={[st.liveDot, { backgroundColor: colors.liveTag }]} />
                 </View>
-              </LinearGradient>
+              </View>
             </Animated.View>
           ) : null}
           renderItem={({ item }) => (

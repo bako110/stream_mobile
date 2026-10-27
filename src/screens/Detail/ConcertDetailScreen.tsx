@@ -1,7 +1,7 @@
 ﻿import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
-  Modal, Share, Platform, Linking,
+  Modal, Platform, Linking,
   Dimensions, StyleSheet, StatusBar, InteractionManager, ActivityIndicator,
 } from 'react-native';
 import Animated, {
@@ -14,10 +14,11 @@ import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
-import { SkeletonDetail, CommentsBottomSheet, ExpandableText, BackButton, GofolyxLoader, FriendsWhoLiked, PriceWithLocal, RepostBottomSheet } from '../../components/common';
+import { SkeletonDetail, CommentsBottomSheet, ExpandableText, BackButton, GofolyxLoader, FriendsWhoLiked, PriceWithLocal, RepostBottomSheet, ShareBottomSheet } from '../../components/common';
 import { TicketPaymentSheet } from '../../components/wallet/TicketPaymentSheet';
 import { concertService, socialService, authService, toastService, showConfirm } from '../../services';
 import { favoriteService } from '../../services/favoriteService';
+import { prefetchConcertLive } from '../../utils/livePrefetch';
 import type { Concert } from '../../types';
 import type { AppColors } from '../../theme/colors';
 import { useNavigation } from '@react-navigation/native';
@@ -144,10 +145,9 @@ const HeroConcert: React.FC<{
       </Text>
       {artistName && (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <LinearGradient colors={['#7B3FF2', '#E0389A']}
-            style={{ width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#7B3FF2' }}>
             <Text style={{ fontSize: FontSize.xs, fontWeight: FontWeight.black, color: '#fff' }}>{getInitials(artistName)}</Text>
-          </LinearGradient>
+          </View>
           <View>
             <Text style={{ fontSize: FontSize.smPlus, fontWeight: FontWeight.bold, color: 'rgba(255,255,255,0.9)' }}>{artistName}</Text>
             {genre && <Text style={{ fontSize: FontSize.xs, color: 'rgba(255,255,255,0.55)', fontWeight: FontWeight.medium }}>{genre}</Text>}
@@ -323,6 +323,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
   const [repostCount,  setRepostCount]  = useState(0);
   const [reposting,    setReposting]    = useState(false);
   const [repostSheetOpen, setRepostSheetOpen] = useState(false);
+  const [shareOpen,       setShareOpen]       = useState(false);
   const [saved,        setSaved]        = useState(false);
   const [showVideo,        setShowVideo]        = useState(false);
   const [showComments,     setShowComments]     = useState(false);
@@ -383,6 +384,16 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
     concertService.recordView(concertId);
   }, [concertId]);
 
+  // Précharge le token LiveKit dès que le concert est détecté en direct — le
+  // viewer passe directement au handshake WebRTC en tapant "Rejoindre", sans
+  // attendre les appels réseau getById/getToken qui précèdent normalement la
+  // connexion. Jamais côté owner (il part sur l'écran de diffusion, pas viewer).
+  useEffect(() => {
+    if (concert?.status === 'live' && !isOwner) {
+      prefetchConcertLive(concertId);
+    }
+  }, [concert?.status, isOwner, concertId]);
+
   const handleLike = () => {
     heartScale.value = withSequence(withSpring(1.4, { damping: 5, stiffness: 300 }), withSpring(1, { damping: 10 }));
     const n = !liked;
@@ -408,15 +419,8 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
     }
   };
 
-  const handleNativeShare = async () => {
-    if (!concert) return;
-    try {
-      await Share.share({ title: concert.title,
-        message: `${concert.title} — ${formatDateShort(concert.scheduled_at)} à ${concert.venue_city ?? 'Gofolyx'}\nVia Gofolyx` });
-      setShareCount(c => c + 1);
-      socialService.share({ platform: 'external', concert_id: concertId }).catch(() => setShareCount(c => Math.max(0, c - 1)));
-    } catch { /**/ }
-  };
+  const handleSharePress = () => setShareOpen(true);
+  const handleShareDone  = () => setShareCount(c => c + 1);
 
   // Repartager — republication dans le fil (avec attribution de source),
   // distinct du partage natif ci-dessus. Aperçu + confirmation explicite.
@@ -541,8 +545,12 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
-      {/* Bouton retour flottant */}
-      <BackButton onPress={onBack ?? (() => {})} transparent color="#fff" />
+      {/* Bouton retour flottant — superposé sur le hero, sous la zone de
+          statut réservée (insets.top saute la bande de statut système,
+          évite le chevauchement avec l'heure/batterie). */}
+      <View style={{ position: 'absolute', top: insets.top + 12, left: 14, zIndex: 20 }} pointerEvents="box-none">
+        <BackButton onPress={onBack ?? (() => {})} transparent color="#fff" />
+      </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 130 }}>
 
@@ -569,14 +577,13 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
           <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4, gap: 10 }}>
             {isLive && (
               <TouchableOpacity onPress={handleWatchLive} activeOpacity={0.88}>
-                <LinearGradient colors={['#EF4444', '#DC2626']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  style={ds.ctaGradient}>
+                <View style={[{ backgroundColor: '#EF4444' }, ds.ctaGradient]}>
                   <Icon name="radio" size={20} color="#fff" />
                   <Text style={ds.ctaText}>Regarder en direct</Text>
                   <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, marginLeft: 'auto' as any }}>
                     <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, color: '#fff' }}>LIVE</Text>
                   </View>
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
             )}
             {isScheduled && (
@@ -590,11 +597,10 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
             )}
             {hasReplay && (
               <TouchableOpacity onPress={handleWatchReplay} activeOpacity={0.88}>
-                <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  style={ds.ctaGradient}>
+                <View style={[{ backgroundColor: colors.gradientStart }, ds.ctaGradient]}>
                   <Icon name="play" size={20} color="#fff" />
                   <Text style={ds.ctaText}>Regarder le replay</Text>
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
             )}
             {isEnded && !hasReplay && concert.live_id && (
@@ -655,7 +661,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
             </TouchableOpacity>
           )}
           <View style={[ds.socialSep, { backgroundColor: colors.divider }]} />
-          <TouchableOpacity style={ds.socialBtn} onPress={handleNativeShare} activeOpacity={0.7}>
+          <TouchableOpacity style={ds.socialBtn} onPress={handleSharePress} activeOpacity={0.7}>
             <MCIcon name="share-outline" size={21} color={shareCount > 0 ? colors.primary : colors.textTertiary} />
             {shareCount > 0 && (
               <Text style={[ds.socialBtnText, { color: colors.textTertiary }]}>
@@ -772,10 +778,8 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
         ) : isFree ? null : (
           <TouchableOpacity onPress={isRegistered ? undefined : handleBuyTicket}
             disabled={isRegistered} activeOpacity={isRegistered ? 1 : 0.85}>
-            <LinearGradient
-              colors={isRegistered ? ['#555', '#444'] : [colors.gradientStart, colors.gradientEnd]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={ds.ctaGradient}>
+            <View
+              style={[{ backgroundColor: isRegistered ? '#555' : colors.gradientStart }, ds.ctaGradient]}>
               <Icon name={isRegistered ? 'check' : 'tag'} size={20} color="#fff" />
               <Text style={ds.ctaText}>
                 {isRegistered ? 'Déjà inscrit'
@@ -792,7 +796,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
                   <Text style={{ fontSize: FontSize['2xs'], color: 'rgba(255,255,255,0.65)', fontWeight: FontWeight.semiBold }}>frais inclus</Text>
                 </View>
               )}
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         )}
       </View>
@@ -841,6 +845,15 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
           reposting={reposting}
           onConfirm={handleRepostConfirm}
           onClose={() => { if (!reposting) setRepostSheetOpen(false); }}
+        />
+      )}
+      {concert && (
+        <ShareBottomSheet
+          type="concert"
+          concert={concert}
+          visible={shareOpen}
+          onClose={() => setShareOpen(false)}
+          onShareCountChange={handleShareDone}
         />
       )}
     </View>

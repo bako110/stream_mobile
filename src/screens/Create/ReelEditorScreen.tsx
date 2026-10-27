@@ -1150,10 +1150,10 @@ export const ReelEditorScreen: React.FC<Props> = ({
         </View>
 
         <TouchableOpacity style={[s.nextBtn, (!isPhoto && !trimValid) && { opacity: 0.45 }]} onPress={handleConfirm} activeOpacity={0.85}>
-          <LinearGradient colors={['#7B3FF2', '#C026D3']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.nextBtnGrad}>
+          <View style={[{ backgroundColor: '#7B3FF2' }, s.nextBtnGrad]}>
             <Text style={s.nextBtnTxt}>Suivant</Text>
             <Icon name="arrow-right" size={14} color="#fff" />
-          </LinearGradient>
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -1393,9 +1393,9 @@ export const ReelEditorScreen: React.FC<Props> = ({
               <>
                 {/* Carte son selectionne */}
                 <View style={s.musicSelected}>
-                  <LinearGradient colors={['#7B3FF2', '#C026D3']} style={s.musicIconWrap}>
+                  <View style={[{ backgroundColor: '#7B3FF2' }, s.musicIconWrap]}>
                     <Icon name="music" size={18} color="#fff" />
-                  </LinearGradient>
+                  </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.musicTitle} numberOfLines={1}>{musicName}</Text>
                     <Text style={s.musicSub}>

@@ -5,7 +5,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
-import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
@@ -80,7 +79,7 @@ const ActiveCard: React.FC<{
   const isCancelled = sub.status === 'cancelled';
 
   return (
-    <LinearGradient colors={gradColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.card}>
+    <View style={[s.card, { backgroundColor: gradColors[0] }]}>
         {/* En-tête plan */}
         <View style={s.cardTop}>
           <View>
@@ -147,7 +146,7 @@ const ActiveCard: React.FC<{
             </Text>
           </View>
         )}
-      </LinearGradient>
+      </View>
   );
 };
 
@@ -174,10 +173,10 @@ const ConfirmModal: React.FC<{
         <View style={[s.modalCard, { backgroundColor: colors.surface, paddingBottom: 20 + insets.bottom }]}>
           <View style={[s.modalHandle, { backgroundColor: colors.divider }]} />
           {/* Header plan */}
-          <LinearGradient colors={grad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.modalHeader}>
+          <View style={[s.modalHeader, { backgroundColor: grad[0] }]}>
             <Text style={s.modalPlanName}>{PLAN_LABELS[plan]}</Text>
             <PriceWithLocal amountEur={PLAN_CONFIG[plan].price} suffix="/mois" style={s.modalPlanPrice} />
-          </LinearGradient>
+          </View>
 
           {/* Solde wallet */}
           <View style={[s.walletRow, { borderColor: colors.divider }]}>

@@ -9,7 +9,6 @@ import Animated, {
   useSharedValue, useAnimatedStyle, withSpring,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import Svg, { Path } from 'react-native-svg';
@@ -466,10 +465,10 @@ export const StoryMediaEditor: React.FC<Props> = ({ uri, mediaType, duration = 0
         )}
         <View style={{ flex: 1 }} />
         <TouchableOpacity onPress={handleConfirm} style={st.doneBtn} activeOpacity={0.85}>
-          <LinearGradient colors={['#7B3FF2','#E0389A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.doneBtnInner}>
+          <View style={[st.doneBtnInner, { backgroundColor: '#7B3FF2' }]}>
             <Text style={st.doneLabel}>Suivant</Text>
             <Icon name="chevron-right" size={14} color="#fff" />
-          </LinearGradient>
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -668,9 +667,9 @@ export const StoryMediaEditor: React.FC<Props> = ({ uri, mediaType, duration = 0
               </TouchableOpacity>
             </View>
             <TouchableOpacity onPress={addText} style={st.addBtn} activeOpacity={0.85}>
-              <LinearGradient colors={['#7B3FF2','#E0389A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.addBtnInner}>
+              <View style={[st.addBtnInner, { backgroundColor: '#7B3FF2' }]}>
                 <Text style={st.addBtnLabel}>Ajouter</Text>
-              </LinearGradient>
+              </View>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>

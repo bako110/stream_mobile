@@ -7,7 +7,6 @@ import {
 import Animated, {
   FadeInDown, FadeInUp,
 } from 'react-native-reanimated';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import Svg, { Path } from 'react-native-svg';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
@@ -371,18 +370,12 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onNeedsVerificati
               onPress={handleLogin}
               disabled={loading}
               activeOpacity={0.85}
-              style={{ marginTop: 8 }}
+              style={[styles.submitBtn, { marginTop: 8, backgroundColor: colors.primary }]}
             >
-              <LinearGradient
-                colors={[colors.gradientStart, colors.gradientEnd]}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={styles.submitBtn}
-              >
-                {loading
-                  ? <ActivityIndicator color="#fff" />
-                  : <Text style={styles.submitBtnText}>Se connecter</Text>
-                }
-              </LinearGradient>
+              {loading
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={styles.submitBtnText}>Se connecter</Text>
+              }
             </TouchableOpacity>
           </Animated.View>
 

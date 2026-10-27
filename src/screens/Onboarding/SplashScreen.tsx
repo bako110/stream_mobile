@@ -43,7 +43,6 @@ export const SplashScreen: React.FC<Props> = ({ onFinish }) => {
   const BRAND_A = '#7B3FF2';
   const BRAND_B = '#E0389A';
   const bg        = isDark ? '#08071A' : '#FFFFFF';
-  const bgDeep    = isDark ? '#0E0A2C' : '#F4F1FF';
 
   // ── Valeurs animées ────────────────────────────────────────────────────────
   const rootOpacity = useSharedValue(1);
@@ -148,24 +147,10 @@ export const SplashScreen: React.FC<Props> = ({ onFinish }) => {
         barStyle={isDark ? 'light-content' : 'dark-content'}
       />
 
-      {/* Fond : dégradé de base + deux halos de marque qui dérivent */}
-      <LinearGradient
-        colors={[bg, bgDeep, bg]}
-        start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
-      <Animated.View style={[s.blob, s.blobA, haloBlobA]}>
-        <LinearGradient
-          colors={[BRAND_A + (isDark ? '55' : '22'), 'transparent']}
-          style={StyleSheet.absoluteFill}
-        />
-      </Animated.View>
-      <Animated.View style={[s.blob, s.blobB, haloBlobB]}>
-        <LinearGradient
-          colors={[BRAND_B + (isDark ? '4D' : '1F'), 'transparent']}
-          style={StyleSheet.absoluteFill}
-        />
-      </Animated.View>
+      {/* Fond : couleur unie + deux halos de marque qui dérivent */}
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: bg }]} />
+      <Animated.View style={[s.blob, s.blobA, haloBlobA, { backgroundColor: BRAND_A, opacity: isDark ? 0.33 : 0.13 }]} />
+      <Animated.View style={[s.blob, s.blobB, haloBlobB, { backgroundColor: BRAND_B, opacity: isDark ? 0.3 : 0.12 }]} />
 
       {/* Centre */}
       <View style={s.center}>
@@ -174,11 +159,7 @@ export const SplashScreen: React.FC<Props> = ({ onFinish }) => {
         <View style={s.logoBox}>
           {/* Halo pulsé */}
           <Animated.View style={[s.halo, haloStyle]} pointerEvents="none">
-            <LinearGradient
-              colors={[BRAND_A + '00', BRAND_A + '66', BRAND_B + '66', BRAND_B + '00']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={s.haloGrad}
-            />
+            <View style={[s.haloGrad, { backgroundColor: BRAND_A, opacity: 0.5 }]} />
           </Animated.View>
 
           {/* Logo */}

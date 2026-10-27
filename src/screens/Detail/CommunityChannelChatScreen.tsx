@@ -10,7 +10,6 @@ import {
   ScrollView, Dimensions, Animated, Linking, PermissionsAndroid,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -808,8 +807,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
           le mélanger au style de la carte ferait apparaître un coin visible
           sous la status bar. */}
       <View style={{ paddingTop: insets.top + 8 }}>
-        <LinearGradient colors={[colors.surface, colors.surface]}
-          style={[C.header, { borderColor: colors.divider }]}>
+        <View style={[{ backgroundColor: colors.surface }, C.header, { borderColor: colors.divider }]}>
           <BackButton onPress={() => nav.goBack()} />
           {channelAvatar
             ? <Image source={{ uri: channelAvatar }} style={[C.channelIconBox, { borderRadius: 10 }]} />
@@ -825,7 +823,7 @@ export const CommunityChannelChatScreen: React.FC = () => {
             ? <View style={[C.onlineDot, { backgroundColor: '#22C55E' }]} />
             : <View style={[C.onlineDot, { backgroundColor: '#94A3B8' }]} />
           }
-        </LinearGradient>
+        </View>
       </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -948,27 +946,23 @@ export const CommunityChannelChatScreen: React.FC = () => {
                 {text.trim() ? (
                   <Animated.View style={{ transform: [{ scale: sendBtnAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }], opacity: sendBtnAnim }}>
                     <TouchableOpacity style={C.sendBtn} onPress={handleSend} disabled={sending}>
-                      <LinearGradient
-                        colors={['#7B3FF2', '#E0389A']}
-                        style={{ flex: 1, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}
-                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                      <View
+                        style={{ flex: 1, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#7B3FF2' }}
                       >
                         {sending
                           ? <ActivityIndicator size="small" color="#fff" />
                           : <Icon name={editingMsg ? 'check' : 'send'} size={17} color="#fff" />
                         }
-                      </LinearGradient>
+                      </View>
                     </TouchableOpacity>
                   </Animated.View>
                 ) : (
                   <TouchableOpacity style={C.sendBtn} onPress={startRecording} disabled={sending}>
-                    <LinearGradient
-                      colors={['#7B3FF2', '#E0389A']}
-                      style={{ flex: 1, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}
-                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    <View
+                      style={{ flex: 1, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#7B3FF2' }}
                     >
                       <Icon name="mic" size={17} color="#fff" />
-                    </LinearGradient>
+                    </View>
                   </TouchableOpacity>
                 )}
               </View>

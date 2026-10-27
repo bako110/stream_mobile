@@ -106,11 +106,11 @@ const EventCard: React.FC<{ item: Event; index: number; colors: any; onPress: ()
             {item.thumbnail_url ? (
               <Image source={{ uri: item.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
             ) : (
-              <LinearGradient colors={grad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill}>
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: grad[0] }]}>
                 <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
                   <Icon name={icon} size={52} color="rgba(255,255,255,0.25)" />
                 </View>
-              </LinearGradient>
+              </View>
             )}
 
             {/* Gradient bas */}
@@ -121,23 +121,20 @@ const EventCard: React.FC<{ item: Event; index: number; colors: any; onPress: ()
 
             {/* Badge type haut gauche */}
             <View style={{ position: 'absolute', top: 12, left: 12 }}>
-              <LinearGradient colors={grad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.typePill}>
+              <View style={[st.typePill, { backgroundColor: grad[0] }]}>
                 <Icon name={icon} size={10} color="#fff" />
                 <Text style={st.typePillText}>{label.toUpperCase()}</Text>
-              </LinearGradient>
+              </View>
             </View>
 
             {/* Badge distance haut droite */}
             {distLabel ? (
-              <LinearGradient
-                colors={[colors.primary, colors.primaryLight]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={[st.distPill, { position: 'absolute', top: 12, right: 12 }]}
+              <View
+                style={[st.distPill, { position: 'absolute', top: 12, right: 12, backgroundColor: colors.primary }]}
               >
                 <Icon name="map-pin" size={10} color="#fff" />
                 <Text style={st.distTxt}>{distLabel}</Text>
-              </LinearGradient>
+              </View>
             ) : null}
 
             {/* Titre + date en bas cover */}
@@ -185,10 +182,8 @@ const EventCard: React.FC<{ item: Event; index: number; colors: any; onPress: ()
                   </Text>
                   {/* Barre capacité */}
                   <View style={[st.capTrack, { backgroundColor: colors.backgroundSecondary }]}>
-                    <LinearGradient
-                      colors={grad}
-                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                      style={[st.capFill, { width: `${Math.min(((item.current_attendees ?? 0) / item.max_attendees) * 100, 100)}%` as any }]}
+                    <View
+                      style={[st.capFill, { backgroundColor: grad[0], width: `${Math.min(((item.current_attendees ?? 0) / item.max_attendees) * 100, 100)}%` as any }]}
                     />
                   </View>
                 </View>
@@ -211,10 +206,10 @@ const EventCard: React.FC<{ item: Event; index: number; colors: any; onPress: ()
                 ) : null}
               </View>
 
-              <LinearGradient colors={grad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.goBtn}>
+              <View style={[st.goBtn, { backgroundColor: grad[0] }]}>
                 <Text style={st.goBtnText}>Voir</Text>
                 <Icon name="arrow-right" size={13} color="#fff" />
-              </LinearGradient>
+              </View>
             </View>
           </View>
         </View>
@@ -255,11 +250,11 @@ const ConcertCard: React.FC<{ item: Concert; colors: any; onPress: () => void }>
             {item.thumbnail_url ? (
               <Image source={{ uri: item.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
             ) : (
-              <LinearGradient colors={grad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill}>
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: grad[0] }]}>
                 <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
                   <Icon name="music" size={52} color="rgba(255,255,255,0.25)" />
                 </View>
-              </LinearGradient>
+              </View>
             )}
 
             <LinearGradient
@@ -268,22 +263,19 @@ const ConcertCard: React.FC<{ item: Concert; colors: any; onPress: () => void }>
             />
 
             <View style={{ position: 'absolute', top: 12, left: 12 }}>
-              <LinearGradient colors={grad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.typePill}>
+              <View style={[st.typePill, { backgroundColor: grad[0] }]}>
                 <Icon name="music" size={10} color="#fff" />
                 <Text style={st.typePillText}>{(item.genre || 'CONCERT').toUpperCase()}</Text>
-              </LinearGradient>
+              </View>
             </View>
 
             {distLabel ? (
-              <LinearGradient
-                colors={[colors.primary, colors.primaryLight]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={[st.distPill, { position: 'absolute', top: 12, right: 12 }]}
+              <View
+                style={[st.distPill, { position: 'absolute', top: 12, right: 12, backgroundColor: colors.primary }]}
               >
                 <Icon name="map-pin" size={10} color="#fff" />
                 <Text style={st.distTxt}>{distLabel}</Text>
-              </LinearGradient>
+              </View>
             ) : null}
 
             <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: 14 }}>
@@ -343,10 +335,10 @@ const ConcertCard: React.FC<{ item: Concert; colors: any; onPress: () => void }>
                 ) : null}
               </View>
 
-              <LinearGradient colors={grad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.goBtn}>
+              <View style={[st.goBtn, { backgroundColor: grad[0] }]}>
                 <Text style={st.goBtnText}>Voir</Text>
                 <Icon name="arrow-right" size={13} color="#fff" />
-              </LinearGradient>
+              </View>
             </View>
           </View>
         </View>

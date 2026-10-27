@@ -479,10 +479,10 @@ const StoryAdSlide: React.FC<{
         ) : (ad.creative_url || ad.thumbnail_url) ? (
           <Reanimated.Image source={{ uri: ad.creative_url || ad.thumbnail_url }} style={[{ position: 'absolute', width: W, height: H }, kburnsStyle]} resizeMode="cover" />
         ) : (
-          <LinearGradient colors={['#3B0764', '#7B3FF2', '#E0389A']} locations={[0, 0.5, 1]} style={{ position: 'absolute', width: W, height: H }}>
+          <View style={{ position: 'absolute', width: W, height: H, backgroundColor: '#3B0764' }}>
             <View style={{ position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(255,255,255,0.06)' }} />
             <View style={{ position: 'absolute', bottom: -60, left: -30, width: 250, height: 250, borderRadius: 125, backgroundColor: 'rgba(255,255,255,0.05)' }} />
-          </LinearGradient>
+          </View>
         )}
 
         <LinearGradient
@@ -1280,18 +1280,18 @@ export const StoryViewer: React.FC<Props> = ({
           <StoryOverlaysRenderer overlaysJson={story.overlays_json} />
         )}
         {story.media_type === 'audio' && (
-          <LinearGradient colors={[story.background_color ?? '#FF9800', '#000']} style={s.media}>
+          <View style={[s.media,{backgroundColor: story.background_color ?? '#FF9800'}]}>
             <View style={s.mediaCenter}>
               <MaterialIcon name="music-note-outline" size={100} color="rgba(255,255,255,0.1)" />
             </View>
-          </LinearGradient>
+          </View>
         )}
         {story.media_type === 'voice' && (
-          <LinearGradient colors={['#0F0C29', '#302B63']} style={s.media}>
+          <View style={[s.media,{backgroundColor:'#0F0C29'}]}>
             <View style={s.mediaCenter}>
               <MaterialIcon name="microphone-outline" size={100} color="rgba(255,255,255,0.1)" />
             </View>
-          </LinearGradient>
+          </View>
         )}
 
         {/* ── Gradients UI ──────────────────────────────────────────────── */}
@@ -1747,11 +1747,11 @@ export const StoryViewer: React.FC<Props> = ({
                 <TouchableOpacity style={s.editCancelBtn} onPress={() => { setEditMode(false); setPaused(false); }}>
                   <Text style={s.editCancelText}>Annuler</Text>
                 </TouchableOpacity>
-                <LinearGradient colors={['#7B3FF2', '#E0389A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.editSaveGrad}>
+                <View style={[s.editSaveGrad,{backgroundColor:'#7B3FF2'}]}>
                   <TouchableOpacity onPress={handleEditSave}>
                     <Text style={s.editSaveText}>Enregistrer</Text>
                   </TouchableOpacity>
-                </LinearGradient>
+                </View>
               </View>
             </View>
           </View>

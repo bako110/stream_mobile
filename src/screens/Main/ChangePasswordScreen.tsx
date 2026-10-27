@@ -5,7 +5,6 @@ import {
   KeyboardAvoidingView, Platform, Animated, StatusBar,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
-import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { authService } from '../../services/authService';

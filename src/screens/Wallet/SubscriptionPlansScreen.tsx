@@ -4,7 +4,6 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   StatusBar, ActivityIndicator,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -177,14 +176,14 @@ export default function SubscriptionPlansScreen() {
             ]}>
               {plan.badge && (
                 <View style={s.badge}>
-                  <LinearGradient colors={plan.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.badgeGrad}>
+                  <View style={[s.badgeGrad, { backgroundColor: plan.gradient[0] }]}>
                     <Text style={s.badgeText}>{plan.badge}</Text>
-                  </LinearGradient>
+                  </View>
                 </View>
               )}
 
               {/* Card header */}
-              <LinearGradient colors={plan.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.cardHeader}>
+              <View style={[s.cardHeader, { backgroundColor: plan.gradient[0] }]}>
                 <View style={s.cardHeaderRow}>
                   <View style={s.iconCircle}>
                     <Icon name={plan.icon} size={22} color="#fff" />
@@ -209,7 +208,7 @@ export default function SubscriptionPlansScreen() {
                   <SpecChip icon="video" label={cfg.quality} />
                   {cfg.downloads > 0 && <SpecChip icon="download" label={`${cfg.downloads} dl`} />}
                 </View>
-              </LinearGradient>
+              </View>
 
               {/* Features */}
               <View style={s.features}>
@@ -232,16 +231,14 @@ export default function SubscriptionPlansScreen() {
                   {isBusy ? (
                     <ActivityIndicator size="small" color="#fff" />
                   ) : (
-                    <LinearGradient
-                      colors={isActive ? ['#6B7280', '#4B5563'] : plan.gradient}
-                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                      style={s.ctaGrad}
+                    <View
+                      style={[s.ctaGrad, { backgroundColor: isActive ? '#6B7280' : plan.gradient[0] }]}
                     >
                       <Icon name={isActive ? 'settings' : 'arrow-right'} size={16} color="#fff" />
                       <Text style={s.ctaText}>
                         {isActive ? 'Gérer' : `Choisir ${plan.label}`}
                       </Text>
-                    </LinearGradient>
+                    </View>
                   )}
                 </TouchableOpacity>
               )}

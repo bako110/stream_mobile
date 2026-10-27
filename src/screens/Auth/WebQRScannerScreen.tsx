@@ -12,7 +12,6 @@ import {
   KeyboardAvoidingView, Platform,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown, ZoomIn } from 'react-native-reanimated';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { Camera, CameraType } from 'react-native-camera-kit';
 import { useNavigation } from '@react-navigation/native';
@@ -119,14 +118,12 @@ export const WebQRScannerScreen: React.FC = () => {
 
         {/* Barre basse */}
         <View style={st.bottomBar}>
-          <LinearGradient
-            colors={['#7B3FF2', '#E0389A']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={st.badge}
+          <View
+            style={[st.badge, { backgroundColor: '#7B3FF2' }]}
           >
             <Icon name="monitor" size={13} color="#fff" />
             <Text style={st.badgeText}>Connexion au site web Gofolyx</Text>
-          </LinearGradient>
+          </View>
           <Text style={st.hint}>
             Ouvrez gofolyx.com sur votre ordinateur, allez sur l'ecran de connexion et scannez le QR code affiché.
           </Text>
@@ -156,9 +153,9 @@ export const WebQRScannerScreen: React.FC = () => {
           </TouchableOpacity>
 
           <Animated.View entering={FadeInDown} style={{ alignItems: 'center', gap: 16 }}>
-            <LinearGradient colors={['#7B3FF2', '#E0389A']} style={st.manualCircle}>
+            <View style={[st.manualCircle, { backgroundColor: '#7B3FF2' }]}>
               <Icon name="key" size={34} color="#fff" />
-            </LinearGradient>
+            </View>
             <Text style={[st.resultText, { color: colors.textPrimary }]}>Saisie manuelle</Text>
             <Text style={{ fontSize: 13, color: colors.textSecondary, textAlign: 'center', lineHeight: 20 }}>
               Copiez le token UUID affiché sous le QR code sur le site web.

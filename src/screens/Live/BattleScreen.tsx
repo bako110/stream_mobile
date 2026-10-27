@@ -24,7 +24,6 @@ import {
 } from '@livekit/react-native';
 import { Track, VideoPresets, ConnectionState, RemoteTrackPublication } from 'livekit-client';
 import Icon from 'react-native-vector-icons/Feather';
-import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { MatchResultModal } from '../../components/live/MatchResultModal';
@@ -168,12 +167,12 @@ function GiftTickItem({ tick, colors, onExpire }: { tick: GiftTick; colors: [str
 
   return (
     <Animated.View entering={ZoomIn.duration(280)} exiting={FadeOut.duration(350)} style={styles.giftTick}>
-      <LinearGradient colors={colors} style={styles.giftTickGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+      <View style={[styles.giftTickGrad, { backgroundColor: colors[0] }]}>
         <Text style={styles.giftTickEmoji}>{tick.emoji}</Text>
         <Text style={styles.giftTickText} numberOfLines={1}>
           <Text style={styles.giftTickSender}>{tick.senderName} </Text>· {tick.GoGold}🪙
         </Text>
-      </LinearGradient>
+      </View>
     </Animated.View>
   );
 }
@@ -1051,12 +1050,7 @@ const BattleContent: React.FC<{
           proportion du score de chaque camp (scoreSplitPct), comme le web
           (BattlePage.tsx) — remplace l'ancienne barre compacte du header. */}
       <View style={styles.scoreBarTrack}>
-        <LinearGradient
-          colors={['#7B3FF2', '#4C1D95', '#9B1C3F', '#F0365A']}
-          locations={[0, Math.max(0, scoreSplitPct / 100 - 0.02), Math.min(1, scoreSplitPct / 100 + 0.02), 1]}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-          style={StyleSheet.absoluteFill}
-        />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#7B3FF2' }]} />
         <BouncyNumber value={scoreA} style={styles.scoreText} />
         <HypeBanner message={hypeMessage} />
         <BouncyNumber value={scoreB} style={styles.scoreText} />
@@ -1064,11 +1058,7 @@ const BattleContent: React.FC<{
 
       {/* Zone video — occupe l'espace restant, les deux hosts en cartes arrondies centrees */}
       <View style={styles.videoZone}>
-        <LinearGradient
-          colors={['#150F24', '#1C0F18', '#150F24']}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-          style={StyleSheet.absoluteFill}
-        />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#150F24' }]} />
         <AnimatedTouchable
           entering={FadeIn.duration(400)}
           activeOpacity={0.92}
@@ -1422,7 +1412,7 @@ const BattleContent: React.FC<{
           style={styles.bigGiftOverlay}
           pointerEvents="none"
         >
-          <LinearGradient colors={['#F59E0B', '#F0365A', '#9B65F5']} style={styles.bigGiftGlow} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+          <View style={[styles.bigGiftGlow, { backgroundColor: '#F59E0B' }]}>
             <View style={styles.bigGiftThroneWrap}>
               <Animated.Text entering={BounceIn.duration(650).delay(100)} style={styles.bigGiftThrone}>🪑</Animated.Text>
               <Animated.Text entering={ZoomIn.duration(500).delay(350).springify()} style={styles.bigGiftCrownOnThrone}>👑</Animated.Text>
@@ -1434,7 +1424,7 @@ const BattleContent: React.FC<{
             <View style={styles.bigGiftGogoldPill}>
               <Text style={styles.bigGiftGogoldText}>🪙 {bigGift.GoGold.toLocaleString('fr-FR')} GoGold</Text>
             </View>
-          </LinearGradient>
+          </View>
         </Animated.View>
       )}
 

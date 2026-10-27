@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
 import { AppLogo } from './AppLogo';
@@ -79,9 +78,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       >
         {/* Bande dégradée subtile — home uniquement */}
         {isHome && (
-          <LinearGradient
-            colors={[colors.primary + '12', 'transparent']}
-            style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
+          <View
+            style={[StyleSheet.absoluteFill, { borderRadius: 24, backgroundColor: colors.primary + '12' }]}
             pointerEvents="none"
           />
         )}

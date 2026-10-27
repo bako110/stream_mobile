@@ -216,11 +216,7 @@ export const GoLiveScreen: React.FC = () => {
       >
         {/* ── Carte principale ─────────────────────────────────────────── */}
         <View style={[st.mainCard, { backgroundColor: colors.surface, borderColor: '#F0365A40' }]}>
-          <LinearGradient
-            colors={['#F0365A18', '#E0389A0C']}
-            style={StyleSheet.absoluteFill}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: '#F0365A18' }]} />
 
           {/* Icône + labels */}
           <View style={st.cardTop}>
@@ -233,9 +229,9 @@ export const GoLiveScreen: React.FC = () => {
                   </View>
                 </View>
               ) : (
-                <LinearGradient colors={['#F0365A', '#E0389A']} style={st.liveIconGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                <View style={[st.liveIconGrad, { backgroundColor: '#F0365A' }]}>
                   <Icon name="radio" size={15} color="#fff" />
-                </LinearGradient>
+                </View>
               )}
             </Animated.View>
             <View style={st.cardLabels}>
@@ -351,11 +347,7 @@ export const GoLiveScreen: React.FC = () => {
 
           {/* ── Bouton Go Live ──────────────────────────────────────────── */}
           <TouchableOpacity onPress={handleStartQuickLive} disabled={starting} activeOpacity={0.85} style={{ marginTop: 14 }}>
-            <LinearGradient
-              colors={starting ? ['#aaa', '#888'] : ['#F0365A', '#E0389A']}
-              style={st.goBtn}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            >
+            <View style={[st.goBtn, { backgroundColor: starting ? '#aaa' : '#F0365A' }]}>
               {starting ? (
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
@@ -364,7 +356,7 @@ export const GoLiveScreen: React.FC = () => {
                   <Text style={st.goBtnText}>Go Live maintenant</Text>
                 </>
               )}
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         </View>
 
@@ -374,11 +366,11 @@ export const GoLiveScreen: React.FC = () => {
           onPress={() => nav.navigate('CreateConcert')}
           activeOpacity={0.82}
         >
-          <LinearGradient colors={['#7B3FF218', '#9B65F50C']} style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: '#7B3FF218' }]} />
           <View style={st.concertInner}>
-            <LinearGradient colors={['#7B3FF2', '#9B65F5']} style={st.concertIconGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+            <View style={[st.concertIconGrad, { backgroundColor: '#7B3FF2' }]}>
               <Icon name="music" size={13} color="#fff" />
-            </LinearGradient>
+            </View>
             <View style={st.concertLabels}>
               <Text style={[st.concertTitle, { color: colors.textPrimary }]}>Concert live</Text>
               <Text style={[st.concertSub,   { color: colors.textSecondary }]}>Programme, vends des billets et diffuse</Text>
@@ -568,9 +560,9 @@ export const GoLiveScreen: React.FC = () => {
                 disabled={!monetType}
                 activeOpacity={0.85}
               >
-                <LinearGradient colors={['#F59E0B', '#F97316']} style={st.sheetConfirmGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                <View style={[st.sheetConfirmGrad, { backgroundColor: '#F59E0B' }]}>
                   <Text style={st.sheetConfirmText}>Confirmer</Text>
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
             </View>
           </View>

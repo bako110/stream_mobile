@@ -17,7 +17,6 @@ import {
   TextInput, KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
@@ -160,23 +159,21 @@ export const PhoneOtpScreen: React.FC<Props> = ({
   /* ── Ecran "done" ─────────────────────────────────────────────────────────── */
   if (step === 'done') {
     return (
-      <LinearGradient
-        colors={[colors.background, colors.backgroundSecondary]}
-        style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}
+      <View
+        style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, backgroundColor: colors.background }}
       >
         <Icon name="check-circle" size={64} color={colors.primary} />
         <Text style={[st.doneTitle, { color: colors.textPrimary }]}>Mot de passe mis a jour !</Text>
         <Text style={[st.doneSub, { color: colors.textSecondary }]}>Vous pouvez maintenant vous connecter avec votre nouveau mot de passe.</Text>
         <Button label="Continuer" onPress={() => onSuccess({})} style={{ marginTop: 24, width: '100%' }} />
-      </LinearGradient>
+      </View>
     );
   }
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <LinearGradient
-        colors={[colors.background, colors.backgroundSecondary]}
-        style={{ flex: 1 }}
+      <View
+        style={{ flex: 1, backgroundColor: colors.background }}
       >
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
 
@@ -325,7 +322,7 @@ export const PhoneOtpScreen: React.FC<Props> = ({
 
           </Animated.View>
         </ScrollView>
-      </LinearGradient>
+      </View>
     </KeyboardAvoidingView>
   );
 };

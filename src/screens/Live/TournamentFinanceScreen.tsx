@@ -9,7 +9,6 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar,
   ActivityIndicator, Image, Modal, TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -86,7 +85,7 @@ export const TournamentFinanceScreen: React.FC = () => {
   return (
     <View style={st.root}>
       <StatusBar barStyle="light-content" />
-      <LinearGradient colors={['#2A1F0A', '#0B0812', '#0B0812']} style={StyleSheet.absoluteFill} />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#2A1F0A' }]} />
 
       <View style={[st.header, { paddingTop: insets.top + 12 }]}>
         <BackButton onPress={() => nav.goBack()} color="#fff" transparent />
@@ -95,7 +94,7 @@ export const TournamentFinanceScreen: React.FC = () => {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-        <LinearGradient colors={['#FFD70025', '#FFA00010']} style={st.totalCard}>
+        <View style={[st.totalCard, { backgroundColor: '#FFD70025' }]}>
           <Text style={st.totalLabel}>Total dans ton wallet</Text>
           <Text style={st.totalValue}>{report.wallet_total.toLocaleString('fr-FR')} GoGold</Text>
           <View style={st.totalBreakdownRow}>
@@ -109,7 +108,7 @@ export const TournamentFinanceScreen: React.FC = () => {
               <Text style={st.totalBreakdownValue}>{report.gifts_total.toLocaleString('fr-FR')}</Text>
             </View>
           </View>
-        </LinearGradient>
+        </View>
 
         {report.by_round.length > 0 && (
           <View style={st.section}>
@@ -170,9 +169,9 @@ export const TournamentFinanceScreen: React.FC = () => {
                 <Text style={st.modalCancelText}>Annuler</Text>
               </TouchableOpacity>
               <TouchableOpacity activeOpacity={0.85} onPress={handleReward} disabled={rewarding}>
-                <LinearGradient colors={['#FFD700', '#D97706']} style={st.modalSendBtn}>
+                <View style={[st.modalSendBtn, { backgroundColor: '#FFD700' }]}>
                   {rewarding ? <ActivityIndicator size="small" color="#fff" /> : <Text style={st.modalSendText}>Envoyer</Text>}
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
             </View>
           </View>

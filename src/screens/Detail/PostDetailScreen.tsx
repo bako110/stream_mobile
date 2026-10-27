@@ -147,12 +147,12 @@ const ReactionPill: React.FC<{
   if (active && gradient) {
     return (
       <TouchableOpacity onPress={handle} activeOpacity={1} style={rp.wrap}>
-        <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={rp.pillActive}>
+        <View style={[rp.pillActive, { backgroundColor: gradient[0] }]}>
           <Animated.View style={aStyle}>
             <Icon name={icon} size={16} color="#fff" />
           </Animated.View>
           <Text style={rp.labelActive}>{display}</Text>
-        </LinearGradient>
+        </View>
       </TouchableOpacity>
     );
   }

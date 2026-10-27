@@ -6,7 +6,6 @@ import {
   ScrollView, Dimensions, Animated, Linking, PermissionsAndroid,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -1286,30 +1285,26 @@ export const CommunityChatScreen: React.FC = () => {
             onLongPress={() => canAnnounce ? setMenuMsg(msg) : null}
             delayLongPress={350}
           >
-            {/* Bande accent gauche + fond dégradé */}
-            <LinearGradient
-              colors={['#F59E0B08', '#F59E0B18']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            {/* Bande accent gauche + fond */}
+            <View
               style={{
+                backgroundColor: '#F59E0B08',
                 borderRadius: 18, borderWidth: 1, borderColor: '#F59E0B35',
                 overflow: 'hidden',
               }}
             >
               {/* Barre accent top */}
-              <LinearGradient
-                colors={['#F59E0B', '#FBBF24']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={{ height: 3, width: '100%' }}
+              <View
+                style={{ backgroundColor: '#F59E0B', height: 3, width: '100%' }}
               />
               <View style={{ padding: 14 }}>
                 {/* Header */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                  <LinearGradient
-                    colors={['#F59E0B', '#D97706']}
-                    style={{ width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' }}
+                  <View
+                    style={{ backgroundColor: '#F59E0B', width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' }}
                   >
                     <Icon name="bell" size={16} color="#fff" />
-                  </LinearGradient>
+                  </View>
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: '#D97706', fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, letterSpacing: 0.8 }}>
                       ANNONCE OFFICIELLE
@@ -1346,7 +1341,7 @@ export const CommunityChatScreen: React.FC = () => {
 
                 <Reactions msg={msg} />
               </View>
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         </View>
       );
@@ -1372,21 +1367,18 @@ export const CommunityChatScreen: React.FC = () => {
             }}
           >
             {/* Barre accent top */}
-            <LinearGradient
-              colors={[colors.primary, '#E0389A']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={{ height: 3 }}
+            <View
+              style={{ backgroundColor: colors.primary, height: 3 }}
             />
 
             <View style={{ padding: 14 }}>
               {/* Header */}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                <LinearGradient
-                  colors={[colors.primary, '#E0389A']}
-                  style={{ width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' }}
+                <View
+                  style={{ backgroundColor: colors.primary, width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' }}
                 >
                   <Icon name="bar-chart-2" size={16} color="#fff" />
-                </LinearGradient>
+                </View>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Text style={{ color: colors.primary, fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, letterSpacing: 0.8 }}>
@@ -1804,11 +1796,11 @@ export const CommunityChatScreen: React.FC = () => {
             {communityAvatarUrl ? (
               <CachedImage uri={communityAvatarUrl} style={{ flex: 1 }} />
             ) : (
-              <LinearGradient colors={['#7B3FF2', '#E0389A']} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+              <View style={{ backgroundColor: '#7B3FF2', flex: 1, alignItems: 'center', justifyContent: 'center' }}>
                 <Text style={{ color: '#fff', fontWeight: FontWeight.extraBold, fontSize: FontSize.md }}>
                   {(communityTitle || '?')[0].toUpperCase()}
                 </Text>
-              </LinearGradient>
+              </View>
             )}
             {/* Dot connecté */}
             <View style={[S.headerAvatarDot, { backgroundColor: isConnected ? '#22C55E' : '#94A3B8' }]} />
@@ -1914,10 +1906,11 @@ export const CommunityChatScreen: React.FC = () => {
           onPress={() => nav.navigate('CommunityFund', { communityId, communityName: communityTitle, myRole })}
           activeOpacity={0.88}
         >
-          <LinearGradient
-            colors={activeCotisation.my_status === 'paid' ? ['#059669', '#047857'] : ['#10B981', '#059669']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, gap: 10 }}
+          <View
+            style={{
+              backgroundColor: activeCotisation.my_status === 'paid' ? '#059669' : '#10B981',
+              flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, gap: 10,
+            }}
           >
             {/* Icône statut perso */}
             <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.2)',
@@ -1952,7 +1945,7 @@ export const CommunityChatScreen: React.FC = () => {
               </View>
             ) : null}
             <Icon name="chevron-right" size={14} color="rgba(255,255,255,0.7)" />
-          </LinearGradient>
+          </View>
         </TouchableOpacity>
       )}
 
@@ -1960,15 +1953,13 @@ export const CommunityChatScreen: React.FC = () => {
       {activeElection && activeTab === 'discussion' && (
         <View style={{ backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.divider }}>
           {/* Barre accent */}
-          <LinearGradient colors={['#7B3FF2', '#E0389A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={{ height: 3 }} />
+          <View style={{ backgroundColor: '#7B3FF2', height: 3 }} />
           <View style={{ padding: 12, gap: 8 }}>
             {/* Header */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <LinearGradient colors={['#7B3FF2', '#E0389A']}
-                style={{ width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{ backgroundColor: '#7B3FF2', width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }}>
                 <Icon name="award" size={14} color="#fff" />
-              </LinearGradient>
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={{ color: colors.textPrimary, fontWeight: FontWeight.extraBold, fontSize: FontSize.smPlus }}>
                   Vote trésorier en cours
@@ -2229,26 +2220,25 @@ export const CommunityChatScreen: React.FC = () => {
                       onPress={handleSend}
                       disabled={sending || !text.trim()}
                     >
-                      <LinearGradient
-                        colors={activeTab === 'announcements' ? ['#F59E0B', '#D97706'] : ['#7B3FF2', '#E0389A']}
-                        style={{ flex: 1, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}
-                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                      <View
+                        style={{
+                          backgroundColor: activeTab === 'announcements' ? '#F59E0B' : '#7B3FF2',
+                          flex: 1, borderRadius: 22, alignItems: 'center', justifyContent: 'center',
+                        }}
                       >
                         {sending
                           ? <ActivityIndicator size="small" color="#fff" />
                           : <Icon name={editingMsg ? 'check' : activeTab === 'announcements' ? 'bell' : 'send'} size={17} color="#fff" />
                         }
-                      </LinearGradient>
+                      </View>
                     </TouchableOpacity>
                   ) : (
                     <TouchableOpacity style={S.sendBtn} onPress={startRecording} disabled={sending}>
-                      <LinearGradient
-                        colors={['#7B3FF2', '#E0389A']}
-                        style={{ flex: 1, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}
-                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                      <View
+                        style={{ backgroundColor: '#7B3FF2', flex: 1, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}
                       >
                         <Icon name="mic" size={17} color="#fff" />
-                      </LinearGradient>
+                      </View>
                     </TouchableOpacity>
                   )}
                 </View>

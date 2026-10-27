@@ -15,7 +15,6 @@ import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   StatusBar, RefreshControl, ActivityIndicator,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -167,9 +166,8 @@ export const CreatorAnalyticsScreen: React.FC = () => {
       ) : (
         <>
           {/* KPI vues + évolution */}
-          <LinearGradient
-            colors={[colors.primary + '18', colors.primary + '06']}
-            style={[s.kpiCard, { borderColor: colors.primary + '30' }]}
+          <View
+            style={[s.kpiCard, { borderColor: colors.primary + '30', backgroundColor: colors.primary + '18' }]}
           >
             <Text style={[s.kpiValue, { color: colors.textPrimary }]}>{fmtNum(overview.current_views)}</Text>
             <Text style={[s.kpiLabel, { color: colors.textSecondary }]}>Vues sur la période</Text>
@@ -177,7 +175,7 @@ export const CreatorAnalyticsScreen: React.FC = () => {
               <Icon name={evolutionIcon as any} size={12} color={evolutionColor} />
               <Text style={[s.evolutionText, { color: evolutionColor }]}>{evolutionLabel}</Text>
             </View>
-          </LinearGradient>
+          </View>
 
           <View style={s.kpiRow}>
             <View style={[s.kpiMini, { backgroundColor: colors.surface, borderColor: colors.border }]}>

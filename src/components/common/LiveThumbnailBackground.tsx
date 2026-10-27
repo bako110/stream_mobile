@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import { CachedImage } from './CachedImage';
 import { AvatarWithBadge } from './AvatarWithBadge';
 
@@ -35,7 +34,7 @@ export const LiveThumbnailBackground: React.FC<Props> = ({
     );
   }
   return (
-    <LinearGradient colors={[accentColor, '#F0365A']} style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
+    <View style={[StyleSheet.absoluteFill, { backgroundColor: accentColor }]} />
   );
 };
 

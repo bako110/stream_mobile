@@ -4,7 +4,6 @@ import {
   StatusBar, ActivityIndicator, Platform,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -149,10 +148,8 @@ export const CompleteProfileScreen: React.FC<Props> = ({ onDone }) => {
 
         <Animated.View entering={FadeInDown.delay(320).springify()} style={{ marginTop: 28 }}>
           <TouchableOpacity onPress={handleSubmit} disabled={loading} activeOpacity={0.85}>
-            <LinearGradient
-              colors={[colors.gradientStart, colors.gradientEnd]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={[s.submitBtn, { opacity: loading ? 0.7 : 1 }]}
+            <View
+              style={[s.submitBtn, { backgroundColor: colors.gradientStart, opacity: loading ? 0.7 : 1 }]}
             >
               {loading
                 ? <ActivityIndicator color="#fff" />
@@ -161,7 +158,7 @@ export const CompleteProfileScreen: React.FC<Props> = ({ onDone }) => {
                     <Icon name="arrow-right" size={18} color="#fff" />
                   </>
               }
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         </Animated.View>
       </View>

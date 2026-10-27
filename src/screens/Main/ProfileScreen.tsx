@@ -256,10 +256,8 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
           {user?.banner_url ? (
             <Image source={{ uri: user.banner_url, cache: 'reload' }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
           ) : (
-            <LinearGradient
-              colors={[colors.gradientStart, colors.gradientEnd]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={{ width: '100%', height: '100%' }}
+            <View
+              style={{ width: '100%', height: '100%', backgroundColor: colors.gradientStart }}
             />
           )}
           {/* Bouton "Modifier la bannière" en haut à droite */}
@@ -279,12 +277,11 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
               {user?.avatar_url ? (
                 <Image source={{ uri: user.avatar_url, cache: 'reload' }} style={{ width: '100%', height: '100%', borderRadius: 44 }} />
               ) : (
-                <LinearGradient
-                  colors={[colors.gradientStart, colors.gradientEnd]}
-                  style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+                <View
+                  style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.gradientStart }}
                 >
                   <Text style={{ fontSize: FontSize['4xl'], fontWeight: FontWeight.black, color: colors.textOnBrand }}>{initials}</Text>
-                </LinearGradient>
+                </View>
               )}
             </View>
             <View style={{ position: 'absolute', bottom: 2, right: 2, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.surface }}>
@@ -510,6 +507,44 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                 d'abord, événements/concerts publiés (recentPublished) en
                 complément jusqu'à 4 si peu de posts — même logique que
                 UserProfileScreen.tsx. Pas de badge durée (pas de vidéo). ── */}
+            {/* ── Mes concerts / Mes événements — liste complète, séparée de la
+                grille "Publications récentes" (limitée à 5 éléments mélangés
+                avec les posts). Réservé aux créateurs (artiste/admin). ── */}
+            {isCreator && (
+              <View style={{ gap: 8 }}>
+                <TouchableOpacity
+                  onPress={() => nav.navigate('MyConcerts')}
+                  style={[s.myContentRow, { borderColor: colors.divider }]}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <View style={[s.myContentIcon, { backgroundColor: '#7B3FF222' }]}>
+                      <Icon name="music" size={16} color="#7B3FF2" />
+                    </View>
+                    <View>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: colors.textPrimary }}>Mes concerts</Text>
+                      <Text style={{ fontSize: 12, color: colors.textTertiary }}>{myConcerts.length} concert{myConcerts.length > 1 ? 's' : ''}</Text>
+                    </View>
+                  </View>
+                  <Icon name="chevron-right" size={18} color={colors.textTertiary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => nav.navigate('MyEvents')}
+                  style={[s.myContentRow, { borderColor: colors.divider }]}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <View style={[s.myContentIcon, { backgroundColor: '#E0389A22' }]}>
+                      <Icon name="calendar" size={16} color="#E0389A" />
+                    </View>
+                    <View>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: colors.textPrimary }}>Mes événements</Text>
+                      <Text style={{ fontSize: 12, color: colors.textTertiary }}>{myEvents.length} événement{myEvents.length > 1 ? 's' : ''}</Text>
+                    </View>
+                  </View>
+                  <Icon name="chevron-right" size={18} color={colors.textTertiary} />
+                </TouchableOpacity>
+              </View>
+            )}
+
             <View style={{ gap: 8 }}>
               <Text style={[s.sectionTitle, { color: colors.textTertiary }]}>PUBLICATIONS RÉCENTES</Text>
               {(() => {
@@ -586,12 +621,11 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                           </Text>
                         </View>
                       ) : (
-                        <LinearGradient
-                          colors={[featured.accent + 'CC', featured.accent + '66']}
-                          style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+                        <View
+                          style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: featured.accent + 'CC' }}
                         >
                           <Icon name={featured.typeIcon} size={36} color="rgba(255,255,255,0.8)" />
-                        </LinearGradient>
+                        </View>
                       )}
 
                       {featured.onMenu && (
@@ -662,12 +696,11 @@ export const ProfileScreen: React.FC<Props> = ({ onLogout, onCreateEvent, onCrea
                                   </Text>
                                 </View>
                               ) : (
-                                <LinearGradient
-                                  colors={[it.accent + 'CC', it.accent + '66']}
-                                  style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+                                <View
+                                  style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: it.accent + 'CC' }}
                                 >
                                   <Icon name={it.typeIcon} size={24} color="rgba(255,255,255,0.8)" />
-                                </LinearGradient>
+                                </View>
                               )}
 
                               {!isTextOnlyPost && (
@@ -1056,14 +1089,13 @@ const CreationCard: React.FC<{
   const isPublished = status === 'published';
   return (
     <TouchableOpacity style={[s.creationCard, { backgroundColor: colors.surfaceElevated }]}>
-      <LinearGradient
-        colors={[colors.gradientStart + '40', colors.gradientEnd + '20']}
-        style={s.creationBanner}
+      <View
+        style={[s.creationBanner, { backgroundColor: colors.gradientStart + '40' }]}
       >
         <View style={[s.creationIconWrap, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
           <Icon name={icon} size={26} color={colors.textOnBrand} />
         </View>
-      </LinearGradient>
+      </View>
       <View style={s.creationBody}>
         <Text style={[s.creationTitle, { color: colors.textPrimary }]} numberOfLines={2}>
           {title}

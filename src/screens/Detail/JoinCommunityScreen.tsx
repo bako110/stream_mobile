@@ -135,7 +135,7 @@ export const JoinCommunityScreen: React.FC = () => {
         {community.banner_url ? (
           <Image source={{ uri: community.banner_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
         ) : (
-          <LinearGradient colors={['#7B3FF2', '#E0389A']} style={{ flex: 1 }} />
+          <View style={{ flex: 1, backgroundColor: '#7B3FF2' }} />
         )}
         <LinearGradient colors={['transparent', 'rgba(0,0,0,0.7)']}
           style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 100 }} />
@@ -155,11 +155,11 @@ export const JoinCommunityScreen: React.FC = () => {
             <Image source={{ uri: community.avatar_url }}
               style={{ width: 64, height: 64, borderRadius: 32, borderWidth: 3, borderColor: colors.background }} />
           ) : (
-            <LinearGradient colors={['#7B3FF2', '#E0389A']}
+            <View
               style={{ width: 64, height: 64, borderRadius: 32, borderWidth: 3, borderColor: colors.background,
-                alignItems: 'center', justifyContent: 'center' }}>
+                alignItems: 'center', justifyContent: 'center', backgroundColor: '#7B3FF2' }}>
               <Icon name="users" size={28} color="#fff" />
-            </LinearGradient>
+            </View>
           )}
           <View style={{ flex: 1 }}>
             <Text style={{ color: colors.textPrimary, fontSize: 20, fontWeight: '900' }} numberOfLines={1}>
@@ -219,11 +219,10 @@ export const JoinCommunityScreen: React.FC = () => {
         {/* Bouton principal */}
         {alreadyMember ? (
           <TouchableOpacity onPress={handleJoin} activeOpacity={0.85} style={{ borderRadius: 16, overflow: 'hidden' }}>
-            <LinearGradient colors={['#10B981', '#059669']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={st.mainBtn}>
+            <View style={[st.mainBtn, { backgroundColor: '#10B981' }]}>
               <Icon name="message-circle" size={20} color="#fff" />
               <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16 }}>Ouvrir la discussion</Text>
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         ) : pendingApproval ? (
           <View style={[st.mainBtn, { backgroundColor: '#F59E0B15', borderWidth: 1.5,
@@ -236,8 +235,7 @@ export const JoinCommunityScreen: React.FC = () => {
         ) : (
           <TouchableOpacity onPress={handleJoin} disabled={joining} activeOpacity={0.85}
             style={{ borderRadius: 16, overflow: 'hidden' }}>
-            <LinearGradient colors={['#7B3FF2', '#E0389A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={st.mainBtn}>
+            <View style={[st.mainBtn, { backgroundColor: '#7B3FF2' }]}>
               {joining
                 ? <ActivityIndicator color="#fff" size="small" />
                 : <>
@@ -247,7 +245,7 @@ export const JoinCommunityScreen: React.FC = () => {
                     </Text>
                   </>
               }
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         )}
 

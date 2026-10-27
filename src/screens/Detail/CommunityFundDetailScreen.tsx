@@ -9,7 +9,6 @@ import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, RefreshControl, Share, Image, StatusBar,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { BackButton, GofolyxLoader } from '../../components/common';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -208,10 +207,8 @@ export const CommunityFundDetailScreen: React.FC = () => {
             <View style={{ padding: 16 }}>
               <View style={[st.progressCard, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
                 {/* Barre top */}
-                <LinearGradient
-                  colors={cotisation.status === 'active' ? ['#7B3FF2', '#E0389A'] : [colors.divider, colors.divider]}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  style={{ height: 4, borderTopLeftRadius: 16, borderTopRightRadius: 16 }}
+                <View
+                  style={{ height: 4, borderTopLeftRadius: 16, borderTopRightRadius: 16, backgroundColor: cotisation.status === 'active' ? '#7B3FF2' : colors.divider }}
                 />
                 <View style={{ padding: 16, gap: 12 }}>
                   {cotisation.description ? (
@@ -232,10 +229,8 @@ export const CommunityFundDetailScreen: React.FC = () => {
                       </Text>
                     </View>
                     <View style={[st.progressTrack, { backgroundColor: colors.backgroundSecondary }]}>
-                      <LinearGradient
-                        colors={cotisation.progress_pct >= 100 ? ['#10B981', '#059669'] : ['#7B3FF2', '#E0389A']}
-                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                        style={[st.progressFill, { width: `${Math.min(cotisation.progress_pct, 100)}%` as any }]}
+                      <View
+                        style={[st.progressFill, { width: `${Math.min(cotisation.progress_pct, 100)}%` as any, backgroundColor: cotisation.progress_pct >= 100 ? '#10B981' : '#7B3FF2' }]}
                       />
                     </View>
                     <Text style={{ color: '#7B3FF2', fontWeight: FontWeight.extraBold, fontSize: FontSize.smPlus, marginTop: 6 }}>
@@ -300,11 +295,9 @@ export const CommunityFundDetailScreen: React.FC = () => {
                   activeOpacity={0.85}
                   style={{ borderRadius: 14, overflow: 'hidden' }}
                 >
-                  <LinearGradient
-                    colors={['#10B981', '#059669']}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  <View
                     style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-                      gap: 10, paddingVertical: 14, borderRadius: 14 }}
+                      gap: 10, paddingVertical: 14, borderRadius: 14, backgroundColor: '#10B981' }}
                   >
                     <Icon name="shield" size={18} color="#fff" />
                     <View>
@@ -315,7 +308,7 @@ export const CommunityFundDetailScreen: React.FC = () => {
                         Requiert approbation admin + trésorier
                       </Text>
                     </View>
-                  </LinearGradient>
+                  </View>
                 </TouchableOpacity>
               </View>
             )}

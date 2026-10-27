@@ -5,7 +5,6 @@ import {
   ActivityIndicator, Dimensions,
 } from 'react-native';
 import Animated, { FadeInDown, FadeInUp, FadeIn } from 'react-native-reanimated';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -54,11 +53,7 @@ const Hero: React.FC<{
   const insets = useSafeAreaInsets();
   return (
     <View style={[hero.wrap, { height: HERO_H }]}>
-      <LinearGradient
-        colors={[colors.gradientStart, colors.gradientEnd, colors.primary + 'CC']}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.primary }]} />
       <View style={[hero.circle1, { backgroundColor: 'rgba(255,255,255,0.10)' }]} />
       <View style={[hero.circle2, { backgroundColor: 'rgba(255,255,255,0.07)' }]} />
 
@@ -92,17 +87,14 @@ const hero = StyleSheet.create({
 
 // ── Bouton submit style hero ──────────────────────────────────────────────────
 const SubmitBtn: React.FC<{ label: string; onPress: () => void; loading?: boolean; colors: any }> = ({ label, onPress, loading, colors }) => (
-  <TouchableOpacity onPress={onPress} disabled={loading} activeOpacity={0.85}>
-    <LinearGradient
-      colors={[colors.gradientStart, colors.gradientEnd]}
-      start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-      style={[s.submitBtn, { opacity: loading ? 0.7 : 1 }]}
-    >
-      {loading
-        ? <ActivityIndicator color="#fff" />
-        : <Text style={s.submitBtnText}>{label}</Text>
-      }
-    </LinearGradient>
+  <TouchableOpacity
+    onPress={onPress} disabled={loading} activeOpacity={0.85}
+    style={[s.submitBtn, { backgroundColor: colors.primary, opacity: loading ? 0.7 : 1 }]}
+  >
+    {loading
+      ? <ActivityIndicator color="#fff" />
+      : <Text style={s.submitBtnText}>{label}</Text>
+    }
   </TouchableOpacity>
 );
 

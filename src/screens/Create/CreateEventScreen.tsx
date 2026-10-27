@@ -10,7 +10,6 @@ import Animated, {
   FadeInDown, FadeInRight, FadeOutLeft,
   useSharedValue, useAnimatedStyle, withSpring,
 } from 'react-native-reanimated';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
@@ -451,15 +450,13 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
           {step === 0 && (
             <Animated.View entering={FadeInRight.springify()}>
               {/* Hero dynamique */}
-              <LinearGradient
-                colors={[selectedTypeConfig.color + 'CC', selectedTypeConfig.color + '55']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                style={s.heroBanner}
+              <View
+                style={[s.heroBanner, { backgroundColor: selectedTypeConfig.color + 'CC' }]}
               >
                 <Icon name={selectedTypeConfig.icon} size={52} color="rgba(255,255,255,0.85)" />
                 <Text style={[s.heroTitle, { color: '#fff' }]}>{title.trim() || 'Nouvel événement'}</Text>
                 <Text style={[s.heroSub, { color: 'rgba(255,255,255,0.8)' }]}>{selectedTypeConfig.label} · {venueCity || 'Lieu à définir'}</Text>
-              </LinearGradient>
+              </View>
 
               <View style={s.section}>
                 <Text style={[s.sectionTitle, { color: colors.textTertiary }]}>INFORMATIONS GÉNÉRALES</Text>
@@ -776,17 +773,17 @@ export const CreateEventScreen: React.FC<Props> = ({ onBack, eventId }) => {
           <Animated.View style={[{ flex: 1 }, isLastStep ? s.publishBtn : {}, publishStyle]}>
             {isLastStep ? (
               <TouchableOpacity onPress={handlePublish} disabled={saving || publishing} style={{ flex: 1 }}>
-                <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.publishBtnInner}>
+                <View style={[s.publishBtnInner, { backgroundColor: colors.gradientStart }]}>
                   {publishing ? <ActivityIndicator size="small" color="#fff" /> : <Icon name="globe" size={16} color="#fff" />}
                   <Text style={s.publishBtnText}>{publishing ? 'Publication...' : 'Publier'}</Text>
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
             ) : (
               <TouchableOpacity onPress={goNext} style={{ flex: 1 }}>
-                <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.publishBtnInner}>
+                <View style={[s.publishBtnInner, { backgroundColor: colors.gradientStart }]}>
                   <Text style={s.publishBtnText}>Suivant</Text>
                   <Icon name="arrow-right" size={16} color="#fff" />
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
             )}
           </Animated.View>

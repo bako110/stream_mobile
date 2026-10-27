@@ -5,7 +5,6 @@ import {
   Animated as RNAnimated, StatusBar, Linking, ActivityIndicator,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
-import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
@@ -415,9 +414,9 @@ export const SupportChatScreen: React.FC<Props> = ({ navigation }) => {
                 <Icon name="user" size={13} color={colors.primary} />
               </View>
             ) : (
-              <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} style={s.agentAvt}>
+              <View style={[s.agentAvt, { backgroundColor: colors.gradientStart }]}>
                 <Icon name="life-buoy" size={13} color="#fff" />
-              </LinearGradient>
+              </View>
             )
           )}
 
@@ -528,9 +527,9 @@ export const SupportChatScreen: React.FC<Props> = ({ navigation }) => {
           onLayout={scrollBottom}
           ListFooterComponent={(typing || loadingAgent) ? (
             <View style={[s.msgRow, s.rowAgent, { marginBottom: 4 }]}>
-              <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} style={s.agentAvt}>
+              <View style={[s.agentAvt, { backgroundColor: colors.gradientStart }]}>
                 <Icon name="life-buoy" size={13} color="#fff" />
-              </LinearGradient>
+              </View>
               <View style={[s.bubble, { backgroundColor: colors.surface, borderColor: colors.divider, borderWidth: StyleSheet.hairlineWidth, borderBottomLeftRadius: 4 }]}>
                 <RNAnimated.View style={[s.typingDots, { opacity: typingOpacity }]}>
                   {[0, 1, 2].map(i => (

@@ -15,7 +15,6 @@ import Animated, {
   FadeInDown, FadeInRight, FadeIn, BounceIn, ZoomIn, withDelay,
   useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSequence, Easing,
 } from 'react-native-reanimated';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -541,10 +540,8 @@ export const TournamentBracketScreen: React.FC = () => {
       >
         {status && (
           <Animated.View entering={FadeInDown.duration(400).springify()}>
-            <LinearGradient
-              colors={[status.color + '22', status.color + '08']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={[styles.statusCard, { borderColor: status.color + '45' }]}
+            <View
+              style={[styles.statusCard, { borderColor: status.color + '45', backgroundColor: status.color + '22' }]}
             >
               <View style={[styles.statusIconWrap, { backgroundColor: status.color + '25', shadowColor: status.color }]}>
                 <Icon name={status.icon} size={19} color={status.color} />
@@ -559,16 +556,14 @@ export const TournamentBracketScreen: React.FC = () => {
                 )}
               </View>
               {status.label === 'Match en cours' && <LiveDot size={9} />}
-            </LinearGradient>
+            </View>
           </Animated.View>
         )}
 
         {tournament.prize_pool > 0 && (
           <Animated.View entering={FadeInDown.duration(400).delay(60).springify()}>
-            <LinearGradient
-              colors={['#FFD70020', '#FFA00010']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={styles.prizePoolCard}
+            <View
+              style={[styles.prizePoolCard, { backgroundColor: '#FFD70020' }]}
             >
               <View style={styles.prizePoolIconWrap}>
                 <Text style={styles.prizePoolEmoji}>🏆</Text>
@@ -577,7 +572,7 @@ export const TournamentBracketScreen: React.FC = () => {
                 <Text style={styles.prizePoolLabel}>Cagnotte du tournoi</Text>
                 <Text style={styles.prizePoolValue}>{tournament.prize_pool.toLocaleString('fr-FR')} GoGold</Text>
               </View>
-            </LinearGradient>
+            </View>
           </Animated.View>
         )}
 
@@ -598,12 +593,12 @@ export const TournamentBracketScreen: React.FC = () => {
 
             {!isOrganizer && !myParticipant && participants.length < tournament.format && (
               <TouchableOpacity activeOpacity={0.85} onPress={handleOpenJoin}>
-                <LinearGradient colors={['#10B981', '#059669']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.regBtn}>
+                <View style={[styles.regBtn, { backgroundColor: '#10B981' }]}>
                   <Icon name="user-plus" size={14} color="#fff" />
                   <Text style={styles.regBtnText}>
                     Rejoindre{tournament.entry_fee_gogold > 0 ? ` (${tournament.entry_fee_gogold} GoGold)` : ''}
                   </Text>
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
             )}
 
@@ -618,7 +613,7 @@ export const TournamentBracketScreen: React.FC = () => {
                 </TouchableOpacity>
                 {participants.length >= 2 && (
                   <TouchableOpacity activeOpacity={0.85} onPress={handleGenerateBracket} disabled={generating} style={{ flex: 1 }}>
-                    <LinearGradient colors={['#9B65F5', '#7B3FF2']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.regBtn, generating && { opacity: 0.6 }]}>
+                    <View style={[styles.regBtn, generating && { opacity: 0.6 }, { backgroundColor: '#9B65F5' }]}>
                       {generating ? (
                         <ActivityIndicator size="small" color="#fff" />
                       ) : (
@@ -627,7 +622,7 @@ export const TournamentBracketScreen: React.FC = () => {
                           <Text style={styles.regBtnText}>Démarrer maintenant</Text>
                         </>
                       )}
-                    </LinearGradient>
+                    </View>
                   </TouchableOpacity>
                 )}
               </View>
@@ -770,10 +765,10 @@ export const TournamentBracketScreen: React.FC = () => {
                       <Text style={[styles.liveCenterNames, { color: colors.textPrimary }]} numberOfLines={1}>
                         {partA?.display_name ?? '—'} <Text style={{ color: colors.textTertiary }}>vs</Text> {partB?.display_name ?? '—'}
                       </Text>
-                      <LinearGradient colors={['#9B65F5', '#7B3FF2']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.liveCenterWatchBtn}>
+                      <View style={[styles.liveCenterWatchBtn, { backgroundColor: '#9B65F5' }]}>
                         <Icon name="play" size={10} color="#fff" />
                         <Text style={styles.liveCenterWatchText}>Regarder</Text>
-                      </LinearGradient>
+                      </View>
                     </TouchableOpacity>
                   </Animated.View>
                 );
@@ -784,26 +779,26 @@ export const TournamentBracketScreen: React.FC = () => {
 
         {myMatch && (
           <Animated.View entering={FadeInDown.duration(400).delay(200).springify()}>
-            <LinearGradient colors={['#7B3FF230', '#7B3FF210']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.myMatchCard}>
+            <View style={[styles.myMatchCard, { backgroundColor: '#7B3FF230' }]}>
               <View style={styles.myMatchIconWrap}>
                 <Icon name="zap" size={18} color="#7B3FF2" />
               </View>
               <Text style={[styles.myMatchText, { color: colors.textPrimary }]}>C'est ton tour de jouer !</Text>
               <TouchableOpacity activeOpacity={0.85} onPress={handleReady} disabled={!!startingMatch}>
-                <LinearGradient colors={['#9B65F5', '#7B3FF2']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.readyBtn}>
+                <View style={[styles.readyBtn, { backgroundColor: '#9B65F5' }]}>
                   {startingMatch
                     ? <ActivityIndicator size="small" color="#fff" />
                     : <Text style={styles.readyBtnText}>Je suis prêt</Text>
                   }
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
-            </LinearGradient>
+            </View>
           </Animated.View>
         )}
 
         {tournament.status === 'completed' && tournament.winner_id && (
           <Animated.View entering={FadeInDown.duration(500).delay(80).springify()}>
-            <LinearGradient colors={['#FFD70030', '#FFA00015']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.winnerCard}>
+            <View style={[styles.winnerCard, { backgroundColor: '#FFD70030' }]}>
               <View style={styles.winnerIconWrap}>
                 <Icon name="award" size={34} color="#FFD700" />
               </View>
@@ -813,7 +808,7 @@ export const TournamentBracketScreen: React.FC = () => {
               {tournament.prize_pool > 0 && (
                 <Text style={styles.winnerPrizeText}>+{tournament.prize_pool.toLocaleString('fr-FR')} GoGold</Text>
               )}
-            </LinearGradient>
+            </View>
           </Animated.View>
         )}
 
@@ -938,9 +933,9 @@ export const TournamentBracketScreen: React.FC = () => {
                 <Text style={[styles.modalCancelText, { color: colors.textTertiary }]}>Annuler</Text>
               </TouchableOpacity>
               <TouchableOpacity activeOpacity={0.85} onPress={handleJoin} disabled={joining}>
-                <LinearGradient colors={['#10B981', '#059669']} style={styles.modalSendBtn}>
+                <View style={[styles.modalSendBtn, { backgroundColor: '#10B981' }]}>
                   {joining ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.modalSendText}>Rejoindre</Text>}
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
             </View>
           </View>
@@ -1009,9 +1004,9 @@ export const TournamentBracketScreen: React.FC = () => {
                   <Text style={[styles.modalCancelText, { color: colors.textTertiary }]}>Annuler</Text>
                 </TouchableOpacity>
                 <TouchableOpacity activeOpacity={0.85} onPress={handleSaveEdit} disabled={saving}>
-                  <LinearGradient colors={['#9B65F5', '#7B3FF2']} style={styles.modalSendBtn}>
+                  <View style={[styles.modalSendBtn, { backgroundColor: '#9B65F5' }]}>
                     {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.modalSendText}>Enregistrer</Text>}
-                  </LinearGradient>
+                  </View>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1100,9 +1095,9 @@ export const TournamentBracketScreen: React.FC = () => {
                         activeOpacity={0.85}
                         onPress={() => { const battleId = selectedMatch.battle_id!; setSelectedMatch(null); nav.navigate('BattleScreen', { battleId }); }}
                       >
-                        <LinearGradient colors={['#9B65F5', '#7B3FF2']} style={styles.modalSendBtn}>
+                        <View style={[styles.modalSendBtn, { backgroundColor: '#9B65F5' }]}>
                           <Text style={styles.modalSendText}>Regarder le direct</Text>
-                        </LinearGradient>
+                        </View>
                       </TouchableOpacity>
                     )}
                   </View>

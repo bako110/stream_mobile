@@ -311,15 +311,12 @@ export const VideoTrimmer: React.FC<Props> = ({ uri, duration, onConfirm, onCanc
           activeOpacity={0.85}
           style={[s.confirmBtn, invalid && s.confirmBtnDisabled]}
         >
-          <LinearGradient
-            colors={invalid ? ['#333', '#333'] : ['#7B3FF2', '#C026D3']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={s.confirmInner}
+          <View
+            style={[s.confirmInner, { backgroundColor: invalid ? '#333' : '#7B3FF2' }]}
           >
             <Icon name="check" size={18} color="#fff" />
             <Text style={s.confirmText}>Utiliser ce segment</Text>
-          </LinearGradient>
+          </View>
         </TouchableOpacity>
       </View>
     </GestureHandlerRootView>

@@ -95,6 +95,8 @@ import { StoryViewersScreen }    from '../screens/Profile/StoryViewersScreen';
 import { LiveStreamScreen }        from '../screens/Live/LiveStreamScreen';
 import { LiveViewerScreen }        from '../screens/Live/LiveViewerScreen';
 import { LiveListScreen }          from '../screens/Live/LiveListScreen';
+import { MyConcertsScreen }        from '../screens/Live/MyConcertsScreen';
+import { MyEventsScreen }          from '../screens/Main/MyEventsScreen';
 import { SimpleLiveListScreen }    from '../screens/Live/SimpleLiveListScreen';
 import { GoLiveScreen }            from '../screens/Live/GoLiveScreen';
 import { SimpleLiveStreamScreen }  from '../screens/Live/SimpleLiveStreamScreen';
@@ -171,6 +173,8 @@ export type MainStackParamList = {
   CreateReel:      { reelPublished?: boolean; sourceReelId?: string; sourceReelUrl?: string } | undefined;
   ConcertDetail:   { concertId: string };
   EventDetail:     { eventId:   string };
+  MyConcerts:      undefined;
+  MyEvents:        undefined;
   AiAnalysisStatus: { contentType: AiContentType; contentId: string; initialStatus?: 'pending' | 'done' | null };
   MyVerificationQueue: undefined;
   MyTicket:        { ticket: any };
@@ -591,6 +595,8 @@ const SettingsWrapper = useCallback(
         <Stack.Screen name="Concerts"       component={ConcertsScreen}        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="BlockedUsers"   component={BlockedUsersScreen}    options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="LiveList"          component={LiveListScreen}          options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="MyConcerts"        component={MyConcertsScreen}        options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="MyEvents"          component={MyEventsScreen}          options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="SimpleLiveList"    component={SimpleLiveListScreen}    options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="GoLive"            component={GoLiveScreen}            options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="SimpleLiveStream"  component={SimpleLiveStreamScreen}  options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />

@@ -749,9 +749,9 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
             ) : community.banner_url ? (
               <Image source={{ uri: community.banner_url }} style={s.editBannerImg} resizeMode="cover" />
             ) : (
-              <LinearGradient colors={['#7B3FF220', '#E0389A20']} style={s.editBannerImg}>
+              <View style={[{ backgroundColor: '#7B3FF220' }, s.editBannerImg]}>
                 <Icon name="image" size={22} color={colors.textTertiary} />
-              </LinearGradient>
+              </View>
             )}
             <View style={s.editCamBadge}>
               <Icon name="camera" size={12} color="#fff" />
@@ -767,12 +767,11 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
           ) : community.avatar_url ? (
             <Image source={{ uri: community.avatar_url }} style={[s.editAvatar, { borderColor: colors.surface }]} />
           ) : (
-            <LinearGradient
-              colors={[colors.gradientStart, colors.gradientEnd]}
-              style={[s.editAvatar, { borderColor: colors.surface, alignItems: 'center', justifyContent: 'center' }]}
+            <View
+              style={[s.editAvatar, { borderColor: colors.surface, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.gradientStart }]}
             >
               <Icon name="users" size={22} color="#fff" />
-            </LinearGradient>
+            </View>
           )}
           <View style={s.editAvatarCam}>
             <Icon name="camera" size={11} color="#fff" />
@@ -1527,11 +1526,8 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                 {community.banner_url ? (
                   <Image source={{ uri: community.banner_url }} style={s.banner} resizeMode="cover" />
                 ) : (
-                  <LinearGradient
-                    colors={[colors.gradientStart, colors.primary, colors.gradientEnd]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={s.banner}
+                  <View
+                    style={[s.banner, { backgroundColor: colors.gradientStart }]}
                   />
                 )}
                 <LinearGradient
@@ -1551,12 +1547,11 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                   {community.avatar_url ? (
                     <Image source={{ uri: community.avatar_url }} style={s.bigAvatar} />
                   ) : (
-                    <LinearGradient
-                      colors={gradientFor(community.name)}
-                      style={s.bigAvatar}
+                    <View
+                      style={[s.bigAvatar, { backgroundColor: gradientFor(community.name)[0] }]}
                     >
                       <Icon name="users" size={32} color="#fff" />
-                    </LinearGradient>
+                    </View>
                   )}
                 </TouchableOpacity>
                 {community.is_verified && (
@@ -1719,11 +1714,8 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                     disabled={actionLoading}
                     activeOpacity={0.85}
                   >
-                    <LinearGradient
-                      colors={[colors.gradientStart, colors.gradientEnd]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 14 }}
+                    <View
+                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 14, backgroundColor: colors.gradientStart }}
                     >
                       {actionLoading ? (
                         <ActivityIndicator size="small" color="#fff" />
@@ -1745,7 +1737,7 @@ export const CommunityDetailScreen: React.FC<Props> = ({ route }) => {
                           )}
                         </>
                       )}
-                    </LinearGradient>
+                    </View>
                   </TouchableOpacity>
                 )}
               </View>

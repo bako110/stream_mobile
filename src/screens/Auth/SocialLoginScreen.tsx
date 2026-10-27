@@ -3,7 +3,6 @@ import {
   View, Text, StyleSheet, StatusBar, ActivityIndicator,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -64,9 +63,8 @@ export const SocialLoginScreen: React.FC<Props> = ({ onGoBack, onAuthSuccess, on
 
       {/* Orbe haut */}
       <View style={styles.orbTR} pointerEvents="none">
-        <LinearGradient
-          colors={[colors.primary + '45', colors.gradientEnd + '20', 'transparent']}
-          style={StyleSheet.absoluteFill}
+        <View
+          style={[StyleSheet.absoluteFill, { backgroundColor: colors.primary + '45' }]}
         />
       </View>
 
@@ -105,9 +103,8 @@ export const SocialLoginScreen: React.FC<Props> = ({ onGoBack, onAuthSuccess, on
 
         {/* Info */}
         <Animated.View entering={FadeInDown.delay(360).duration(400)} style={styles.infoBox}>
-          <LinearGradient
-            colors={[colors.primary + '10', colors.gradientEnd + '08']}
-            style={[StyleSheet.absoluteFill, { borderRadius: 14 }]}
+          <View
+            style={[StyleSheet.absoluteFill, { borderRadius: 14, backgroundColor: colors.primary + '10' }]}
           />
           <Icon name="shield" size={16} color={colors.primary} />
           <Text style={[styles.infoText, { color: colors.textSecondary }]}>
@@ -118,9 +115,8 @@ export const SocialLoginScreen: React.FC<Props> = ({ onGoBack, onAuthSuccess, on
 
       {/* Orbe bas */}
       <View style={styles.orbBL} pointerEvents="none">
-        <LinearGradient
-          colors={['transparent', colors.accentOrange + '22', colors.gradientEnd + '28']}
-          style={StyleSheet.absoluteFill}
+        <View
+          style={[StyleSheet.absoluteFill, { backgroundColor: colors.accentOrange + '22' }]}
         />
       </View>
     </View>

@@ -4,7 +4,6 @@ import {
   Platform, StatusBar, ActivityIndicator, ScrollView,
 } from 'react-native';
 import { Camera, CameraType } from 'react-native-camera-kit';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
@@ -103,16 +102,15 @@ export const TicketScannerScreen: React.FC<Props> = ({ eventId, eventTitle, onBa
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* Header */}
-      <LinearGradient
-        colors={[colors.gradientStart, colors.gradientEnd]}
-        style={[st.header, { paddingTop: Platform.OS === 'ios' ? 56 : 42 }]}
+      <View
+        style={[st.header, { paddingTop: Platform.OS === 'ios' ? 56 : 42, backgroundColor: colors.gradientStart }]}
       >
         <BackButton onPress={onBack} transparent color="#fff" />
         <View style={{ flex: 1, marginHorizontal: 12 }}>
           <Text style={st.headerTitle} numberOfLines={1}>Scanner les billets</Text>
           <Text style={st.headerSub} numberOfLines={1}>{eventTitle}</Text>
         </View>
-      </LinearGradient>
+      </View>
 
       {/* Camera / Result */}
       {state === 'scanning' ? (

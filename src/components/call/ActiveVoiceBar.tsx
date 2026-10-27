@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
-import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useActiveVoice } from '../../context/ActiveVoiceContext';
@@ -30,10 +29,8 @@ export const ActiveVoiceBar: React.FC = () => {
 
   return (
     <View style={[styles.wrapper, { bottom: insets.bottom + 8 }]}>
-      <LinearGradient
-        colors={['#1C1033', '#2A1550']}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-        style={styles.bar}
+      <View
+        style={[styles.bar, { backgroundColor: '#1C1033' }]}
       >
         <TouchableOpacity style={styles.leftSection} onPress={handleReturn} activeOpacity={0.8}>
           {activeVoice.avatarUrl ? (
@@ -62,7 +59,7 @@ export const ActiveVoiceBar: React.FC = () => {
             <Icon name="x" size={16} color="#fff" />
           </TouchableOpacity>
         </View>
-      </LinearGradient>
+      </View>
     </View>
   );
 };

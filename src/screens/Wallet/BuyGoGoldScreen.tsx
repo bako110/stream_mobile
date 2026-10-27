@@ -3,7 +3,6 @@ import {
   View, Text, TouchableOpacity, StyleSheet, StatusBar, ScrollView, TextInput,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
-import LinearGradient from 'react-native-linear-gradient';
 import { useStripe } from '@stripe/stripe-react-native';
 import { BackButton } from '../../components/common';
 import { useNavigation } from '@react-navigation/native';

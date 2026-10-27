@@ -171,10 +171,8 @@ const HeroSlide: React.FC<{ item: FilmItem; purchased: boolean; onPress: () => v
         {item.synopsis ? <Text style={hs.synopsis} numberOfLines={2}>{item.synopsis}</Text> : null}
         <View style={hs.buttons}>
           <TouchableOpacity style={[hs.btnWatch, isPremiumUnpaid && { backgroundColor: '#E8501A' }]} onPress={onPress} activeOpacity={0.85}>
-            <LinearGradient
-              colors={isPremiumUnpaid ? ['#E8501A', '#c43e14'] : ['#ffffff', '#e0e0e0']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={hs.btnGradient}
+            <View
+              style={[hs.btnGradient, { backgroundColor: isPremiumUnpaid ? '#E8501A' : '#ffffff' }]}
             >
               <Icon name={isPremiumUnpaid ? 'lock' : 'play'} size={15} color={isPremiumUnpaid ? '#fff' : '#000'} />
               <Text style={[hs.btnWatchText, isPremiumUnpaid && { color: '#fff' }]}>
@@ -189,7 +187,7 @@ const HeroSlide: React.FC<{ item: FilmItem; purchased: boolean; onPress: () => v
                   </>
                 ) : 'Regarder'}
               </Text>
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
           <TouchableOpacity style={hs.btnMore} onPress={onPress} activeOpacity={0.85}>
             <View style={hs.btnMoreInner}>

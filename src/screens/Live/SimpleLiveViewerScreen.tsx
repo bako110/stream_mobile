@@ -45,10 +45,11 @@ import { LiveSettingsSheet } from '../../components/live/LiveSettingsSheet';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { WS_BASE_URL, STORAGE_KEYS } from '../../utils/constants';
-import { openAuthenticatedWs } from '../../utils/authenticatedWs';
+import { openReconnectingAuthenticatedWs, type ReconnectingWs } from '../../utils/authenticatedWs';
 import { storage } from '../../utils/storage';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
 import { configureLiveAudioSession } from '../../utils/liveAudioSession';
+import { consumeSimpleLivePrefetch, clearSimpleLivePrefetch } from '../../utils/livePrefetch';
 import { useWs } from '../../context/WebSocketContext';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { LiveGiftOverlay } from '../../components/wallet/LiveGiftOverlay';
@@ -199,9 +200,9 @@ const StageAccessSheet: React.FC<{
 
         {/* Titre */}
         <View style={sas.titleRow}>
-          <LinearGradient colors={['#F0365A', '#9B65F5']} style={sas.lockIcon} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+          <View style={[sas.lockIcon, { backgroundColor: '#F0365A' }]}>
             <Text style={{ fontSize: FontSize.lg }}>🎤</Text>
-          </LinearGradient>
+          </View>
           <View style={{ flex: 1 }}>
             <Text style={sas.title}>Monter sur scène</Text>
             <Text style={sas.subtitle}>{hostName} a monétisé l'accès à la scène</Text>
@@ -252,10 +253,10 @@ const StageAccessSheet: React.FC<{
             onPress={() => { onClose(); navigation.navigate('Wallet'); }}
             activeOpacity={0.85}
           >
-            <LinearGradient colors={['#F0365A', '#9B65F5']} style={sas.payBtnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+            <View style={[sas.payBtnGrad, { backgroundColor: '#F0365A' }]}>
               <Text style={{ fontSize: FontSize.lg }}>💳</Text>
               <Text style={sas.payBtnText}>Recharger mon solde</Text>
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
@@ -264,10 +265,8 @@ const StageAccessSheet: React.FC<{
             disabled={loading || balanceLoading}
             activeOpacity={0.85}
           >
-            <LinearGradient
-              colors={isGoGold ? ['#F59E0B', '#F97316'] : ['#F0365A', '#9B65F5']}
-              style={sas.payBtnGrad}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            <View
+              style={[sas.payBtnGrad, { backgroundColor: isGoGold ? '#F59E0B' : '#F0365A' }]}
             >
               {loading || balanceLoading
                 ? <ActivityIndicator color="#fff" size="small" />
@@ -280,7 +279,7 @@ const StageAccessSheet: React.FC<{
                     </Text>
                   </>
               }
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         )}
 
@@ -848,9 +847,9 @@ const RoomContent: React.FC<{
           à l'ancien pill flottant "Tu es sur scène" centré en plein écran. */}
       {onStage && !isHost && (
         <Animated.View entering={SlideInUp.duration(350)} exiting={SlideOutDown.duration(250)} style={st.onStageBadge}>
-          <LinearGradient colors={['#3FEDB6', '#22d3a5']} style={st.onStagePill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+          <View style={[st.onStagePill, { backgroundColor: '#3FEDB6' }]}>
             <Icon name="mic" size={14} color="#fff" />
-          </LinearGradient>
+          </View>
         </Animated.View>
       )}
 
@@ -859,13 +858,13 @@ const RoomContent: React.FC<{
         <View style={gt.container} pointerEvents="none">
           {giftTicker.map(t => (
             <Animated.View key={t.id} entering={FadeIn.duration(250)} exiting={FadeOut.duration(400)} style={gt.row}>
-              <LinearGradient colors={['rgba(155,101,245,0.85)', 'rgba(240,54,90,0.85)']} style={gt.pill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+              <View style={[gt.pill, { backgroundColor: 'rgba(155,101,245,0.85)' }]}>
                 <Text style={gt.emoji}>{t.emoji}</Text>
                 <View style={gt.info}>
                   <Text style={gt.sender} numberOfLines={1}>{t.senderName}</Text>
                   <Text style={gt.detail}>{t.giftName} · {t.GoGold} GoGold</Text>
                 </View>
-              </LinearGradient>
+              </View>
             </Animated.View>
           ))}
         </View>
@@ -1212,7 +1211,7 @@ const SimpleLiveViewerContent: React.FC<SimpleLiveViewerContentProps> = ({ liveI
   const [handRequests,   setHandRequests]   = useState<HandRequest[]>([]);
 
   const chatRef      = useRef<FlatList>(null);
-  const wsRef        = useRef<WebSocket | null>(null);
+  const wsRef        = useRef<ReconnectingWs | null>(null);
   const elapsedRef   = useRef<ReturnType<typeof setInterval> | null>(null);
   const likeThrottle = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingLikes = useRef(0);
@@ -1246,8 +1245,13 @@ const SimpleLiveViewerContent: React.FC<SimpleLiveViewerContentProps> = ({ liveI
         // montage. Jamais utilisé pour un live monétisé : l'accès doit être
         // vérifié au moment réel de l'ouverture, pas en avance pendant qu'un
         // autre live est affiché.
+        // Pour l'entrée initiale (événement live ouvert depuis EventDetailScreen,
+        // pas encore dans le feed swipe), on retombe sur le cache global
+        // livePrefetch — alimenté par le onPressIn de la carte "Regarder en
+        // direct" avant même que la navigation n'ait fini de résoudre.
+        const globalPreload = !preloaded ? consumeSimpleLivePrefetch(liveId) : null;
         const usingPreload = !!preloaded && preloaded.live.id === liveId && !preloaded.live.is_monetized;
-        const l = usingPreload ? preloaded!.live : await liveService.getById(liveId);
+        const l = usingPreload ? preloaded!.live : (globalPreload?.live ?? await liveService.getById(liveId));
         setLive(l);
         liveService.recordView(liveId);
         if (l.status !== 'active') { setEnded(true); setLoading(false); return; }
@@ -1291,6 +1295,9 @@ const SimpleLiveViewerContent: React.FC<SimpleLiveViewerContentProps> = ({ liveI
         if (usingPreload) {
           setToken(preloaded!.token);
           setWsUrl(preloaded!.wsUrl);
+        } else if (globalPreload) {
+          setToken(globalPreload.token);
+          setWsUrl(globalPreload.wsUrl);
         } else {
           const t = await liveService.getToken(liveId);
           setToken(t.token);
@@ -1343,9 +1350,9 @@ const SimpleLiveViewerContent: React.FC<SimpleLiveViewerContentProps> = ({ liveI
   useEffect(() => {
     const accessToken = storage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
     if (!accessToken || !token) return;
-    let ws: WebSocket;
+    let ws: ReconnectingWs;
     try {
-      ws = openAuthenticatedWs(`${WS_BASE_URL}/api/v1/social/comments/ws/live/${liveId}`, accessToken);
+      ws = openReconnectingAuthenticatedWs(`${WS_BASE_URL}/api/v1/social/comments/ws/live/${liveId}`, accessToken);
     } catch { return; }
     wsRef.current = ws;
 
@@ -1491,9 +1498,9 @@ const SimpleLiveViewerContent: React.FC<SimpleLiveViewerContentProps> = ({ liveI
       } catch {}
     };
 
-    const ping = setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) ws.send('{"type":"ping"}');
-    }, 25_000);
+    // send() est un no-op silencieux si la connexion est en cours de reprise —
+    // le prochain tick trouvera le socket reconnecté.
+    const ping = setInterval(() => { ws.send('{"type":"ping"}'); }, 25_000);
     return () => { clearInterval(ping); try { ws.close(); } catch {} };
   }, [liveId, token, addSysMsg]);
 
@@ -1520,9 +1527,10 @@ const SimpleLiveViewerContent: React.FC<SimpleLiveViewerContentProps> = ({ liveI
   const handleLeave = useCallback(() => {
     try { wsRef.current?.close(); } catch {}
     if (elapsedRef.current) clearInterval(elapsedRef.current);
+    clearSimpleLivePrefetch(liveId);
     if (onLeaveProp) onLeaveProp();
     else nav.goBack();
-  }, [nav, onLeaveProp]);
+  }, [nav, onLeaveProp, liveId]);
 
   const handleDeleteMsg = useCallback(async (id: string) => {
     // Suppression optimiste locale immédiate

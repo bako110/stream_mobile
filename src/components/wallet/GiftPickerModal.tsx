@@ -3,7 +3,6 @@ import {
   Modal, View, Text, TouchableOpacity, StyleSheet,
   ActivityIndicator, Animated, Dimensions, Image, FlatList,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
@@ -219,11 +218,8 @@ export const GiftPickerModal: React.FC<Props> = ({
           disabled={!selected || sending || !canAfford}
           style={[s.sendBtn, (!selected || sending || !canAfford) && { opacity: 0.45 }]}
         >
-          <LinearGradient
-            colors={['#7B3FF2', '#E0389A']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={s.sendBtnInner}
+          <View
+            style={[s.sendBtnInner, { backgroundColor: '#7B3FF2' }]}
           >
             {sending ? (
               <ActivityIndicator size="small" color="#fff" />
@@ -237,7 +233,7 @@ export const GiftPickerModal: React.FC<Props> = ({
                 </Text>
               </>
             )}
-          </LinearGradient>
+          </View>
         </TouchableOpacity>
 
         {/* Emoji qui s'envole */}

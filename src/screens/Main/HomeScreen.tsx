@@ -639,9 +639,8 @@ export const HomeScreen: React.FC = () => {
                     {ev.thumbnail_url ? (
                       <Image source={{ uri: ev.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
                     ) : (
-                      <LinearGradient
-                        colors={[colors.primary + 'CC', colors.primary + '44']}
-                        style={StyleSheet.absoluteFill}
+                      <View
+                        style={[StyleSheet.absoluteFill, { backgroundColor: colors.primary + 'CC' }]}
                       />
                     )}
                     <LinearGradient colors={['transparent', 'rgba(0,0,0,0.6)']} style={StyleSheet.absoluteFill} />
@@ -823,12 +822,11 @@ export const HomeScreen: React.FC = () => {
           }
           ListEmptyComponent={
             <View style={s.empty}>
-              <LinearGradient
-                colors={[colors.primary + '22', colors.primary + '08']}
-                style={s.emptyIcon}
+              <View
+                style={[s.emptyIcon, { backgroundColor: colors.primary + '22' }]}
               >
                 <Icon name="inbox" size={34} color={colors.primary} />
-              </LinearGradient>
+              </View>
               <Text style={[s.emptyTitle, { color: colors.textPrimary }]}>
                 Rien pour le moment
               </Text>
@@ -894,12 +892,11 @@ const Header: React.FC<HeaderProps> = ({
           {user?.avatar_url ? (
             <Image source={{ uri: user.avatar_url }} style={s.headerAvatar} />
           ) : (
-            <LinearGradient
-              colors={[colors.primary, colors.primary + 'AA']}
-              style={s.headerAvatar}
+            <View
+              style={[s.headerAvatar, { backgroundColor: colors.primary }]}
             >
               <Text style={s.headerAvatarText}>{initials}</Text>
-            </LinearGradient>
+            </View>
           )}
           <View>
             <Text style={[s.headerGreeting, { color: colors.textTertiary }]}>{greeting} 👋</Text>
@@ -1344,14 +1341,11 @@ const PostCard: React.FC<PostCardProps> = React.memo(({ item, colors, isDark, on
         {thumbUrl ? (
           <Image source={{ uri: thumbUrl }} style={s.postMediaImg} resizeMode="cover" />
         ) : (
-          <LinearGradient
-            colors={[accentColor + 'DD', accentColor + '55']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={s.postMediaImg}
+          <View
+            style={[s.postMediaImg, { backgroundColor: accentColor + 'DD' }]}
           >
             <Icon name={typeIcon} size={52} color="rgba(255,255,255,0.35)" />
-          </LinearGradient>
+          </View>
         )}
 
         <LinearGradient

@@ -18,7 +18,6 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
@@ -112,16 +111,13 @@ const GiftCard: React.FC<{
   if (selected) {
     return (
       <TouchableOpacity onPress={onSelect} activeOpacity={0.85}>
-        <LinearGradient
-          colors={['#9B65F5', '#E85DAD']}
-          style={s.selectedWrapper}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+        <View
+          style={[s.selectedWrapper, { backgroundColor: '#9B65F5' }]}
         >
           <View style={s.selectedInner}>
             {content}
           </View>
-        </LinearGradient>
+        </View>
       </TouchableOpacity>
     );
   }
@@ -350,15 +346,8 @@ const GiftPickerScreen: React.FC<Props> = ({ route }) => {
           activeOpacity={0.85}
           style={s.sendBtnWrapper}
         >
-          <LinearGradient
-            colors={
-              selected && canAfford(selected)
-                ? ['#9B65F5', '#E85DAD']
-                : [colors.border, colors.border]
-            }
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={s.sendBtn}
+          <View
+            style={[s.sendBtn, { backgroundColor: selected && canAfford(selected) ? '#9B65F5' : colors.border }]}
           >
             {sending
               ? <ActivityIndicator color="#FFF" />
@@ -371,7 +360,7 @@ const GiftPickerScreen: React.FC<Props> = ({ route }) => {
                 </>
               )
             }
-          </LinearGradient>
+          </View>
         </TouchableOpacity>
       </View>
     </View>

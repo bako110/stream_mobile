@@ -285,10 +285,10 @@ export const StoryCameraScreen: React.FC<Props> = ({
             Autorise Gofolyx à utiliser ta caméra et ton micro dans les réglages du téléphone pour créer une story.
           </Text>
           <TouchableOpacity onPress={() => openSettings().catch(() => {})} activeOpacity={0.88} style={s.permissionSettingsBtnWrap}>
-            <LinearGradient colors={['#7B3FF2', '#C026D3']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.permissionSettingsBtn}>
+            <View style={[{ backgroundColor: '#7B3FF2' }, s.permissionSettingsBtn]}>
               <Icon name="settings" size={15} color="#fff" />
               <Text style={s.permissionGalleryTxt}>Ouvrir les réglages</Text>
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
           <TouchableOpacity style={s.permissionGalleryBtn} onPress={handleOpenGallery} activeOpacity={0.85}>
             <Icon name="image" size={16} color="rgba(255,255,255,0.85)" />
@@ -317,10 +317,10 @@ export const StoryCameraScreen: React.FC<Props> = ({
             Impossible d'accéder à la caméra {position === 'front' ? 'avant' : 'arrière'} de cet appareil. Réessaie ou choisis une image depuis ta galerie.
           </Text>
           <TouchableOpacity onPress={handleSwitchCamera} activeOpacity={0.85} style={s.permissionSettingsBtnWrap}>
-            <LinearGradient colors={['#7B3FF2', '#C026D3']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.permissionSettingsBtn}>
+            <View style={[{ backgroundColor: '#7B3FF2' }, s.permissionSettingsBtn]}>
               <Icon name="refresh-cw" size={15} color="#fff" />
               <Text style={s.permissionGalleryTxt}>Changer de caméra</Text>
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
           <TouchableOpacity style={s.permissionGalleryBtn} onPress={handleOpenGallery} activeOpacity={0.85}>
             <Icon name="image" size={16} color="rgba(255,255,255,0.85)" />

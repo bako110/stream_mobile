@@ -4,7 +4,6 @@ import {
   View, Text, TouchableOpacity, StyleSheet, StatusBar,
   ActivityIndicator, ScrollView,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -62,9 +61,9 @@ export default function SubscriptionPaymentScreen() {
   if (success) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', gap: 20 }}>
-        <LinearGradient colors={gradient} style={s.successCircle}>
+        <View style={[s.successCircle, { backgroundColor: gradient[0] }]}>
           <Icon name="check" size={40} color="#fff" />
-        </LinearGradient>
+        </View>
         <Text style={[s.successTitle, { color: colors.textPrimary }]}>Abonnement activé !</Text>
         <Text style={[s.successSub, { color: colors.textSecondary }]}>
           Bienvenue sur le plan {PLAN_LABELS[plan]}
@@ -89,7 +88,7 @@ export default function SubscriptionPaymentScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
 
         {/* Plan summary card */}
-        <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.planCard}>
+        <View style={[s.planCard, { backgroundColor: gradient[0] }]}>
           <Text style={s.planCardLabel}>Plan {PLAN_LABELS[plan]}</Text>
           <PriceWithLocal amountEur={cfg.price} suffix="/mois" style={s.planCardPrice} localStyle={{ color: 'rgba(255,255,255,0.75)' }} />
           <View style={s.planCardSpecs}>
@@ -101,7 +100,7 @@ export default function SubscriptionPaymentScreen() {
               <Text style={s.planCardSpec}>{cfg.downloads} dl</Text>
             </>}
           </View>
-        </LinearGradient>
+        </View>
 
         {/* Payment method — GoGold uniquement (paiement carte pas encore disponible) */}
         <Text style={[s.sectionTitle, { color: colors.textSecondary }]}>MODE DE PAIEMENT</Text>
@@ -164,12 +163,8 @@ export default function SubscriptionPaymentScreen() {
           style={{ marginTop: 8, borderRadius: 16, overflow: 'hidden' }}
           activeOpacity={0.8}
         >
-          <LinearGradient
-            colors={(walletCheck && !walletCheck.sufficient)
-              ? ['#4B5563', '#374151']
-              : gradient}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={s.confirmBtn}
+          <View
+            style={[s.confirmBtn, { backgroundColor: (walletCheck && !walletCheck.sufficient) ? '#4B5563' : gradient[0] }]}
           >
             {processing
               ? <ActivityIndicator size="small" color="#fff" />
@@ -178,7 +173,7 @@ export default function SubscriptionPaymentScreen() {
                   <Text style={s.confirmText}>Confirmer l'abonnement</Text>
                 </>
             }
-          </LinearGradient>
+          </View>
         </TouchableOpacity>
 
         <Text style={[s.disclaimer, { color: colors.textTertiary }]}>

@@ -7,7 +7,6 @@ import {
   ActivityIndicator, RefreshControl, Modal,
   TextInput, KeyboardAvoidingView, Platform, ScrollView, StatusBar,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { BackButton, GofolyxLoader, PriceWithLocal } from '../../components/common';
@@ -59,21 +58,18 @@ const CotisationCard: React.FC<{
       style={[st.card, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
 
       {/* Barre accent top */}
-      <LinearGradient
-        colors={isActive ? ['#7B3FF2', '#E0389A'] : [colors.divider, colors.divider]}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-        style={{ height: 3, borderTopLeftRadius: 16, borderTopRightRadius: 16 }}
+      <View
+        style={{ height: 3, borderTopLeftRadius: 16, borderTopRightRadius: 16, backgroundColor: isActive ? '#7B3FF2' : colors.divider }}
       />
 
       <View style={{ padding: 14, gap: 10 }}>
         {/* Header */}
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
-          <LinearGradient
-            colors={isActive ? ['#7B3FF2', '#E0389A'] : [colors.backgroundSecondary, colors.backgroundSecondary]}
-            style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }}
+          <View
+            style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: isActive ? '#7B3FF2' : colors.backgroundSecondary }}
           >
             <Icon name="dollar-sign" size={18} color={isActive ? '#fff' : colors.textTertiary} />
-          </LinearGradient>
+          </View>
           <View style={{ flex: 1 }}>
             <Text style={{ color: colors.textPrimary, fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold }} numberOfLines={1}>
               {item.title}
@@ -104,10 +100,8 @@ const CotisationCard: React.FC<{
         {/* Barre de progression */}
         <View>
           <View style={[st.progressTrack, { backgroundColor: colors.backgroundSecondary }]}>
-            <LinearGradient
-              colors={item.progress_pct >= 100 ? ['#10B981', '#059669'] : ['#7B3FF2', '#E0389A']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={[st.progressFill, { width: `${Math.min(item.progress_pct, 100)}%` as any }]}
+            <View
+              style={[st.progressFill, { width: `${Math.min(item.progress_pct, 100)}%` as any, backgroundColor: item.progress_pct >= 100 ? '#10B981' : '#7B3FF2' }]}
             />
           </View>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
@@ -140,17 +134,15 @@ const CotisationCard: React.FC<{
         {/* Bouton payer */}
         {isActive && !hasPaid && !isExempt && (
           <TouchableOpacity onPress={onPay} activeOpacity={0.85} style={{ borderRadius: 12, overflow: 'hidden' }}>
-            <LinearGradient
-              colors={['#7B3FF2', '#E0389A']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            <View
               style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-                gap: 8, paddingVertical: 12, borderRadius: 12 }}
+                gap: 8, paddingVertical: 12, borderRadius: 12, backgroundColor: '#7B3FF2' }}
             >
               <Icon name="zap" size={15} color="#fff" />
               <Text style={{ color: '#fff', fontSize: FontSize.base, fontWeight: FontWeight.extraBold }}>
                 Payer {item.amount_per_member} GoGold
               </Text>
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         )}
         {hasPaid && (
@@ -306,8 +298,8 @@ export const CommunityFundScreen: React.FC = () => {
               colors={['#7B3FF2']} tintColor="#7B3FF2" />
           }
           ListHeaderComponent={cotisations.length > 0 ? (
-            <LinearGradient colors={['#7B3FF215', '#E0389A10']}
-              style={[st.summaryCard, { borderColor: '#7B3FF230' }]}>
+            <View
+              style={[st.summaryCard, { borderColor: '#7B3FF230', backgroundColor: '#7B3FF215' }]}>
               <Text style={{ color: colors.textPrimary, fontWeight: FontWeight.extraBold, fontSize: FontSize.base, marginBottom: 10 }}>
                 Résumé · <Text style={{ color: '#7B3FF2' }}>{activeCount} active{activeCount !== 1 ? 's' : ''}</Text>
               </Text>
@@ -324,7 +316,7 @@ export const CommunityFundScreen: React.FC = () => {
                   </View>
                 ))}
               </View>
-            </LinearGradient>
+            </View>
           ) : null}
           renderItem={({ item }) => (
             <View>
@@ -345,10 +337,10 @@ export const CommunityFundScreen: React.FC = () => {
           )}
           ListEmptyComponent={
             <View style={st.empty}>
-              <LinearGradient colors={['#7B3FF222', '#E0389A11']}
-                style={{ width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+              <View
+                style={{ width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: 10, backgroundColor: '#7B3FF222' }}>
                 <Icon name="dollar-sign" size={32} color="#7B3FF2" />
-              </LinearGradient>
+              </View>
               <Text style={{ color: colors.textPrimary, fontSize: FontSize.mdPlus, fontWeight: FontWeight.black, textAlign: 'center' }}>
                 Aucune cotisation
               </Text>
@@ -360,11 +352,11 @@ export const CommunityFundScreen: React.FC = () => {
               {isAdmin && (
                 <TouchableOpacity onPress={() => setCreateOpen(true)}
                   style={{ borderRadius: 20, overflow: 'hidden', marginTop: 8 }}>
-                  <LinearGradient colors={['#7B3FF2', '#E0389A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                    style={{ paddingHorizontal: 24, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View
+                    style={{ paddingHorizontal: 24, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#7B3FF2' }}>
                     <Icon name="plus" size={15} color="#fff" />
                     <Text style={{ color: '#fff', fontWeight: FontWeight.extraBold, fontSize: FontSize.base }}>Lancer une cotisation</Text>
-                  </LinearGradient>
+                  </View>
                 </TouchableOpacity>
               )}
             </View>
@@ -478,8 +470,8 @@ export const CommunityFundScreen: React.FC = () => {
 
               {/* Résumé */}
               {formAmount && parseInt(formAmount) > 0 && (
-                <LinearGradient colors={['#7B3FF215', '#E0389A10']}
-                  style={{ borderRadius: 14, borderWidth: 1, borderColor: '#7B3FF230', padding: 14, gap: 6 }}>
+                <View
+                  style={{ borderRadius: 14, borderWidth: 1, borderColor: '#7B3FF230', padding: 14, gap: 6, backgroundColor: '#7B3FF215' }}>
                   <Text style={{ color: '#7B3FF2', fontWeight: FontWeight.extraBold, fontSize: FontSize.smPlus }}>Aperçu</Text>
                   <Text style={{ color: colors.textSecondary, fontSize: FontSize.smPlus }}>
                     Chaque membre paiera <Text style={{ fontWeight: FontWeight.extraBold, color: colors.textPrimary }}>{formAmount} GoGold</Text>
@@ -488,7 +480,7 @@ export const CommunityFundScreen: React.FC = () => {
                   <Text style={{ color: colors.textTertiary, fontSize: FontSize.sm }}>
                     Le total collecté dépend du nombre de membres présents au lancement.
                   </Text>
-                </LinearGradient>
+                </View>
               )}
 
             </ScrollView>

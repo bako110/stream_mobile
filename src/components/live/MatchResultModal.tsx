@@ -12,7 +12,6 @@ import { View, Text, Image, TouchableOpacity, StyleSheet, Dimensions, Modal } fr
 import Animated, {
   FadeIn, BounceIn, ZoomIn, useSharedValue, useAnimatedStyle, withDelay, withTiming, Easing,
 } from 'react-native-reanimated';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontSize, FontWeight } from '../../theme';
@@ -92,7 +91,7 @@ export const MatchResultModal: React.FC<{ result: MatchResultData | null; onClos
         <View style={s.endedOverlay}>
           <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
           <Animated.View entering={BounceIn.duration(700).delay(150)}>
-            <LinearGradient colors={['#7B3FF2', '#4C1D95']} style={[s.endedCard, { paddingBottom: 28 + insets.bottom }]}>
+            <View style={[s.endedCard, { paddingBottom: 28 + insets.bottom, backgroundColor: '#7B3FF2' }]}>
               <View style={s.handle} />
               <Animated.View entering={ZoomIn.duration(500).delay(400)}>
                 <Icon name="award" size={48} color="#FFD700" />
@@ -103,7 +102,7 @@ export const MatchResultModal: React.FC<{ result: MatchResultData | null; onClos
               <TouchableOpacity style={s.endedBtn} onPress={onClose}>
                 <Text style={s.endedBtnText}>Fermer</Text>
               </TouchableOpacity>
-            </LinearGradient>
+            </View>
           </Animated.View>
         </View>
       </Modal>
@@ -116,7 +115,7 @@ export const MatchResultModal: React.FC<{ result: MatchResultData | null; onClos
         <View style={s.endedOverlay}>
           <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
           <Animated.View entering={FadeIn.duration(700).delay(150)}>
-            <LinearGradient colors={['#3A3F52', '#20232F']} style={[s.comfortCard, { paddingBottom: 26 + insets.bottom }]}>
+            <View style={[s.comfortCard, { paddingBottom: 26 + insets.bottom, backgroundColor: '#3A3F52' }]}>
               <View style={s.handle} />
               <Animated.View entering={ZoomIn.duration(500).delay(300)}>
                 <Text style={s.comfortEmoji}>💙</Text>
@@ -141,7 +140,7 @@ export const MatchResultModal: React.FC<{ result: MatchResultData | null; onClos
               <TouchableOpacity style={s.comfortBtn} onPress={onClose}>
                 <Text style={s.comfortBtnText}>Fermer</Text>
               </TouchableOpacity>
-            </LinearGradient>
+            </View>
           </Animated.View>
         </View>
       </Modal>
@@ -163,7 +162,7 @@ export const MatchResultModal: React.FC<{ result: MatchResultData | null; onClos
           />
         ))}
         <Animated.View entering={BounceIn.duration(800).delay(150)}>
-          <LinearGradient colors={['#FFD700', '#FFA000', '#B8860B']} style={s.championCard}>
+          <View style={[s.championCard, { backgroundColor: '#FFD700' }]}>
             <View style={[s.championInnerBorder, { paddingBottom: 30 + insets.bottom }]}>
               <View style={s.handle} />
               <Animated.View entering={ZoomIn.duration(600).delay(400)}>
@@ -205,7 +204,7 @@ export const MatchResultModal: React.FC<{ result: MatchResultData | null; onClos
                 <Text style={s.championBtnText}>Fermer</Text>
               </TouchableOpacity>
             </View>
-          </LinearGradient>
+          </View>
         </Animated.View>
       </View>
     </Modal>

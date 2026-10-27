@@ -1,10 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, Modal, TouchableOpacity,
-  Animated, ActivityIndicator, Image, Platform,
+  Animated, ActivityIndicator, Image, Platform, ScrollView, useWindowDimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
-import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import ReactNativeBlobUtil from 'react-native-blob-util';
@@ -72,6 +71,13 @@ export const TicketPaymentSheet: React.FC<Props> = ({
   const insets     = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const slideY     = useRef(new Animated.Value(600)).current;
+  // En paysage (écran live concert/événement), la hauteur dispo est bien
+  // plus réduite qu'en portrait — sans plafond, le contenu pousse le bouton
+  // "Payer" hors écran. maxHeight + contenu scrollable, boutons toujours
+  // visibles en bas.
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const isLandscape = screenWidth > screenHeight;
+  const sheetMaxHeight = screenHeight * (isLandscape ? 0.92 : 0.85);
 
   const [balance,    setBalance]    = useState<number | null>(null);
   const [loadingBal, setLoadingBal] = useState(false);
@@ -174,8 +180,14 @@ export const TicketPaymentSheet: React.FC<Props> = ({
     <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
       <TouchableOpacity style={sh.backdrop} activeOpacity={1} onPress={onClose} />
 
-      <Animated.View style={[sh.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + 16, transform: [{ translateY: slideY }] }]}>
+      <Animated.View style={[sh.sheet, { backgroundColor: colors.surface, maxHeight: sheetMaxHeight, paddingBottom: insets.bottom + 16, transform: [{ translateY: slideY }] }]}>
         <View style={[sh.handle, { backgroundColor: colors.divider }]} />
+
+        <ScrollView
+          style={{ flexGrow: 0 }}
+          contentContainerStyle={{ flexGrow: 1 }}
+          showsVerticalScrollIndicator={false}
+        >
 
         {/* ── Header événement ── */}
         <View style={sh.header}>
@@ -328,7 +340,12 @@ export const TicketPaymentSheet: React.FC<Props> = ({
                 )}
               </View>
             )}
+          </>
+        )}
+        </ScrollView>
 
+        {(step === 'confirm' || step === 'insufficient') && (
+          <>
             {/* ── Boutons ── */}
             <View style={sh.btnRow}>
               <TouchableOpacity style={[sh.btnCancel, { borderColor: colors.border }]} onPress={onClose}>
@@ -337,10 +354,10 @@ export const TicketPaymentSheet: React.FC<Props> = ({
 
               {step === 'insufficient' ? (
                 <TouchableOpacity style={sh.btnMain} onPress={goRecharge} activeOpacity={0.85}>
-                  <LinearGradient colors={['#F59E0B', '#EF4444']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={sh.btnGradient}>
+                  <View style={[sh.btnGradient, { backgroundColor: '#F59E0B' }]}>
                     <Icon name="zap" size={16} color="#fff" />
                     <Text style={sh.btnTxt}>Recharger mon wallet</Text>
-                  </LinearGradient>
+                  </View>
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity
@@ -349,10 +366,8 @@ export const TicketPaymentSheet: React.FC<Props> = ({
                   disabled={loadingBal || buying || (isPaid && balance === null)}
                   activeOpacity={0.85}
                 >
-                  <LinearGradient
-                    colors={activeTier ? [activeTier.color, activeTier.color + 'BB'] : [colors.gradientStart ?? colors.primary, colors.gradientEnd ?? colors.primary + 'BB']}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                    style={sh.btnGradient}
+                  <View
+                    style={[sh.btnGradient, { backgroundColor: activeTier ? activeTier.color : (colors.gradientStart ?? colors.primary) }]}
                   >
                     {buying ? (
                       <ActivityIndicator color="#fff" size="small" />
@@ -366,7 +381,7 @@ export const TicketPaymentSheet: React.FC<Props> = ({
                         </Text>
                       </>
                     )}
-                  </LinearGradient>
+                  </View>
                 </TouchableOpacity>
               )}
             </View>

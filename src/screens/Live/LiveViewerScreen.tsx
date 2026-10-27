@@ -5,6 +5,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, StatusBar,
   Platform, FlatList, TextInput, KeyboardAvoidingView, Dimensions, Image,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import {
   LiveKitRoom,
@@ -13,18 +14,20 @@ import {
   useTracks,
 } from '@livekit/react-native';
 import { Track, VideoPresets } from 'livekit-client';
+import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
-import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { concertService, liveService, toastService } from '../../services';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { WS_BASE_URL, STORAGE_KEYS } from '../../utils/constants';
-import { openAuthenticatedWs } from '../../utils/authenticatedWs';
+import { openReconnectingAuthenticatedWs, type ReconnectingWs } from '../../utils/authenticatedWs';
 import { storage } from '../../utils/storage';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
+import { useAutoHideControls } from '../../hooks/useAutoHideControls';
 import { configureLiveAudioSession } from '../../utils/liveAudioSession';
+import { prefetchConcertLive, consumeConcertLivePrefetch, clearConcertLivePrefetch } from '../../utils/livePrefetch';
 import type { Concert } from '../../types';
 import { BackButton, GofolyxLoader } from '../../components/common';
 import { StageTileRow } from '../../components/live/StageTileRow';
@@ -122,6 +125,7 @@ const ArtistVideoView: React.FC<{
 export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
   useKeepAwake();
   useForceLandscape();
+  const { controlsVisible, onTapVideo } = useAutoHideControls();
   useEffect(() => { configureLiveAudioSession(); }, []);
   const nav = useNavigation();
   const insets = useSafeAreaInsets();
@@ -134,7 +138,10 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
   const [viewerCount, setViewerCount] = useState(0);
   const [chatMessages, setChatMessages] = useState<LiveChat[]>([]);
   const [chatInput, setChatInput] = useState('');
-  const [showChat, setShowChat] = useState(true);
+  // Préférence viewer persistée — indépendante du réglage host (comments_disabled) :
+  // le viewer peut masquer le chat même quand le host l'autorise, et ce choix
+  // est mémorisé pour les prochains lives (comme REELS_AUTO_ADVANCE).
+  const [showChat, setShowChat] = useState(() => storage.getBoolean(STORAGE_KEYS.LIVE_CHAT_VISIBLE) ?? true);
   const [sending, setSending] = useState(false);
   const [spotlightId, setSpotlightId] = useState<string | null>(null);
   // Le backend renvoie 402 quand access_type nécessite un ticket/abonnement
@@ -147,13 +154,28 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
 
   const chatListRef = useRef<FlatList>(null);
   const pollRef     = useRef<ReturnType<typeof setInterval> | null>(null);
-  const wsRef       = useRef<WebSocket | null>(null);
+  const wsRef       = useRef<ReconnectingWs | null>(null);
 
   // Charge le concert + récupère le token viewer — réutilisée au montage ET
   // après un achat de billet réussi (retry sans recharger tout l'écran).
   const loadConcertAndToken = useCallback(async () => {
     let c: Concert | null = null;
     try {
+      // Prefetch déjà résolu (carte liste tapée en pressIn, ou écran détail
+      // qui a préchargé dès que le concert est passé en direct) — on saute
+      // les deux appels réseau séquentiels, seul le handshake LiveKit reste.
+      const preloaded = consumeConcertLivePrefetch(concertId);
+      if (preloaded) {
+        c = preloaded.concert;
+        setConcert(c);
+        setToken(preloaded.token);
+        setWsUrl(preloaded.wsUrl);
+        setViewerCount(c.current_viewers + 1);
+        setAccessDenied(null);
+        setLoading(false);
+        return;
+      }
+
       c = await concertService.getById(concertId);
       setConcert(c);
       if (c.status !== 'live') {
@@ -191,9 +213,12 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
 
   useEffect(() => { loadConcertAndToken(); }, [loadConcertAndToken]);
 
-  // Poll viewer count + check if stream ended
+  // Poll viewer count + check if stream ended + reprend comments_disabled —
+  // le host peut couper/rouvrir le chat en cours de live (LiveStreamScreen),
+  // ce poll est ce qui permet au viewer de voir le changement sans recharger.
   useEffect(() => {
     if (!token) return;
+    let tick = 0;
     pollRef.current = setInterval(async () => {
       try {
         const s = await concertService.getStreamStatus(concertId);
@@ -203,6 +228,14 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
           setToken(null);
         }
       } catch {}
+      // Toutes les 3 ticks (~30s) — pas besoin d'actualiser comments_disabled
+      // aussi souvent que le compteur de viewers.
+      tick++;
+      if (tick % 3 === 0) {
+        concertService.getById(concertId)
+          .then(c => setConcert(prev => prev ? { ...prev, comments_disabled: c.comments_disabled } : prev))
+          .catch(() => {});
+      }
     }, 10000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [token, concertId]);
@@ -212,7 +245,7 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
     if (!token) return;
     const accessToken = storage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
     if (!accessToken) return;
-    const ws = openAuthenticatedWs(`${WS_BASE_URL}/api/v1/social/comments/ws/concert/${concertId}`, accessToken);
+    const ws = openReconnectingAuthenticatedWs(`${WS_BASE_URL}/api/v1/social/comments/ws/concert/${concertId}`, accessToken);
     wsRef.current = ws;
     ws.onmessage = (e) => {
       try {
@@ -228,9 +261,9 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
         }
       } catch {}
     };
-    const ping = setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) ws.send('{"type":"ping"}');
-    }, 25_000);
+    // send() est un no-op silencieux si la connexion est en cours de reprise —
+    // le prochain tick trouvera le socket reconnecté.
+    const ping = setInterval(() => { ws.send('{"type":"ping"}'); }, 25_000);
     return () => { clearInterval(ping); ws.close(); };
   }, [concertId, token]);
 
@@ -248,6 +281,7 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
   const handleLeave = useCallback(() => {
     if (pollRef.current) clearInterval(pollRef.current);
     wsRef.current?.close();
+    clearConcertLivePrefetch(concertId);
     if (onBack) onBack();
     else nav.goBack();
   }, [nav, onBack]);
@@ -381,14 +415,21 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
       >
         <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-        {/* Lecteur — plein écran paysage */}
-        <ArtistVideoView
-          hostId={concert?.artist_id ?? ''}
-          spotlightId={spotlightId}
-          onTapTile={setSpotlightId}
-        />
+        {/* Lecteur — plein écran paysage. Un tap affiche/masque les overlays
+            (header, chat, bandeau billet) — comme un lecteur vidéo classique,
+            même comportement que côté host (LiveStreamScreen). */}
+        <TouchableWithoutFeedback onPress={onTapVideo}>
+          <View style={StyleSheet.absoluteFill}>
+            <ArtistVideoView
+              hostId={concert?.artist_id ?? ''}
+              spotlightId={spotlightId}
+              onTapTile={setSpotlightId}
+            />
+          </View>
+        </TouchableWithoutFeedback>
 
         {/* Header — overlay, logo + titre à gauche, badges EN DIRECT/vues à droite */}
+        {controlsVisible && (
         <View style={[
           styles.header, styles.headerOverlay,
           { paddingTop: 10 + insets.top, paddingLeft: 16 + insets.left, paddingRight: 16 + insets.right },
@@ -414,9 +455,14 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
             </View>
           </View>
         </View>
+        )}
 
-        {/* Chat */}
-        {showChat && (
+        {/* Chat — désactivé entièrement si le host a coupé les commentaires
+            (comments_disabled, réglage serveur côté ConcertDetailScreen,
+            s'applique à tout le monde). Sinon, visibilité pilotée par la
+            préférence du viewer (persistée, voir showChat ci-dessus) + l'auto-
+            hide des overlays — jamais un bloc fixe qui mangerait la vidéo. */}
+        {!concert?.comments_disabled && controlsVisible && showChat && (
           <View style={[
             styles.chatContainer,
             {
@@ -424,13 +470,20 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
               paddingLeft: 12 + insets.left, paddingRight: 12 + insets.right,
             },
           ]}>
+            {/* Fondu vers transparent — détache visuellement le chat de la
+                vidéo derrière, plutôt qu'un bloc plat qui la cache. */}
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.55)']}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
             <FlatList
               ref={chatListRef}
-              data={chatMessages}
+              data={chatMessages.slice(-30)}
               keyExtractor={item => item.id}
               renderItem={({ item }) => (
                 <View style={styles.chatBubble}>
-                  <Text style={styles.chatUser}>{item.username}</Text>
+                  <Text style={styles.chatUser}>{item.username} </Text>
                   <Text style={styles.chatText}>{item.text}</Text>
                 </View>
               )}
@@ -461,12 +514,18 @@ export const LiveViewerScreen: React.FC<Props> = ({ concertId, onBack }) => {
           </View>
         )}
 
-        <TouchableOpacity
-          style={styles.toggleChatBtn}
-          onPress={() => setShowChat(p => !p)}
-        >
-          <Icon name="message-circle" size={20} color="#fff" />
-        </TouchableOpacity>
+        {!concert?.comments_disabled && controlsVisible && (
+          <TouchableOpacity
+            style={styles.toggleChatBtn}
+            onPress={() => setShowChat(p => {
+              const next = !p;
+              storage.setBoolean(STORAGE_KEYS.LIVE_CHAT_VISIBLE, next);
+              return next;
+            })}
+          >
+            <Icon name={showChat ? 'message-circle' : 'message-square'} size={20} color={showChat ? '#fff' : 'rgba(255,255,255,0.5)'} />
+          </TouchableOpacity>
+        )}
       </KeyboardAvoidingView>
     </LiveKitRoom>
   );
@@ -541,12 +600,14 @@ const styles = StyleSheet.create({
   ticketBannerBtnText: { color: '#fff', fontSize: 12.5, fontWeight: '800' },
   chatContainer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    maxHeight: '45%', paddingHorizontal: 12,
+    maxHeight: '38%', paddingHorizontal: 12,
   },
-  chatList: { flexGrow: 0, maxHeight: 250, marginBottom: 8 },
+  // Plafonné bas — un concert live se regarde toujours en paysage (hauteur
+  // d'écran réduite), le chat ne doit jamais prendre le pas sur la vidéo.
+  chatList: { flexGrow: 0, maxHeight: 160, marginBottom: 8 },
   chatBubble: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 4,
+    paddingHorizontal: 10, paddingVertical: 4, marginBottom: 2,
+    flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline',
   },
   chatUser: { color: '#E53E3E', fontSize: 11, fontWeight: '700' },
   chatText: { color: '#fff', fontSize: 13 },

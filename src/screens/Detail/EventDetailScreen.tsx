@@ -22,6 +22,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { SkeletonDetail, CommentsBottomSheet, ExpandableText, BackButton, GofolyxLoader, FriendsWhoLiked, PriceWithLocal, RepostBottomSheet } from '../../components/common';
 import { TicketPaymentSheet } from '../../components/wallet/TicketPaymentSheet';
 import { eventService, socialService, authService, toastService, showConfirm, liveService } from '../../services';
+import { prefetchSimpleLive } from '../../utils/livePrefetch';
 import { favoriteService } from '../../services/favoriteService';
 import type { Event } from '../../types/event';
 import type { AppColors } from '../../theme/colors';
@@ -186,9 +187,9 @@ const HeroInfoCard: React.FC<{
           {organizerAvatar ? (
             <Image source={{ uri: organizerAvatar }} style={{ width: 24, height: 24 }} resizeMode="cover" />
           ) : (
-            <LinearGradient colors={[accent, accent + '88']} style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: accent }}>
               <Text style={{ fontSize: FontSize['2xs'], fontWeight: FontWeight.black, color: '#fff' }}>{getInitials(organizerName)}</Text>
-            </LinearGradient>
+            </View>
           )}
         </View>
         <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, color: colors.textSecondary }}>{organizerName}</Text>
@@ -677,15 +678,15 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
           <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4, gap: 10 }}>
             {isLiveNow && (
               <TouchableOpacity activeOpacity={0.88}
+                onPressIn={() => { if (event.live_id) prefetchSimpleLive(event.live_id); }}
                 onPress={() => nav.navigate('SimpleLiveViewer' as any, { liveId: event.live_id })}>
-                <LinearGradient colors={['#EF4444', '#DC2626']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  style={ds.ctaGradient}>
+                <View style={[{ backgroundColor: '#EF4444' }, ds.ctaGradient]}>
                   <Icon name="radio" size={20} color="#fff" />
                   <Text style={ds.ctaText}>Regarder en direct</Text>
                   <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, marginLeft: 'auto' as any }}>
                     <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, color: '#fff' }}>LIVE</Text>
                   </View>
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
             )}
             {isScheduled && (
@@ -700,11 +701,10 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
             {hasReplay && (
               <TouchableOpacity activeOpacity={0.88}
                 onPress={() => nav.navigate('VideoPlayer' as any, { url: replayUrl, title: event.title, thumbnailUrl: event.thumbnail_url ?? undefined })}>
-                <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  style={ds.ctaGradient}>
+                <View style={[{ backgroundColor: colors.gradientStart }, ds.ctaGradient]}>
                   <Icon name="play" size={20} color="#fff" />
                   <Text style={ds.ctaText}>Regarder le replay</Text>
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
             )}
             {isCompleted && event.live_id && !hasReplay && (
@@ -910,14 +910,14 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
           </View>
         ) : isRegistered ? (
           <TouchableOpacity onPress={handleViewTicket} disabled={ticketLoading} activeOpacity={0.85}>
-            <LinearGradient colors={['#10B981', '#059669']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={ds.ctaGradient}>
+            <View style={[{ backgroundColor: '#10B981' }, ds.ctaGradient]}>
               {ticketLoading ? <ActivityIndicator color="#fff" /> : <Icon name="credit-card" size={20} color="#fff" />}
               <Text style={ds.ctaText}>Voir mon billet</Text>
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         ) : isFree ? null : (
           <TouchableOpacity onPress={handleBuyTicket} activeOpacity={0.85}>
-            <LinearGradient colors={[accent, accent + 'CC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={ds.ctaGradient}>
+            <View style={[{ backgroundColor: accent }, ds.ctaGradient]}>
               <Icon name={isInviteOnly ? 'lock' : 'tag'} size={20} color="#fff" />
               <Text style={ds.ctaText}>
                 {isInviteOnly ? 'Accès sur invitation'
@@ -933,7 +933,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
                   <Text style={{ fontSize: FontSize['2xs'], color: 'rgba(255,255,255,0.65)', fontWeight: FontWeight.semiBold }}>frais inclus</Text>
                 </View>
               )}
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         )}
       </View>

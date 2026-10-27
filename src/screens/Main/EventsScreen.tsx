@@ -4,7 +4,6 @@ import {
   ScrollView, RefreshControl, Image, TextInput, Keyboard,
 } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
@@ -195,14 +194,13 @@ const EventCard: React.FC<EventCardProps> = ({ event, colors, onPress, onDelete 
             style={s.cardImage}
           />
         ) : (
-          <LinearGradient
-            colors={[accent + 'CC', accent + '44']}
-            style={s.cardImage}
+          <View
+            style={[s.cardImage, { backgroundColor: accent + 'CC' }]}
           >
             <View style={s.cardImageOverlay}>
               <Icon name={cfg.icon} size={32} color="rgba(255,255,255,0.6)" />
             </View>
-          </LinearGradient>
+          </View>
         )}
         {/* Date badge overlay */}
         <View style={[s.dateBadge, { backgroundColor: 'rgba(0,0,0,0.55)' }]}>

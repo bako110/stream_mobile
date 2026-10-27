@@ -9,7 +9,6 @@ import Animated, {
   withRepeat, withTiming, interpolate,
   Easing,
 } from 'react-native-reanimated';
-import LinearGradient from 'react-native-linear-gradient';
 import { useTheme } from '../../hooks/useTheme';
 import { BorderRadius, Spacing } from '../../theme';
 
@@ -49,11 +48,8 @@ export const SkeletonBox: React.FC<{
       ]}
     >
       <Animated.View style={[StyleSheet.absoluteFill, shimmerStyle]}>
-        <LinearGradient
-          colors={['transparent', colors.skeletonHighlight + 'E0', 'transparent']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={StyleSheet.absoluteFill}
+        <View
+          style={[StyleSheet.absoluteFill, { backgroundColor: colors.skeletonHighlight + 'E0' }]}
         />
       </Animated.View>
     </View>

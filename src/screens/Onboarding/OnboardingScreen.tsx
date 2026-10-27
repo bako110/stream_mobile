@@ -8,7 +8,6 @@ import Animated, {
   withTiming, withDelay, withSpring,
   Easing,
 } from 'react-native-reanimated';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
 import { getLogo } from '../../assets';
@@ -94,13 +93,9 @@ export const OnboardingScreen: React.FC<Props> = ({ onFinish, onLogin, onGoCGU, 
         translucent
       />
 
-      {/* Fond dégradé */}
-      <LinearGradient
-        colors={isDark
-          ? ['#09071C', '#130B2E', '#1A0A20']
-          : ['#F5F3FF', '#EDE8FF', '#F9F5FF']}
-        locations={[0, 0.55, 1]}
-        style={StyleSheet.absoluteFill}
+      {/* Fond */}
+      <View
+        style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? '#09071C' : '#F5F3FF' }]}
       />
 
       {/* Lueurs de fond */}
@@ -156,14 +151,10 @@ export const OnboardingScreen: React.FC<Props> = ({ onFinish, onLogin, onGoCGU, 
 
         {/* Bouton principal */}
         <TouchableOpacity onPress={onFinish} activeOpacity={0.88} style={{ width: '100%' }}>
-          <LinearGradient
-            colors={['#7B3FF2', '#E0389A']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={s.ctaBtn}
-          >
+          <View style={[s.ctaBtn, { backgroundColor: '#7B3FF2' }]}>
             <Text style={s.ctaBtnTxt}>Rejoindre Gofolyx</Text>
             <Icon name="arrow-right" size={18} color="#fff" />
-          </LinearGradient>
+          </View>
         </TouchableOpacity>
 
         {/* Connexion */}

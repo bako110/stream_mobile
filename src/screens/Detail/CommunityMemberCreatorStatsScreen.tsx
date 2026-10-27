@@ -3,7 +3,6 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   StatusBar, RefreshControl, Animated,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -80,14 +79,14 @@ interface SectionCardProps {
 function SectionCard({ title, icon, gradient, children, colors }: SectionCardProps) {
   return (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.cardHeader}>
+      <View style={[{ backgroundColor: gradient[0] }, styles.cardHeader]}>
         <View style={styles.cardHeaderLeft}>
           <View style={styles.cardIconWrap}>
             <Icon name={icon} size={16} color="#fff" />
           </View>
           <Text style={styles.cardTitle}>{title}</Text>
         </View>
-      </LinearGradient>
+      </View>
       <View style={styles.cardBody}>{children}</View>
     </View>
   );
@@ -175,7 +174,7 @@ export function CommunityMemberCreatorStatsScreen({ route }: Props) {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         >
           {/* Bannière recap */}
-          <LinearGradient colors={['#3A1480', '#7B3FF2', '#E0389A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.heroBanner}>
+          <View style={[{ backgroundColor: '#3A1480' }, styles.heroBanner]}>
             <Text style={styles.heroName}>{memberName}</Text>
             <Text style={styles.heroCommunity}>{communityName}</Text>
             <View style={styles.heroRow}>
@@ -194,7 +193,7 @@ export function CommunityMemberCreatorStatsScreen({ route }: Props) {
                 <Text style={styles.heroStatLabel}>GoGold gagnés</Text>
               </View>
             </View>
-          </LinearGradient>
+          </View>
 
           {/* Reels */}
           <SectionCard title="Reels" icon="film" gradient={['#7B3FF2', '#5B1FD2']} colors={colors}>

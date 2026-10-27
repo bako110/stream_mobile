@@ -211,12 +211,11 @@ const ConcertCard: React.FC<ConcertCardProps> = ({ concert, colors, onPress, onD
         {concert.thumbnail_url ? (
           <Image source={{ uri: concert.thumbnail_url }} style={s.thumb} />
         ) : (
-          <LinearGradient
-            colors={[colors.gradientStart + '60', colors.gradientEnd + '30']}
-            style={s.thumb}
+          <View
+            style={[s.thumb, { backgroundColor: colors.gradientStart + '60' }]}
           >
             <Icon name="music" size={40} color={colors.textOnBrand + 'AA'} />
-          </LinearGradient>
+          </View>
         )}
 
         {/* Overlay gradient bottom */}
@@ -309,12 +308,11 @@ const NearbyCard: React.FC<NearbyCardProps> = ({ concert, colors, onPress }) => 
         {concert.thumbnail_url ? (
           <Image source={{ uri: concert.thumbnail_url }} style={s.nearbyThumb} resizeMode="cover" />
         ) : (
-          <LinearGradient
-            colors={[colors.gradientStart + '60', colors.gradientEnd + '30']}
-            style={s.nearbyThumb}
+          <View
+            style={[s.nearbyThumb, { backgroundColor: colors.gradientStart + '60' }]}
           >
             <Icon name="music" size={28} color={colors.textOnBrand + 'AA'} />
-          </LinearGradient>
+          </View>
         )}
 
         {/* Badge LIVE */}

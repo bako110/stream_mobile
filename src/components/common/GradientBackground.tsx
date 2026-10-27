@@ -1,6 +1,5 @@
 import React from 'react';
-import { StyleSheet, ViewStyle } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import { View, StyleSheet, ViewStyle } from 'react-native';
 import { useTheme } from '../../hooks/useTheme';
 
 interface Props {
@@ -11,23 +10,18 @@ interface Props {
   end?: { x: number; y: number };
 }
 
-export const GradientBackground: React.FC<Props> = ({
-  children,
-  style,
-  colors,
-  start = { x: 0.1, y: 0 },
-  end = { x: 0.9, y: 1 },
-}) => {
+// Couleur unie — anciennement un LinearGradient (gradientStart → gradientEnd).
+// `colors`/`start`/`end` restent acceptés pour compat des appelants existants :
+// seule la première couleur de `colors` (ou colors.primary par défaut) sert
+// de fond, le reste est ignoré.
+export const GradientBackground: React.FC<Props> = ({ children, style, colors }) => {
   const { theme } = useTheme();
-  const gradColors = colors ?? [
-    theme.colors.gradientStart,
-    theme.colors.gradientEnd,
-  ];
+  const bgColor = colors?.[0] ?? theme.colors.primary;
 
   return (
-    <LinearGradient colors={gradColors} start={start} end={end} style={[styles.fill, style]}>
+    <View style={[styles.fill, { backgroundColor: bgColor }, style]}>
       {children}
-    </LinearGradient>
+    </View>
   );
 };
 

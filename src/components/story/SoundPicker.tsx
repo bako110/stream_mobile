@@ -4,7 +4,6 @@ import {
   StatusBar, ActivityIndicator, TextInput, FlatList,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Sound from 'react-native-sound';
@@ -147,7 +146,7 @@ export const SoundPicker: React.FC<Props> = ({ colors, onGoBack, onSelectLocal, 
       <ScrollView style={{ flex: 0 }} contentContainerStyle={{ paddingTop: 20, paddingHorizontal: 20 }}>
         <Animated.View entering={FadeInDown.delay(40).springify()}>
           <TouchableOpacity style={sp.localCard} onPress={onSelectLocal} activeOpacity={0.8}>
-            <LinearGradient colors={['#E65100', '#FF9800']} style={sp.localCardInner}>
+            <View style={[sp.localCardInner, { backgroundColor: '#E65100' }]}>
               <View style={sp.localIconWrap}>
                 <MaterialIcon name="folder-music" size={24} color="#fff" />
               </View>
@@ -156,7 +155,7 @@ export const SoundPicker: React.FC<Props> = ({ colors, onGoBack, onSelectLocal, 
                 <Text style={sp.localSub}>MP3, M4A, AAC, WAV, OGG</Text>
               </View>
               <Icon name="chevron-right" size={18} color="rgba(255,255,255,0.85)" />
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         </Animated.View>
       </ScrollView>

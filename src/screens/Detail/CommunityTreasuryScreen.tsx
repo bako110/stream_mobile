@@ -7,7 +7,6 @@ import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   RefreshControl, StatusBar,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { BackButton, GofolyxLoader, PriceWithLocal } from '../../components/common';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -116,10 +115,8 @@ export const CommunityTreasuryScreen: React.FC = () => {
           ListHeaderComponent={
             <View>
               {/* Card solde principal */}
-              <LinearGradient
-                colors={['#7B3FF2', '#E0389A']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                style={{ margin: 16, borderRadius: 22, padding: 22 }}
+              <View
+                style={{ margin: 16, borderRadius: 22, padding: 22, backgroundColor: '#7B3FF2' }}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
                   <View style={{ width: 42, height: 42, borderRadius: 21,
@@ -157,7 +154,7 @@ export const CommunityTreasuryScreen: React.FC = () => {
                     </View>
                   ))}
                 </View>
-              </LinearGradient>
+              </View>
 
               {/* Titre historique */}
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

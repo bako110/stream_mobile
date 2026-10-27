@@ -8,7 +8,6 @@ import React, { useEffect, useRef, useState, useImperativeHandle } from 'react';
 import {
   View, Text, StyleSheet, Animated, Dimensions, Platform,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Sound from 'react-native-sound';
 
 Sound.setCategory('Ambient', true);
@@ -98,10 +97,8 @@ const GiftToast: React.FC<{ notif: GiftNotif; onDone: () => void }> = ({ notif, 
 
   return (
     <Animated.View style={[g.giftToast, { opacity, transform: [{ translateX: x }] }]}>
-      <LinearGradient
-        colors={['rgba(255,215,0,0.25)', 'rgba(255,140,0,0.25)']}
-        style={g.giftToastBg}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+      <View
+        style={[g.giftToastBg, { backgroundColor: 'rgba(255,215,0,0.25)' }]}
       >
         <Text style={g.giftToastEmoji}>{notif.emoji}</Text>
         <View style={{ flex: 1 }}>
@@ -110,7 +107,7 @@ const GiftToast: React.FC<{ notif: GiftNotif; onDone: () => void }> = ({ notif, 
             a envoyé {notif.giftName} · {notif.GoGold} 🪙
           </Text>
         </View>
-      </LinearGradient>
+      </View>
     </Animated.View>
   );
 };

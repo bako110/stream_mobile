@@ -8,7 +8,6 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import LinearGradient from 'react-native-linear-gradient';
 import { BackButton, GofolyxLoader, PriceWithLocal } from '../../components/common';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,10 +26,8 @@ const coins2eur = (GoGold: number) => (GoGold / EUR_TO_COINS).toFixed(2);
 // ── Section "Comment ça marche" ────────────────────────────────────────────────
 const HowItWorks: React.FC<{ colors: any }> = ({ colors }) => (
   <View style={{ marginBottom: 20 }}>
-    <LinearGradient
-      colors={[colors.gradientStart, colors.gradientEnd]}
-      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-      style={{ borderRadius: 18, padding: 18, marginBottom: 12 }}
+    <View
+      style={{ borderRadius: 18, padding: 18, marginBottom: 12, backgroundColor: colors.gradientStart }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
         <MaterialCommunityIcons name="bullhorn" size={20} color="#fff" />
@@ -49,7 +46,7 @@ const HowItWorks: React.FC<{ colors: any }> = ({ colors }) => (
           <Text style={{ color: 'rgba(255,255,255,0.92)', fontSize: FontSize.smPlus, flex: 1, lineHeight: 18 }}>{r.text}</Text>
         </View>
       ))}
-    </LinearGradient>
+    </View>
 
     {/* Tableau CPM */}
     <View style={[{ borderRadius: 16, borderWidth: 1, borderColor: colors.divider, backgroundColor: colors.surface, overflow: 'hidden' }]}>

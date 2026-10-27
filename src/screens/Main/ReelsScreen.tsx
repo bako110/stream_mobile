@@ -2299,8 +2299,8 @@ const SearchAdCard: React.FC<{ ad: SearchAdCardData; onOpenFullscreen: (ad: Sear
         />
       )}
       <LinearGradient colors={['transparent', 'rgba(0,0,0,0.35)', 'rgba(0,0,0,0.94)']} locations={[0.25, 0.6, 1]} style={s.searchCardGrad} />
-      {/* Repère éditorial : filet gradient 2px en haut + mot « Annonce » (fini la pastille rose) */}
-      <LinearGradient colors={['#7B3FF2', '#E0389A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.searchAdRule} />
+      {/* Repère éditorial : filet 2px en haut + mot « Annonce » (fini la pastille rose) */}
+      <View style={[s.searchAdRule, { backgroundColor: '#7B3FF2' }]} />
       <Text style={s.searchAdMark}>Annonce</Text>
       <View style={s.searchCardInfo}>
         <Text style={s.searchCardAuthor} numberOfLines={1}>{ad.title}</Text>

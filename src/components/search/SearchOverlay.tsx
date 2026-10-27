@@ -163,9 +163,9 @@ const SearchOverlayContent: React.FC<{ state: SearchOverlayState }> = ({ state }
 
             const SrSection = ({ icon, label, count, accent }: { icon: string; label: string; count: number; accent: string }) => (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 24, paddingBottom: 8 }}>
-                <LinearGradient colors={[accent, accent + 'AA']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{ backgroundColor: accent, width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}>
                   <Icon name={icon} size={13} color="#fff" />
-                </LinearGradient>
+                </View>
                 <Text style={{ flex: 1, fontSize: FontSize.smPlus, fontWeight: FontWeight.extraBold, color: colors.textPrimary, letterSpacing: 0.2, textTransform: 'uppercase' }}>{label}</Text>
                 <View style={{ backgroundColor: accent + '18', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 }}>
                   <Text style={{ fontSize: FontSize.xsPlus, fontWeight: FontWeight.extraBold, color: accent }}>{count}</Text>

@@ -5,7 +5,6 @@ import {
   Modal, KeyboardAvoidingView, Platform, StatusBar,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
-import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { FontSize, FontWeight } from '../../theme';
@@ -160,15 +159,10 @@ export const CommunityJoinRequestsScreen: React.FC<Props> = ({ route }) => {
             {isProcessing ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
-              <LinearGradient
-                colors={['#36D9A0', '#0EA5E9']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={s.btnApproveInner}
-              >
+              <View style={[{ backgroundColor: '#36D9A0' }, s.btnApproveInner]}>
                 <Icon name="check" size={15} color="#fff" />
                 <Text style={s.btnApproveTxt}>Accepter</Text>
-              </LinearGradient>
+              </View>
             )}
           </TouchableOpacity>
         </View>

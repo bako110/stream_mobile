@@ -4,7 +4,6 @@ import {
   StyleSheet, ActivityIndicator, Image,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
-import LinearGradient from 'react-native-linear-gradient';
 import { useTheme } from '../../hooks/useTheme';
 import { useCurrency } from '../../hooks/useCurrency';
 import { AppHeader } from '../../components/common';
@@ -151,9 +150,9 @@ export const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
             ) : user?.avatar_url ? (
               <Image source={{ uri: user.avatar_url }} style={s.avatarCircle} />
             ) : (
-              <LinearGradient colors={[colors.primary, colors.primary + 'AA']} style={s.avatarCircle}>
+              <View style={[s.avatarCircle, { backgroundColor: colors.primary }]}>
                 <Text style={s.avatarInitial}>{initials}</Text>
-              </LinearGradient>
+              </View>
             )}
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>

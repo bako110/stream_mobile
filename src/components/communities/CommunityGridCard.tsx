@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import type { CommunityData } from '../../services/communityService';
 
@@ -10,8 +9,8 @@ function fmtCount(n: number): string {
   return String(n);
 }
 
-function gradientFor(_name: string): [string, string] {
-  return ['#7B3FF2', '#9B65F5'];
+function colorFor(_name: string): string {
+  return '#7B3FF2';
 }
 
 // Carte compacte pour l'affichage en grille 2 colonnes de "Mes communautés" —
@@ -37,9 +36,9 @@ export const CommunityGridCard = React.memo(function CommunityGridCard({
         {item.avatar_url ? (
           <Image source={{ uri: item.avatar_url }} style={G.avatar} />
         ) : (
-          <LinearGradient colors={gradientFor(item.name)} style={G.avatarGrad}>
+          <View style={[G.avatarGrad, { backgroundColor: colorFor(item.name) }]}>
             <Text style={G.avatarLetter}>{(item.name[0] ?? '?').toUpperCase()}</Text>
-          </LinearGradient>
+          </View>
         )}
         {item.is_verified && (
           <View style={G.verifiedDot}>

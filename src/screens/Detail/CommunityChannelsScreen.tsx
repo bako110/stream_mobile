@@ -6,7 +6,6 @@ import {
   Dimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
-import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -556,11 +555,11 @@ export const CommunityChannelsScreen: React.FC = () => {
                   onPress={handleSave}
                   disabled={saving || avatarUploading}
                 >
-                  <LinearGradient colors={['#7B3FF2', '#E0389A']} style={S.saveBtnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                  <View style={[{ backgroundColor: '#7B3FF2' }, S.saveBtnGrad]}>
                     {saving ? <ActivityIndicator color="#fff" size="small" />
                       : <Text style={S.saveBtnText}>{editChannel ? 'Enregistrer' : 'Créer le canal'}</Text>
                     }
-                  </LinearGradient>
+                  </View>
                 </TouchableOpacity>
                 <View style={{ height: Math.max(24, insets.bottom) }} />
               </ScrollView>

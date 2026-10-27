@@ -46,7 +46,7 @@ import { toastService, showConfirm } from '../../services';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { WS_BASE_URL, STORAGE_KEYS } from '../../utils/constants';
-import { openAuthenticatedWs } from '../../utils/authenticatedWs';
+import { openReconnectingAuthenticatedWs, type ReconnectingWs } from '../../utils/authenticatedWs';
 import { storage } from '../../utils/storage';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
 import { configureLiveAudioSession } from '../../utils/liveAudioSession';
@@ -376,7 +376,7 @@ const StreamContent: React.FC<{
   const [liveData,     setLiveData]     = useState<LiveStream | null>(null);
 
   const chatRef     = useRef<FlatList>(null);
-  const wsRef       = useRef<WebSocket | null>(null);
+  const wsRef       = useRef<ReconnectingWs | null>(null);
   const timerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
   const [showLaunchBanner, setShowLaunchBanner] = useState(true);
   const giftRef  = useRef<LiveGiftOverlayRef>(null);
@@ -490,9 +490,9 @@ const StreamContent: React.FC<{
     if (!liveId) { if (__DEV__) console.warn('[host WS] liveId manquant, WS non ouvert'); return; }
     const accessToken = storage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
     if (!accessToken) { if (__DEV__) console.warn('[host WS] accessToken manquant, WS non ouvert'); return; }
-    let ws: WebSocket;
+    let ws: ReconnectingWs;
     try {
-      ws = openAuthenticatedWs(`${WS_BASE_URL}/api/v1/social/comments/ws/live/${liveId}`, accessToken);
+      ws = openReconnectingAuthenticatedWs(`${WS_BASE_URL}/api/v1/social/comments/ws/live/${liveId}`, accessToken);
       if (__DEV__) console.warn('[host WS] connexion ouverte vers', liveId);
     } catch (e) { if (__DEV__) console.warn('[host WS] échec création WebSocket', e); return; }
     wsRef.current = ws;
@@ -620,9 +620,7 @@ const StreamContent: React.FC<{
       } catch {}
     };
 
-    const ping = setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) ws.send('{"type":"ping"}');
-    }, 25_000);
+    const ping = setInterval(() => { ws.send('{"type":"ping"}'); }, 25_000);
     return () => { clearInterval(ping); try { ws.close(); } catch {} };
   }, [liveId, addSysMsg, refreshRanking, bumpDonorsVisibility]);
 
@@ -879,14 +877,14 @@ const StreamContent: React.FC<{
         <View style={st.giftTickerZone} pointerEvents="none">
           {giftTicker.map(t => (
             <Animated.View key={t.id} entering={FadeIn.duration(300)} exiting={FadeOut.duration(400)} style={st.giftTickerRow}>
-              <LinearGradient colors={['#F0365A', '#9B65F5']} style={st.giftTickerGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+              <View style={[st.giftTickerGrad, { backgroundColor: '#F0365A' }]}>
                 <Text style={st.giftTickerEmoji}>{t.emoji}</Text>
                 <Text style={st.giftTickerText} numberOfLines={1}>
                   <Text style={st.giftTickerSender}>{t.senderName}</Text>
                   {' · '}{t.giftName}
                 </Text>
                 <Text style={st.giftTickerGoGold}>{t.GoGold} 🪙</Text>
-              </LinearGradient>
+              </View>
             </Animated.View>
           ))}
         </View>

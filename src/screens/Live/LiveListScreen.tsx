@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { SkeletonLiveList, BackButton, GofolyxLoader } from '../../components/common';
 import { concertService, eventService } from '../../services';
+import { prefetchConcertLive } from '../../utils/livePrefetch';
 import { useUser } from '../../context/UserContext';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import type { Concert, UpcomingLiveMixedItem } from '../../types/concert';
@@ -154,9 +155,9 @@ export const LiveListScreen: React.FC = () => {
         {item.thumbnail_url ? (
           <Image source={{ uri: item.thumbnail_url }} style={st.liveThumb} />
         ) : (
-          <LinearGradient colors={['#7B3FF2', '#E0389A']} style={st.liveThumb} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+          <View style={[st.liveThumb, { backgroundColor: '#7B3FF2' }]}>
             <Icon name="calendar" size={36} color="#fff" />
-          </LinearGradient>
+          </View>
         )}
         <LinearGradient colors={['transparent', 'rgba(0,0,0,0.7)']} style={st.liveOverlay} />
         <View style={st.liveBadge}>
@@ -185,6 +186,7 @@ export const LiveListScreen: React.FC = () => {
       <TouchableOpacity
           style={[st.liveCard, { backgroundColor: colors.surface }]}
           activeOpacity={0.85}
+          onPressIn={() => { if (item.status === 'live' && currentUser?.id !== item.artist_id) prefetchConcertLive(item.id); }}
           onPress={() => handlePress(item)}
         >
           {/* Thumbnail */}
@@ -192,14 +194,9 @@ export const LiveListScreen: React.FC = () => {
             {item.thumbnail_url ? (
               <Image source={{ uri: item.thumbnail_url }} style={st.liveThumb} />
             ) : (
-              <LinearGradient
-                colors={['#7B3FF2', '#E0389A']}
-                style={st.liveThumb}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
+              <View style={[st.liveThumb, { backgroundColor: '#7B3FF2' }]}>
                 <Icon name="radio" size={36} color="#fff" />
-              </LinearGradient>
+              </View>
             )}
             {/* Overlay gradient */}
             <LinearGradient

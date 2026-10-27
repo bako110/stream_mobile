@@ -118,10 +118,10 @@ export const CreateCaptionScreen: React.FC<Props> = ({
         {/* ══ CTA ══ */}
         <View style={[s.footer, { paddingBottom: Math.max(insets.bottom, 16) + 8 }]}>
           <TouchableOpacity onPress={onNext} activeOpacity={0.88} style={s.nextBtnWrap}>
-            <LinearGradient colors={['#7B3FF2', '#C026D3']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.nextBtn}>
+            <View style={[s.nextBtn, { backgroundColor: '#7B3FF2' }]}>
               <Text style={s.nextBtnTxt}>Continuer</Text>
               <Icon name="arrow-right" size={17} color="#fff" />
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
           <TouchableOpacity onPress={onNext} activeOpacity={0.7} style={s.skipBtn}>
             <Text style={s.skipTxt}>Passer cette étape</Text>

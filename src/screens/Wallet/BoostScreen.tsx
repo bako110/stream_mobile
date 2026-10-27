@@ -6,7 +6,6 @@ import {
   Animated, Modal, TextInput,
   FlatList, Image, RefreshControl,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -410,14 +409,14 @@ const ActiveBoostCard: React.FC<{
     <>
       <View style={[abc.card, { backgroundColor: colors.surface, borderColor: g1 + '35' }]}>
         {/* Barre accent top */}
-        <LinearGradient colors={[g1, g2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={abc.topBar} />
+        <View style={[abc.topBar, { backgroundColor: g1 }]} />
 
         <View style={{ padding: 14, gap: 12 }}>
           {/* Header : icône + titre + badge statut */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <LinearGradient colors={[g1, g2]} style={abc.iconBox}>
+            <View style={[abc.iconBox, { backgroundColor: g1 }]}>
               <Icon name={cat.icon as any} size={20} color="#fff" />
-            </LinearGradient>
+            </View>
             <View style={{ flex: 1 }}>
               <Text style={{ color: colors.textPrimary, fontSize: FontSize.basePlus, fontWeight: FontWeight.extraBold }} numberOfLines={1}>
                 {boost.tier_label}
@@ -444,8 +443,7 @@ const ActiveBoostCard: React.FC<{
             {/* Barre haute + gradient */}
             <View style={{ height: 10, backgroundColor: colors.backgroundSecondary, borderRadius: 5, overflow: 'hidden' }}>
               <Animated.View style={[{ height: 10, borderRadius: 5 }, { width: progressWidth }]}>
-                <LinearGradient colors={[g1, g2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  style={{ flex: 1 }} />
+                <View style={{ flex: 1, backgroundColor: g1 }} />
               </Animated.View>
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -701,13 +699,13 @@ const SuggestionCard: React.FC<{
 
   return (
     <View style={[sc.card, { backgroundColor: colors.surface, borderColor: g1 + '30' }]}>
-      <LinearGradient colors={[g1, g2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={sc.topBar} />
+      <View style={[sc.topBar, { backgroundColor: g1 }]} />
 
       <View style={sc.body}>
         {/* Icon + impact label */}
-        <LinearGradient colors={[g1, g2]} style={sc.iconBox}>
+        <View style={[sc.iconBox, { backgroundColor: g1 }]}>
           <Icon name={icon as any} size={18} color="#fff" />
-        </LinearGradient>
+        </View>
 
         <View style={{ flex: 1 }}>
           <View style={sc.topRow}>
@@ -751,12 +749,12 @@ const SuggestionCard: React.FC<{
           activeOpacity={0.85}
           style={[sc.boostBtnWrap, { opacity: canAfford ? 1 : 0.55 }]}
         >
-          <LinearGradient colors={canAfford ? [g1, g2] : ['#888', '#666']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={sc.boostBtn}>
+          <View style={[sc.boostBtn, { backgroundColor: canAfford ? g1 : '#888' }]}>
             <Icon name="zap" size={12} color="#fff" />
             <Text style={sc.boostBtnText}>
               {canAfford ? `${suggestion.gogold.toLocaleString('fr-FR')} GoGold` : 'Solde insuffisant'}
             </Text>
-          </LinearGradient>
+          </View>
         </TouchableOpacity>
       </View>
     </View>
@@ -1034,9 +1032,9 @@ export default function BoostScreen() {
             <ActivityIndicator style={{ marginTop: 40 }} color="#7B3FF2" />
           ) : suggestions.length === 0 ? (
             <View style={s.emptyState}>
-              <LinearGradient colors={['#7B3FF2', '#E0389A']} style={s.emptyIcon}>
+              <View style={[s.emptyIcon, { backgroundColor: '#7B3FF2' }]}>
                 <Icon name="star" size={28} color="#fff" />
-              </LinearGradient>
+              </View>
               <Text style={[s.emptyTitle, { color: colors.textPrimary }]}>Aucune suggestion pour l'instant</Text>
               <Text style={[s.emptySub, { color: colors.textTertiary }]}>
                 Publie des reels ou des events pour obtenir des recommandations personnalisees.
@@ -1071,10 +1069,10 @@ export default function BoostScreen() {
               const [og1, og2] = c.gradient;
               return isActive ? (
                 <TouchableOpacity key={c.id} onPress={() => selectCat(i)} activeOpacity={0.85}>
-                  <LinearGradient colors={[og1, og2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.catActive}>
+                  <View style={[s.catActive, { backgroundColor: og1 }]}>
                     <Icon name={c.icon as any} size={13} color="#fff" />
                     <Text style={s.catActiveText}>{c.label}</Text>
-                  </LinearGradient>
+                  </View>
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity
@@ -1092,9 +1090,9 @@ export default function BoostScreen() {
 
           {/* Description categorie */}
           <View style={[s.descBox, { backgroundColor: g1 + '12', borderColor: g1 + '30' }]}>
-            <LinearGradient colors={[g1, g2]} style={s.descIcon}>
+            <View style={[s.descIcon, { backgroundColor: g1 }]}>
               <Icon name={cat.icon as any} size={18} color="#fff" />
-            </LinearGradient>
+            </View>
             <View style={{ flex: 1 }}>
               <Text style={[s.descTitle, { color: colors.textPrimary }]}>{cat.label}</Text>
               <Text style={[s.descSublabel, { color: g1 }]}>{cat.sublabel}</Text>
@@ -1156,13 +1154,13 @@ export default function BoostScreen() {
                     style={{ width: '48%', opacity: !afford || locked ? 0.45 : 1 }}
                   >
                     {isSel ? (
-                      <LinearGradient colors={[g1, g2]} style={[s.tierCard, s.tierSelected]}>
+                      <View style={[s.tierCard, s.tierSelected, { backgroundColor: g1 }]}>
                         {tier.popular && <View style={s.popularBadge}><Text style={s.popularText}>POPULAIRE</Text></View>}
                         <Text style={[s.tierLabel, { color: 'rgba(255,255,255,0.8)' }]}>{tier.label}</Text>
                         <Text style={[s.tierQty, { color: '#fff' }]}>{tier.quantity}</Text>
                         <Text style={[s.tierDur, { color: 'rgba(255,255,255,0.7)' }]}>{tier.duration}</Text>
                         <Text style={[s.tierGoGold, { color: '#fff' }]}>{tier.GoGold.toLocaleString('fr-FR')} GoGold</Text>
-                      </LinearGradient>
+                      </View>
                     ) : (
                       <View style={[s.tierCard, { backgroundColor: colors.surface, borderColor: tier.popular ? g1 : colors.border }]}>
                         {tier.popular && <View style={[s.popularBadge, { backgroundColor: g1 }]}><Text style={s.popularText}>POPULAIRE</Text></View>}
@@ -1236,14 +1234,14 @@ export default function BoostScreen() {
                 activeOpacity={0.85}
                 style={{ borderRadius: 16, overflow: 'hidden', opacity: balance < customGoGold ? 0.4 : 1 }}
               >
-                <LinearGradient colors={[g1, g2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.buyInner}>
+                <View style={[s.buyInner, { backgroundColor: g1 }]}>
                   <Icon name="zap" size={15} color="#fff" />
                   <Text style={s.buyText}>
                     {balance >= customGoGold
                       ? `Booster pour ${customGoGold.toLocaleString('fr-FR')} GoGold`
                       : 'Solde insuffisant'}
                   </Text>
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
             </View>
           )}
@@ -1276,9 +1274,9 @@ export default function BoostScreen() {
             <ActivityIndicator style={{ marginTop: 60 }} color="#7B3FF2" />
           ) : activeBoosts.length === 0 ? (
             <View style={s.emptyState}>
-              <LinearGradient colors={['#7B3FF2', '#E0389A']} style={s.emptyIcon}>
+              <View style={[s.emptyIcon, { backgroundColor: '#7B3FF2' }]}>
                 <Icon name="zap" size={28} color="#fff" />
-              </LinearGradient>
+              </View>
               <Text style={[s.emptyTitle, { color: colors.textPrimary }]}>Aucun boost actif</Text>
               <Text style={[s.emptySub, { color: colors.textTertiary }]}>
                 Lance ton premier boost depuis l'onglet Nouveau
@@ -1370,7 +1368,7 @@ export default function BoostScreen() {
                   })}
                 </ScrollView>
 
-                <LinearGradient colors={[g1, g2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.modalPreview}>
+                <View style={[s.modalPreview, { backgroundColor: g1 }]}>
                   <Icon name={cat.icon as any} size={28} color="#fff" />
                   <Text style={s.modalPreviewQty}>{selectedTier.quantity}</Text>
                   <Text style={s.modalPreviewCat}>{cat.label} · {selectedTier.label}</Text>
@@ -1378,7 +1376,7 @@ export default function BoostScreen() {
                   {targetContent?.title && (
                     <Text style={s.modalPreviewContent} numberOfLines={1}>{targetContent.title}</Text>
                   )}
-                </LinearGradient>
+                </View>
 
                 <View style={[s.modalSummary, { backgroundColor: colors.background }]}>
                   {[
@@ -1400,14 +1398,14 @@ export default function BoostScreen() {
                   activeOpacity={0.85}
                   style={{ borderRadius: 16, overflow: 'hidden', opacity: purchasing || balance < selectedTier.GoGold ? 0.5 : 1 }}
                 >
-                  <LinearGradient colors={[g1, g2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.confirmInner}>
+                  <View style={[s.confirmInner, { backgroundColor: g1 }]}>
                     {purchasing
                       ? <ActivityIndicator color="#fff" />
                       : balance < selectedTier.GoGold
                         ? <Text style={s.confirmText}>Solde insuffisant</Text>
                         : <><Icon name="zap" size={16} color="#fff" /><Text style={s.confirmText}>Activer le boost</Text></>
                     }
-                  </LinearGradient>
+                  </View>
                 </TouchableOpacity>
               </>
             )}
@@ -1428,9 +1426,9 @@ export default function BoostScreen() {
         ]}
       >
         <Animated.View style={[s.successBox, { transform: [{ scale: successScale }] }]}>
-          <LinearGradient colors={[g1, g2]} style={s.successRing}>
+          <View style={[s.successRing, { backgroundColor: g1 }]}>
             <Icon name="zap" size={40} color="#fff" />
-          </LinearGradient>
+          </View>
           <Text style={s.successTitle}>Boost active !</Text>
           <Text style={s.successSub}>
             Votre contenu apparait plus souvent dans les feeds.{'\n'}Suivez les impressions dans l'onglet Actifs.

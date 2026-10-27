@@ -184,16 +184,13 @@ const CreateTabButton: React.FC<CreateTabButtonProps> = memo(({ open, onToggle, 
         style={styles.createBtnTouchable}
         activeOpacity={0.85}
       >
-        <LinearGradient
-          colors={[colors.gradientStart, colors.gradientEnd]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.createBtn, { borderColor: colors.surface }]}
+        <View
+          style={[styles.createBtn, { borderColor: colors.surface, backgroundColor: colors.gradientStart }]}
         >
           <Animated.View style={iconRotateStyle}>
             <Icon name="plus" size={16} color="#fff" />
           </Animated.View>
-        </LinearGradient>
+        </View>
       </TouchableOpacity>
     </View>
   );

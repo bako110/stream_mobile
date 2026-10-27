@@ -42,6 +42,7 @@ import { onboardingDelayService } from '../../services/onboardingDelayService';
 import { getAppPreferences, setCachedAppPreferences, type StartScreen } from '../../hooks/useAppPreferences';
 import { boostPromptService } from '../../services/boostPromptService';
 import { openPhoneMenu } from '../../utils/phoneMenu';
+import { prefetchConcertLive } from '../../utils/livePrefetch';
 import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
 import { ShareBottomSheet } from '../../components/common/ShareBottomSheet';
 import { RepostBottomSheet } from '../../components/common/RepostBottomSheet';
@@ -163,8 +164,9 @@ const LiveConcertCard: React.FC<LiveConcertCardProps> = React.memo(({
     if (isOwn) onNavLiveStream(c.id);
     else onNavLiveViewer(c.id);
   }, [isOwn, c.id, onNavLiveStream, onNavLiveViewer]);
+  const onPressIn = useCallback(() => { if (!isOwn) prefetchConcertLive(c.id); }, [isOwn, c.id]);
   return (
-    <TouchableOpacity style={{ width: FeedCarousel.cardW, borderRadius: 14, overflow: 'hidden', backgroundColor: surfaceColor }} activeOpacity={0.85} onPress={onPress}>
+    <TouchableOpacity style={{ width: FeedCarousel.cardW, borderRadius: 14, overflow: 'hidden', backgroundColor: surfaceColor }} activeOpacity={0.85} onPressIn={onPressIn} onPress={onPress}>
       <View style={{ width: FeedCarousel.cardW, height: FeedCarousel.cardH, position: 'relative' }}>
         {c.thumbnail_url
           ? <CachedImage uri={c.thumbnail_url} style={{ width: FeedCarousel.cardW, height: FeedCarousel.cardH }} />

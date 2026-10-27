@@ -9,7 +9,6 @@ import {
   RefreshControl,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
-import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
@@ -441,13 +440,9 @@ export const MessagesScreen: React.FC<Props> = ({ onBack }) => {
 
       {/* FAB nouveau message */}
       <TouchableOpacity style={[styles.fab, { shadowColor: colors.primary }]} activeOpacity={0.9} onPress={() => nav.navigate('NewConversation' as any)}>
-        <LinearGradient
-          colors={[colors.gradientStart, colors.gradientEnd]}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          style={styles.fabInner}
-        >
+        <View style={[styles.fabInner, { backgroundColor: colors.gradientStart }]}>
           <Icon name="message-square" size={22} color="#fff" />
-        </LinearGradient>
+        </View>
       </TouchableOpacity>
     </View>
   );

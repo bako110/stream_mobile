@@ -90,6 +90,15 @@ export const profileStyles = StyleSheet.create({
     marginBottom:   Spacing[3],
   },
   sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 1.1 },
+  myContentRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 10, paddingHorizontal: 12,
+    borderRadius: 14, borderWidth: 1,
+  },
+  myContentIcon: {
+    width: 36, height: 36, borderRadius: 11,
+    alignItems: 'center', justifyContent: 'center',
+  },
   sectionCount: {
     fontSize:    12,
     fontWeight:  '700',

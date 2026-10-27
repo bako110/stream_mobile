@@ -24,7 +24,6 @@ const SCREEN_W = Dimensions.get('window').width;
 const IS_SMALL = SCREEN_W < 380;
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontSize, FontWeight } from '../../theme';
@@ -219,11 +218,8 @@ const WalletScreen: React.FC = () => {
         contentContainerStyle={s.scroll}
       >
         {/* Balance card */}
-        <LinearGradient
-          colors={[colors.gradientStart, colors.gradientEnd]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[s.balanceCard, { shadowColor: colors.primary }]}
+        <View
+          style={[s.balanceCard, { shadowColor: colors.primary, backgroundColor: colors.gradientStart }]}
         >
           <Text style={s.balanceLabel}>Solde total</Text>
           <Text style={s.balanceAmount}>{displayGoGold.toLocaleString('fr-FR')}</Text>
@@ -236,7 +232,7 @@ const WalletScreen: React.FC = () => {
               localStyle={{ color: 'rgba(255,255,255,0.7)' }}
             />
           </View>
-        </LinearGradient>
+        </View>
 
         {/* Quick actions */}
         <View style={s.actionsRow}>

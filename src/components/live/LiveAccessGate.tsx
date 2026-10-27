@@ -10,7 +10,6 @@ import {
   View, Text, StyleSheet, TouchableOpacity,
   Image, ActivityIndicator, StatusBar,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
@@ -168,9 +167,9 @@ export const LiveAccessGate: React.FC<Props> = ({
       <View style={[s.gateCard, { backgroundColor: colors.surface, paddingBottom: 40 + insets.bottom }]}>
         {/* Icone verrou */}
         <View style={s.lockIconWrap}>
-          <LinearGradient colors={['#F59E0B', '#F97316']} style={s.lockIconGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+          <View style={[s.lockIconGrad, { backgroundColor: '#F59E0B' }]}>
             <MCIcon name="lock" size={26} color="#fff" />
-          </LinearGradient>
+          </View>
         </View>
 
         <Text style={[s.gateTitle, { color: colors.textPrimary }]}>Live payant</Text>
@@ -228,10 +227,8 @@ export const LiveAccessGate: React.FC<Props> = ({
           disabled={checking}
           activeOpacity={0.85}
         >
-          <LinearGradient
-            colors={isGoGold ? ['#F59E0B', '#F97316'] : ['#E85DAD', '#9B65F5']}
-            style={s.actionBtnGrad}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          <View
+            style={[s.actionBtnGrad, { backgroundColor: isGoGold ? '#F59E0B' : '#E85DAD' }]}
           >
             {checking ? (
               <ActivityIndicator color="#fff" size="small" />
@@ -243,7 +240,7 @@ export const LiveAccessGate: React.FC<Props> = ({
                 </Text>
               </>
             )}
-          </LinearGradient>
+          </View>
         </TouchableOpacity>
 
         <TouchableOpacity onPress={onLeave} style={s.leaveBtn} activeOpacity={0.7}>

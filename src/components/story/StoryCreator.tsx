@@ -786,9 +786,9 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
             <View style={{width:40}} />
           </View>
           <View style={s.recordBody}>
-            <LinearGradient colors={recording?['#AD1457','#E91E63']:['#00838F','#00BCD4']} style={s.recordOrb}>
+            <View style={[s.recordOrb,{backgroundColor:recording?'#AD1457':'#00838F'}]}>
               <MaterialIcon name="microphone" size={54} color="#fff" />
-            </LinearGradient>
+            </View>
             <Text style={[s.recordTimer,{color:colors.textPrimary}]}>{recordTime}</Text>
             <Text style={[s.recordStatus,{color:recording?'#E91E63':colors.textSecondary}]}>{recording?'Enregistrement...':'Pret a enregistrer'}</Text>
             <TouchableOpacity style={[s.recordBtn,{backgroundColor:recording?'#E91E63':'#00BCD4'}]} onPress={recording?stopRecording:startRecording} activeOpacity={0.82}>
@@ -899,11 +899,11 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
             );
           })()}
           {mode === 'voice' && (
-            <LinearGradient colors={['#0F0C29','#302B63']} style={StyleSheet.absoluteFill}>
+            <View style={[StyleSheet.absoluteFill,{backgroundColor:'#0F0C29'}]}>
               <View style={{flex:1,alignItems:'center',justifyContent:'center'}}>
                 <MaterialIcon name="microphone-outline" size={120} color="rgba(255,255,255,0.1)" />
               </View>
-            </LinearGradient>
+            </View>
           )}
 
           {/* OVERLAY CROP style WhatsApp — images uniquement */}
@@ -1052,10 +1052,10 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
               <TouchableOpacity onPress={undo} style={s.hBtn}><Icon name="corner-ccw" size={18} color="#fff" /></TouchableOpacity>
               <View style={{flex:1}} />
               <TouchableOpacity onPress={handlePublish} disabled={!canPublish} style={[s.publishBtn,!canPublish&&{opacity:0.4}]} activeOpacity={0.85}>
-                <LinearGradient colors={['#7B3FF2','#E0389A']} start={{x:0,y:0}} end={{x:1,y:0}} style={s.publishBtnInner}>
+                <View style={[s.publishBtnInner,{backgroundColor:'#7B3FF2'}]}>
                   <Icon name="send" size={14} color="#fff" />
                   <Text style={s.publishLabel}>Publier</Text>
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
             </View>
           )}
@@ -1289,7 +1289,7 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
                           return (
                             <TouchableOpacity key={c.id} style={[s.audContactRow,i<arr.length-1&&s.audContactRowBorder]} onPress={()=>setSelectedUsers(p=>p.includes(c.id)?p.filter(x=>x!==c.id):[...p,c.id])} activeOpacity={0.7}>
                               {c.avatar_url ? <Image source={{uri:c.avatar_url}} style={s.audAvatar} /> : (
-                                <LinearGradient colors={['#7B3FF2','#E0389A']} style={s.audAvatarFallback}><Text style={s.audAvatarInitial}>{(c.name[0]??'?').toUpperCase()}</Text></LinearGradient>
+                                <View style={[s.audAvatarFallback,{backgroundColor:'#7B3FF2'}]}><Text style={s.audAvatarInitial}>{(c.name[0]??'?').toUpperCase()}</Text></View>
                               )}
                               <Text style={s.audContactName} numberOfLines={1}>{c.name}</Text>
                               <View style={[s.audCheckbox,checked&&s.audCheckboxOn]}>{checked&&<Icon name="check" size={12} color="#fff" />}</View>
@@ -1340,9 +1340,9 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
               ))}
             </View>
             <TouchableOpacity onPress={addTextLayer} style={s.addBtn} activeOpacity={0.85}>
-              <LinearGradient colors={['#7B3FF2','#E0389A']} start={{x:0,y:0}} end={{x:1,y:0}} style={s.addBtnInner}>
+              <View style={[s.addBtnInner,{backgroundColor:'#7B3FF2'}]}>
                 <Text style={s.addBtnLabel}>Ajouter</Text>
-              </LinearGradient>
+              </View>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>

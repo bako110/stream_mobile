@@ -15,7 +15,6 @@ import {
   Platform,
   Switch,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -122,11 +121,8 @@ function EventCard({ event, rsvpStatus, onRsvpChange, onEdit, onCancel, onDelete
   return (
     <Animated.View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
       {/* Cover */}
-      <LinearGradient
-        colors={isPast ? ['#444', '#2A2A2A'] : [cardColor, cardColor + 'BB']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.cover}
+      <View
+        style={[styles.cover, { backgroundColor: isPast ? '#444' : cardColor }]}
       >
         <View style={styles.coverBadges}>
           {event.is_online && (
@@ -181,7 +177,7 @@ function EventCard({ event, rsvpStatus, onRsvpChange, onEdit, onCancel, onDelete
             <Icon name="trash-2" size={12} color="#EF4444" />
           </TouchableOpacity>
         )}
-      </LinearGradient>
+      </View>
 
       {/* Body */}
       <View style={styles.cardBody}>
@@ -492,14 +488,11 @@ function EventFormModal({ visible, initial, onClose, onSave, colors, insets }: E
             </View>
 
             {/* Preview */}
-            <LinearGradient
-              colors={[color, color + 'AA']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.colorPreview}
+            <View
+              style={[styles.colorPreview, { backgroundColor: color }]}
             >
               <Text style={styles.colorPreviewText}>{title || 'Aperçu de la couleur'}</Text>
-            </LinearGradient>
+            </View>
 
           </ScrollView>
         </View>

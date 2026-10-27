@@ -4,7 +4,6 @@ import {
   Share, RefreshControl, StatusBar,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { BackButton, GofolyxLoader } from '../../components/common';
 import { useNavigation } from '@react-navigation/native';
@@ -111,9 +110,8 @@ export const ReferralScreen: React.FC = () => {
         >
 
           {/* Hero */}
-          <LinearGradient
-            colors={[colors.primary + '22', colors.gradientEnd + '18']}
-            style={[s.heroCard, { borderColor: colors.primary + '30' }]}
+          <View
+            style={[s.heroCard, { borderColor: colors.primary + '30', backgroundColor: colors.primary + '22' }]}
           >
             <Text style={[s.heroTitle, { color: colors.textPrimary }]}>Invitez vos amis</Text>
             <Text style={[s.heroSub, { color: colors.textSecondary }]}>
@@ -131,7 +129,7 @@ export const ReferralScreen: React.FC = () => {
                 <Text style={[s.rewardText, { color: colors.accentGreen }]}>+5% sur achats</Text>
               </View>
             </View>
-          </LinearGradient>
+          </View>
 
           {/* Code de parrainage */}
           <View style={[s.codeCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>

@@ -6,7 +6,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
-import LinearGradient from 'react-native-linear-gradient';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { postService, type PostLiker } from '../../services/postService';
@@ -121,16 +120,14 @@ const LikerRow: React.FC<{
           </TouchableOpacity>
         ) : (
           <TouchableOpacity onPress={handleFollow} activeOpacity={0.85} disabled={loading}>
-            <LinearGradient
-              colors={['#6366F1', '#4F46E5']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={ls.btnFollow}
+            <View
+              style={[ls.btnFollow, { backgroundColor: '#6366F1' }]}
             >
               {loading
                 ? <ActivityIndicator size="small" color="#fff" />
                 : <Text style={ls.btnFollowTxt}>Suivre</Text>
               }
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         )
       )}

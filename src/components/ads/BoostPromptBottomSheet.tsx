@@ -79,9 +79,9 @@ export const BoostPromptBottomSheet: React.FC<Props> = ({ visible, suggestion, o
           )}
 
           <View style={st.hookRow}>
-            <LinearGradient colors={['#7B3FF2', '#E0389A']} style={st.hookIcon}>
+            <View style={[st.hookIcon, { backgroundColor: '#7B3FF2' }]}>
               <Icon name="zap" size={16} color="#fff" />
-            </LinearGradient>
+            </View>
             <Text style={[st.hook, { color: colors.textPrimary }]}>{suggestion.impact_label}</Text>
           </View>
 
@@ -102,10 +102,8 @@ export const BoostPromptBottomSheet: React.FC<Props> = ({ visible, suggestion, o
           </View>
 
           <TouchableOpacity activeOpacity={0.85} onPress={() => onBoost(suggestion)}>
-            <LinearGradient
-              colors={suggestion.affordable ? [colors.gradientStart, colors.gradientEnd] : ['#888', '#666']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={st.ctaBtn}
+            <View
+              style={[st.ctaBtn, { backgroundColor: suggestion.affordable ? colors.gradientStart : '#888' }]}
             >
               <Icon name="zap" size={16} color="#fff" />
               <Text style={st.ctaTxt}>
@@ -113,7 +111,7 @@ export const BoostPromptBottomSheet: React.FC<Props> = ({ visible, suggestion, o
                   ? `Booster — ${suggestion.gogold.toLocaleString('fr-FR')} GoGold`
                   : 'Solde insuffisant'}
               </Text>
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
 
           <TouchableOpacity style={st.dismissBtn} onPress={onClose} activeOpacity={0.7}>

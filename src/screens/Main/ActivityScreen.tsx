@@ -8,7 +8,6 @@ import Animated, {
   interpolateColor, withTiming, runOnJS, interpolate, Extrapolation,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -196,9 +195,8 @@ export const ActivityScreen: React.FC = () => {
           le mélanger au style de la carte ferait apparaître un coin visible
           sous la status bar. ── */}
       <View style={{ paddingTop: insets.top + 12 }}>
-        <LinearGradient
-          colors={[colors.surface, colors.background]}
-          style={[s.header, { borderColor: colors.divider }]}
+        <View
+          style={[s.header, { borderColor: colors.divider, backgroundColor: colors.surface }]}
         >
           <BackButton onPress={() => nav.goBack()} />
           <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Activité</Text>
@@ -207,7 +205,7 @@ export const ActivityScreen: React.FC = () => {
               <Text style={s.unreadBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
             </View>
           )}
-        </LinearGradient>
+        </View>
       </View>
 
       {/* ── Onglets ── */}

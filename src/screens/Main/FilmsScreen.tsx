@@ -312,14 +312,12 @@ const TabSelector: React.FC<{
             activeOpacity={0.8}
           >
             {active ? (
-              <LinearGradient
-                colors={[colors.primary, colors.primary]}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={tabs_s.btnInner}
+              <View
+                style={[tabs_s.btnInner, { backgroundColor: colors.primary }]}
               >
                 <Icon name={t.icon} size={13} color="#fff" />
                 <Text style={tabs_s.labelActive}>{t.label}</Text>
-              </LinearGradient>
+              </View>
             ) : (
               <View style={tabs_s.btnInner}>
                 <Icon name={t.icon} size={13} color={colors.textTertiary} />

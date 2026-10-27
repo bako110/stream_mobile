@@ -8,7 +8,6 @@ import {
   StatusBar,
   Image,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -259,12 +258,9 @@ export function CommunityMemberProfileScreen({ route }: Props) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
       >
-        {/* Hero gradient */}
-        <LinearGradient
-          colors={gradientColors as string[]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.hero, { paddingTop: insets.top + 8 }]}
+        {/* Hero */}
+        <View
+          style={[{ backgroundColor: gradientColors[0] }, styles.hero, { paddingTop: insets.top + 8 }]}
         >
           <View style={[styles.backBtnWrap, { top: insets.top + 8 }]}>
             <BackButton onPress={() => navigation.goBack()} color="#fff" transparent />
@@ -297,7 +293,7 @@ export function CommunityMemberProfileScreen({ route }: Props) {
           <View style={[styles.roleBadge, { backgroundColor: 'rgba(255,255,255,0.2)', borderColor: 'rgba(255,255,255,0.4)' }]}>
             <Text style={styles.roleBadgeText}>{ROLE_LABEL[member.role] ?? member.role}</Text>
           </View>
-        </LinearGradient>
+        </View>
 
         {/* Body */}
         <View style={styles.body}>

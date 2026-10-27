@@ -9,7 +9,6 @@ import {
   View, Text, StyleSheet, TouchableOpacity, Modal,
   ScrollView, TextInput, FlatList, ActivityIndicator, Image,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
@@ -178,12 +177,12 @@ const MonetForm: React.FC<{
           style={[s.saveBtn, (!type || saving) && { opacity: 0.5 }]}
           onPress={save} disabled={!type || saving} activeOpacity={0.85}
         >
-          <LinearGradient colors={[accentColor, accentColor + 'BB']} style={s.saveBtnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+          <View style={[s.saveBtnGrad, { backgroundColor: accentColor }]}>
             {saving
               ? <ActivityIndicator color="#fff" size="small" />
               : <Text style={s.saveBtnText}>Confirmer</Text>
             }
-          </LinearGradient>
+          </View>
         </TouchableOpacity>
       </View>
     );
@@ -214,10 +213,10 @@ const MonetForm: React.FC<{
         </>
       ) : (
         <TouchableOpacity style={s.monetStartBtn} onPress={open} activeOpacity={0.8}>
-          <LinearGradient colors={[accentColor, accentColor + 'AA']} style={s.monetStartGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+          <View style={[s.monetStartGrad, { backgroundColor: accentColor }]}>
             <MCIcon name="lock-outline" size={18} color="#fff" />
             <Text style={s.monetStartText}>{title}</Text>
-          </LinearGradient>
+          </View>
         </TouchableOpacity>
       )}
     </View>
@@ -471,10 +470,10 @@ export const LiveSettingsSheet: React.FC<Props> = ({
                 </View>
                 <View style={s.handActions}>
                   <TouchableOpacity style={s.acceptBtn} onPress={() => onInvite(req.identity)} activeOpacity={0.8}>
-                    <LinearGradient colors={['#4ade80', '#22c55e']} style={s.acceptBtnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                    <View style={[s.acceptBtnGrad, { backgroundColor: '#4ade80' }]}>
                       <Icon name="user-check" size={14} color="#fff" />
                       <Text style={s.acceptBtnText}>Inviter</Text>
-                    </LinearGradient>
+                    </View>
                   </TouchableOpacity>
                   <TouchableOpacity style={[s.dismissBtn, { borderColor: colors.border }]} onPress={() => onDismissHand(req.identity)} activeOpacity={0.8}>
                     <Icon name="x" size={14} color={colors.textSecondary} />

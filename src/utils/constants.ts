@@ -54,6 +54,7 @@ export const STORAGE_KEYS = {
   CURRENCY_CODE:  'gofolyx_currency_code',
   ACCOUNTS:       'gofolyx_accounts_v1',
   REELS_AUTO_ADVANCE: 'gofolyx_reels_auto_advance',
+  LIVE_CHAT_VISIBLE: 'gofolyx_live_chat_visible',
 } as const;
 
 // ── Multi-compte ───────────────────────────────────────────────────────────

@@ -10,7 +10,6 @@ import { useTheme } from '../../hooks/useTheme';
 import { toastService } from '../../services';
 import { communityService } from '../../services/communityService';
 import type { VerificationRequest } from '../../services/communityService';
-import LinearGradient from 'react-native-linear-gradient';
 import { BackButton, GofolyxLoader } from '../../components/common';
 
 type FilterStatus = 'pending' | 'approved' | 'rejected';
@@ -83,9 +82,9 @@ export const AdminVerificationScreen: React.FC = () => {
           {community?.avatar_url ? (
             <Image source={{ uri: community.avatar_url }} style={s.avatar} />
           ) : (
-            <LinearGradient colors={['#7B3FF2', '#E0389A']} style={[s.avatar, { alignItems: 'center', justifyContent: 'center' }]}>
+            <View style={[s.avatar, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#7B3FF2' }]}>
               <Icon name="users" size={18} color="#fff" />
-            </LinearGradient>
+            </View>
           )}
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>

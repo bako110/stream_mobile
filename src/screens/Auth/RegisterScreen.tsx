@@ -8,7 +8,6 @@ import Animated, {
   FadeInDown, FadeInUp,
   SlideInRight, SlideOutLeft,
 } from 'react-native-reanimated';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import Svg, { Path } from 'react-native-svg';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -80,10 +79,8 @@ const StepBar: React.FC<{ current: number; total: number; colors: any }> = ({ cu
     {Array.from({ length: total }).map((_, i) => (
       <View key={i} style={[sb.track, { backgroundColor: colors.border }]}>
         {i < current && (
-          <LinearGradient
-            colors={[colors.gradientStart, colors.gradientEnd]}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={StyleSheet.absoluteFill}
+          <View
+            style={[StyleSheet.absoluteFill, { backgroundColor: colors.primary }]}
           />
         )}
       </View>
@@ -204,15 +201,9 @@ const Step1: React.FC<{
       </Animated.View>
 
       <Animated.View entering={FadeInDown.delay(320).springify()} style={{ marginTop: 24 }}>
-        <TouchableOpacity onPress={onNext} activeOpacity={0.85}>
-          <LinearGradient
-            colors={[colors.gradientStart, colors.gradientEnd]}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={s.submitBtn}
-          >
-            <Text style={s.submitBtnText}>Continuer</Text>
-            <Icon name="arrow-right" size={18} color="#fff" />
-          </LinearGradient>
+        <TouchableOpacity onPress={onNext} activeOpacity={0.85} style={[s.submitBtn, { backgroundColor: colors.primary }]}>
+          <Text style={s.submitBtnText}>Continuer</Text>
+          <Icon name="arrow-right" size={18} color="#fff" />
         </TouchableOpacity>
       </Animated.View>
     </Animated.View>
@@ -295,15 +286,9 @@ const Step2: React.FC<{
       </Animated.View>
 
       <Animated.View entering={FadeInDown.delay(320).springify()} style={{ marginTop: 24 }}>
-        <TouchableOpacity onPress={onNext} activeOpacity={0.85}>
-          <LinearGradient
-            colors={[colors.gradientStart, colors.gradientEnd]}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={s.submitBtn}
-          >
-            <Text style={s.submitBtnText}>Continuer</Text>
-            <Icon name="arrow-right" size={18} color="#fff" />
-          </LinearGradient>
+        <TouchableOpacity onPress={onNext} activeOpacity={0.85} style={[s.submitBtn, { backgroundColor: colors.primary }]}>
+          <Text style={s.submitBtnText}>Continuer</Text>
+          <Icon name="arrow-right" size={18} color="#fff" />
         </TouchableOpacity>
       </Animated.View>
     </Animated.View>
@@ -402,20 +387,17 @@ const Step3: React.FC<{
       </Animated.Text>
 
       <Animated.View entering={FadeInDown.delay(380).springify()} style={{ marginTop: 20 }}>
-        <TouchableOpacity onPress={onSubmit} disabled={loading} activeOpacity={0.85}>
-          <LinearGradient
-            colors={[colors.gradientStart, colors.gradientEnd]}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={[s.submitBtn, { opacity: loading ? 0.7 : 1 }]}
-          >
-            {loading
-              ? <ActivityIndicator color="#fff" />
-              : <>
-                  <Text style={s.submitBtnText}>Créer mon compte</Text>
-                  <Icon name="check" size={18} color="#fff" />
-                </>
-            }
-          </LinearGradient>
+        <TouchableOpacity
+          onPress={onSubmit} disabled={loading} activeOpacity={0.85}
+          style={[s.submitBtn, { backgroundColor: colors.primary, opacity: loading ? 0.7 : 1 }]}
+        >
+          {loading
+            ? <ActivityIndicator color="#fff" />
+            : <>
+                <Text style={s.submitBtnText}>Créer mon compte</Text>
+                <Icon name="check" size={18} color="#fff" />
+              </>
+          }
         </TouchableOpacity>
       </Animated.View>
     </Animated.View>

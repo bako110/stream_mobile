@@ -6,7 +6,6 @@ import {
 } from 'react-native';
 import Svg, { Rect, Text as SvgText, G, Line } from 'react-native-svg';
 import Icon from 'react-native-vector-icons/Feather';
-import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
@@ -551,7 +550,7 @@ export function CreatorStatsScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Hero */}
-        <LinearGradient colors={['#7B3FF222', '#7B3FF205']} style={[styles.hero, { borderColor: '#7B3FF230' }]}>
+        <View style={[styles.hero, { borderColor: '#7B3FF230', backgroundColor: '#7B3FF222' }]}>
           <View style={styles.heroRow}>
             <View style={styles.heroItem}>
               <Text style={[styles.heroValue, { color: colors.textPrimary }]}>{fmt(stats.followers)}</Text>
@@ -568,7 +567,7 @@ export function CreatorStatsScreen() {
               <Text style={[styles.heroLabel, { color: colors.textTertiary }]}>GoGold gagnes</Text>
             </View>
           </View>
-        </LinearGradient>
+        </View>
 
         {/* Reels chart */}
         <SectionHeader title="Reels" accent="#7B3FF2" />

@@ -70,13 +70,13 @@ export const BattleCard: React.FC<{ battle: ActiveBattle; onWatch: () => void }>
           <View style={s.battleDuelHalf}>
             {battle.host_a_avatar
               ? <Image source={{ uri: battle.host_a_avatar }} style={[s.battleDuelPhoto, s.battleDuelPhotoZoom]} />
-              : <LinearGradient colors={['#7B3FF2', '#4C2696']} style={s.battleDuelPhoto} />}
+              : <View style={[s.battleDuelPhoto, { backgroundColor: '#7B3FF2' }]} />}
             <LinearGradient colors={['rgba(123,63,242,0.35)', 'transparent']} style={s.battleDuelTint} pointerEvents="none" />
           </View>
           <View style={s.battleDuelHalf}>
             {battle.host_b_avatar
               ? <Image source={{ uri: battle.host_b_avatar }} style={[s.battleDuelPhoto, s.battleDuelPhotoZoom]} />
-              : <LinearGradient colors={['#F0365A', '#7A1030']} style={s.battleDuelPhoto} />}
+              : <View style={[s.battleDuelPhoto, { backgroundColor: '#F0365A' }]} />}
             <LinearGradient colors={['rgba(240,54,90,0.35)', 'transparent']} style={s.battleDuelTint} pointerEvents="none" />
           </View>
         </View>
@@ -87,9 +87,9 @@ export const BattleCard: React.FC<{ battle: ActiveBattle; onWatch: () => void }>
         {/* VS central — badge plus imposant, halo, anneau metallique */}
         <View style={s.battleVsWrap} pointerEvents="none">
           <View style={s.battleVsRing}>
-            <LinearGradient colors={['#FFD34D', '#F0365A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.battleVsBadge}>
+            <View style={[s.battleVsBadge, { backgroundColor: '#FFD34D' }]}>
               <Text style={s.battleVsText}>VS</Text>
-            </LinearGradient>
+            </View>
           </View>
         </View>
 
@@ -117,7 +117,7 @@ export const BattleCard: React.FC<{ battle: ActiveBattle; onWatch: () => void }>
           </View>
 
           <View style={s.battleScoreBarTrack}>
-            <LinearGradient colors={['#7B3FF2', '#FFD34D']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[s.battleScoreBarFill, { width: `${pctA}%` }]} />
+            <View style={[s.battleScoreBarFill, { width: `${pctA}%`, backgroundColor: '#7B3FF2' }]} />
           </View>
 
           <View style={s.battleFooterRow}>
@@ -145,9 +145,9 @@ export const TournamentCard: React.FC<{ tournament: ActiveTournament; onView: ()
       <TouchableOpacity style={s.tourCard} onPress={onView} activeOpacity={0.9}>
         {tournament.image_url
           ? <Image source={{ uri: tournament.image_url }} style={s.tourImage} />
-          : <LinearGradient colors={['#9B65F5', '#7B3FF2']} style={s.tourImage}>
+          : <View style={[s.tourImage, { backgroundColor: '#9B65F5' }]}>
               <Icon name="award" size={40} color="rgba(255,255,255,0.85)" />
-            </LinearGradient>}
+            </View>}
         <LinearGradient colors={['transparent', 'rgba(0,0,0,0.88)']} style={s.tourGrad} />
 
         <View style={[s.tourStatusBadge, { backgroundColor: statusColor }]}>

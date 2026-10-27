@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withSequence, withTiming, Easing } from 'react-native-reanimated';
 import { CachedImage } from './CachedImage';
@@ -56,12 +55,11 @@ export const AvatarWithBadge: React.FC<Props> = ({
   const avatarInner = avatarUrl ? (
     <CachedImage uri={avatarUrl} style={{ width: size, height: size, borderRadius }} />
   ) : (
-    <LinearGradient
-      colors={[accentColor, accentColor + 'AA']}
-      style={{ width: size, height: size, borderRadius, alignItems: 'center', justifyContent: 'center' }}
+    <View
+      style={{ width: size, height: size, borderRadius, alignItems: 'center', justifyContent: 'center', backgroundColor: accentColor }}
     >
       <Text style={{ color: '#fff', fontSize: size * 0.35, fontWeight: '800' }}>{initials}</Text>
-    </LinearGradient>
+    </View>
   );
 
   return (
@@ -69,12 +67,11 @@ export const AvatarWithBadge: React.FC<Props> = ({
       {/* Avatar (+ anneau live si actif) */}
       {isLive ? (
         <Animated.View style={[{ position: 'absolute', top: 0, left: 0, width: outerSize, height: outerSize }, ringStyle]}>
-          <LinearGradient
-            colors={['#F0365A', '#E0389A', '#7B3FF2']}
-            style={{ width: outerSize, height: outerSize, borderRadius: outerSize / 2, padding: ringWidth, alignItems: 'center', justifyContent: 'center' }}
+          <View
+            style={{ width: outerSize, height: outerSize, borderRadius: outerSize / 2, padding: ringWidth, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F0365A' }}
           >
             <View style={{ width: size, height: size, borderRadius, overflow: 'hidden' }}>{avatarInner}</View>
-          </LinearGradient>
+          </View>
           <View style={[s.liveBadge, { bottom: -2 }]}>
             <Text style={s.liveBadgeText}>LIVE</Text>
           </View>

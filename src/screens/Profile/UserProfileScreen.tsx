@@ -372,12 +372,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
             {profile.banner_url ? (
               <Image source={{ uri: profile.banner_url }} style={styles.banner} />
             ) : (
-              <LinearGradient
-                colors={[colors.primary + 'CC', colors.primary + '66']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.banner}
-              />
+              <View style={[styles.banner, { backgroundColor: colors.primary + 'CC' }]} />
             )}
           </TouchableOpacity>
           <View style={styles.headerOverlay}>
@@ -407,7 +402,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
             }}
           >
             {profileIsLive ? (
-              <LinearGradient colors={['#F0365A', '#E0389A', '#7B3FF2']} style={styles.avatarRingLive}>
+              <View style={[styles.avatarRingLive, { backgroundColor: '#F0365A' }]}>
                 <View style={[styles.avatarRing, { borderWidth: 0, width: 80, height: 80, borderRadius: 40 }]}>
                   {profile.avatar_url ? (
                     <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
@@ -425,7 +420,7 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                 <View style={styles.liveBadgeProfile}>
                   <Text style={styles.liveBadgeProfileText}>LIVE</Text>
                 </View>
-              </LinearGradient>
+              </View>
             ) : (
               <View style={[styles.avatarRing, { borderColor: colors.background }]}>
                 {profile.avatar_url ? (
@@ -635,16 +630,14 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                     activeOpacity={0.85}
                     onPress={() => navigation.push('UserProfile', { userId: f.id })}
                   >
-                    {/* Cover gradient */}
-                    <LinearGradient
-                      colors={[colors.primary + 'CC', colors.primary + '44']}
-                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                      style={[styles.friendCover, { height: FRIEND_COVER }]}
+                    {/* Cover */}
+                    <View
+                      style={[styles.friendCover, { height: FRIEND_COVER, backgroundColor: colors.primary + 'CC' }]}
                     >
                       {f.is_online && (
                         <View style={[styles.friendOnline, { borderColor: colors.surfaceElevated }]} />
                       )}
-                    </LinearGradient>
+                    </View>
 
                     {/* Avatar chevauchant — jamais de badge vérifié ici, un seul
                         suffit (à côté du nom ci-dessous). */}
@@ -655,9 +648,9 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                       {f.avatar_url ? (
                         <Image source={{ uri: f.avatar_url }} style={[styles.friendAvtImg, { width: FRIEND_AVT, height: FRIEND_AVT, borderRadius: FRIEND_AVT / 2 }]} />
                       ) : (
-                        <LinearGradient colors={[colors.primary, colors.primary + 'AA']} style={[styles.friendAvtImg, { width: FRIEND_AVT, height: FRIEND_AVT, borderRadius: FRIEND_AVT / 2 }]}>
+                        <View style={[styles.friendAvtImg, { width: FRIEND_AVT, height: FRIEND_AVT, borderRadius: FRIEND_AVT / 2, backgroundColor: colors.primary }]}>
                           <Text style={[styles.friendInitial, { fontSize: FRIEND_AVT * 0.38 }]}>{initials2}</Text>
-                        </LinearGradient>
+                        </View>
                       )}
                     </View>
 
@@ -782,12 +775,11 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                               <Icon name="file-text" size={32} color={colors.textTertiary} />
                             </View>
                           ) : (
-                            <LinearGradient
-                              colors={[(featured as any).accent + 'CC', (featured as any).accent + '66']}
-                              style={[styles.contentFeaturedThumb, { alignItems: 'center', justifyContent: 'center' }]}
+                            <View
+                              style={[styles.contentFeaturedThumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: (featured as any).accent + 'CC' }]}
                             >
                               <Icon name={(featured as any).typeIcon} size={36} color="rgba(255,255,255,0.8)" />
-                            </LinearGradient>
+                            </View>
                           )}
 
                           <LinearGradient
@@ -843,12 +835,11 @@ export const UserProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                                       <Icon name="file-text" size={24} color={colors.textTertiary} />
                                     </View>
                                   ) : (
-                                    <LinearGradient
-                                      colors={[it.accent + 'CC', it.accent + '66']}
-                                      style={[styles.reelThumb, { alignItems: 'center', justifyContent: 'center' }]}
+                                    <View
+                                      style={[styles.reelThumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: it.accent + 'CC' }]}
                                     >
                                       <Icon name={it.typeIcon} size={28} color="rgba(255,255,255,0.8)" />
-                                    </LinearGradient>
+                                    </View>
                                   )}
                                   <View style={styles.gridOverlay}>
                                     {it.caption ? (

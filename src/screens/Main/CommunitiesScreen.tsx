@@ -4,7 +4,6 @@ import {
   StyleSheet, ActivityIndicator, RefreshControl, TextInput,
   ScrollView, KeyboardAvoidingView, Platform, Animated, StatusBar,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { CategorySelector, CONTENT_CATEGORIES, CategoryIcon } from '../../components/common';
 import { CommunityCard } from '../../components/communities/CommunityCard';
@@ -422,15 +421,12 @@ export const CommunitiesScreen: React.FC = () => {
             onPress={() => { resetForm(); setCreateOpen(true); }}
             style={{ borderRadius: 14, overflow: 'hidden', marginTop: 4 }}
           >
-            <LinearGradient
-              colors={[colors.gradientStart, colors.gradientEnd]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={S.emptyBtn}
+            <View
+              style={[S.emptyBtn, { backgroundColor: colors.gradientStart }]}
             >
               <Icon name="plus" size={16} color="#fff" />
               <Text style={S.emptyBtnText}>Créer une communauté</Text>
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setJoinOpen(true)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
             <Text style={[S.emptyLinkText, { color: colors.primary }]}>Utiliser un code d'invitation</Text>
@@ -545,11 +541,11 @@ export const CommunitiesScreen: React.FC = () => {
         {createAvatarUri ? (
           <Image source={{ uri: createAvatarUri }} style={S.avatarPickerImg} />
         ) : (
-          <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} style={S.avatarPickerImg}>
+          <View style={[S.avatarPickerImg, { backgroundColor: colors.gradientStart }]}>
             <Text style={S.avatarPickerLetter}>
               {createName ? createName[0].toUpperCase() : '?'}
             </Text>
-          </LinearGradient>
+          </View>
         )}
         <View style={S.avatarCam}>
           <Icon name="camera" size={11} color="#fff" />
@@ -678,15 +674,12 @@ export const CommunitiesScreen: React.FC = () => {
           style={{ flex: 1, borderRadius: 14, overflow: 'hidden' }}
           activeOpacity={0.85}
         >
-          <LinearGradient
-            colors={[colors.gradientStart, colors.gradientEnd]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={S.footerBtnPrimary}
+          <View
+            style={[S.footerBtnPrimary, { backgroundColor: colors.gradientStart }]}
           >
             <Text style={S.footerBtnPrimaryTxt}>Suivant</Text>
             <Icon name="arrow-right" size={16} color="#fff" />
-          </LinearGradient>
+          </View>
         </TouchableOpacity>
       </View>
       <View style={{ height: 16 }} />
@@ -701,9 +694,9 @@ export const CommunitiesScreen: React.FC = () => {
         {createAvatarUri ? (
           <Image source={{ uri: createAvatarUri }} style={S.previewAvatar} />
         ) : (
-          <LinearGradient colors={gradientFor(createName, colors.primary)} style={S.previewAvatar}>
+          <View style={[S.previewAvatar, { backgroundColor: gradientFor(createName, colors.primary)[0] }]}>
             <Text style={S.previewLetter}>{(createName[0] ?? '?').toUpperCase()}</Text>
-          </LinearGradient>
+          </View>
         )}
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: FontSize.basePlus, fontWeight: FontWeight.bold, color: colors.textPrimary }}>
@@ -885,11 +878,8 @@ export const CommunitiesScreen: React.FC = () => {
           style={{ flex: 1, borderRadius: 14, overflow: 'hidden', opacity: creating ? 0.72 : 1 }}
           activeOpacity={0.85}
         >
-          <LinearGradient
-            colors={[colors.gradientStart, colors.gradientEnd]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={S.footerBtnPrimary}
+          <View
+            style={[S.footerBtnPrimary, { backgroundColor: colors.gradientStart }]}
           >
             {creating ? (
               <ActivityIndicator color="#fff" size="small" />
@@ -899,7 +889,7 @@ export const CommunitiesScreen: React.FC = () => {
                 <Text style={S.footerBtnPrimaryTxt}>Créer</Text>
               </>
             )}
-          </LinearGradient>
+          </View>
         </TouchableOpacity>
       </View>
       <View style={{ height: 24 }} />
@@ -1156,14 +1146,13 @@ export const CommunitiesScreen: React.FC = () => {
             />
             <TouchableOpacity onPress={handleJoinByCode} disabled={joining}
               activeOpacity={0.85} style={{ borderRadius: 14, overflow: 'hidden' }}>
-              <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+              <View style={{ backgroundColor: colors.gradientStart, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
                   gap: 8, paddingVertical: 14 }}>
                 {joining ? <ActivityIndicator color="#fff" size="small" /> : (
                   <><Icon name="log-in" size={18} color="#fff" />
                   <Text style={{ color: '#fff', fontWeight: FontWeight.extraBold, fontSize: FontSize.basePlus }}>Rejoindre</Text></>
                 )}
-              </LinearGradient>
+              </View>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => { setJoinOpen(false); setJoinCode(''); }} style={{ alignItems: 'center', paddingVertical: 8 }}>
               <Text style={{ color: colors.textTertiary, fontSize: FontSize.base }}>Annuler</Text>

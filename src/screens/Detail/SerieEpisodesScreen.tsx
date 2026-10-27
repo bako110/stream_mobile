@@ -52,11 +52,7 @@ const SeasonTab: React.FC<{
     <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
       <Animated.View style={[st.tab, style]}>
         {active && (
-          <LinearGradient
-            colors={[PURPLE, '#5B2DB0']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: PURPLE }]} />
         )}
         <View style={[st.tabInner, !active && { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, borderWidth: StyleSheet.hairlineWidth }]}>
           <Text style={[st.tabNum, { color: active ? '#fff' : colors.textTertiary }]}>S{season.number}</Text>
@@ -430,14 +426,14 @@ export const SerieEpisodesScreen: React.FC<Props> = ({ route, navigation }) => {
         {/* ── PAYWALL BANNER ── */}
         {item.is_premium && !accessLoading && !hasAccess && (
           <TouchableOpacity onPress={() => setShowPaywall(true)} activeOpacity={0.9} style={pw2.banner}>
-            <LinearGradient colors={[ORANGE, '#FF5500']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={pw2.bannerGrad}>
+            <View style={[pw2.bannerGrad, { backgroundColor: ORANGE }]}>
               <View style={pw2.bannerIcon}><Icon name="lock" size={14} color="#fff" /></View>
               <View style={{ flex: 1 }}>
                 <Text style={pw2.bannerTitle}>Déverrouiller toute la série</Text>
                 <Text style={pw2.bannerSub}>{goGoldRequired} GoGold · <PriceWithLocal amountEur={item.price ?? 0} style={pw2.bannerSub} localStyle={{ color: 'rgba(255,255,255,0.6)' }} /></Text>
               </View>
               <Icon name="chevron-right" size={18} color="rgba(255,255,255,0.8)" />
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         )}
 
@@ -550,9 +546,9 @@ export const SerieEpisodesScreen: React.FC<Props> = ({ route, navigation }) => {
 
             {/* Lock hero */}
             <View style={pw.lockHero}>
-              <LinearGradient colors={[ORANGE, '#FF4500']} style={pw.lockCircle}>
+              <View style={[pw.lockCircle, { backgroundColor: ORANGE }]}>
                 <Icon name="lock" size={26} color="#fff" />
-              </LinearGradient>
+              </View>
               <TouchableOpacity onPress={() => setShowPaywall(false)} style={pw.closeBtn}>
                 <Icon name="x" size={18} color={colors.textTertiary} />
               </TouchableOpacity>
@@ -620,12 +616,12 @@ export const SerieEpisodesScreen: React.FC<Props> = ({ route, navigation }) => {
                 activeOpacity={0.88}
                 style={pw.btnWrap}
               >
-                <LinearGradient colors={[ORANGE, '#FF4500']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={pw.btn}>
+                <View style={[pw.btn, { backgroundColor: ORANGE }]}>
                   {purchasing
                     ? <ActivityIndicator color="#fff" size="small" />
                     : <><Icon name="unlock" size={17} color="#fff" /><Text style={pw.btnTxt}>Acheter — {goGoldRequired} GoGold</Text></>
                   }
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
@@ -633,10 +629,10 @@ export const SerieEpisodesScreen: React.FC<Props> = ({ route, navigation }) => {
                 activeOpacity={0.88}
                 style={pw.btnWrap}
               >
-                <LinearGradient colors={[PURPLE, '#5B2DB0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={pw.btn}>
+                <View style={[pw.btn, { backgroundColor: PURPLE }]}>
                   <Icon name="plus-circle" size={17} color="#fff" />
                   <Text style={pw.btnTxt}>Recharger — manque {goGoldRequired - walletGoGold} GoGold</Text>
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
             )}
 

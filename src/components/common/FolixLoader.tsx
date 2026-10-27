@@ -11,7 +11,6 @@
  */
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, StyleSheet, Dimensions, Easing } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 
 const W = Dimensions.get('window').width;
 
@@ -119,24 +118,13 @@ export const GofolyxLoader: React.FC<Props> = ({
 
   const barWidth = W * 0.55;
 
-  const gradientColors = [
-    hexToRgba(color, 0),
-    hexToRgba(color, 0.6),
-    hexToRgba(color, 1),
-    hexToRgba(color, 0.6),
-    hexToRgba(color, 0),
-  ];
-
   const bar = (
     <View style={[styles.track, { height, backgroundColor: hexToRgba(color, 0.15) }]}>
       <Animated.View
         style={[styles.barWrap, { width: barWidth, height, transform: [{ translateX }] }]}
       >
-        <LinearGradient
-          colors={gradientColors}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={{ flex: 1, borderRadius: height / 2 }}
+        <View
+          style={{ flex: 1, borderRadius: height / 2, backgroundColor: hexToRgba(color, 1) }}
         />
       </Animated.View>
     </View>

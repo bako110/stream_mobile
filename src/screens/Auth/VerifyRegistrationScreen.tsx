@@ -10,7 +10,6 @@ import {
   TextInput, KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
@@ -85,9 +84,8 @@ export const VerifyRegistrationScreen: React.FC<Props> = ({
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <LinearGradient
-        colors={[colors.background, colors.backgroundSecondary]}
-        style={{ flex: 1 }}
+      <View
+        style={{ flex: 1, backgroundColor: colors.background }}
       >
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
 
@@ -155,7 +153,7 @@ export const VerifyRegistrationScreen: React.FC<Props> = ({
             </TouchableOpacity>
           </Animated.View>
         </ScrollView>
-      </LinearGradient>
+      </View>
     </KeyboardAvoidingView>
   );
 };

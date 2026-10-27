@@ -87,11 +87,7 @@ const TournamentRow: React.FC<{
           {item.image_url ? (
             <Image source={{ uri: item.image_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
           ) : (
-            <LinearGradient
-              colors={[colors.gradientStart, colors.gradientEnd]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.gradientStart }]} />
           )}
           <LinearGradient
             colors={['transparent', 'rgba(0,0,0,0.55)']}
@@ -156,10 +152,8 @@ const TournamentRow: React.FC<{
               <Text style={[styles.ctaText, { color: colors.textTertiary }]}>Tournoi complet</Text>
             </View>
           ) : (
-            <LinearGradient
-              colors={[colors.gradientStart, colors.gradientEnd]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={styles.cta}
+            <View
+              style={[styles.cta, { backgroundColor: colors.gradientStart }]}
             >
               {joining
                 ? <ActivityIndicator size="small" color="#fff" />
@@ -168,7 +162,7 @@ const TournamentRow: React.FC<{
                     <Text style={[styles.ctaText, { color: '#fff' }]}>Rejoindre le tournoi</Text>
                   </>
               }
-            </LinearGradient>
+            </View>
           )}
         </TouchableOpacity>
       </View>
@@ -297,14 +291,12 @@ export const TournamentListScreen: React.FC = () => {
                 Lance le tien et invite la communauté à s'affronter.
               </Text>
               <TouchableOpacity onPress={() => setShowCreate(true)} activeOpacity={0.85} style={{ marginTop: 6 }}>
-                <LinearGradient
-                  colors={[colors.gradientStart, colors.gradientEnd]}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  style={styles.emptyCta}
+                <View
+                  style={[styles.emptyCta, { backgroundColor: colors.gradientStart }]}
                 >
                   <Icon name="plus" size={14} color="#fff" />
                   <Text style={styles.emptyCtaText}>Créer un tournoi</Text>
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
             </View>
           }

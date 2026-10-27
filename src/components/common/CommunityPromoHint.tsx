@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, Pressable } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Animated, {
   useSharedValue, useAnimatedStyle, withTiming, withRepeat, withSequence,
   Easing, runOnJS,
@@ -63,25 +62,19 @@ export const CommunityPromoHint: React.FC<Props> = ({ onPress }) => {
 
   return (
     <Animated.View style={[styles.wrap, containerStyle]}>
-      <LinearGradient
-        colors={['#3B1B6B', '#5B2E9E', '#2D3F8F']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.card}
+      <View
+        style={[styles.card, { backgroundColor: '#3B1B6B' }]}
       >
         <Pressable onPress={dismiss} hitSlop={10} style={styles.closeBtn}>
           <Icon name="x" size={16} color="rgba(255,255,255,0.7)" />
         </Pressable>
 
         <View style={styles.row}>
-          <LinearGradient
-            colors={['#B14FE8', '#5B7CFA']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.iconCircle}
+          <View
+            style={[styles.iconCircle, { backgroundColor: '#B14FE8' }]}
           >
             <Icon name="users" size={22} color="#fff" />
-          </LinearGradient>
+          </View>
 
           <View style={styles.textCol}>
             <Text style={styles.title}>
@@ -96,15 +89,12 @@ export const CommunityPromoHint: React.FC<Props> = ({ onPress }) => {
         </View>
 
         <Pressable onPress={handlePress} style={styles.ctaBtn}>
-          <LinearGradient
-            colors={['#E85DAD', '#5B9CFA']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.ctaGradient}
+          <View
+            style={[styles.ctaGradient, { backgroundColor: '#E85DAD' }]}
           >
             <Text style={styles.ctaText}>Voir les communautés</Text>
             <Icon name="arrow-right" size={15} color="#fff" />
-          </LinearGradient>
+          </View>
         </Pressable>
 
         {/* Flèche pointant vers l'onglet "Découvrir" de la tab bar, en bas de
@@ -112,7 +102,7 @@ export const CommunityPromoHint: React.FC<Props> = ({ onPress }) => {
         <Animated.View style={[styles.arrowWrap, arrowStyle]} pointerEvents="none">
           <Icon name="corner-right-down" size={26} color="#E85DAD" />
         </Animated.View>
-      </LinearGradient>
+      </View>
     </Animated.View>
   );
 };

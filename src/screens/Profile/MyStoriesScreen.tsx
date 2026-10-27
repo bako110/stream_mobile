@@ -6,7 +6,6 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -93,9 +92,9 @@ const StoryRow: React.FC<RowProps> = ({ story, colors, onPress, onMenu }) => {
       {/* Thumbnail */}
       <View style={row.thumbWrap}>
         {isText ? (
-          <LinearGradient colors={[bg, bg + 'CC']} style={row.thumb}>
+          <View style={[row.thumb, { backgroundColor: bg }]}>
             <Text style={row.thumbText} numberOfLines={2}>{story.caption ?? ''}</Text>
-          </LinearGradient>
+          </View>
         ) : story.thumbnail_url || story.media_url ? (
           <Image
             source={{ uri: story.thumbnail_url ?? story.media_url ?? '' }}
@@ -103,9 +102,9 @@ const StoryRow: React.FC<RowProps> = ({ story, colors, onPress, onMenu }) => {
             resizeMode="cover"
           />
         ) : (
-          <LinearGradient colors={['#7B3FF2', '#E0389A']} style={row.thumb}>
+          <View style={[row.thumb, { backgroundColor: '#7B3FF2' }]}>
             <Icon name="image" size={22} color="rgba(255,255,255,0.6)" />
-          </LinearGradient>
+          </View>
         )}
       </View>
 
@@ -262,9 +261,9 @@ export const MyStoriesScreen: React.FC<Props> = ({ navigation }) => {
         ListEmptyComponent={
           !loading ? (
             <Animated.View entering={FadeInDown.duration(300)} style={s.empty}>
-              <LinearGradient colors={['#7B3FF2', '#E0389A']} style={s.emptyIcon}>
+              <View style={[s.emptyIcon, { backgroundColor: '#7B3FF2' }]}>
                 <Icon name="camera" size={36} color="#fff" />
-              </LinearGradient>
+              </View>
               <Text style={[s.emptyTitle, { color: colors.textPrimary }]}>Aucun statut publié</Text>
               <Text style={[s.emptyText, { color: colors.textTertiary }]}>
                 Vos statuts apparaissent ici pendant 24h après publication.

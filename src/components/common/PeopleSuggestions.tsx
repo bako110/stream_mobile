@@ -4,7 +4,6 @@ import {
   ActivityIndicator, ScrollView, useWindowDimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
-import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { userService } from '../../services/userService';
@@ -164,12 +163,10 @@ export const PeopleSuggestions: React.FC<Props> = ({ users, loading, onUserPress
                     <Icon name="x" size={11} color="#fff" />
                   </TouchableOpacity>
 
-                  {/* Cover gradient */}
+                  {/* Cover */}
                   <TouchableOpacity activeOpacity={0.9} onPress={() => onUserPress(item.id)}>
-                    <LinearGradient
-                      colors={[colors.primary + 'DD', colors.primary + '44']}
-                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                      style={[st.cover, { height: COVER_H }]}
+                    <View
+                      style={[st.cover, { height: COVER_H, backgroundColor: colors.primary + 'DD' }]}
                     />
                   </TouchableOpacity>
 

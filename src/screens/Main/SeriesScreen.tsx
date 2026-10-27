@@ -217,7 +217,7 @@ const HeroSlide: React.FC<{ item: FilmItem; purchased: boolean; onPress: () => v
         <View style={hs.buttons}>
           <TouchableOpacity style={[hs.btnWatch, isPremiumUnpaid && { overflow: 'hidden' }]} onPress={onPress} activeOpacity={0.85}>
             {isPremiumUnpaid ? (
-              <LinearGradient colors={['#E8501A', '#c43e14']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={hs.btnGrad}>
+              <View style={[hs.btnGrad, { backgroundColor: '#E8501A' }]}>
                 <Icon name="lock" size={15} color="#fff" />
                 <Text style={[hs.btnWatchText, { color: '#fff' }]}>
                   Acheter ·{' '}
@@ -227,12 +227,12 @@ const HeroSlide: React.FC<{ item: FilmItem; purchased: boolean; onPress: () => v
                     localStyle={{ color: 'rgba(255,255,255,0.7)' }}
                   />
                 </Text>
-              </LinearGradient>
+              </View>
             ) : (
-              <LinearGradient colors={[PURPLE, PURPLE_DARK]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={hs.btnGrad}>
+              <View style={[hs.btnGrad, { backgroundColor: PURPLE }]}>
                 <Icon name="play" size={15} color="#fff" />
                 <Text style={[hs.btnWatchText, { color: '#fff' }]}>Regarder</Text>
-              </LinearGradient>
+              </View>
             )}
           </TouchableOpacity>
           <TouchableOpacity style={hs.btnMore} onPress={onPress} activeOpacity={0.85}>

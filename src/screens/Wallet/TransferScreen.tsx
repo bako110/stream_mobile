@@ -3,7 +3,6 @@ import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   StatusBar, ScrollView, ActivityIndicator, Image,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { BackButton, PriceWithLocal } from '../../components/common';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -237,10 +236,8 @@ export default function TransferScreen() {
           disabled={!selected || !GoGold || sending}
           activeOpacity={0.85}
         >
-          <LinearGradient
-            colors={['#7B3FF2', '#E0389A']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={s.sendInner}
+          <View
+            style={[s.sendInner, { backgroundColor: '#7B3FF2' }]}
           >
             {sending
               ? <ActivityIndicator size={18} color="#fff" />
@@ -251,7 +248,7 @@ export default function TransferScreen() {
                   </Text>
                 </>
             }
-          </LinearGradient>
+          </View>
         </TouchableOpacity>
       </ScrollView>
       {pinModal}

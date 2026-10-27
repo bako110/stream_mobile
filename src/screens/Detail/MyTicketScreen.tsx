@@ -4,7 +4,6 @@ import {
   Share, Platform, StatusBar, Dimensions, ActivityIndicator,
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import { useTheme } from '../../hooks/useTheme';
@@ -122,7 +121,7 @@ export const MyTicketScreen: React.FC<Props> = ({ ticket, onBack }) => {
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* Header */}
-      <LinearGradient colors={th.gradient} style={[st.header, { paddingTop: Platform.OS === 'ios' ? 52 : 38 }]}>
+      <View style={[st.header, { paddingTop: Platform.OS === 'ios' ? 52 : 38, backgroundColor: th.gradient[0] }]}>
         <BackButton onPress={onBack} transparent color="#fff" />
         <View style={{ alignItems: 'center' }}>
           <Text style={st.hTitle}>Mon billet</Text>
@@ -136,7 +135,7 @@ export const MyTicketScreen: React.FC<Props> = ({ ticket, onBack }) => {
             <Icon name="share-2" size={18} color="#fff" />
           </TouchableOpacity>
         </View>
-      </LinearGradient>
+      </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
 
@@ -145,7 +144,7 @@ export const MyTicketScreen: React.FC<Props> = ({ ticket, onBack }) => {
           <View style={{ borderRadius: 16, overflow: 'hidden' }}>
 
             {/* Bandeau haut */}
-            <LinearGradient colors={th.gradient} style={{ paddingVertical: 10, paddingHorizontal: 16 }}>
+            <View style={{ paddingVertical: 10, paddingHorizontal: 16, backgroundColor: th.gradient[0] }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 {/* Coin gauche */}
                 <Text style={{ fontSize: 16, color: 'rgba(255,255,255,0.4)' }}>{th.corner}</Text>
@@ -176,7 +175,7 @@ export const MyTicketScreen: React.FC<Props> = ({ ticket, onBack }) => {
                 <View style={{ flex: 1, borderTopWidth: 1, borderStyle: 'dashed', borderColor: 'rgba(255,255,255,0.25)' }} />
                 <View style={[st.notch, { backgroundColor: colors.background }]} />
               </View>
-            </LinearGradient>
+            </View>
 
             {/* Corps */}
             <View style={{ backgroundColor: colors.surface, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 0 }}>
@@ -285,13 +284,12 @@ export const MyTicketScreen: React.FC<Props> = ({ ticket, onBack }) => {
               </View>
 
               {/* Bas décoratif */}
-              <LinearGradient colors={[th.gradient[0] + '18', th.gradient[2] + '06']}
-                style={{ paddingVertical: 6, marginHorizontal: -16 }}>
+              <View style={{ paddingVertical: 6, marginHorizontal: -16, backgroundColor: th.gradient[0] + '18' }}>
                 <Text style={{ textAlign: 'center', fontSize: 9, color: th.accent,
                   opacity: 0.7, letterSpacing: 8 }}>
                   {th.deco}
                 </Text>
-              </LinearGradient>
+              </View>
 
             </View>
           </View>

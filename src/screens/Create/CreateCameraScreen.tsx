@@ -122,10 +122,10 @@ export const CreateCameraScreen: React.FC<Props> = ({ onBack, onPicked }) => {
             Autorise Gofolyx à utiliser ta caméra dans les réglages du téléphone pour créer des reels.
           </Text>
           <TouchableOpacity onPress={() => openSettings().catch(() => {})} activeOpacity={0.88} style={s.permissionSettingsBtnWrap}>
-            <LinearGradient colors={['#7B3FF2', '#C026D3']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.permissionSettingsBtn}>
+            <View style={[s.permissionSettingsBtn, { backgroundColor: '#7B3FF2' }]}>
               <Icon name="settings" size={15} color="#fff" />
               <Text style={s.permissionGalleryTxt}>Ouvrir les réglages</Text>
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
           <TouchableOpacity style={s.permissionGalleryBtn} onPress={handleOpenGallery} activeOpacity={0.85}>
             <Icon name="image" size={16} color="rgba(255,255,255,0.85)" />

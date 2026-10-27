@@ -4,7 +4,6 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   StatusBar, ActivityIndicator, RefreshControl,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -122,10 +121,8 @@ export default function MySubscriptionScreen() {
         {current ? (
           <>
             {/* Active subscription card */}
-            <LinearGradient
-              colors={PLAN_GRADIENTS[current.plan]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={s.currentCard}
+            <View
+              style={[s.currentCard, { backgroundColor: PLAN_GRADIENTS[current.plan][0] }]}
             >
               <View style={s.currentTop}>
                 <View>
@@ -158,7 +155,7 @@ export default function MySubscriptionScreen() {
                   </Text>
                 </View>
               )}
-            </LinearGradient>
+            </View>
 
             {/* Specs */}
             <View style={[s.specsCard, { backgroundColor: colors.surface }]}>

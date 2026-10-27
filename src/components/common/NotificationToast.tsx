@@ -6,7 +6,6 @@ import Animated, {
   useSharedValue, useAnimatedStyle,
   withSpring, withTiming, runOnJS,
 } from 'react-native-reanimated';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Sound from 'react-native-sound';
@@ -194,13 +193,13 @@ export const NotificationToast: React.FC = () => {
     >
       <TouchableOpacity activeOpacity={0.92} onPress={handlePress} style={styles.touchable}>
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
-          <LinearGradient colors={toast.grad} style={styles.leftBar} />
+          <View style={[styles.leftBar, { backgroundColor: toast.grad[0] }]} />
           {toast.avatarUrl ? (
             <Image source={{ uri: toast.avatarUrl }} style={styles.avatar} />
           ) : (
-            <LinearGradient colors={toast.grad} style={styles.iconWrap}>
+            <View style={[styles.iconWrap, { backgroundColor: toast.grad[0] }]}>
               <Icon name={toast.icon} size={16} color="#fff" />
-            </LinearGradient>
+            </View>
           )}
           <View style={styles.textWrap}>
             <Text style={[styles.title, { color: colors.textPrimary }]} numberOfLines={1}>

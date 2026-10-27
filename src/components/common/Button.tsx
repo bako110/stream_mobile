@@ -6,7 +6,6 @@ import {
 import Animated, {
   useSharedValue, useAnimatedStyle, withSpring, withTiming,
 } from 'react-native-reanimated';
-import LinearGradient from 'react-native-linear-gradient';
 import { useTheme } from '../../hooks/useTheme';
 
 type Variant = 'primary' | 'secondary' | 'outline' | 'ghost';
@@ -85,23 +84,16 @@ export const Button: React.FC<Props> = ({
         onPressOut={handlePressOut}
         disabled={disabled || loading}
         activeOpacity={1}
-        style={[animStyle, style]}
+        style={[animStyle, baseStyle, { backgroundColor: colors.primary }, style]}
       >
-        <LinearGradient
-          colors={[colors.gradientStart, colors.gradientEnd]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={baseStyle}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <>
-              {icon}
-              <Text style={[labelStyle, { color: '#fff' }]}>{label}</Text>
-            </>
-          )}
-        </LinearGradient>
+        {loading ? (
+          <ActivityIndicator color="#fff" size="small" />
+        ) : (
+          <>
+            {icon}
+            <Text style={[labelStyle, { color: '#fff' }]}>{label}</Text>
+          </>
+        )}
       </AnimTouchable>
     );
   }

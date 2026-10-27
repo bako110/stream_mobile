@@ -3,7 +3,6 @@ import {
   View, Text, FlatList, TouchableOpacity, TextInput,
   StyleSheet, ActivityIndicator, RefreshControl, Image, ScrollView, Animated, StatusBar,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -114,8 +113,7 @@ const PodiumCard: React.FC<{
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.8}
       style={{ flex: 1, marginTop: rank === 1 ? 0 : 20 }}>
-      <LinearGradient colors={gradients[rank]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        style={{ borderRadius: rank === 1 ? 18 : 14, padding: rank === 1 ? 16 : 12,
+      <View style={{ backgroundColor: gradients[rank][0], borderRadius: rank === 1 ? 18 : 14, padding: rank === 1 ? 16 : 12,
           alignItems: 'center', gap: 5 }}>
         <View style={{ width: 30, height: 30, borderRadius: 15,
           backgroundColor: mc + '22', borderWidth: 1, borderColor: mc + '55',
@@ -136,7 +134,7 @@ const PodiumCard: React.FC<{
           </View>
         )}
         {GoGold > 0 && <AnimBar progress={maxGoGold > 0 ? GoGold / maxGoGold : 0} color={mc} />}
-      </LinearGradient>
+      </View>
     </TouchableOpacity>
   );
 };

@@ -4,7 +4,6 @@ import {
   RefreshControl, Image, StyleSheet,
   Modal, TextInput, ScrollView, Platform, KeyboardAvoidingView,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -609,10 +608,10 @@ export const PlanningScreen: React.FC = () => {
 
       {/* FAB */}
       <TouchableOpacity activeOpacity={0.85} onPress={() => setShowCreate(true)} style={s.fab}>
-        <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.fabInner}>
+        <View style={[s.fabInner, { backgroundColor: colors.gradientStart }]}>
           <Icon name="plus" size={20} color="#fff" />
           <Text style={s.fabText}>Créer</Text>
-        </LinearGradient>
+        </View>
       </TouchableOpacity>
 
       {/* Contact Picker */}
@@ -762,7 +761,7 @@ export const PlanningScreen: React.FC = () => {
               </View>
 
               <TouchableOpacity onPress={handleCreate} disabled={!formTitle.trim() || creating} activeOpacity={0.85} style={[s.submitBtn, { opacity: (!formTitle.trim() || creating) ? 0.5 : 1 }]}>
-                <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.submitBtnInner}>
+                <View style={[s.submitBtnInner, { backgroundColor: colors.gradientStart }]}>
                   <Icon name="check" size={18} color="#fff" />
                   <Text style={s.submitBtnText}>
                     {creating
@@ -773,7 +772,7 @@ export const PlanningScreen: React.FC = () => {
                           ? `Créer & inviter (${selectedContacts.length})`
                           : 'Ajouter au planning'}
                   </Text>
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
             </ScrollView>
           </View>

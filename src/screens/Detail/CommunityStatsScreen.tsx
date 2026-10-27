@@ -10,7 +10,6 @@ import {
   Dimensions,
   RefreshControl,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -155,14 +154,14 @@ export const CommunityStatsScreen: React.FC<Props> = ({ route }) => {
     // mélanger au style de la carte ferait apparaître un coin visible sous
     // la status bar.
     <View style={{ paddingTop: insets.top + 10 }}>
-      <LinearGradient colors={[colors.surface, colors.background]} style={[styles.header, { borderColor: colors.divider }]}>
+      <View style={[{ backgroundColor: colors.surface }, styles.header, { borderColor: colors.divider }]}>
         <BackButton onPress={() => nav.goBack()} />
         <View style={styles.headerCenter}>
           <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Statistiques</Text>
           <Text style={[styles.headerSub, { color: colors.textSecondary }]} numberOfLines={1}>{communityName}</Text>
         </View>
         <View style={styles.headerBtn} />
-      </LinearGradient>
+      </View>
     </View>
   );
 
@@ -197,7 +196,7 @@ export const CommunityStatsScreen: React.FC<Props> = ({ route }) => {
       <Animated.View style={[styles.kpiGrid, { opacity: fadeAnim }]}>
         {kpis.map((k, i) => (
           <View key={i} style={[styles.kpiCard, { backgroundColor: colors.surface }]}>
-            <LinearGradient colors={k.gradColors} style={styles.kpiInner}>
+            <View style={[{ backgroundColor: k.gradColors[0] }, styles.kpiInner]}>
               <View style={[styles.kpiIconCircle, { backgroundColor: k.iconBg }]}>
                 <Icon name={k.icon as any} size={17} color={k.iconColor} />
               </View>
@@ -206,7 +205,7 @@ export const CommunityStatsScreen: React.FC<Props> = ({ route }) => {
               <View style={[styles.kpiBadge, { backgroundColor: k.badgeColor + '18' }]}>
                 <Text style={[styles.kpiBadgeText, { color: k.badgeColor }]}>{k.badge}</Text>
               </View>
-            </LinearGradient>
+            </View>
           </View>
         ))}
       </Animated.View>

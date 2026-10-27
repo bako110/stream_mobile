@@ -4,7 +4,6 @@ import {
   ActivityIndicator, Linking, ScrollView, StatusBar,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { BackButton } from '../../components/common';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -138,10 +137,8 @@ export const CommunityInviteScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
       >
         {/* Card principale — code + lien */}
-        <LinearGradient
-          colors={['#7B3FF2', '#E0389A']}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          style={{ borderRadius: 24, padding: 24, gap: 16 }}
+        <View
+          style={{ borderRadius: 24, padding: 24, gap: 16, backgroundColor: '#7B3FF2' }}
         >
           {/* Code */}
           <View style={{ alignItems: 'center', gap: 6 }}>
@@ -174,7 +171,7 @@ export const CommunityInviteScreen: React.FC = () => {
               {shareUrl || `${SHARE_BASE}/...`}
             </Text>
           </View>
-        </LinearGradient>
+        </View>
 
         {/* Boutons copier */}
         <View style={{ flexDirection: 'row', gap: 10 }}>

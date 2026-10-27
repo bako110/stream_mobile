@@ -8,7 +8,6 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import LinearGradient from 'react-native-linear-gradient';
 import Animated, {
   useSharedValue, useAnimatedStyle, withSpring, withSequence,
 } from 'react-native-reanimated';
@@ -79,9 +78,8 @@ const ImgTile: React.FC<{
     <TouchableOpacity activeOpacity={0.92} onPress={onPress}
       style={[style, br, { overflow: 'hidden', backgroundColor: '#0d0d1a' }]}>
       {!loaded && (
-        <LinearGradient
-          colors={['#1a1a2e', '#252540']}
-          style={[StyleSheet.absoluteFill, br]}
+        <View
+          style={[StyleSheet.absoluteFill, br, { backgroundColor: '#1a1a2e' }]}
         />
       )}
       <CachedImage
@@ -586,7 +584,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
                 {post.thumbnail_url ? (
                   <CachedImage uri={post.thumbnail_url} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                 ) : (
-                  <LinearGradient colors={['#1a1a2e', '#252540']} style={StyleSheet.absoluteFill} />
+                  <View style={[StyleSheet.absoluteFill, { backgroundColor: '#1a1a2e' }]} />
                 )}
                 <View style={pc.videoPlayOverlay}>
                   <View style={pc.videoPlayCircle}>

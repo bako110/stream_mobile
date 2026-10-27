@@ -4,7 +4,6 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   StatusBar, ActivityIndicator, TextInput,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -91,9 +90,9 @@ export default function MonetisationRequestScreen() {
   if (submitted) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', gap: 20, paddingHorizontal: 32 }}>
-        <LinearGradient colors={['#10B981', '#059669']} style={s.successCircle}>
+        <View style={[s.successCircle, { backgroundColor: '#10B981' }]}>
           <Icon name="check" size={40} color="#fff" />
-        </LinearGradient>
+        </View>
         <Text style={[s.successTitle, { color: colors.textPrimary }]}>Demande envoyée !</Text>
         <Text style={[s.successSub, { color: colors.textSecondary }]}>
           Votre dossier est vérifié automatiquement sous 24h. Vous serez notifié dès que la décision est prise.
@@ -246,7 +245,7 @@ export default function MonetisationRequestScreen() {
           style={{ marginTop: 8, borderRadius: 16, overflow: 'hidden', opacity: elig && !elig.eligible ? 0.5 : 1 }}
           activeOpacity={0.8}
         >
-          <LinearGradient colors={['#10B981', '#059669']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.submitBtn}>
+          <View style={[s.submitBtn, { backgroundColor: '#10B981' }]}>
             {submitting
               ? <ActivityIndicator size="small" color="#fff" />
               : <>
@@ -254,7 +253,7 @@ export default function MonetisationRequestScreen() {
                   <Text style={s.submitText}>Envoyer ma demande</Text>
                 </>
             }
-          </LinearGradient>
+          </View>
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />
