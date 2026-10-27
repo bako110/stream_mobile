@@ -157,7 +157,7 @@ export const OnboardingScreen: React.FC<Props> = ({ onFinish, onLogin, onGoCGU, 
         {/* Bouton principal */}
         <TouchableOpacity onPress={onFinish} activeOpacity={0.88} style={{ width: '100%' }}>
           <LinearGradient
-            colors={['#7B3FF2', '#C044E8', '#E0389A']}
+            colors={['#7B3FF2', '#E0389A']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={s.ctaBtn}
           >

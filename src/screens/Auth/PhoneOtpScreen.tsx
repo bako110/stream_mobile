@@ -161,7 +161,7 @@ export const PhoneOtpScreen: React.FC<Props> = ({
   if (step === 'done') {
     return (
       <LinearGradient
-        colors={isDark ? ['#0a0a0a', '#111827'] : ['#f8fafc', '#e2e8f0']}
+        colors={[colors.background, colors.backgroundSecondary]}
         style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}
       >
         <Icon name="check-circle" size={64} color={colors.primary} />
@@ -175,7 +175,7 @@ export const PhoneOtpScreen: React.FC<Props> = ({
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <LinearGradient
-        colors={isDark ? ['#0a0a0a', '#111827'] : ['#f8fafc', '#e2e8f0']}
+        colors={[colors.background, colors.backgroundSecondary]}
         style={{ flex: 1 }}
       >
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
