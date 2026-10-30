@@ -337,6 +337,18 @@ export const ReelsScreen: React.FC = () => {
   const adSlotPositionsRef = useRef<Map<number, number>>(new Map());
   const servedAdIdsRef = useRef<Set<string>>(new Set());
   const loadingAdSlotsRef = useRef<Set<number>>(new Set());
+  // Horodatage jusqu'auquel on sait qu'AUCUNE autre campagne n'est disponible
+  // que celles déjà servies (détecté quand fetchOne retombe sur repeat=true
+  // ci-dessous, cf. son commentaire) — tant qu'on est avant cette échéance, la
+  // revalidation périodique (AD_SLOT_REVALIDATE_MS) ne sert à rien : relancer
+  // loadAdForSlot ne peut matériellement renvoyer qu'une pub déjà vue. Avant ce
+  // garde-fou, avec une seule campagne active, le timer révoquait puis
+  // rechargeait le même slot toutes les 3 min pour rien — vu en prod (logs
+  // serveur) comme une alternance ininterrompue d'appels /ads/feed/next avec
+  // et sans exclude_ids, génératrice d'impressions dupliquées (risque trafic
+  // invalide AdSense/AdMob). Durée alignée sur AD_SLOT_REVALIDATE_MS : une
+  // nouvelle campagne qui démarre reste détectée au prochain cycle normal.
+  const adsExhaustedUntilRef = useRef<number>(0);
   // reelAdRef — reflète juste "au moins une ad a déjà été chargée" (utilisé par
   // toRenderedIndex pour savoir si des slots pub existent dans le flux rendu).
   const reelAdRef = useRef(false);
@@ -373,7 +385,18 @@ export const ReelsScreen: React.FC = () => {
           // immédiatement — des dizaines de requêtes par seconde vues dans les logs.
           if (!r.data) {
             if (excludeIds && !repeat) return fetchOne(true);
+            // Même sans exclusion, rien à servir — stock de pubs actives
+            // réellement épuisé (campagnes toutes en pause/budget atteint).
+            adsExhaustedUntilRef.current = Date.now() + AD_SLOT_REVALIDATE_MS;
             return;
+          }
+          // repeat=true (fallback sans exclusion) ET l'ID reçu a déjà été
+          // servi avant dans cette session : la seule pub servable est une
+          // déjà vue — rien de nouveau à offrir tant qu'aucune campagne
+          // supplémentaire ne démarre. servedAdIdsRef (pas recentExcluded,
+          // toujours vide quand repeat=true) est l'historique complet.
+          if (repeat && servedAdIdsRef.current.has(r.data.id)) {
+            adsExhaustedUntilRef.current = Date.now() + AD_SLOT_REVALIDATE_MS;
           }
           servedAdIdsRef.current.add(r.data.id);
           setAdSlots(prev => {
@@ -905,7 +928,14 @@ export const ReelsScreen: React.FC = () => {
   // ── Focus ─────────────────────────────────────────────────────────────────
   // paramsRef.current est toujours frais (mis à jour à chaque render, avant useFocusEffect)
   useFocusEffect(useCallback(() => {
-    setScreenFocused(true);
+    // Délai d'une frame avant d'activer réellement la vidéo (isActive dérive
+    // de screenFocused) — bug connu : la surface vidéo native (VideoView)
+    // ignore le zIndex React Native habituel et peut s'afficher brièvement
+    // PAR-DESSUS la pilule de navigation au moment précis de son montage,
+    // la faisant paraître carrée (coins arrondis masqués) un court instant.
+    // Laisser la pilule finir de se stabiliser avant que la vidéo ne se mette
+    // à jouer réduit la fenêtre où cette course de montage natif est visible.
+    const raf = requestAnimationFrame(() => setScreenFocused(true));
 
     const p          = paramsRef.current;
     const targetId   = p.initialReelId;
@@ -916,6 +946,7 @@ export const ReelsScreen: React.FC = () => {
       load(false);
       didFocusOnceRef.current = true;
       return () => {
+        cancelAnimationFrame(raf);
         setScreenFocused(false);
         try { activePlayerRef.current?.pause(); } catch {}
         requestAnimationFrame(() => sendViewForCurrent());
@@ -1036,6 +1067,7 @@ export const ReelsScreen: React.FC = () => {
 
     didFocusOnceRef.current = true;
     return () => {
+      cancelAnimationFrame(raf);
       setScreenFocused(false);
       try { activePlayerRef.current?.pause(); } catch {}
       requestAnimationFrame(() => sendViewForCurrent());
@@ -1290,6 +1322,10 @@ export const ReelsScreen: React.FC = () => {
   useEffect(() => {
     if (userMode) return;
     const timer = setInterval(() => {
+      // Stock de pubs connu comme épuisé (cf. adsExhaustedUntilRef) — revoquer
+      // puis recharger ne peut matériellement rien changer avant cette
+      // échéance, ne fait que dupliquer des requêtes/impressions pour rien.
+      if (Date.now() < adsExhaustedUntilRef.current) return;
       adSlotsRef.current.forEach((_, slotIdx) => {
         const renderedIndex = adSlotPositionsRef.current.get(slotIdx);
         if (renderedIndex === undefined) return;
@@ -1342,6 +1378,7 @@ export const ReelsScreen: React.FC = () => {
         muted={muted}
         screenW={SCREEN_W}
         screenH={SCREEN_H}
+        insetTop={insets.top}
         insetBottom={insets.bottom}
         colors={colors}
         currentUserId={myId ?? undefined}
@@ -1358,7 +1395,7 @@ export const ReelsScreen: React.FC = () => {
         reelsShowInterface={reelsShowInterface}
       />
     );
-  }, [currentIndex, screenFocused, fullscreenAd, searchOpen, awaitingTarget, muted, insets.bottom, colors, myId, myAvatar, myInitial, toggleMute, onAuthorPress, goNextReel, SCREEN_W, SCREEN_H, isWifi, ui, autoAdvance, toggleAutoAdvanceHeader, swipeHintDone, reelsShowInterface]);
+  }, [currentIndex, screenFocused, fullscreenAd, searchOpen, awaitingTarget, muted, insets.top, insets.bottom, colors, myId, myAvatar, myInitial, toggleMute, onAuthorPress, goNextReel, SCREEN_W, SCREEN_H, isWifi, ui, autoAdvance, toggleAutoAdvanceHeader, swipeHintDone, reelsShowInterface]);
 
   // ── Render: loading ───────────────────────────────────────────────────────
   if (loading && reels.length === 0) {
@@ -1604,15 +1641,14 @@ export const ReelsScreen: React.FC = () => {
   // ── Render: Feed principal ────────────────────────────────────────────────
   return (
     <View style={{ width: SCREEN_W, height: SCREEN_H, backgroundColor: '#000', overflow: 'hidden' }}>
-      {/* translucent — la status bar reste barStyle="light-content" (icônes
-          blanches) en permanence, peu importe le contenu vidéo du reel —
-          détecter la luminosité réelle frame par frame serait trop coûteux.
-          Le dégradé de protection est monté APRÈS la FlatList plus bas (pas
-          ici) : la surface vidéo native (VideoView) ignore le zIndex React
-          Native habituel et passe toujours au-dessus, peu importe sa valeur —
-          seul l'ORDRE DE MONTAGE dans l'arbre JSX fait foi pour un élément
-          natif comme celui-ci. */}
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      {/* Même pattern que les autres écrans (Home/Feed) : adaptée au thème,
+          pas forcée en dur — les icônes système doivent rester visibles quel
+          que soit l'état hérité d'un écran précédent. Le dégradé de protection
+          est monté APRÈS la FlatList plus bas (pas ici) : la surface vidéo
+          native (VideoView) ignore le zIndex React Native habituel et passe
+          toujours au-dessus, peu importe sa valeur — seul l'ORDRE DE MONTAGE
+          dans l'arbre JSX fait foi pour un élément natif comme celui-ci. */}
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
 
       <FlatList
         ref={listRef}
@@ -2145,8 +2181,12 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
           insetBottom>0, qui peut valoir 0 sur des appareils Android sans
           geste de navigation alors que la tab bar overlay est bien affichée).
           hasTabBar=false (Modal plein écran, grille recherche) retombe sur
-          les 40px d'origine, pas de régression là. ── */}
-      <View style={[adSlideS.adv, { bottom: 40 + (hasTabBar ? TAB_BAR_HEIGHT + Math.max(insetBottom, 12) : 0) }]} pointerEvents="box-none">
+          les 40px d'origine, pas de régression là. Hauteur de pilule plafonnée
+          à 24 (même formule que AppTabBar.tsx) + vrai insetBottom séparé pour
+          la distance système réelle — sans ça, un appareil à barre de
+          navigation système (Samsung) gonflait ce bloc bien plus haut que
+          nécessaire au-dessus d'une pilule qui, elle, reste compacte. ── */}
+      <View style={[adSlideS.adv, { bottom: 40 + (hasTabBar ? TAB_BAR_HEIGHT + Math.min(Math.max(insetBottom, 12), 24) + insetBottom : 0) }]} pointerEvents="box-none">
         <View style={adSlideS.advRow}>
           <View style={{ flex: 1, minWidth: 0 }}>
             <AdvertiserRow ad={ad} variant="dark" onPressAdvertiser={onAuthorPress} />
@@ -2333,6 +2373,7 @@ interface VideoSlideProps {
   muted:                boolean;
   screenW:              number;
   screenH:              number;
+  insetTop:             number;
   insetBottom:          number;
   colors:               any;
   currentUserId?:       string;
@@ -2364,7 +2405,7 @@ interface VideoSlideProps {
 }
 
 const VideoSlide: React.FC<VideoSlideProps> = memo(({
-  reel, isActive, isPreload, preloadDistance, isCachePriority, isWifi, networkQuality, muted, screenW, screenH, insetBottom,
+  reel, isActive, isPreload, preloadDistance, isCachePriority, isWifi, networkQuality, muted, screenW, screenH, insetTop, insetBottom,
   colors, currentUserId, currentUserAvatar, currentUserInitial = 'M',
   onAuthorPress, onEnd, activePlayerRef, audioOwnerRef, ui,
   autoAdvance, onToggleAutoAdvance, giftHintEnabled, reelsShowInterface,
@@ -3295,12 +3336,20 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
 
   // safeBottom s'adapte toujours à l'appareil (zone sûre système — barre de
   // gestes Android, encoche bas iPhone) : jamais chevauchée. La tab bar
-  // (Accueil/Découvrir/Reels/Profil) flotte en overlay par-dessus la vidéo
-  // sur cet écran (voir AppTabBar.tsx, isReelsScreen) — sans ajouter sa
-  // hauteur ici, le titre/description du reel se retrouvait caché dessous.
-  // Même formule exacte que AppTabBar.tsx pour rester toujours synchronisé.
-  const tabBarBottomPad = Platform.OS === 'android' ? Math.max(insetBottom, 12) : insetBottom;
+  // (Accueil/Découvrir/Reels/Profil) flotte en overlay par-dessus la vidéo sur
+  // cet écran (voir AppTabBar.tsx) — sans ajouter sa hauteur ici, le titre/
+  // description du reel se retrouvait caché dessous.
+  // tabBarBottomPad PLAFONNÉ à 24 — même formule que AppTabBar.tsx (synchronisé
+  // exprès) : sert uniquement à estimer la HAUTEUR de la pilule (tabBarOverlayH),
+  // jamais sa distance réelle au bord de l'écran. Sans ce plafond, un appareil
+  // à barre de navigation système (Samsung) donnait un insetBottom de 40-48px+,
+  // gonflant tabBarOverlayH et poussant actions/texte bien plus haut que
+  // nécessaire au-dessus d'une pilule qui, elle, reste compacte.
+  const tabBarBottomPad = Platform.OS === 'android' ? Math.min(Math.max(insetBottom, 12), 24) : insetBottom;
   const tabBarOverlayH  = TAB_BAR_HEIGHT + tabBarBottomPad;
+  // insetBottom RÉEL (non plafonné) ici : c'est la vraie distance entre le bas
+  // de la pilule et le bord physique de l'écran (zone système), à ne jamais
+  // confondre avec la hauteur de la pilule elle-même ci-dessus.
   const safeBottom    = Math.max(insetBottom, Platform.OS === 'android' ? 56 : 0) + tabBarOverlayH;
   // Barre de commentaire + barre de progression retirées (le tap sur "commenter"
   // dans la colonne d'actions ouvre CommentsBottomSheet) — la colonne d'actions
@@ -3328,6 +3377,15 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         resizeMode="contain"
         controls={false}
         surfaceType="texture"
+      />
+
+      {/* Bandeau noir OPAQUE réservé à la zone système (heure/batterie/réseau)
+          — pas un simple dégradé semi-transparent (0.12 d'opacité restait
+          illisible sur une vidéo claire) : la vidéo ne doit plus jamais
+          "atteindre" visuellement cette zone, elle doit être couverte net. */}
+      <View
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insetTop, backgroundColor: '#000', zIndex: 9 }}
+        pointerEvents="none"
       />
 
       {/* Thumbnail retiree (2026-09) — demande explicite : jouer la video
@@ -3620,7 +3678,17 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
             )}
           </View>
 
-          {captionSt ? <RichText text={captionSt} textStyle={[s.caption, { fontSize: ui.caption, lineHeight: Math.round(ui.caption * 1.42) }]} primaryColor="#93C5FD" maxLines={3} showLinkPreview={false} /> : null}
+          {captionSt ? (
+            <RichText
+              text={captionSt}
+              textStyle={[s.caption, { fontSize: ui.caption, lineHeight: Math.round(ui.caption * 1.42) }]}
+              primaryColor="#93C5FD"
+              showLinkPreview={false}
+              isTruncated={!!reel.is_caption_truncated}
+              entityType="reel"
+              entityId={reel.id}
+            />
+          ) : null}
 
           {reel.music_name ? (
             <View style={s.musicBand} pointerEvents="none">
