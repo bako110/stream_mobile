@@ -41,6 +41,7 @@ export {
   SkeletonPostDetail,
   SkeletonPostCardFeed,
 } from './SkeletonLoader';
+export { SheetCloseButton }     from './SheetCloseButton';
 export { CommentsBottomSheet }  from './CommentsBottomSheet';
 export { ShareBottomSheet }     from './ShareBottomSheet';
 export { RepostBottomSheet }    from './RepostBottomSheet';

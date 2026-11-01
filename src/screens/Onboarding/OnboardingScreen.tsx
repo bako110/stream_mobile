@@ -56,7 +56,7 @@ export const OnboardingScreen: React.FC<Props> = ({ onFinish, onLogin, onGoCGU, 
   const bg         = isDark ? '#09071C' : '#F5F3FF';
   const headline   = isDark ? '#FFFFFF' : '#0D0B2A';
   const sub        = isDark ? '#A09DC0' : '#4E4C6A';
-  const accent     = '#C872FF';
+  const accent     = colors.primary;
   const pillBg     = isDark ? '#FFFFFF14' : '#7B3FF214';
   const pillBorder = isDark ? '#FFFFFF1E' : '#7B3FF233';
   const pillTxt    = isDark ? '#F0EFF8' : '#7B3FF2';
@@ -98,7 +98,9 @@ export const OnboardingScreen: React.FC<Props> = ({ onFinish, onLogin, onGoCGU, 
         style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? '#09071C' : '#F5F3FF' }]}
       />
 
-      {/* Lueurs de fond */}
+      {/* Lueurs de fond — même couleur de marque unie aux deux positions, pas
+          un dégradé à deux teintes (#E0389A était la fin d'un ancien dégradé,
+          retiré partout ailleurs dans l'app au profit d'une couleur unie). */}
       <View style={[s.glow, {
         top: -H * 0.1, left: -W * 0.2,
         width: W * 0.9, height: W * 0.9,
@@ -107,7 +109,7 @@ export const OnboardingScreen: React.FC<Props> = ({ onFinish, onLogin, onGoCGU, 
       <View style={[s.glow, {
         bottom: H * 0.08, right: -W * 0.3,
         width: W * 0.8, height: W * 0.8,
-        backgroundColor: '#E0389A', opacity: glowOp,
+        backgroundColor: '#7B3FF2', opacity: glowOp,
       }]} />
 
       {/* Corps */}
@@ -168,11 +170,11 @@ export const OnboardingScreen: React.FC<Props> = ({ onFinish, onLogin, onGoCGU, 
         {/* Légal */}
         <Text style={[s.legal, { color: legalColor }]}>
           En continuant, vous acceptez nos{' '}
-          <Text style={[s.legalLink, { color: isDark ? '#C872FF' : '#7B3FF2' }]} onPress={onGoCGU}>
+          <Text style={[s.legalLink, { color: accent }]} onPress={onGoCGU}>
             Conditions d'utilisation
           </Text>
           {' '}et notre{' '}
-          <Text style={[s.legalLink, { color: isDark ? '#C872FF' : '#7B3FF2' }]} onPress={onGoPrivacy}>
+          <Text style={[s.legalLink, { color: accent }]} onPress={onGoPrivacy}>
             Politique de confidentialité
           </Text>
           .

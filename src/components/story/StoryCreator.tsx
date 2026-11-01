@@ -637,11 +637,38 @@ export const StoryCreator: React.FC<Props> = ({ visible, onClose, onCreated }) =
           Image.getSize(finalUri, (w, h) => res({width:w, height:h}), rej)
         );
         console.log('[crop] imgSize=', imgW, imgH);
-        const scaleX = imgW / W;
-        const scaleY = imgH / H;
+        // Le rectangle `crop` est dessiné par l'utilisateur sur l'image telle
+        // qu'affichée en resizeMode="contain" (cf. bloc isFull plus haut) —
+        // donc PAS étirée sur tout W×H : letterboxée, centrée, avec des bandes
+        // vides de chaque côté selon l'écart entre le ratio de l'image et
+        // celui de l'écran. Avant ce fix, scaleX/scaleY étaient calculés comme
+        // si l'image occupait tout l'écran (imgW/W, imgH/H), ignorant ces
+        // bandes : le crop final appliqué à l'image source réelle se
+        // retrouvait décalé et zoomé par rapport à ce que l'utilisateur avait
+        // réellement cadré à l'écran (bug vu en prod — zoom/recadrage
+        // incohérent sur les stories photo après usage de l'outil crop).
+        const screenRatio = W / H;
+        const imageRatio  = imgW / imgH;
+        let dispW: number, dispH: number, dispX: number, dispY: number;
+        if (imageRatio > screenRatio) {
+          // Image plus "large" que l'écran — bandes en haut/bas.
+          dispW = W;
+          dispH = W / imageRatio;
+          dispX = 0;
+          dispY = (H - dispH) / 2;
+        } else {
+          // Image plus "haute" que l'écran — bandes à gauche/droite.
+          dispH = H;
+          dispW = H * imageRatio;
+          dispY = 0;
+          dispX = (W - dispW) / 2;
+        }
+        const scale = imgW / dispW; // == imgH / dispH, les deux dimensions sont mises à l'échelle identiquement en contain
+        const relX = Math.max(0, crop!.x - dispX);
+        const relY = Math.max(0, crop!.y - dispY);
         const cropped = await ImageEditor.cropImage(finalUri, {
-          offset: { x: Math.round(crop!.x * scaleX), y: Math.round(crop!.y * scaleY) },
-          size:   { width: Math.round(crop!.w * scaleX), height: Math.round(crop!.h * scaleY) },
+          offset: { x: Math.round(relX * scale), y: Math.round(relY * scale) },
+          size:   { width: Math.round(Math.min(crop!.w, dispW - relX) * scale), height: Math.round(Math.min(crop!.h, dispH - relY) * scale) },
         });
         finalUri = typeof cropped === 'string' ? cropped : (cropped as any).uri ?? finalUri;
         console.log('[crop] result=', finalUri);

@@ -263,11 +263,18 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
     setAuthorHasMore(true); authorIdRef.current = null;
 
     if (initialPost) {
+      // Affichage instantané avec les données déjà en main (venant d'une
+      // route de LISTE, donc `body` potentiellement tronqué par le backend)
+      // — on charge quand même le détail complet derrière, silencieusement,
+      // pour que le texte intégral soit disponible (sinon "Voir plus" sur
+      // localTruncate n'a rien de plus à révéler, le texte complet n'a
+      // jamais été reçu).
       setPost(initialPost);
       if (initialPost.author?.id) {
         authorIdRef.current = String(initialPost.author.id);
         loadAuthorPosts(String(initialPost.author.id), 1, true);
       }
+      postService.getById(postId).then(setPost).catch(() => {});
     } else {
       setPost(null);
       setLoading(true);
@@ -489,10 +496,12 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
             <View style={[s.pBody, !thumb && { paddingVertical: 14 }]}>
               <RichText
                 text={item.body}
-                maxLines={thumb ? 2 : 6}
                 primaryColor={colors.primary}
                 textStyle={[s.pBodyTxt, { color: colors.textPrimary }]}
                 showLinkPreview={false}
+                isTruncated={!!item.is_body_truncated}
+                entityType="post"
+                entityId={item.id}
               />
               {!thumb && (
                 <View style={[s.pStatsLight, { marginTop: 8 }]}>
@@ -648,7 +657,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
             <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
               <RichText
                 text={bodyToShow}
-                maxLines={2}
+                localTruncate
                 primaryColor={colors.primary}
                 textStyle={[s.bodyTxt, { color: colors.textPrimary }]}
                 // L'aperçu est géré par <LinkPreviewCard> ci-dessous.

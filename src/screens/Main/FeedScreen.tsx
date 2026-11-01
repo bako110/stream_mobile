@@ -58,6 +58,7 @@ import { liveService } from '../../services/liveService';
 import type { LiveStream } from '../../services/liveService';
 import { communityService, type CommunityData } from '../../services/communityService';
 import { useWs } from '../../context/WebSocketContext';
+import { setOnlineStatus, useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { useUser } from '../../context/UserContext';
 import { useSearchOverlayActions } from '../../context/SearchOverlayContext';
 import { networkService } from '../../services/networkService';
@@ -817,7 +818,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   const { colors } = theme;
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
-  const { addListener, removeListener, lastLiveStarted, lastLiveEnded, lastLiveViewersUpdated, lastPresenceUpdate, unreadMessages, unreadActivity, unreadNotifications } = useWs();
+  const { addListener, removeListener, lastPresenceUpdate, unreadMessages, unreadActivity, unreadNotifications } = useWs();
   const headerNotifCount = unreadNotifications + unreadActivity;
   const { currentUser } = useUser();
   const { openSearchOverlay } = useSearchOverlayActions();
@@ -864,12 +865,6 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   const [liveConcerts,    setLiveConcerts]    = useState<Concert[]>([]);
   const [spontLives,      setSpontLives]      = useState<LiveStream[]>([]);
   const [nearbyItems,    setNearbyItems]    = useState<NearbyItem[]>([]);
-  // Miroirs synchrones — lus par applySpontLivesUpdate quand on n'est pas au
-  // sommet (le state peut être en retard d'un tick sur ce qu'on veut accumuler).
-  const spontLivesRef   = useRef<LiveStream[]>([]);
-  const liveConcertsRef = useRef<Concert[]>([]);
-  useEffect(() => { spontLivesRef.current = spontLives; }, [spontLives]);
-  useEffect(() => { liveConcertsRef.current = liveConcerts; }, [liveConcerts]);
   // Panneau infos primaires — ouvert via le chevron du header, fermé au tap
   // extérieur. Restait ouvert indéfiniment si on quittait l'écran (changement
   // d'onglet, navigation vers un écran empilé) sans re-taper explicitement à
@@ -1492,13 +1487,18 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         // refresh, changement de filtre). Un refresh silencieux (retour de focus) alors que
         // l'utilisateur a déjà scrollé plus loin ne doit PAS réinitialiser la pagination —
         // voir le early-return plus bas qui bloque ce cas avant de toucher aux items/refs.
-        // Refresh silencieux alors que l'utilisateur a déjà scrollé plus loin (pages > 1) :
-        // sortir tout de suite, AVANT tout fetch réseau et toute écriture de ref — sinon un
-        // fetch page 1 écraserait silencieusement les refs de pagination déjà avancées
-        // (feedPageRef...) avec des valeurs de page 1, cassant loadMoreFeed au prochain
-        // scroll sans que rien ne se voie tout de suite (les items affichés, eux, ne
-        // changent pas).
-        if (silent && feedPageRef.current > 1) {
+        // Refresh silencieux (retour de focus, WS feed_updated) : sortir tout de
+        // suite, AVANT tout fetch réseau — qu'on soit en page 1 ou au-delà.
+        // Avant ce garde-fou, rester en page 1 (cas le plus courant : peu ou pas
+        // encore scrollé) laissait le fetch + la comparaison de signature plus
+        // bas s'exécuter quand même, et sur une plateforme avec plusieurs
+        // utilisateurs actifs, N'IMPORTE QUEL like/commentaire ailleurs change
+        // updated_at d'un item de la page 1 — la signature différait alors
+        // systématiquement et remplaçait tout `items`, décalant le feed sous les
+        // yeux de l'utilisateur sans aucune action de sa part ("ça bug tout
+        // seul"). Les nouveautés arrivent désormais seulement via une action
+        // explicite (pull-to-refresh, changement de filtre).
+        if (silent) {
           lastLoadedAtRef.current = Date.now();
           loadingInitialRef.current = false;
           return;
@@ -1525,11 +1525,11 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         if (requestId !== loadRequestIdRef.current) return;
         feedHasMoreRef.current = (feedResult.items ?? []).length >= FEED_PAGE_SIZE;
         // Header "En direct" : ne le laisser changer de hauteur (donc pousser tout
-        // le feed) QUE si l'utilisateur est au sommet, ou lors d'un vrai
-        // rechargement (pull-to-refresh / changement de filtre / 1er montage).
-        // Un refresh silencieux au retour de focus alors qu'on lit plus bas ne
-        // doit jamais bouger le carrousel — sinon "l'écran glisse tout seul".
-        if (!silent || feedAtTopRef.current) {
+        // le feed) QUE lors d'un vrai rechargement (pull-to-refresh / changement de
+        // filtre / 1er montage) — jamais sur un refresh silencieux de focus, même
+        // proche du sommet (sinon l'écran "glisse tout seul" dès qu'un live
+        // démarre/s'arrête pendant qu'on regardait ailleurs).
+        if (!silent) {
           setLiveConcerts(Array.isArray(liveConcerts) ? liveConcerts : []);
           setSpontLives(Array.isArray(spontLivesResult) ? spontLivesResult : []);
         } else {
@@ -1631,11 +1631,15 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
           followingReelPageRef.current = 1;
           followingFeedHasMoreRef.current = true;
           followingReelHasMoreRef.current = true;
-        } else if (followingFeedPageRef.current > 1 || followingReelPageRef.current > 1) {
-          // Refresh silencieux alors qu'on a déjà paginé plus loin : ne pas
-          // écraser la progression (même garde que le filtre "all", mais sur
-          // les refs qui appartiennent réellement à CE filtre — feedPageRef
-          // est celle du filtre "all", la tester ici n'avait aucun sens).
+        } else if (silent) {
+          // Refresh silencieux (retour de focus) : ne jamais toucher à ce qui est
+          // déjà affiché, peu importe la position de pagination — avant ce garde-
+          // fou, setItems(merged) plus bas s'exécutait quand même tant qu'on
+          // n'avait pas dépassé la page 1, remplaçant le tableau par un nouveau
+          // tri fusionné (posts + reels) dont l'ordre exact peut varier d'un appel
+          // à l'autre (nouveaux posts des amis entre-temps) — l'utilisateur se
+          // retrouvait ramené sur un tout autre contenu au retour sur le feed,
+          // pas juste un léger décalage de hauteur de carte.
           lastLoadedAtRef.current = Date.now();
           loadingInitialRef.current = false;
           return;
@@ -2000,59 +2004,23 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     } catch { /* silencieux */ }
   }, []);
 
-  // Applique une transformation au carrousel "En direct" — MAIS seulement si on
-  // est au sommet. Scrollé plus bas, on l'accumule dans pendingLiveHeaderRef :
-  // l'effect de resync l'appliquera quand on remontera. Sans ça, un événement WS
-  // (live qui démarre/s'arrête, viewers) redimensionne le header sous les yeux de
-  // l'utilisateur qui lit un post 10 écrans plus bas → "ça glisse tout seul".
-  const applySpontLivesUpdate = useCallback((fn: (prev: LiveStream[]) => LiveStream[]) => {
-    if (feedAtTopRef.current) {
-      setSpontLives(fn);
-      return;
-    }
-    const base = pendingLiveHeaderRef.current?.spontLives ?? spontLivesRef.current;
-    pendingLiveHeaderRef.current = {
-      liveConcerts: pendingLiveHeaderRef.current?.liveConcerts ?? liveConcertsRef.current,
-      spontLives: fn(base),
-    };
-  }, []);
+  // Mises à jour temps réel du carrousel "En direct" (live démarré/arrêté,
+  // viewers) — désactivées : elles redimensionnaient le header à chaque
+  // événement WS, qui arrivent en continu sur une plateforme multi-
+  // utilisateurs, donnant l'impression que "le feed bouge tout seul". Le
+  // carrousel ne se met plus à jour qu'au prochain vrai rechargement (pull-to-
+  // refresh, changement de filtre) — lastLiveStarted/lastLiveEnded/
+  // lastLiveViewersUpdated restent disponibles via useWs() mais ne sont plus
+  // lus ici.
 
-  // WS : nouveau live spontané démarré → refetch pour respecter is_private + follow
-  useEffect(() => {
-    if (!lastLiveStarted) return;
-    liveService.getLives()
-      .then(lives => { applySpontLivesUpdate(() => (Array.isArray(lives) ? lives : [])); })
-      .catch(() => {});
-  }, [lastLiveStarted, applySpontLivesUpdate]);
-
-  // WS : live spontané terminé
-  useEffect(() => {
-    if (!lastLiveEnded) return;
-    applySpontLivesUpdate(prev => prev.filter(l => l.id !== lastLiveEnded));
-  }, [lastLiveEnded, applySpontLivesUpdate]);
-
-  // WS : viewers mis à jour
-  useEffect(() => {
-    if (!lastLiveViewersUpdated) return;
-    applySpontLivesUpdate(prev => prev.map(l =>
-      l.id === lastLiveViewersUpdated.live_id
-        ? { ...l, current_viewers: lastLiveViewersUpdated.current_viewers }
-        : l
-    ));
-  }, [lastLiveViewersUpdated, applySpontLivesUpdate]);
-
-  // WS : mise à jour is_online en temps réel sur les cartes du feed
+  // Présence en ligne — passe par un store externe (useOnlineStatus), jamais
+  // par setItems : l'ancienne version recréait tout le tableau `items` à
+  // chaque connexion/déconnexion de n'importe quel utilisateur, forçant un
+  // re-render de TOUTES les cartes visibles. Ici, seule la carte de
+  // l'utilisateur concerné se re-render (voir FeedCard plus bas).
   useEffect(() => {
     if (!lastPresenceUpdate) return;
-    const { user_id, is_online } = lastPresenceUpdate;
-    setItems(prev => prev.map(item => {
-      const d = item.data as any;
-      if (!d) return item;
-      const authorKey = d.organizer ? 'organizer' : d.artist ? 'artist' : d.author ? 'author' : null;
-      if (!authorKey) return item;
-      if (String(d[authorKey]?.id) !== String(user_id)) return item;
-      return { ...item, data: { ...d, [authorKey]: { ...d[authorKey], is_online } } };
-    }));
+    setOnlineStatus(String(lastPresenceUpdate.user_id), lastPresenceUpdate.is_online);
   }, [lastPresenceUpdate]);
 
   // Rafraîchissement temps réel : reload quand un autre utilisateur publie.
@@ -3077,6 +3045,7 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
   const date      = isEvent ? event?.starts_at : concert?.scheduled_at;
   const city      = isEvent ? event?.venue_city : concert?.venue_city;
   const desc      = isEvent ? event?.description : concert?.description;
+  const descTruncated = isEvent ? !!event?.is_description_truncated : !!concert?.is_description_truncated;
   const thumbUrl  = isEvent
     ? (event?.thumbnail_url ?? event?.banner_url)
     : (concert?.thumbnail_url ?? concert?.banner_url);
@@ -3084,6 +3053,22 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
 
   const isFree = isEvent ? event?.access_type === 'free' : concert?.access_type === 'free';
   const isLive = isConcert && concert?.status === 'live';
+  // Événement "en cours" — le backend garde les events jusqu'à 3 jours après
+  // starts_at dans le feed (cf. feed_service.py, ev_cutoff), donc un event
+  // dont la date de début est déjà passée reste affiché : sans ce badge,
+  // l'utilisateur ne peut pas distinguer "à venir" de "déjà commencé,
+  // toujours actif". Même fenêtre que PlanningScreen.tsx (24h sans ends_at
+  // renseigné) pour rester cohérent entre les deux écrans.
+  const isEventOngoing = isEvent && (() => {
+    if (!event?.starts_at) return false;
+    const start = new Date(event.starts_at).getTime();
+    const now = Date.now();
+    if (event.ends_at) {
+      const end = new Date(event.ends_at).getTime();
+      return now >= start && now <= end;
+    }
+    return now >= start && now <= start + 24 * 3600_000;
+  })();
   const price  = isEvent ? event?.ticket_price : concert?.ticket_price;
   const commentsDisabled = isEvent ? (event?.comments_disabled ?? false) : (concert?.comments_disabled ?? false);
 
@@ -3217,6 +3202,10 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
 
   const author       = isEvent ? event?.organizer : concert?.artist ?? null;
   const authorId     = author?.id ?? null;
+  // Présence temps réel isolée du state de la liste — voir useOnlineStatus.
+  // (author as any)?.is_online sert de valeur de départ tant qu'aucun
+  // événement WS n'est encore arrivé pour cet utilisateur précis.
+  const isAuthorOnline = useOnlineStatus(authorId, (author as any)?.is_online ?? undefined);
   const authorName   = author?.display_name ?? author?.username ?? 'Gofolyx';
   const authorAvatar = author?.avatar_url ?? null;
   const authorInit   = (authorName || 'F')[0].toUpperCase();
@@ -3256,7 +3245,7 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
             size={38}
             accentColor={accent}
             isVerified={!!author?.is_verified}
-            isOnline={(author as any)?.is_online ?? undefined}
+            isOnline={isAuthorOnline}
             isLive={(author as any)?.is_live ?? undefined}
           />
           <View style={{ flex: 1, minWidth: 0 }}>
@@ -3316,6 +3305,11 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
               <View style={[fc.liveDot, { backgroundColor: colors.liveTag }]} />
               <Text style={[fc.heroStatusText, { color: colors.liveTag }]}>LIVE</Text>
             </View>
+          ) : isEventOngoing ? (
+            <View style={fc.heroStatus}>
+              <View style={[fc.liveDot, { backgroundColor: '#36D9A0' }]} />
+              <Text style={[fc.heroStatusText, { color: '#36D9A0' }]}>En cours</Text>
+            </View>
           ) : isFree ? (
             <Text style={[fc.heroStatusText, { color: colors.success }]}>Gratuit</Text>
           ) : price != null && price > 0 ? (
@@ -3365,7 +3359,14 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
       {/* ── Description ─────────────────────────────────────────────────── */}
       {desc ? (
         <View style={fc.descWrap}>
-          <ExpandableText text={desc} maxLines={3} textStyle={[fc.desc, { color: colors.textSecondary }]} primaryColor={colors.primary} />
+          <ExpandableText
+            text={desc}
+            textStyle={[fc.desc, { color: colors.textSecondary }]}
+            primaryColor={colors.primary}
+            isTruncated={descTruncated}
+            entityType={isEvent ? 'event' : 'concert'}
+            entityId={item.id}
+          />
         </View>
       ) : null}
 
@@ -3487,9 +3488,11 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
           onClose={() => { if (!reposting) setRepostSheetOpen(false); }}
         />
       )}
-      <LikersBottomSheet visible={likersOpen} onClose={() => setLikersOpen(false)} postId={item.id} likeCount={likeCount}
-        fetchLikers={(page, limit) => isEvent ? socialService.getReactionLikers({ event_id: item.id, page, limit }) : socialService.getReactionLikers({ concert_id: item.id, page, limit })}
-        onNavigateToProfile={uid => { setLikersOpen(false); setTimeout(() => (nav as any).navigate('UserProfile', { userId: uid }), 300); }} />
+      {likersOpen && (
+        <LikersBottomSheet visible={likersOpen} onClose={() => setLikersOpen(false)} postId={item.id} likeCount={likeCount}
+          fetchLikers={(page, limit) => isEvent ? socialService.getReactionLikers({ event_id: item.id, page, limit }) : socialService.getReactionLikers({ concert_id: item.id, page, limit })}
+          onNavigateToProfile={uid => { setLikersOpen(false); setTimeout(() => (nav as any).navigate('UserProfile', { userId: uid }), 300); }} />
+      )}
     </View>
   );
 });

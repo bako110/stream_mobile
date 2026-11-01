@@ -5,6 +5,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { authService, invalidateUserCache } from '../services/authService';
+import { accountsService } from '../services/accountsService';
 import { storage } from '../utils/storage';
 import { STORAGE_KEYS } from '../utils/constants';
 import type { User } from '../types/user';
@@ -40,6 +41,14 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const currentUserRef = useRef(currentUser);
   currentUserRef.current = currentUser;
+
+  // Garde le snapshot du compte actif (panneau multi-compte, FeedScreen) en
+  // phase avec le profil réel — capte TOUT changement de currentUser (refreshUser,
+  // le fetch initial, ET les setCurrentUser directs faits par EditProfileScreen
+  // après une sauvegarde), sans dépendre que chaque écran pense à le faire lui-même.
+  useEffect(() => {
+    if (currentUser) accountsService.syncActiveAccountSnapshot(currentUser);
+  }, [currentUser]);
 
   const refreshUser = useCallback(async (): Promise<User | null> => {
     try {

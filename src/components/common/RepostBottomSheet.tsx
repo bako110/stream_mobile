@@ -14,6 +14,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { GofolyxLoader } from './FolixLoader';
+import { SheetCloseButton } from './SheetCloseButton';
 
 type RepostKind = 'post' | 'event' | 'concert';
 
@@ -65,6 +66,7 @@ export const RepostBottomSheet: React.FC<Props> = ({ visible, kind, author, titl
 
       <Animated.View style={[st.sheet, { backgroundColor: colors.surface }, { transform: [{ translateY: slideY }] }]}>
         <View style={[st.handle, { backgroundColor: colors.divider }]} />
+        <SheetCloseButton onPress={onClose} style={st.closeBtn} />
 
         {/* Titre/sous-titre + aperçu défilables — seuls les boutons d'action
             restent fixes hors du scroll, pour que "Republier" reste toujours
@@ -153,6 +155,7 @@ const st = StyleSheet.create({
     shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 20, elevation: 12,
   },
   handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  closeBtn: { position: 'absolute', top: 10, right: 14, zIndex: 10 },
   scroll: { flexGrow: 0 },
   scrollContent: { paddingHorizontal: 18 },
   title: { fontSize: 17, fontWeight: '800', textAlign: 'center' },

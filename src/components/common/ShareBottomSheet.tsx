@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import RNBlobUtil from 'react-native-blob-util';
 import RNShare from 'react-native-share';
 import { useTheme } from '../../hooks/useTheme';
+import { SheetCloseButton } from './SheetCloseButton';
 import { encodeId } from '../../utils/slugId';
 import { socialService } from '../../services/socialService';
 import { toastService } from '../../services/toastService';
@@ -26,6 +27,19 @@ import type { FilmItem } from '../../screens/Main/FilmsScreen';
 
 const { height: H } = Dimensions.get('window');
 const SHEET_H = H * 0.72;
+
+// Tronque par POINT DE CODE Unicode complet (Array.from), jamais par unité
+// UTF-16 brute (.slice) — un .slice() peut couper en plein milieu d'une paire
+// de substituts (emoji, caractère multi-unité), laissant un caractère orphelin
+// dans le titre. encodeURIComponent (plus bas, pour les intents réseaux
+// sociaux) lève alors une URIError fatale non rattrapée sur une telle chaîne,
+// qui faisait planter l'app entière au clic sur Partager (vu en prod, crash
+// reproductible sur un post/reel dont le texte contient un emoji coupé pile
+// à la limite des 80 caractères).
+function truncateSafe(text: string, max = 80): string {
+  const chars = Array.from(text);
+  return chars.length > max ? chars.slice(0, max).join('') + '…' : text;
+}
 
 // Types acceptés par le backend pour le partage interne (message type=share) —
 // "film"/"serie" ne sont qu'un seul share_type "content" côté backend.
@@ -112,7 +126,7 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
     authorName   = author?.display_name ?? author?.username ?? 'Utilisateur';
     authorAvatar = author?.avatar_url ?? null;
     initials     = authorName[0]?.toUpperCase() ?? '?';
-    title        = p.body ? (p.body.length > 80 ? p.body.slice(0, 80) + '…' : p.body) : 'Post Gofolyx';
+    title        = p.body ? truncateSafe(p.body) : 'Post Gofolyx';
     thumb        = p.image_urls?.[0] ?? p.image_url ?? null;
     videoUrl     = p.video_url ?? null;
     createdAt    = p.created_at;
@@ -160,7 +174,7 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
     authorName   = author?.display_name ?? author?.username ?? 'Utilisateur';
     authorAvatar = author?.avatar_url ?? null;
     initials     = authorName[0]?.toUpperCase() ?? '?';
-    title        = r.caption ? (r.caption.length > 80 ? r.caption.slice(0, 80) + '…' : r.caption) : 'Reel Gofolyx';
+    title        = r.caption ? truncateSafe(r.caption) : 'Reel Gofolyx';
     subtitle     = null;
     thumb        = r.thumbnail_url ?? null;
     videoUrl     = r.hls_url ?? null;
@@ -289,8 +303,14 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
   // (ShareModal.tsx), via Linking.openURL au lieu de window.open : sur
   // mobile ça ouvre directement l'app installée (WhatsApp/Telegram/
   // Messenger) plutôt qu'une page web, quand elle est présente.
-  const encodedUrl   = encodeURIComponent(shareUrl);
-  const encodedTitle = encodeURIComponent(title);
+  // encodeURIComponent lève une URIError fatale (non catchée par React,
+  // crash de l'app entière) sur un caractère mal formé — garde-fou défensif
+  // en plus de truncateSafe ci-dessus : jamais de crash même si shareUrl/
+  // title contenait malgré tout une séquence invalide (donnée déjà corrompue
+  // en amont, hors du contrôle de ce composant).
+  const safeEncode = (s: string) => { try { return encodeURIComponent(s); } catch { return ''; } };
+  const encodedUrl   = safeEncode(shareUrl);
+  const encodedTitle = safeEncode(title);
 
   function openPlatform(platform: string, url: string) {
     onClose();
@@ -420,6 +440,7 @@ export const ShareBottomSheet: React.FC<Props> = (props) => {
 
       <Animated.View style={[st.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + 12 }, { transform: [{ translateY: slideY }] }]}>
         <View style={[st.handle, { backgroundColor: colors.divider }]} />
+        <SheetCloseButton onPress={onClose} style={st.closeBtn} />
 
         <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
@@ -621,6 +642,7 @@ const st = StyleSheet.create({
     shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 20, elevation: 12,
   },
   handle:        { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 14 },
+  closeBtn:      { position: 'absolute', top: 10, right: 14, zIndex: 10 },
 
   /* Reel TikTok-style */
   reelCard: {

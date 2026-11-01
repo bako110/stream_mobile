@@ -551,22 +551,28 @@ const PostCardInner: React.FC<PostCardProps> = ({
         </View>
       )}
 
-      {/* ── Body texte — toujours au même endroit, avec ou sans média ────────── */}
+      {/* ── Body texte — toujours au même endroit, avec ou sans média. Reste
+          cliquable vers le détail du post même avec média : pour une image
+          unique c'est redondant avec le tap sur l'image (comportement
+          identique, sans conséquence) ; pour plusieurs images c'est
+          désormais le SEUL accès au détail, les tuiles étant dédiées à la
+          galerie plein écran (voir plus bas, ImageGrid). ─────────────────── */}
       {displayBody ? (
         <TouchableOpacity
-          onPress={hasMedia ? undefined : onPress}
-          activeOpacity={hasMedia ? 1 : 0.7}
-          disabled={hasMedia}
+          onPress={onPress}
+          activeOpacity={0.7}
           style={pc.bodyWrap}
         >
           <RichText
             text={displayBody}
-            maxLines={hasMedia ? 4 : 6}
             textStyle={[pc.body, { color: colors.textPrimary }]}
             primaryColor={colors.primary}
             // L'aperçu de lien est géré par la carte <LinkPreviewCard> plus bas
             // (post.link_url) — RichText ne doit PAS en afficher un 2e.
             showLinkPreview={false}
+            isTruncated={!!post.is_body_truncated}
+            entityType="post"
+            entityId={post.id}
           />
         </TouchableOpacity>
       ) : null}
@@ -593,19 +599,27 @@ const PostCardInner: React.FC<PostCardProps> = ({
                 </View>
               </View>
             </TouchableOpacity>
-          ) : (
+          ) : images.length === 1 ? (
+            // Une seule image — le tap ouvre le détail du post (pas de galerie
+            // à naviguer entre plusieurs tuiles).
             <TouchableOpacity onPress={onPress} activeOpacity={0.95}>
-              <View style={[pc.mediaClip, { height: images.length === 1 ? HERO_H : gridHeightFor(images.length) }]}>
-                {images.length === 1 ? (
-                  <CachedImage uri={images[0]} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                ) : (
-                  <ImageGrid
-                    urls={images}
-                    onPressImage={i => nav.navigate('ImageGallery', { urls: images, initialIndex: i })}
-                  />
-                )}
+              <View style={[pc.mediaClip, { height: HERO_H }]}>
+                <CachedImage uri={images[0]} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
               </View>
             </TouchableOpacity>
+          ) : (
+            // Plusieurs images — PAS de TouchableOpacity englobant ici : chaque
+            // tuile d'ImageGrid a déjà son propre onPress vers ImageGallery.
+            // Un wrapper tactile par-dessus (comme avant) interceptait parfois
+            // le tap au même titre que la tuile elle-même (zones de bordure/
+            // marge entre tuiles), déclenchant les DEUX navigations à la fois —
+            // galerie ET détail du post qui s'ouvraient l'un après l'autre.
+            <View style={[pc.mediaClip, { height: gridHeightFor(images.length) }]}>
+              <ImageGrid
+                urls={images}
+                onPressImage={i => nav.navigate('ImageGallery', { urls: images, initialIndex: i })}
+              />
+            </View>
           )}
         </View>
       )}
@@ -747,6 +761,15 @@ const PostCardInner: React.FC<PostCardProps> = ({
             {/* Groupe 1 — icônes neutres : seule une action destructive/irréversible
                 (Supprimer) justifie une couleur, le reste reste sobre. */}
             <View style={[pc.menuGroup, { backgroundColor: colors.backgroundSecondary, borderColor: colors.divider }]}>
+              {/* Seul accès garanti au détail pour un post à plusieurs images
+                  sans texte — les tuiles de la grille sont dédiées à la
+                  galerie plein écran, le body texte (s'il existe) l'ouvre déjà
+                  directement, mais un post image-only n'avait plus aucune
+                  zone de tap vers le détail sans cette entrée. */}
+              <MenuRow icon="file-text" color={colors.textPrimary} iconBg={colors.background}
+                label="Voir le post" sub="Ouvrir les détails" colors={colors}
+                onPress={() => { setMenuOpen(false); onPress(); }} />
+              <View style={[pc.menuDiv, { backgroundColor: colors.divider }]} />
               <MenuRow icon="bookmark" color={colors.textPrimary}
                 iconBg={colors.background}
                 label={saved ? 'Retirer des favoris' : 'Sauvegarder'}

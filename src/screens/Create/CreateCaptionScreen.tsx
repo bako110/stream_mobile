@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { MentionInput } from '../../components/common/MentionInput';
 import { CONTENT_CATEGORIES } from '../../components/common/CategorySelector';
+import { CategoryIcon } from '../../components/common/categoryIcons';
 import { DarkColors } from '../../theme/colors';
 
 interface Props {
@@ -107,7 +108,7 @@ export const CreateCaptionScreen: React.FC<Props> = ({
                   onPress={() => onCategoryChange(active ? null : cat.value)}
                   style={[s.categoryChip, active && s.categoryChipActive]}
                 >
-                  <Text style={s.categoryEmoji}>{cat.emoji}</Text>
+                  <CategoryIcon value={cat.value} size={13} color={active ? '#fff' : 'rgba(255,255,255,0.65)'} />
                   <Text style={[s.categoryChipTxt, active && s.categoryChipTxtActive]}>{cat.label}</Text>
                 </TouchableOpacity>
               );
@@ -171,7 +172,6 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.14)',
   },
   categoryChipActive: { backgroundColor: 'rgba(192,38,212,0.22)', borderColor: '#C026D3' },
-  categoryEmoji: { fontSize: 13 },
   categoryChipTxt: { color: 'rgba(255,255,255,0.65)', fontWeight: '700', fontSize: 12 },
   categoryChipTxtActive: { color: '#fff' },
 

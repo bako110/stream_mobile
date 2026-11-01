@@ -68,6 +68,19 @@ function formatDist(km: number | null | undefined): string {
   if (km == null) return '';
   return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
 }
+// Événement "en cours" — starts_at déjà passé, toujours dans sa fenêtre active
+// (ends_at si renseigné, sinon 24h après le début). Même logique que
+// FeedScreen.tsx (FeedCard.isEventOngoing), gardée synchronisée.
+function isEventOngoingNow(startsAt?: string | null, endsAt?: string | null): boolean {
+  if (!startsAt) return false;
+  const start = new Date(startsAt).getTime();
+  const now = Date.now();
+  if (endsAt) {
+    const end = new Date(endsAt).getTime();
+    return now >= start && now <= end;
+  }
+  return now >= start && now <= start + 24 * 3600_000;
+}
 
 // ── Card composant ────────────────────────────────────────────────────────────
 
@@ -80,6 +93,7 @@ const EventCard: React.FC<{ item: Event; index: number; colors: any; onPress: ()
   const dist   = (item as any).distance_km as number | null | undefined;
   const distLabel = formatDist(dist);
   const isFree = item.access_type === 'free' || (item.ticket_price == null && item.access_type !== 'ticket');
+  const isOngoing = isEventOngoingNow(item.starts_at, (item as any).ends_at);
 
   const scale = useSharedValue(1);
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
@@ -146,6 +160,12 @@ const EventCard: React.FC<{ item: Event; index: number; colors: any; onPress: ()
                   <Text style={st.coverDate}>
                     {formatDate(item.starts_at)} · {formatTime(item.starts_at)}
                   </Text>
+                  {isOngoing && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 4 }}>
+                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#36D9A0' }} />
+                      <Text style={{ color: '#36D9A0', fontSize: FontSize.xs, fontWeight: FontWeight.extraBold }}>En cours</Text>
+                    </View>
+                  )}
                 </View>
               )}
             </View>
@@ -377,7 +397,7 @@ export const NearbyEventsScreen: React.FC = () => {
       const [ev, conc] = await Promise.all([
         eventService.list({
           page: p, limit: PAGE_LIMIT, lat: location.lat, lon: location.lon,
-          radius_km: r, status: 'published', noCache: true,
+          radius_km: r, status: 'published', noCache: true, originals_only: true,
         }).catch(() => [] as Event[]),
         concertService.list({
           page: p, limit: PAGE_LIMIT, lat: location.lat, lon: location.lon, radius_km: r,

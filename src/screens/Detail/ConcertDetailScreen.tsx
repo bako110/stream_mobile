@@ -690,7 +690,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
         {concert.description ? (
           <View style={ds.section}>
             <SectionHeader label="À propos" colors={colors} />
-            <ExpandableText text={concert.description} maxLines={4}
+            <ExpandableText text={concert.description} localTruncate
               textStyle={{ fontSize: FontSize.base, lineHeight: 22, color: colors.textSecondary }}
               primaryColor={colors.primary} />
           </View>

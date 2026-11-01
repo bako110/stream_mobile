@@ -21,19 +21,30 @@ export const reelService = {
     limit?: number;
     followingOnly?: boolean;
     refresh?: boolean;
+    seedReelId?: string;
+    seedReelIds?: string[];
   }): Promise<ReelFeedResponse> {
     const page  = params?.page  ?? 1;
     const limit = params?.limit ?? REELS_PAGE_LIMIT;
 
-    const queryParams: Record<string, string> = {
-      page:  String(page),
-      limit: String(limit),
-    };
-    if (params?.followingOnly) queryParams.following_only = 'true';
+    const query = new URLSearchParams();
+    query.set('page', String(page));
+    query.set('limit', String(limit));
+    if (params?.followingOnly) query.set('following_only', 'true');
     // refresh=true bypass le cache serveur du pool (pull-to-refresh explicite) —
     // meme principe que searchService.getFeed pour le fil mixte.
-    if (params?.refresh) queryParams.refresh = 'true';
-    const query = new URLSearchParams(queryParams).toString();
+    if (params?.refresh) query.set('refresh', 'true');
+    // Clic depuis le feed principal sur ce reel precis — bascule le pool sur
+    // la similarite/co-occurrence de CE reel (voir ReelService.get_feed cote
+    // backend), pool Redis dedie, jamais le pool generique de l'onglet Reels.
+    // seedReelIds (fenetre glissante des derniers reels bien regardes DANS
+    // CETTE SESSION) prend le pas sur seedReelId cote backend quand fourni —
+    // repete en plusieurs seed_reel_ids=... (FastAPI Query(list[str])).
+    if (params?.seedReelIds && params.seedReelIds.length > 0) {
+      for (const id of params.seedReelIds) query.append('seed_reel_ids', id);
+    } else if (params?.seedReelId) {
+      query.set('seed_reel_id', params.seedReelId);
+    }
 
     const res  = await apiClient.get<any>(`${Endpoints.reels.feed}?${query}`);
     const data = res.data ?? res;

@@ -23,6 +23,7 @@ import { VerifiedBadge } from './VerifiedBadge';
 import { GofolyxLoader } from './FolixLoader';
 import { RichText } from './RichText';
 import { MentionInput } from './MentionInput';
+import { SheetCloseButton } from './SheetCloseButton';
 import type { Comment } from '../../types';
 
 const { height: SCREEN_H } = Dimensions.get('window');
@@ -266,6 +267,9 @@ const CommentRow: React.FC<RowProps> = ({
               text={item.body}
               textStyle={[st.commentText, { color: colors.textPrimary }]}
               primaryColor={colors.primary}
+              isTruncated={!!item.is_body_truncated}
+              entityType="comment"
+              entityId={item.id}
             />
           )}
           {item.image_url && (
@@ -794,9 +798,7 @@ export const CommentsBottomSheet: React.FC<Props> = ({
                 ? `${totalCount.toLocaleString('fr')} commentaire${totalCount > 1 ? 's' : ''}`
                 : 'Commentaires'}
             </Text>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Icon name="x" size={26} color={colors.textSecondary} />
-            </TouchableOpacity>
+            <SheetCloseButton onPress={onClose} />
           </View>
 
           {/* Liste — prend tout l'espace disponible */}

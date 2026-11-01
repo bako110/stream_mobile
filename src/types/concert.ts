@@ -9,6 +9,7 @@ export interface Concert {
   artist_id: string;
   title: string;
   description: string | null;
+  is_description_truncated?: boolean;
   genre: string | null;
   venue_name: string | null;
   venue_city: string | null;

@@ -87,6 +87,20 @@ function normalizePhone(phone: string): string {
   return phone.replace(/[^\d+]/g, '');
 }
 
+// Événement "en cours" — starts_at déjà passé, toujours dans sa fenêtre active
+// (ends_at si renseigné, sinon 24h après le début). Même logique que
+// FeedScreen.tsx (FeedCard.isEventOngoing), gardée synchronisée.
+function isEventOngoingNow(startsAt?: string | null, endsAt?: string | null): boolean {
+  if (!startsAt) return false;
+  const start = new Date(startsAt).getTime();
+  const now = Date.now();
+  if (endsAt) {
+    const end = new Date(endsAt).getTime();
+    return now >= start && now <= end;
+  }
+  return now >= start && now <= start + 24 * 3600_000;
+}
+
 // ── SpontLiveCard — mémoïsé pour éviter re-renders dans la map ───────────────
 
 interface SpontLiveCardProps {
@@ -650,6 +664,14 @@ export const HomeScreen: React.FC = () => {
                         <Text style={{ fontSize: 9, fontWeight: '700', color: '#fff' }}>{distLabel}</Text>
                       </View>
                     )}
+                    {/* Événement en cours — starts_at passé, toujours dans sa
+                        fenêtre active (ends_at si renseigné, sinon 24h). Même
+                        logique que FeedScreen.tsx/PostCard ci-dessus. */}
+                    {isEventOngoingNow(ev.starts_at, (ev as any).ends_at) && (
+                      <View style={{ position: 'absolute', top: 6, left: 6, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#36D9A0EE', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 }}>
+                        <Text style={{ fontSize: 9, fontWeight: '800', color: '#fff' }}>EN COURS</Text>
+                      </View>
+                    )}
                   </View>
                   <View style={{ padding: 8 }}>
                     <Text style={{ fontSize: 12, fontWeight: '800', color: colors.textPrimary, lineHeight: 16 }} numberOfLines={2}>{ev.title}</Text>
@@ -1180,6 +1202,7 @@ const PostCard: React.FC<PostCardProps> = React.memo(({ item, colors, isDark, on
   const thumbUrl   = concert?.thumbnail_url ?? event?.thumbnail_url ?? null;
   const createdAt  = (concert?.created_at ?? event?.created_at ?? '');
   const isLive     = concert?.status === 'live';
+  const isEventOngoing = !isConcert && isEventOngoingNow(event?.starts_at, (event as any)?.ends_at);
   const city       = concert?.venue_city  ?? event?.venue_city  ?? null;
   const genre      = concert?.genre ?? null;
   const accessType = concert?.access_type ?? event?.access_type ?? null;
@@ -1370,6 +1393,12 @@ const PostCard: React.FC<PostCardProps> = React.memo(({ item, colors, isDark, on
             <View style={[s.postBadge, { backgroundColor: '#FF3B30' }]}>
               <View style={s.postBadgeDot} />
               <Text style={s.postBadgeText}>LIVE</Text>
+            </View>
+          )}
+          {isEventOngoing && (
+            <View style={[s.postBadge, { backgroundColor: '#36D9A0EE' }]}>
+              <View style={[s.postBadgeDot, { backgroundColor: '#fff' }]} />
+              <Text style={s.postBadgeText}>EN COURS</Text>
             </View>
           )}
           <View style={[s.postBadge, { backgroundColor: accentColor + 'EE' }]}>

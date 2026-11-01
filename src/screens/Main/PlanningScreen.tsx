@@ -37,9 +37,12 @@ function getTimeStatus(item: PlanningItem): TimeStatus {
     if (now > end)                  return 'past';
     return 'upcoming';
   }
-  // Pas de end_date : "en cours" dans la fenêtre de 2h autour du début
-  if (now >= start && now <= start + 2 * 3600_000) return 'ongoing';
-  if (now > start + 2 * 3600_000)                  return 'past';
+  // Pas de end_date : "en cours" pendant 24h à partir du début (une journée
+  // complète, pas une fenêtre de 2h trop courte pour la plupart des
+  // événements réels sans heure de fin explicite).
+  const ONE_DAY_MS = 24 * 3600_000;
+  if (now >= start && now <= start + ONE_DAY_MS) return 'ongoing';
+  if (now > start + ONE_DAY_MS)                  return 'past';
   return 'upcoming';
 }
 

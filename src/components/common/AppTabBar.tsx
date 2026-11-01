@@ -4,7 +4,6 @@ import Animated, {
   useAnimatedStyle, withTiming, useSharedValue,
   interpolate,
 } from 'react-native-reanimated';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -41,11 +40,13 @@ export const AppTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, nav
   const focusedRoute = state.routes[state.index];
   const focusedOptions = descriptors[focusedRoute.key]?.options as any;
   const hideTabBar = focusedOptions?.tabBarStyle?.display === 'none' || focusedOptions?.tabBarVisible === false;
-  // Sur Reels, la vidéo occupe tout l'écran (plein écran réel, voir SCREEN_H
-  // dans ReelsScreen.tsx) — même pilule flottante que le reste de l'app,
-  // mais fond dégradé transparent (pas colors.surface opaque) pour ne jamais
-  // masquer complètement la vidéo derrière.
-  const isReelsScreen = focusedRoute.name === 'Reels';
+  // tabBarTransparent (option déclarée par l'écran lui-même, ex: Reels dans
+  // MainNavigator.tsx) — AppTabBar n'a plus besoin de connaître le nom
+  // "Reels" en dur, n'importe quel écran plein écran peut demander le même
+  // traitement. Seule la couleur de fond change (transparent, pour ne jamais
+  // masquer le contenu derrière) — hauteur, position, icônes et tout le reste
+  // restent exactement identiques à tous les autres écrans.
+  const wantsTransparentBar = !!focusedOptions?.tabBarTransparent;
 
   // Le menu "+" restait ouvert indéfiniment si on changeait d'onglet ou
   // qu'on naviguait ailleurs sans re-cliquer dessus pour le refermer
@@ -56,13 +57,27 @@ export const AppTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, nav
 
   if (hideTabBar) return null;
 
+  // bottomPad PLAFONNÉ à 24 — sert uniquement à calculer la HAUTEUR visuelle
+  // de la pilule (barHeight), jamais sa position. Sur un téléphone en
+  // navigation gestuelle, insets.bottom est petit (quelques px), donc
+  // Math.max(..., 12) suffisait. Mais sur un téléphone avec une VRAIE barre de
+  // navigation système (3 boutons — Samsung notamment), insets.bottom peut
+  // dépasser 40-48px : utilisé tel quel dans barHeight, ce nombre gonflait
+  // toute la pilule bien au-delà de sa taille normale (symptôme confirmé par
+  // capture d'écran : pilule démesurée uniquement sur ces appareils).
   const bottomPad = Platform.OS === 'android'
-    ? Math.max(insets.bottom, 12)
+    ? Math.min(Math.max(insets.bottom, 12), 24)
     : insets.bottom;
   // Hauteur d'origine conservée (TAB_BAR_HEIGHT + bottomPad) — seul le DESIGN
   // (pilule détachée des bords, radius, ombre colorée) reprend la référence,
   // pas le gabarit.
   const barHeight = TAB_BAR_HEIGHT + bottomPad;
+  // insets.bottom RÉEL (non plafonné) pour la POSITION — ce conteneur est
+  // absolute par rapport au bord physique de l'écran (pas une zone qui exclut
+  // déjà la barre système), donc la distance depuis le bas doit refléter la
+  // vraie hauteur de la barre de navigation Android, sinon la pilule
+  // chevaucherait les boutons système sur les appareils concernés.
+  const bottomOffset = Math.max(insets.bottom - 8, 4);
 
   const navigateToCreate = (screen: string) => {
     setCreateOpen(false);
@@ -71,38 +86,23 @@ export const AppTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, nav
 
   return (
     // left/right/borderRadius répétés explicitement ici (déjà dans
-    // styles.container, mais en dernier dans le tableau pour qu'aucune valeur
-    // de la branche isReelsScreen ne puisse jamais les écraser) — un flash
-    // bref au retour de Reels (pilule carrée collée aux bords, fond
-    // transparent) a été signalé ; aucune cause certaine identifiée, mais ce
-    // conteneur ne doit JAMAIS pouvoir perdre sa forme pilule détachée,
-    // transitoirement ou non.
+    // styles.container, mais en dernier dans le tableau) — ce conteneur ne
+    // doit JAMAIS pouvoir perdre sa forme pilule détachée, transitoirement ou
+    // non. Hauteur/position identiques sur TOUS les écrans (simplification
+    // 2026-10, supprime la duplication de calcul qui divergeait de
+    // ReelsScreen.tsx sur les appareils à barre de navigation système
+    // Samsung). Sur Reels, un fond ENTIÈREMENT transparent avait été essayé
+    // mais donnait un rectangle visuellement franc (coins arrondis non
+    // "découpés" puisqu'il n'y a rien à découper sur un fond 100%
+    // transparent — la vidéo rectangulaire en dessous occupait alors tout
+    // l'espace, sans forme pilule perceptible). Un voile noir semi-
+    // transparent garde la vidéo bien lisible à travers tout en laissant la
+    // forme pilule visible, cohérent avec tous les autres écrans.
     <View style={[
       styles.container,
-      isReelsScreen
-        ? {
-            backgroundColor: 'transparent',
-            height: barHeight, bottom: Math.max(bottomPad - 8, 4),
-            shadowOpacity: 0, elevation: 0,
-          }
-        : { backgroundColor: colors.surface, height: barHeight, bottom: Math.max(bottomPad - 8, 4) },
+      { backgroundColor: wantsTransparentBar ? 'rgba(0,0,0,0.35)' : colors.surface, height: barHeight, bottom: bottomOffset },
       { left: 8, right: 8, borderRadius: 24 },
     ]}>
-      {isReelsScreen ? (
-        /* Dégradé sombre (bas → haut) plutôt qu'un fond opaque — garantit la
-           lisibilité des icônes blanches quel que soit le contenu de la vidéo
-           derrière, sans jamais masquer complètement l'image. Même forme
-           pilule que le reste de l'app (radius hérité de styles.container) —
-           seul le fond reste transparent/dégradé au lieu d'opaque. */
-        <LinearGradient
-          colors={['rgba(0,0,0,0.75)', 'rgba(0,0,0,0.0)']}
-          start={{ x: 0, y: 1 }}
-          end={{ x: 0, y: 0 }}
-          style={[StyleSheet.absoluteFill, { borderRadius: 24 }]}
-          pointerEvents="none"
-        />
-      ) : null}
-
       {TABS.map((tab, index) => {
         const route     = state.routes.find(r => r.name === tab.name);
         const isFocused = !!route && state.routes[state.index]?.name === tab.name;
@@ -114,8 +114,8 @@ export const AppTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, nav
               routeKey={route?.key}
               isFocused={isFocused}
               navigation={navigation}
-              activeColor={isReelsScreen ? '#fff' : colors.primary}
-              inactiveColor={isReelsScreen ? 'rgba(255,255,255,0.6)' : colors.textTertiary}
+              activeColor={colors.primary}
+              inactiveColor={colors.textTertiary}
             />
             {/* Bouton Créer — entre Communautés (index 1) et Reels (index 2) */}
             {index === 1 && (
@@ -185,10 +185,10 @@ const CreateTabButton: React.FC<CreateTabButtonProps> = memo(({ open, onToggle, 
         activeOpacity={0.85}
       >
         <View
-          style={[styles.createBtn, { borderColor: colors.surface, backgroundColor: colors.gradientStart }]}
+          style={[styles.createBtn, { borderColor: colors.surface, backgroundColor: open ? 'transparent' : colors.gradientStart }]}
         >
           <Animated.View style={iconRotateStyle}>
-            <Icon name="plus" size={16} color="#fff" />
+            <Icon name="plus" size={16} color={open ? colors.primary : '#fff'} />
           </Animated.View>
         </View>
       </TouchableOpacity>

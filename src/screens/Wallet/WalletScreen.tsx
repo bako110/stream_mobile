@@ -31,7 +31,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useWsEvents } from '../../hooks/useWsEvents';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
-import { BackButton, PriceWithLocal } from '../../components/common';
+import { BackButton, PriceWithLocal, HelpGuideSheet, HelpGuideButton } from '../../components/common';
 import { showConfirm } from '../../services';
 import { showWithdrawUnavailable } from '../../utils/withdrawAlert';
 
@@ -106,6 +106,7 @@ const WalletScreen: React.FC = () => {
   const [balance, setBalance]       = useState<WalletBalance | null>(null);
   const [error, setError]           = useState<string | null>(null);
   const [isMonetized, setIsMonetized] = useState(false);
+  const [showHelp, setShowHelp]       = useState(false);
 
   // Animated coin count-up
   const animatedGoGold = useRef(new Animated.Value(0)).current;
@@ -206,6 +207,7 @@ const WalletScreen: React.FC = () => {
         <View style={[s.header, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <BackButton onPress={() => navigation.goBack()} />
           <Text style={[s.headerTitle, { flex: 1, textAlign: 'center' }]}>Mon Portefeuille</Text>
+          <HelpGuideButton onPress={() => setShowHelp(true)} color={colors.textSecondary} />
           <TouchableOpacity onPress={() => navigation.navigate('SettingsWallet')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Icon name="settings" size={22} color={colors.textSecondary} />
           </TouchableOpacity>
@@ -295,7 +297,71 @@ const WalletScreen: React.FC = () => {
           <Text style={[s.txLinkText, { color: colors.textPrimary }]}>Voir les transactions</Text>
           <Icon name="chevron-right" size={20} color={colors.textTertiary} />
         </TouchableOpacity>
+
+        {/* Point d'entrée visible du guide GoGold — pas seulement caché
+            derrière l'icône "?" du header, pour qu'un nouvel utilisateur
+            comprenne tout de suite ce qu'il regarde sur cet écran. */}
+        <TouchableOpacity
+          style={[s.txLinkBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          onPress={() => setShowHelp(true)}
+          activeOpacity={0.8}
+        >
+          <View style={[s.txLinkIcon, { backgroundColor: `${ACCENT}22` }]}>
+            <MaterialCommunityIcons name="help-circle-outline" size={20} color={ACCENT} />
+          </View>
+          <Text style={[s.txLinkText, { color: colors.textPrimary }]}>Qu'est-ce que le GoGold ?</Text>
+          <Icon name="chevron-right" size={20} color={colors.textTertiary} />
+        </TouchableOpacity>
       </ScrollView>
+
+      <HelpGuideSheet
+        visible={showHelp}
+        onClose={() => setShowHelp(false)}
+        title="Qu'est-ce que le GoGold ?"
+        intro="Le GoGold (🪙) est la monnaie virtuelle de Gofolyx. Tu l'utilises pour soutenir les créateurs et débloquer des fonctionnalités premium ; les créateurs, eux, le convertissent en argent réel. 1 € acheté = 100 GoGold."
+        points={[
+          {
+            icon: 'shopping-cart',
+            title: 'Acheter des GoGold',
+            text: "Depuis Acheter ci-dessus : choisis un pack ou un montant libre (1 € = 100 GoGold). Le paiement passe par Orange Money, Mobile Money ou carte bancaire selon ton pays.",
+          },
+          {
+            icon: 'gift',
+            title: 'Envoyer des cadeaux',
+            text: "Pendant un live ou sur un reel, envoie un cadeau animé à ton créateur préféré — chaque cadeau a un coût en GoGold affiché avant l'envoi. C'est la principale façon de soutenir financièrement un créateur sur l'app.",
+          },
+          {
+            icon: 'radio',
+            title: 'Programmer un concert ou événement',
+            text: "Diffuser un concert ou un événement en direct coûte des GoGold (réservés au moment de la programmation), pour financer l'infrastructure de streaming.",
+          },
+          {
+            icon: 'zap',
+            title: 'Booster & publicité',
+            text: "Booster augmente la visibilité de ton profil ou d'un contenu, payé en GoGold. La Pub (campagne publicitaire en euros) est différente — visible par tous, gérée séparément dans Mes publicités.",
+          },
+          {
+            icon: 'users',
+            title: 'Communautés & tournois',
+            text: "Certaines communautés demandent une cotisation en GoGold pour y adhérer ou participer à leur caisse commune ; les tournois peuvent aussi avoir des frais d'inscription en GoGold.",
+          },
+          {
+            icon: 'user-check',
+            title: 'Parrainage — en gagner gratuitement',
+            text: "Partage ton code de parrainage (écran Parrainage) : chaque ami qui s'inscrit avec ton code te rapporte 20 GoGold bonus, sans rien payer.",
+          },
+          {
+            icon: 'arrow-up-right',
+            title: 'Retirer en argent réel (créateurs)',
+            text: "Si tu es créateur et que tu as reçu des cadeaux, tu peux retirer ton solde GoGold en argent réel : 100 GoGold = 0,35 €. Le taux de retrait est plus bas que le taux d'achat (1 € = 100 GoGold), la différence couvrant les frais de la plateforme.",
+          },
+          {
+            icon: 'list',
+            title: 'Suivre ses mouvements',
+            text: "Gagné / Dépensé / En attente (ci-dessus) résument ton activité. Voir les transactions ouvre l'historique complet et détaillé, filtrable par type et par date.",
+          },
+        ]}
+      />
     </View>
   );
 };

@@ -205,6 +205,15 @@ export const Endpoints = {
     commentsSettings: `${V1}/social/comments/settings`,
   },
 
+  // ── Texte complet à la demande (prefix: /api/v1/content-text) ──────────────
+  // Récupère le texte complet d'une entité dont la liste (feed, /posts,
+  // /events, /concerts, /reels, commentaires) a renvoyé une version tronquée
+  // côté serveur — jamais de troncature calculée côté client, voir RichText.tsx.
+  contentText: {
+    fullText: (entityType: 'post' | 'event' | 'concert' | 'reel' | 'comment', entityId: string) =>
+      `${V1}/content-text/${entityType}/${entityId}`,
+  },
+
   // ── Posts (prefix: /api/v1/posts) ────────────────────────────────────────
   posts: {
     create:  `${V1}/posts`,
@@ -555,6 +564,16 @@ export const Endpoints = {
       (excludeIds && excludeIds.length ? `&exclude_ids=${encodeURIComponent(excludeIds.join(','))}` : ''),
     impression:  (id: string) => `${V1}/ads/${id}/impression`,
     click:       (id: string) => `${V1}/ads/${id}/click`,
+    audienceEstimate: (params: { countries?: string[]; regions?: string[]; genders?: string[]; ageMin?: string; ageMax?: string }) => {
+      const qs = new URLSearchParams();
+      if (params.countries?.length) qs.set('target_countries', params.countries.join(','));
+      if (params.regions?.length)   qs.set('target_regions', params.regions.join(','));
+      if (params.genders?.length)   qs.set('target_genders', params.genders.join(','));
+      if (params.ageMin)            qs.set('target_age_min', params.ageMin);
+      if (params.ageMax)            qs.set('target_age_max', params.ageMax);
+      const s = qs.toString();
+      return `${V1}/ads/audience-estimate${s ? `?${s}` : ''}`;
+    },
   },
 
   // ── Utilitaires ───────────────────────────────────────────────────────────

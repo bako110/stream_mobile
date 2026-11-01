@@ -13,6 +13,7 @@ export interface Event {
   title: string;
   distance_km?: number | null;
   description: string | null;
+  is_description_truncated?: boolean;
   event_type: EventType;
   status: EventStatus;
   access_type: EventAccessType;

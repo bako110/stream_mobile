@@ -4,13 +4,13 @@ import {
   StyleSheet, ActivityIndicator, Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Icon from 'react-native-vector-icons/Feather';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useTheme } from '../../hooks/useTheme';
 import { useUser } from '../../context/UserContext';
 import { postService, type PostLiker } from '../../services/postService';
 import { userService } from '../../services/userService';
 import { VerifiedBadge } from './VerifiedBadge';
+import { SheetCloseButton } from './SheetCloseButton';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 const SHEET_H = Math.round(SCREEN_H * 0.75);
@@ -248,13 +248,7 @@ export const LikersBottomSheet: React.FC<Props> = ({
               )}
             </View>
           </View>
-          <TouchableOpacity
-            onPress={onClose}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            style={[ls.closeBtn, { backgroundColor: colors.backgroundSecondary }]}
-          >
-            <Icon name="x" size={15} color={colors.textTertiary} />
-          </TouchableOpacity>
+          <SheetCloseButton onPress={onClose} />
         </View>
 
         {/* Contenu */}
@@ -345,10 +339,6 @@ const ls = StyleSheet.create({
   },
   headerTitle: { fontSize: 16, fontWeight: '800' },
   headerSub:   { fontSize: 12, marginTop: 2 },
-  closeBtn: {
-    width: 32, height: 32, borderRadius: 16,
-    alignItems: 'center', justifyContent: 'center',
-  },
 
   // Ligne
   row: {

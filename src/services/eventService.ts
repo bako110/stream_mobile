@@ -10,6 +10,10 @@ export const eventService = {
     lat?: number; lon?: number;
     radius_km?: number;
     contact_ids?: string[];
+    /** Exclut les republications (remix_type='repost') — un event reposté ne
+     * doit apparaître que sur la page de son auteur (profil), jamais dans une
+     * surface de découverte comme "Près de chez toi". */
+    originals_only?: boolean;
   }): Promise<Event[]> {
     const q = new URLSearchParams({
       page:  String(params?.page  ?? 1),
@@ -21,6 +25,7 @@ export const eventService = {
       ...(params?.lon != null      ? { lon:         String(params.lon) }             : {}),
       ...(params?.radius_km != null ? { radius_km:  String(params.radius_km) }      : {}),
       ...(params?.contact_ids?.length ? { contact_ids: params.contact_ids.join(',') } : {}),
+      ...(params?.originals_only   ? { originals_only: 'true' }                      : {}),
     }).toString();
     const res = await apiClient.get<Event[]>(
       `${Endpoints.events.list}?${q}`,

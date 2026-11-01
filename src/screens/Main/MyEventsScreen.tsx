@@ -59,6 +59,21 @@ export const MyEventsScreen: React.FC = () => {
   }, [events, search]);
 
   const isLiveNow = (e: Event) => e.is_online && !!e.live_id;
+  // Événement "en cours" — starts_at déjà passé, toujours dans sa fenêtre
+  // active (ends_at si renseigné, sinon 24h après le début). Même logique que
+  // FeedScreen.tsx (FeedCard.isEventOngoing), gardée synchronisée. Seulement
+  // pour un événement réellement publié (pas un brouillon/annulé).
+  const isOngoingNow = (e: Event) => {
+    if (e.status !== 'published' || !e.starts_at) return false;
+    const start = new Date(e.starts_at).getTime();
+    const now = Date.now();
+    const endsAt = (e as any).ends_at;
+    if (endsAt) {
+      const end = new Date(endsAt).getTime();
+      return now >= start && now <= end;
+    }
+    return now >= start && now <= start + 24 * 3600_000;
+  };
 
   const handlePress = (e: Event) => nav.navigate('EventDetail', { eventId: e.id });
   const handleEdit  = (e: Event) => nav.navigate('CreateEvent', { eventId: e.id });
@@ -83,6 +98,7 @@ export const MyEventsScreen: React.FC = () => {
 
   const renderItem = ({ item }: { item: Event }) => {
     const live = isLiveNow(item);
+    const ongoing = !live && isOngoingNow(item);
     const startDate = new Date(item.starts_at).toLocaleDateString('fr-FR', {
       day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
     });
@@ -100,10 +116,10 @@ export const MyEventsScreen: React.FC = () => {
           </View>
         )}
         <View style={st.info}>
-          <View style={[st.statusPill, { backgroundColor: (live ? '#F0365A' : STATUS_COLOR[item.status]) + '22' }]}>
-            {live && <View style={[st.liveDot, { backgroundColor: '#F0365A' }]} />}
-            <Text style={[st.statusText, { color: live ? '#F0365A' : STATUS_COLOR[item.status] }]}>
-              {live ? 'En direct' : STATUS_LABEL[item.status]}
+          <View style={[st.statusPill, { backgroundColor: (live ? '#F0365A' : ongoing ? '#36D9A0' : STATUS_COLOR[item.status]) + '22' }]}>
+            {(live || ongoing) && <View style={[st.liveDot, { backgroundColor: live ? '#F0365A' : '#36D9A0' }]} />}
+            <Text style={[st.statusText, { color: live ? '#F0365A' : ongoing ? '#36D9A0' : STATUS_COLOR[item.status] }]}>
+              {live ? 'En direct' : ongoing ? 'En cours' : STATUS_LABEL[item.status]}
             </Text>
           </View>
           <Text style={[st.title, { color: colors.textPrimary }]} numberOfLines={1}>{item.title}</Text>

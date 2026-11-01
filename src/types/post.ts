@@ -12,6 +12,10 @@ export interface Post {
   id: string;
   user_id: string;
   body?: string | null;
+  // true si le backend a tronqué `body` dans cette réponse de LISTE (jamais
+  // présent/vrai sur une réponse de détail, toujours complet là) — voir
+  // RichText.tsx, qui récupère le texte complet à la demande au clic "Voir plus".
+  is_body_truncated?: boolean;
   caption?: string | null;
   category?: string | null;
   image_url?: string | null;

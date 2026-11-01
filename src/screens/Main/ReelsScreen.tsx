@@ -178,19 +178,16 @@ function hashCode(str: string): number {
 
 // ─── ReelsScreen ─────────────────────────────────────────────────────────────
 
+// Feed reels avec pub injectee toutes les AD_INTERVAL reels — voir feedWithAds
+// et toRenderedIndex (conversion d'index reels → index liste rendue).
+const AD_INTERVAL = 5;
 // Durée de vie max d'une pub Reels déjà chargée dans un slot avant revalidation
 // silencieuse — contrairement au Feed principal (refresh_ad_slots côté backend,
 // réappliqué à chaque page servie), une pub Reels chargée une fois dans adSlots
 // n'était jusqu'ici JAMAIS revérifiée : une campagne dont le budget s'épuise ou
 // qui est mise en pause pendant la session restait affichée indéfiniment tant que
-// l'utilisateur ne quittait pas l'écran. Voir l'effet de revalidation périodique
-// plus bas — ne touche jamais un slot proche de currentIndex (jamais la pub
-// actuellement regardée ni ses voisins immédiats).
+// l'utilisateur ne quittait pas l'écran.
 const AD_SLOT_REVALIDATE_MS = 3 * 60 * 1000;
-
-// Feed reels avec pub injectee toutes les AD_INTERVAL reels — voir feedWithAds
-// et toRenderedIndex (conversion d'index reels → index liste rendue).
-const AD_INTERVAL = 5;
 // Taille de page pour le mode "reels d'un utilisateur" (profil, recherche) — scroll infini.
 const USER_REELS_PAGE_LIMIT = 20;
 // Grille recherche (tendances + résultats) — une pub occupe une cellule toutes les
@@ -272,6 +269,29 @@ export const ReelsScreen: React.FC = () => {
   const userModeRef = useRef<string | undefined>(params.userId);
   const userMode = userModeRef.current;
 
+  // Reel "seed" du clic depuis le feed principal — contrairement à userModeRef,
+  // PAS figé au montage : le Tab.Navigator garde cet écran monté en arrière-plan
+  // entre deux visites (cf. commentaire plus bas sur targetReel), donc un 2e clic
+  // depuis le feed doit mettre à jour cette valeur sans remontage. Mise à jour au
+  // moment où targetId/targetReel sont traités (CAS FEED ci-dessous), lue par
+  // load()/loadMore() (refs stables, pas de dépendance sur params).
+  const seedReelIdRef = useRef<string | undefined>(undefined);
+  // true tant qu'on est dans une session de visionnage démarrée depuis le feed —
+  // seul ce mode fait glisser la seed (cf. SEED_WATCH_WINDOW ci-dessous) ; en
+  // usage normal de l'onglet Reels (CAS FOOTER), le pool générique ne doit
+  // jamais être perturbé par ce mécanisme.
+  const seedModeActiveRef = useRef(false);
+  // Fenêtre glissante des derniers reels "bien regardés" (watch_ratio >= 0.7,
+  // même seuil que le reste du systeme) DANS CETTE SESSION de visionnage —
+  // pas tout l'historique du compte comme le profil habituel. Comme
+  // TikTok/Facebook : la suite proposée suit ce qu'on vient vraiment de
+  // regarder, pas seulement le reel de départ. Taille 5 : assez pour lisser
+  // un skip isolé (vidéo passée vite, pas représentative du goût réel),
+  // assez court pour que le centre de gravité bouge vite quand le
+  // visionnage change de direction.
+  const SEED_WATCH_WINDOW = 5;
+  const seedWatchHistoryRef = useRef<string[]>([]);
+
   // ── Refs ─────────────────────────────────────────────────────────────────
   const listRef           = useRef<FlatList>(null);
   const isLoadingMoreRef  = useRef(false);
@@ -336,6 +356,15 @@ export const ReelsScreen: React.FC = () => {
   // au-delà), donc toujours dans une zone de reels déjà chargés.
   const adSlotPositionsRef = useRef<Map<number, number>>(new Map());
   const servedAdIdsRef = useRef<Set<string>>(new Set());
+  // Données complètes de chaque pub déjà servie dans cette session (pas juste
+  // son id, cf. servedAdIdsRef) — permet à un NOUVEAU slot de réutiliser
+  // directement une pub déjà vue SANS appel réseau quand une seule campagne
+  // (ou un petit nombre) est active. Avant ce cache, chaque nouveau slot
+  // refaisait le cycle complet (requête avec exclusion → échec → requête sans
+  // exclusion → succès) pour recevoir... la même pub déjà en mémoire — vu en
+  // prod comme une rafale continue à chaque page de reels chargée (plusieurs
+  // slots créés d'affilée pendant un scroll actif, cf. logs serveur).
+  const servedAdDataRef = useRef<Map<string, AdData0>>(new Map());
   const loadingAdSlotsRef = useRef<Set<number>>(new Set());
   // Horodatage jusqu'auquel on sait qu'AUCUNE autre campagne n'est disponible
   // que celles déjà servies (détecté quand fetchOne retombe sur repeat=true
@@ -363,9 +392,48 @@ export const ReelsScreen: React.FC = () => {
   // d'exclusion à jour de tout ce qui a déjà été servi.
   const adQueueRef = useRef<Promise<void>>(Promise.resolve());
 
-  const loadAdForSlot = useCallback((slotIdx: number, allowRepeat = false) => {
+  // Porte UNIQUE vers le réseau pub — TOUS les appelants (scroll/nouvelle page,
+  // timer de revalidation, clic direct) passent par loadAdForSlot, qui est donc
+  // le SEUL endroit qui a besoin de connaître adsExhaustedUntilRef. Avant cette
+  // refonte, trois call-sites indépendants dupliquaient chacun leur propre
+  // vérification "est-ce qu'on est épuisé" — un 3e bug de rafale est réapparu en
+  // prod (cf. logs) malgré deux correctifs antérieurs, précisément parce qu'un
+  // des trois avait été oublié. Centraliser ici rend la vérification impossible
+  // à oublier à un futur 4e point d'appel : un appelant qui ne connaît même pas
+  // l'existence d'adsExhaustedUntilRef est protégé automatiquement.
+  // allowForceRepeat réservé au retry interne (fetchOne ci-dessous) — jamais
+  // utile depuis l'extérieur, un appelant externe n'a plus à décider de repeat.
+  const loadAdForSlot = useCallback((slotIdx: number, allowForceRepeat = false) => {
     if (loadingAdSlotsRef.current.has(slotIdx) || adSlotsRef.current.has(slotIdx)) return;
+    // Stock connu comme épuisé : AUCUN appel réseau, quel que soit l'appelant —
+    // le slot reste vide, repris par le timer de revalidation à l'échéance
+    // (seul endroit qui retente après une fenêtre d'épuisement).
+    if (!allowForceRepeat && Date.now() < adsExhaustedUntilRef.current) return;
+
+    // Au moins une pub DÉJÀ CONNUE en mémoire (cf. servedAdDataRef) : on la
+    // réutilise directement, SANS appeler le réseau pour ce slot. Avec une
+    // seule campagne active, le réseau renverrait de toute façon cette même
+    // pub après un aller-retour inutile (requête avec exclusion → échec →
+    // requête sans exclusion → succès) — exactement la rafale vue en prod à
+    // chaque nouveau slot créé pendant un scroll actif (plusieurs pages de
+    // reels chargées d'affilée). Mieux vaut revoir une pub déjà vue
+    // instantanément que repayer ce cycle réseau pour un résultat identique.
+    // allowForceRepeat (retry interne de fetchOne, jamais un appelant externe)
+    // garde le chemin réseau intact pour sa propre logique de fallback.
+    if (!allowForceRepeat && servedAdDataRef.current.size > 0) {
+      const ids = Array.from(servedAdDataRef.current.keys());
+      const reused = servedAdDataRef.current.get(ids[slotIdx % ids.length])!;
+      setAdSlots(prev => {
+        if (prev.has(slotIdx)) return prev;
+        const next = new Map(prev);
+        next.set(slotIdx, reused);
+        return next;
+      });
+      return;
+    }
+
     loadingAdSlotsRef.current.add(slotIdx);
+    const startRepeat = allowForceRepeat;
 
     const fetchOne = (repeat: boolean): Promise<void> => {
       // Bornage défensif — au-delà d'une vingtaine d'ads distinctes déjà servies dans la
@@ -399,6 +467,10 @@ export const ReelsScreen: React.FC = () => {
             adsExhaustedUntilRef.current = Date.now() + AD_SLOT_REVALIDATE_MS;
           }
           servedAdIdsRef.current.add(r.data.id);
+          // Alimente le cache réutilisable par les PROCHAINS nouveaux slots
+          // (cf. début de loadAdForSlot) — évite qu'ils refassent ce même
+          // aller-retour réseau pour recevoir la même pub.
+          servedAdDataRef.current.set(r.data.id, r.data as AdData0);
           setAdSlots(prev => {
             const next = new Map(prev);
             next.set(slotIdx, r.data as AdData0);
@@ -409,7 +481,7 @@ export const ReelsScreen: React.FC = () => {
     };
 
     adQueueRef.current = adQueueRef.current
-      .then(() => fetchOne(allowRepeat))
+      .then(() => fetchOne(startRepeat))
       .finally(() => { loadingAdSlotsRef.current.delete(slotIdx); });
   }, []);
   const [menuReel,      setMenuReel]      = useState<Reel | null>(null);
@@ -590,6 +662,15 @@ export const ReelsScreen: React.FC = () => {
       viewedReelsRef.current.add(cur.id);
       reelService.recordView(cur.id, parseFloat(watchRatio.toFixed(2)), elapsed).catch(() => {});
     }
+    // Fenêtre glissante de la session "depuis le feed" (cf. seedWatchHistoryRef) —
+    // même seuil 0.7 que "long_view" côté backend (UserInterest, profil embedding
+    // normal). Seulement en mode seed actif : en usage normal de l'onglet Reels,
+    // le pool générique ne doit jamais être perturbé par ce mécanisme.
+    if (seedModeActiveRef.current && watchRatio >= 0.7) {
+      const hist = seedWatchHistoryRef.current.filter(id => id !== cur.id);
+      hist.push(cur.id);
+      seedWatchHistoryRef.current = hist.slice(-SEED_WATCH_WINDOW);
+    }
   }, []);
 
   useEffect(() => {
@@ -602,6 +683,22 @@ export const ReelsScreen: React.FC = () => {
     const next = list[currentIndex + 1];
     if (next?.thumbnail_url) Image.prefetch(next.thumbnail_url).catch(() => {});
   }, [currentIndex, sendViewForCurrent]);
+
+  // Seeds à envoyer au backend pour le prochain fetch : la fenêtre glissante
+  // (ce qu'on vient vraiment de regarder dans cette session) prime dès qu'elle
+  // contient au moins un reel ; avant le premier "long_view", on retombe sur la
+  // seed initiale (le reel cliqué depuis le feed) pour ne jamais perdre le
+  // contexte au tout début de la session.
+  const currentSeedIds = useCallback((): string[] | undefined => {
+    if (seedWatchHistoryRef.current.length > 0) return seedWatchHistoryRef.current;
+    if (seedReelIdRef.current) return [seedReelIdRef.current];
+    return undefined;
+  }, []);
+  // Dernière combinaison de seeds utilisée pour fetcher — un glissement de la
+  // fenêtre change la pool_cache_key côté backend (nouveau pool recalculé), donc
+  // la pagination doit repartir à 1 sur ce nouveau pool plutôt que de continuer
+  // à incrémenter page comme s'il s'agissait toujours du même pool.
+  const lastSeedKeyRef = useRef<string>('');
 
   // ── Load ──────────────────────────────────────────────────────────────────
   // targetId : reel à afficher en priorité (peut changer à chaque navigation)
@@ -648,7 +745,13 @@ export const ReelsScreen: React.FC = () => {
       // refresh=true bypass le cache serveur du pool — soit un vrai rechargement
       // (non silencieux), soit un retour de focus qui demande explicitement du
       // contenu frais tout en restant silencieux (forceRefresh, cf. appelant).
-      const data = await reelService.getFeed({ page: 1, refresh: !silent || forceRefresh });
+      const seedIdsForLoad = currentSeedIds();
+      lastSeedKeyRef.current = seedIdsForLoad ? seedIdsForLoad.join(',') : '';
+      const data = await reelService.getFeed({
+        page: 1,
+        refresh: !silent || forceRefresh,
+        seedReelIds: seedIdsForLoad,
+      });
       if (!mountedRef.current) return;
 
       const filtered = (data.items ?? []).filter((r: Reel) => (!!r.hls_url || !!r.mp4_url));
@@ -736,14 +839,22 @@ export const ReelsScreen: React.FC = () => {
         return;
       }
 
-      const data = await reelService.getFeed({ page: nextPage });
+      const seedIds = currentSeedIds();
+      const seedKey = seedIds ? seedIds.join(',') : '';
+      // La fenêtre a glissé depuis le dernier fetch — nouveau pool côté backend
+      // (nouvelle pool_cache_key), donc on redemande sa page 1, pas "nextPage"
+      // d'un pool qui n'existe plus sous cette forme.
+      const pageToFetch = seedKey !== lastSeedKeyRef.current ? 1 : nextPage;
+      lastSeedKeyRef.current = seedKey;
+
+      const data = await reelService.getFeed({ page: pageToFetch, seedReelIds: seedIds });
       if (!mountedRef.current) return;
       const newReels = (data.items ?? []).filter((r: Reel) => (!!r.hls_url || !!r.mp4_url));
       setReels(prev => {
         const ids = new Set(prev.map(r => r.id));
         return [...prev, ...newReels.filter((r: Reel) => !ids.has(r.id))];
       });
-      pageRef.current = nextPage;
+      pageRef.current = pageToFetch;
       setHasMore(data.has_more);
     } catch { /* silencieux */ }
     finally { isLoadingMoreRef.current = false; }
@@ -960,6 +1071,14 @@ export const ReelsScreen: React.FC = () => {
       // targetId (cf. useEffect dédié plus bas, qui le repasse à false).
       awaitingTargetIdRef.current = targetId;
       setAwaitingTarget(true);
+      // La suite proposée se recalcule autour de CE reel (similarité/co-occurrence
+      // côté backend, cf. ReelService.get_feed seed_reel_id) — mis à jour avant le
+      // load(true) plus bas qui le consomme, jamais le pool générique figé.
+      seedReelIdRef.current = targetId;
+      // Nouvelle session de visionnage "depuis le feed" — la fenêtre glissante
+      // repart de zéro (pas de résidu d'une précédente session sur un autre reel).
+      seedModeActiveRef.current = true;
+      seedWatchHistoryRef.current = [];
 
       if (targetReel?.hls_url || targetReel?.mp4_url) {
         // Même logique que Facebook/Instagram : le reel cliqué DEPUIS LE FEED
@@ -1012,7 +1131,12 @@ export const ReelsScreen: React.FC = () => {
         load(true);
       }
     } else {
-      // CAS FOOTER — navigation normale
+      // CAS FOOTER — navigation normale : retour au pool générique habituel,
+      // jamais hérité d'un précédent clic depuis le feed (seedReelIdRef n'est
+      // PAS figé au montage, cf. déclaration plus haut).
+      seedReelIdRef.current = undefined;
+      seedModeActiveRef.current = false;
+      seedWatchHistoryRef.current = [];
       if (!didFocusOnceRef.current) {
         // Premier montage : si RootNavigator a déjà préchargé la 1ère page (et
         // commencé à télécharger la 1ère vidéo) dès l'entrée en session — voir
@@ -1299,9 +1423,11 @@ export const ReelsScreen: React.FC = () => {
   // pagination). Si une page ajoute plusieurs nouveaux slots d'un coup (page >
   // AD_INTERVAL reels), seul le premier était jamais chargé — les slots suivants
   // restaient vides en permanence et n'affichaient donc aucune pub (bug corrigé ici :
-  // "plusieurs pubs ne s'affichent pas"). loadAdForSlot est déjà protégé par
-  // loadingAdSlotsRef/adSlotsRef, donc lancer tous les slots manquants ici ne
-  // duplique jamais une requête ni ne recharge un slot déjà rempli.
+  // "plusieurs pubs ne s'affichent pas"). Aucune vérification d'épuisement ICI :
+  // loadAdForSlot est désormais la SEULE porte vers le réseau (cf. son
+  // commentaire) — elle refuse déjà l'appel si le stock est épuisé, ce qui
+  // laisse ces slots vides sans requête superflue, repris par la revalidation
+  // périodique (useEffect juste en dessous) à l'échéance.
   useEffect(() => {
     if (userMode) return;
     const totalSlots = Math.floor(reels.length / AD_INTERVAL);
@@ -1322,10 +1448,19 @@ export const ReelsScreen: React.FC = () => {
   useEffect(() => {
     if (userMode) return;
     const timer = setInterval(() => {
-      // Stock de pubs connu comme épuisé (cf. adsExhaustedUntilRef) — revoquer
-      // puis recharger ne peut matériellement rien changer avant cette
-      // échéance, ne fait que dupliquer des requêtes/impressions pour rien.
+      // Stock de pubs connu comme épuisé (cf. adsExhaustedUntilRef) — inutile de
+      // RÉVOQUER un slot déjà rempli puisque loadAdForSlot refuserait de toute
+      // façon le fetch de remplacement (seule porte vers le réseau, cf. son
+      // commentaire) : on perdrait juste la pub déjà affichée pour rien.
       if (Date.now() < adsExhaustedUntilRef.current) return;
+      // Vide le cache réutilisable (cf. servedAdDataRef, début de
+      // loadAdForSlot) UNE FOIS PAR CYCLE de revalidation — sans ça,
+      // loadAdForSlot servirait indéfiniment depuis le cache et ne
+      // redemanderait JAMAIS au réseau, donc ne détecterait jamais qu'une
+      // nouvelle campagne a démarré. C'est volontairement à ce rythme (3 min),
+      // pas plus souvent : revérifier à chaque nouveau slot recréerait
+      // exactement la rafale qu'on cherche à éviter.
+      servedAdDataRef.current.clear();
       adSlotsRef.current.forEach((_, slotIdx) => {
         const renderedIndex = adSlotPositionsRef.current.get(slotIdx);
         if (renderedIndex === undefined) return;
@@ -1344,6 +1479,20 @@ export const ReelsScreen: React.FC = () => {
         // rendu déclenché par setAdSlots ci-dessus se produire d'abord.
         setTimeout(() => loadAdForSlot(slotIdx), 0);
       });
+      // Slots JAMAIS remplis (créés pendant une fenêtre d'épuisement — le
+      // useEffect[reels.length] ci-dessus appelle bien loadAdForSlot, mais
+      // celui-ci refuse le fetch tant que l'épuisement n'est pas passé, cf.
+      // son commentaire) : ce forEach seul ne les couvrirait jamais puisqu'ils
+      // n'existent pas encore dans adSlotsRef. Sans cette reprise, ils
+      // resteraient vides indéfiniment une fois le stock de nouveau
+      // disponible — même bug que celui déjà corrigé plus haut ("plusieurs
+      // pubs ne s'affichent pas"), juste retardé par l'épuisement.
+      const totalSlots = Math.floor(reelsRef.current.length / AD_INTERVAL);
+      for (let s = 0; s < totalSlots; s++) {
+        if (!adSlotsRef.current.has(s) && !loadingAdSlotsRef.current.has(s)) {
+          loadAdForSlot(s);
+        }
+      }
     }, AD_SLOT_REVALIDATE_MS);
     return () => clearInterval(timer);
   }, [userMode, reels.length, currentIndex, loadAdForSlot]);
@@ -1845,7 +1994,7 @@ export const ReelsScreen: React.FC = () => {
                 s.iconBtn,
                 {
                   width: Math.round(36 * ui.scale), height: Math.round(36 * ui.scale), borderRadius: Math.round(18 * ui.scale),
-                  backgroundColor: autoAdvance ? colors.primary : 'rgba(255,255,255,0.15)',
+                  backgroundColor: autoAdvance ? 'rgba(255,255,255,0.3)' : 'transparent',
                 },
               ]}
             >

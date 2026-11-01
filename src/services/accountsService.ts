@@ -88,6 +88,32 @@ export const accountsService = {
     return _readAll().find(a => a.is_active) ?? null;
   },
 
+  /**
+   * Resynchronise le snapshot (nom/username/avatar) du compte ACTIF dans la
+   * liste multi-compte avec les données fraîches d'un User — sans ça, modifier
+   * son profil (EditProfileScreen) ne mettait à jour que le UserContext en
+   * mémoire, jamais la liste stockée localement. Le panneau multi-compte
+   * (FeedScreen) continuait donc d'afficher l'ancien avatar/nom pour CE compte
+   * tant qu'on n'avait pas basculé vers lui depuis un autre compte au moins une
+   * fois (seul switchAccount() rafraîchissait ce snapshot). No-op silencieux si
+   * aucun compte actif n'est trouvé (ex: juste après un login, avant que
+   * addCurrentSessionAsAccount() n'ait tourné) ou si rien n'a changé.
+   */
+  syncActiveAccountSnapshot(user: User): void {
+    const accounts = _readAll();
+    const idx = accounts.findIndex(a => a.is_active);
+    if (idx === -1) return;
+    const current = accounts[idx];
+    const nextDisplayName = user.display_name ?? user.username ?? current.display_name;
+    const nextUsername = user.username ?? current.username;
+    const nextAvatar = user.avatar_url ?? null;
+    if (current.display_name === nextDisplayName && current.username === nextUsername && current.avatar_url === nextAvatar) {
+      return; // déjà à jour — évite une écriture MMKV inutile à chaque getMe()
+    }
+    accounts[idx] = { ...current, display_name: nextDisplayName, username: nextUsername, avatar_url: nextAvatar };
+    _writeAll(accounts);
+  },
+
   canAddAccount(): boolean {
     return _readAll().length < MAX_ACCOUNTS;
   },

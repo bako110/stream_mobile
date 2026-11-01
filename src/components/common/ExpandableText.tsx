@@ -9,6 +9,10 @@ interface Props {
   primaryColor: string;
   moreLabel?: string;
   lessLabel?: string;
+  isTruncated?: boolean;
+  entityType?: 'post' | 'event' | 'concert' | 'reel' | 'comment';
+  entityId?: string;
+  localTruncate?: boolean;
 }
 
 // Kept for backwards-compatibility — delegates to RichText which handles

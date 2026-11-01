@@ -6,6 +6,9 @@ export interface Reel {
   id: string;
   user_id: string;
   caption: string | null;
+  // true si le backend a tronqué `caption` dans cette réponse de LISTE — voir
+  // RichText.tsx, qui récupère le texte complet à la demande au clic "Voir plus".
+  is_caption_truncated?: boolean;
   category: string | null;
   hls_url: string | null;
   thumbnail_url: string | null;
@@ -73,6 +76,9 @@ export interface Comment {
   event_id: string | null;
   // Nullable (2026-10) : un commentaire peut être une image seule, sans texte.
   body: string | null;
+  // true si le backend a tronqué `body` dans cette réponse de LISTE — voir
+  // RichText.tsx, qui récupère le texte complet à la demande au clic "Voir plus".
+  is_body_truncated?: boolean;
   image_url?: string | null;
   is_edited: boolean;
   like_count: number;

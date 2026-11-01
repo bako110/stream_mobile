@@ -8,33 +8,38 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useTheme } from '../../hooks/useTheme';
+import { CategoryIcon } from './categoryIcons';
 
 export interface ContentCategory {
   value: string;
   label: string;
-  emoji: string;
 }
 
 export const CONTENT_CATEGORIES: ContentCategory[] = [
-  { value: 'musique',      label: 'Musique',      emoji: '🎵' },
-  { value: 'sport',        label: 'Sport',        emoji: '⚽' },
-  { value: 'gaming',       label: 'Gaming',       emoji: '🎮' },
-  { value: 'humour',       label: 'Humour',       emoji: '😂' },
-  { value: 'danse',        label: 'Danse',        emoji: '💃' },
-  { value: 'cuisine',      label: 'Cuisine',      emoji: '🍳' },
-  { value: 'mode',         label: 'Mode',         emoji: '👗' },
-  { value: 'beaute',       label: 'Beauté',       emoji: '💄' },
-  { value: 'tech',         label: 'Tech',         emoji: '💻' },
-  { value: 'education',    label: 'Éducation',    emoji: '📚' },
-  { value: 'lifestyle',    label: 'Lifestyle',    emoji: '✨' },
-  { value: 'art',          label: 'Art',          emoji: '🎨' },
-  { value: 'voyage',       label: 'Voyage',       emoji: '✈️' },
-  { value: 'business',     label: 'Business',     emoji: '💼' },
-  { value: 'actualite',    label: 'Actualité',    emoji: '📰' },
-  { value: 'spiritualite', label: 'Spiritualité', emoji: '🙏' },
-  { value: 'famille',      label: 'Famille',      emoji: '👨‍👩‍👧' },
-  { value: 'sante',        label: 'Santé',        emoji: '🏥' },
-  { value: 'autre',        label: 'Autre',        emoji: '📌' },
+  { value: 'musique',      label: 'Musique' },
+  { value: 'sport',        label: 'Sport' },
+  { value: 'gaming',       label: 'Gaming' },
+  { value: 'humour',       label: 'Humour' },
+  { value: 'danse',        label: 'Danse' },
+  { value: 'cuisine',      label: 'Cuisine' },
+  { value: 'mode',         label: 'Mode' },
+  { value: 'beaute',       label: 'Beauté' },
+  { value: 'tech',         label: 'Tech' },
+  { value: 'education',    label: 'Éducation' },
+  { value: 'lifestyle',    label: 'Lifestyle' },
+  { value: 'art',          label: 'Art' },
+  { value: 'voyage',       label: 'Voyage' },
+  { value: 'business',     label: 'Business' },
+  { value: 'actualite',    label: 'Actualité' },
+  { value: 'spiritualite', label: 'Spiritualité' },
+  { value: 'famille',      label: 'Famille' },
+  { value: 'sante',        label: 'Santé' },
+  { value: 'auto',         label: 'Auto/Moto' },
+  { value: 'animaux',      label: 'Animaux' },
+  { value: 'nature',       label: 'Nature' },
+  { value: 'bricolage',    label: 'Bricolage' },
+  { value: 'cinema',       label: 'Film/Série' },
+  { value: 'autre',        label: 'Autre' },
 ];
 
 interface Props {
@@ -62,7 +67,7 @@ export const CategorySelector: React.FC<Props> = ({ value, onChange, label }) =>
                 { borderColor: active ? '#9B65F5' : colors.border, backgroundColor: active ? '#9B65F522' : colors.backgroundSecondary },
               ]}
             >
-              <Text style={s.emoji}>{cat.emoji}</Text>
+              <CategoryIcon value={cat.value} size={13} color={active ? '#9B65F5' : colors.textSecondary} />
               <Text style={{ color: active ? '#9B65F5' : colors.textSecondary, fontWeight: '700', fontSize: 12 }}>
                 {cat.label}
               </Text>
@@ -81,5 +86,4 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 5,
     borderWidth: 1, borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8,
   },
-  emoji: { fontSize: 13 },
 });

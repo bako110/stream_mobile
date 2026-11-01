@@ -2,7 +2,7 @@
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
   FlatList, ActivityIndicator,
-  Share, Platform, Linking,
+  Platform, Linking,
   Modal, Dimensions, NativeScrollEvent, NativeSyntheticEvent, StatusBar, InteractionManager,
 } from 'react-native';
 
@@ -19,7 +19,7 @@ import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
-import { SkeletonDetail, CommentsBottomSheet, ExpandableText, BackButton, GofolyxLoader, FriendsWhoLiked, PriceWithLocal, RepostBottomSheet } from '../../components/common';
+import { SkeletonDetail, CommentsBottomSheet, ExpandableText, BackButton, GofolyxLoader, FriendsWhoLiked, PriceWithLocal, RepostBottomSheet, ShareBottomSheet } from '../../components/common';
 import { TicketPaymentSheet } from '../../components/wallet/TicketPaymentSheet';
 import { eventService, socialService, authService, toastService, showConfirm, liveService } from '../../services';
 import { prefetchSimpleLive } from '../../utils/livePrefetch';
@@ -33,6 +33,20 @@ import { StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ── Config ────────────────────────────────────────────────────────────────────
+
+// Événement "en cours" — starts_at déjà passé, toujours dans sa fenêtre active
+// (ends_at si renseigné, sinon 24h après le début). Même logique que
+// FeedScreen.tsx (FeedCard.isEventOngoing), gardée synchronisée.
+function isEventOngoingNow(startsAt?: string | null, endsAt?: string | null): boolean {
+  if (!startsAt) return false;
+  const start = new Date(startsAt).getTime();
+  const now = Date.now();
+  if (endsAt) {
+    const end = new Date(endsAt).getTime();
+    return now >= start && now <= end;
+  }
+  return now >= start && now <= start + 24 * 3600_000;
+}
 
 const EVENT_CONFIG: Record<string, { icon: string; label: string; color: string }> = {
   concert:    { icon: 'music',    label: 'Concert',      color: '#7B3FF2' },
@@ -171,12 +185,12 @@ const HeroCarousel: React.FC<{
 // ── HeroInfoCard — titre + organisateur + badges, dans une vraie section sous
 // le hero, pas en overlay sur l'image ─────────────────────────────────────────
 const HeroInfoCard: React.FC<{
-  title: string; accent: string; eventType: string; isFree: boolean; isOnline: boolean;
+  title: string; accent: string; eventType: string; isFree: boolean; isOnline: boolean; isOngoing?: boolean;
   organizerName?: string; organizerAvatar?: string;
   showAiPending?: boolean;
   onAiPendingPress?: () => void;
   colors: AppColors;
-}> = ({ title, accent, eventType, isFree, isOnline, organizerName, organizerAvatar, showAiPending, onAiPendingPress, colors }) => (
+}> = ({ title, accent, eventType, isFree, isOnline, isOngoing, organizerName, organizerAvatar, showAiPending, onAiPendingPress, colors }) => (
   <View style={{ backgroundColor: colors.surface, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12, gap: 8 }}>
     <Text style={{ fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold, color: colors.textPrimary, lineHeight: 22, letterSpacing: -0.2 }}>
       {title}
@@ -208,6 +222,11 @@ const HeroInfoCard: React.FC<{
       <View style={{ backgroundColor: accent + '15', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 }}>
         <Text style={{ fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold, color: accent, letterSpacing: 0.4 }}>{eventType.toUpperCase()}</Text>
       </View>
+      {isOngoing && (
+        <View style={{ backgroundColor: '#36D9A022', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 }}>
+          <Text style={{ fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold, color: '#1F9D6E', letterSpacing: 0.4 }}>EN COURS</Text>
+        </View>
+      )}
       {isFree && (
         <View style={{ backgroundColor: '#36D9A022', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 }}>
           <Text style={{ fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold, color: '#1F9D6E', letterSpacing: 0.4 }}>GRATUIT</Text>
@@ -396,6 +415,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
   const [repostCount,  setRepostCount]  = useState(0);
   const [reposting,    setReposting]    = useState(false);
   const [repostSheetOpen, setRepostSheetOpen] = useState(false);
+  const [shareOpen,       setShareOpen]       = useState(false);
   const [saved,        setSaved]        = useState(false);
   const [reminded,     setReminded]     = useState(false);
   const [remindLoading,setRemindLoading]= useState(false);
@@ -490,15 +510,8 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
     finally { setRemindLoading(false); }
   };
 
-  const handleNativeShare = async () => {
-    if (!event) return;
-    try {
-      await Share.share({ title: event.title,
-        message: `${event.title} — ${formatDateShort(event.starts_at)} à ${event.venue_city ?? 'Gofolyx'}\nVia Gofolyx` });
-      setShareCount(c => c + 1);
-      socialService.share({ platform: 'external', event_id: eventId }).catch(() => setShareCount(c => Math.max(0, c - 1)));
-    } catch { /**/ }
-  };
+  const handleSharePress = () => setShareOpen(true);
+  const handleShareDone  = () => setShareCount(c => c + 1);
 
   // Repartager — republication dans le fil (avec attribution de source),
   // distinct du partage natif ci-dessus. Aperçu + confirmation explicite.
@@ -631,6 +644,10 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
   const isLiveNow    = event.is_online && !!event.live_id && !isCompleted;
   const hasReplay    = isCompleted && !!replayUrl;
   const isScheduled  = event.is_online && !!event.live_id && !isLiveNow && !isCompleted;
+  // Badge "En cours" (événement physique/sans live rattaché) — distinct de
+  // isLiveNow (qui concerne un live rattaché, pas la date de l'événement).
+  const isOngoingByDate = !isCompleted && !isLiveNow
+    && isEventOngoingNow(event.starts_at, (event as any).ends_at);
 
   const scheduledIn = (() => {
     if (!isScheduled) return null;
@@ -664,7 +681,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
         {/* ── Titre + organisateur + badges — section séparée, pas sur l'image ─── */}
         <HeroInfoCard
           title={event.title} accent={accent}
-          eventType={cfg.label} isFree={isFree} isOnline={!!event.is_online}
+          eventType={cfg.label} isFree={isFree} isOnline={!!event.is_online} isOngoing={isOngoingByDate}
           organizerName={organizerName ?? undefined} organizerAvatar={organizerAvatar}
           showAiPending={isOwner && event.ai_analysis_status === 'pending'}
           onAiPendingPress={() => nav.navigate('AiAnalysisStatus', { contentType: 'event', contentId: event.id, initialStatus: event.ai_analysis_status })}
@@ -766,7 +783,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
             </TouchableOpacity>
           )}
           <View style={[ds.socialSep, { backgroundColor: colors.divider }]} />
-          <TouchableOpacity style={ds.socialBtn} onPress={handleNativeShare} activeOpacity={0.7}>
+          <TouchableOpacity style={ds.socialBtn} onPress={handleSharePress} activeOpacity={0.7}>
             <MCIcon name="share-outline" size={21} color={shareCount > 0 ? colors.primary : colors.textTertiary} />
             {shareCount > 0 && (
               <Text style={[ds.socialBtnText, { color: colors.textTertiary }]}>
@@ -795,7 +812,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
         {event.description ? (
           <View style={ds.section}>
             <SectionHeader label="À propos" colors={colors} />
-            <ExpandableText text={event.description} maxLines={4}
+            <ExpandableText text={event.description} localTruncate
               textStyle={{ fontSize: FontSize.base, lineHeight: 22, color: colors.textSecondary }}
               primaryColor={accent} />
           </View>
@@ -987,6 +1004,15 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
           reposting={reposting}
           onConfirm={handleRepostConfirm}
           onClose={() => { if (!reposting) setRepostSheetOpen(false); }}
+        />
+      )}
+      {event && (
+        <ShareBottomSheet
+          type="event"
+          event={event}
+          visible={shareOpen}
+          onClose={() => setShareOpen(false)}
+          onShareCountChange={handleShareDone}
         />
       )}
     </View>

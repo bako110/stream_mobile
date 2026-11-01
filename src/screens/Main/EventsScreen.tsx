@@ -29,6 +29,20 @@ const EVENT_CONFIG: Record<EventType, { icon: string; label: string }> = {
   other:      { icon: 'calendar',    label: 'Autre' },
 };
 
+// Événement "en cours" — starts_at déjà passé, toujours dans sa fenêtre active
+// (ends_at si renseigné, sinon 24h après le début). Même logique que
+// FeedScreen.tsx (FeedCard.isEventOngoing), gardée synchronisée.
+function isEventOngoingNow(startsAt?: string | null, endsAt?: string | null): boolean {
+  if (!startsAt) return false;
+  const start = new Date(startsAt).getTime();
+  const now = Date.now();
+  if (endsAt) {
+    const end = new Date(endsAt).getTime();
+    return now >= start && now <= end;
+  }
+  return now >= start && now <= start + 24 * 3600_000;
+}
+
 export const EventsScreen: React.FC = () => {
   const { theme } = useTheme();
   const { colors } = theme;
@@ -174,6 +188,7 @@ interface EventCardProps { event: Event; colors: AppColors; onPress: () => void;
 const EventCard: React.FC<EventCardProps> = ({ event, colors, onPress, onDelete }) => {
   const cfg    = EVENT_CONFIG[event.event_type] ?? EVENT_CONFIG.other;
   const accent = colors.primary;
+  const isOngoing = isEventOngoingNow(event.starts_at, (event as any).ends_at);
   const pct    = event.max_attendees
     ? Math.min(event.current_attendees / event.max_attendees, 1)
     : 0;
@@ -239,6 +254,11 @@ const EventCard: React.FC<EventCardProps> = ({ event, colors, onPress, onDelete 
               {cfg.label.toUpperCase()}
             </Text>
           </View>
+          {isOngoing && (
+            <View style={[s.typePill, { backgroundColor: '#36D9A022' }]}>
+              <Text style={[s.typePillText, { color: '#36D9A0' }]}>EN COURS</Text>
+            </View>
+          )}
           {event.access_type === 'free' && (
             <View style={[s.typePill, { backgroundColor: colors.accentGreen + '22' }]}>
               <Text style={[s.typePillText, { color: colors.accentGreen }]}>GRATUIT</Text>

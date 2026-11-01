@@ -28,6 +28,11 @@ export const CATEGORY_ICONS: Record<string, { lib: 'feather' | 'mc'; name: strin
   spiritualite: { lib: 'mc',      name: 'hands-pray' },
   famille:      { lib: 'mc',      name: 'home-heart' },
   sante:        { lib: 'feather', name: 'heart' },
+  auto:         { lib: 'mc',      name: 'car' },
+  animaux:      { lib: 'mc',      name: 'paw' },
+  nature:       { lib: 'feather', name: 'feather' },
+  bricolage:    { lib: 'mc',      name: 'hammer-wrench' },
+  cinema:       { lib: 'feather', name: 'film' },
   autre:        { lib: 'feather', name: 'grid' },
   free:         { lib: 'feather', name: 'star' },
 };

@@ -459,7 +459,11 @@ const Tabs: React.FC<{ onLogout: () => void; onSwitchAccount: (userId: string) =
     <Tab.Screen name="Communities">
       {() => <SwipeTabScreen tabName="Communities"><CommunitiesTabScreen /></SwipeTabScreen>}
     </Tab.Screen>
-    <Tab.Screen name="Reels"       component={ReelsScreen} />
+    {/* tabBarTransparent (option custom, lue par AppTabBar) : Reels est plein
+        écran vidéo, la pilule de navigation doit y être transparente plutôt
+        que colors.surface opaque — déclaré ici par l'écran lui-même, AppTabBar
+        n'a plus besoin de connaître le nom "Reels" en dur. */}
+    <Tab.Screen name="Reels" component={ReelsScreen} options={{ tabBarTransparent: true } as any} />
     <Tab.Screen name="Profile">
       {() => <SwipeTabScreen tabName="Profile"><ProfileTab onLogout={onLogout} /></SwipeTabScreen>}
     </Tab.Screen>

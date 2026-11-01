@@ -14,6 +14,7 @@ import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
+import { SheetCloseButton } from '../common/SheetCloseButton';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import { liveService, type LiveStream, type BannedUser } from '../../services/liveService';
@@ -388,9 +389,7 @@ export const LiveSettingsSheet: React.FC<Props> = ({
         <View style={s.handle} />
         <View style={s.sheetHeader}>
           <Text style={[s.sheetTitle, { color: colors.textPrimary }]}>Parametres du live</Text>
-          <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Icon name="x" size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
+          <SheetCloseButton onPress={onClose} />
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>

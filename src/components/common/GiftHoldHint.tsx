@@ -9,18 +9,12 @@ import { storage } from '../../utils/storage';
 
 const AUTO_HIDE_MS = 5500;
 const ACCENT = '#4F8CFF';
-const STORAGE_KEY = 'reels_gift_hint_last_shown_date';
+// Anciennement une clé par JOUR civil (réapparaissait chaque jour) — changé
+// (2026-11) pour un simple flag "déjà montré", une seule fois à vie, même
+// comportement que SwipeUpHint.
+const STORAGE_KEY = 'reels_gift_hint_ever_shown';
 
-// Date du jour au format YYYY-MM-DD (fuseau local) — comparée au dernier
-// affichage stocké en MMKV pour limiter le hint à une fois par JOUR civil,
-// pas une fois par session/ouverture d'app (ce qui le faisait réapparaître à
-// chaque relance, plusieurs fois par jour).
-const todayKey = (): string => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
-
-const alreadyShownToday = (): boolean => storage.getItem(STORAGE_KEY) === todayKey();
+const alreadyShown = (): boolean => storage.getBoolean(STORAGE_KEY) === true;
 
 interface Props {
   /** Le parent doit passer true dès que l'utilisateur a fait le vrai geste
@@ -32,12 +26,12 @@ interface Props {
 }
 
 // Overlay pédagogique "appuyez et maintenez pour envoyer un cadeau" (halo
-// circulaire pulsant + icône de main, façon TikTok) affiché une fois par JOUR
-// civil (contrairement au hint swipe, vu une seule fois à vie), jamais
-// bloquant (pointerEvents="none"), et qui s'efface dès que l'utilisateur fait
-// le vrai geste ou après un délai de sécurité si personne ne le fait.
+// circulaire pulsant + icône de main, façon TikTok) affiché UNE SEULE FOIS À
+// VIE (même comportement que SwipeUpHint) — jamais bloquant
+// (pointerEvents="none"), et qui s'efface dès que l'utilisateur fait le vrai
+// geste ou après un délai de sécurité si personne ne le fait.
 export const GiftHoldHint: React.FC<Props> = ({ dismiss, suppressed }) => {
-  const [everShown, setEverShown] = useState(() => !alreadyShownToday());
+  const [everShown, setEverShown] = useState(() => !alreadyShown());
   const opacity = useSharedValue(0);
   const pulse = useSharedValue(0);
 
@@ -65,7 +59,7 @@ export const GiftHoldHint: React.FC<Props> = ({ dismiss, suppressed }) => {
   }, [dismiss]);
 
   const hide = () => {
-    storage.setItem(STORAGE_KEY, todayKey());
+    storage.setBoolean(STORAGE_KEY, true);
     opacity.value = withTiming(0, { duration: 200 }, (finished) => {
       if (finished) runOnJS(setEverShown)(false);
     });
@@ -106,12 +100,13 @@ export const GiftHoldHint: React.FC<Props> = ({ dismiss, suppressed }) => {
 };
 
 const styles = StyleSheet.create({
-  // Même emplacement que SwipeUpHint (top: 38%) — voir son commentaire pour le
-  // raisonnement. Jamais affichés ensemble (suppressed tant que SwipeUpHint
-  // n'est pas done), donc partager la position est sans risque.
+  // Repositionné hors du centre de l'écran (2026-11) — il masquait la vidéo
+  // en plein milieu du champ de vision principal. Placé dans le tiers bas,
+  // au-dessus de la zone auteur/description (reelInfo dans ReelsScreen.tsx)
+  // plutôt qu'au centre, sans la recouvrir.
   container: {
     position: 'absolute',
-    top: '38%',
+    bottom: '28%',
     alignSelf: 'center',
     alignItems: 'center',
   },
