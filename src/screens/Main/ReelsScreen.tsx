@@ -52,6 +52,7 @@ import Sound from 'react-native-sound';
 import { BackButton } from '../../components/common';
 import { getLogo } from '../../assets';
 import * as reelVideoCache from '../../services/reelVideoCacheService';
+import { consumeReelsFeedPrefetch } from '../../utils/reelsFeedPrefetch';
 import { consumeReelsPrefetch } from '../../services/reelsPrefetchService';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
@@ -281,6 +282,13 @@ export const ReelsScreen: React.FC = () => {
   // usage normal de l'onglet Reels (CAS FOOTER), le pool générique ne doit
   // jamais être perturbé par ce mécanisme.
   const seedModeActiveRef = useRef(false);
+  // true dès que l'onglet Reels est explicitement re-tapé (icône footer) alors
+  // qu'une session seed (clic depuis le feed) est active — consommé par le
+  // prochain useFocusEffect pour sortir du mode seed et retrouver le pool
+  // générique habituel avec du contenu frais, au lieu de rester sur la petite
+  // suite centrée sur le reel cliqué (qui finissait par montrer "toujours la
+  // même chose" après quelques allers-retours feed → reel → footer → reel).
+  const forceResetOnNextFocusRef = useRef(false);
   // Fenêtre glissante des derniers reels "bien regardés" (watch_ratio >= 0.7,
   // même seuil que le reste du systeme) DANS CETTE SESSION de visionnage —
   // pas tout l'historique du compte comme le profil habituel. Comme
@@ -1036,6 +1044,22 @@ export const ReelsScreen: React.FC = () => {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Re-tap explicite de l'icône Reels (footer) — même événement natif que
+  // popToTabRoot (cf. AppTabBar.tsx), déclenché que l'onglet soit déjà actif
+  // ou non. Si une session seed (clic depuis le feed) est active à ce
+  // moment-là, on marque juste l'intention ; le useFocusEffect juste en
+  // dessous (toujours ré-exécuté après un tabPress, puisque React Navigation
+  // refocus l'écran) consomme ce flag pour sortir du mode seed.
+  useEffect(() => {
+    if (userMode) return;
+    const parent = nav.getParent?.();
+    if (!parent) return;
+    const sub = parent.addListener('tabPress' as any, () => {
+      if (seedModeActiveRef.current) forceResetOnNextFocusRef.current = true;
+    });
+    return sub;
+  }, [nav, userMode]);
+
   // ── Focus ─────────────────────────────────────────────────────────────────
   // paramsRef.current est toujours frais (mis à jour à chaque render, avant useFocusEffect)
   useFocusEffect(useCallback(() => {
@@ -1120,11 +1144,29 @@ export const ReelsScreen: React.FC = () => {
         if (scrollLockTimer.current) clearTimeout(scrollLockTimer.current);
         scrollLockTimer.current = setTimeout(() => { isScrollingRef.current = false; }, 1200);
         listRef.current?.scrollToOffset({ offset: SCREEN_H * scrollIdx, animated: false });
-        // File suivante chargée en arrière-plan derrière ce premier reel — pas
-        // besoin d'attendre pour afficher/jouer celui-ci. silent=true (comme
+        // File suivante — si FeedScreen a eu le temps de précharger la liste
+        // dès l'appui (cf. reelsFeedPrefetch.ts, démarré avant la navigation),
+        // on l'utilise directement : pas d'attente réseau, les voisins sont
+        // déjà là pour que le préchargement vidéo (isPreload/preloadDistance)
+        // puisse démarrer tout de suite au lieu d'attendre que GET /reels/feed
+        // revienne après coup (écran noir visible au scroll suivant sinon).
+        // Sinon, retombe sur le flux réseau normal (load(true), silent, comme
         // le CAS FEED existant) : enrichit la liste sans toucher à l'index ni
         // au scroll déjà positionnés ci-dessus.
-        load(true);
+        const prefetchedFeed = consumeReelsFeedPrefetch(targetId);
+        if (prefetchedFeed) {
+          const filtered = (prefetchedFeed.items ?? []).filter((r: Reel) => (!!r.hls_url || !!r.mp4_url));
+          const existingIds = new Set(reelsRef.current.map(r => r.id));
+          const toAdd = filtered.filter(r => !existingIds.has(r.id));
+          if (toAdd.length > 0) {
+            const merged = [...reelsRef.current, ...toAdd];
+            reelsRef.current = merged;
+            setReels(merged);
+          }
+          setHasMore(prefetchedFeed.has_more);
+        } else {
+          load(true);
+        }
       } else {
         // Pas d'objet reel — charger en background
         pendingTargetRef.current = { id: targetId };
@@ -1171,6 +1213,19 @@ export const ReelsScreen: React.FC = () => {
           // normal, prioritaire et immédiat.
           load(false);
         }
+      } else if (forceResetOnNextFocusRef.current) {
+        // Re-tap explicite de l'icône Reels pendant qu'une session seed (clic
+        // depuis le feed) était active — contrairement au simple retour de
+        // focus ci-dessous, c'est une demande explicite de "revenir à
+        // l'onglet Reels normal". Sort du mode seed et refait un vrai reset
+        // (comme le tout premier montage) pour retrouver le pool générique
+        // avec du contenu frais, au lieu de rester sur la petite suite
+        // centrée sur le reel cliqué.
+        forceResetOnNextFocusRef.current = false;
+        seedModeActiveRef.current = false;
+        seedReelIdRef.current = undefined;
+        seedWatchHistoryRef.current = [];
+        load(false, true);
       } else {
         // Tout retour sur l'onglet (changement d'onglet, ou reprise après
         // arrière-plan) : le reel affiché à l'écran ne doit JAMAIS être
@@ -3496,14 +3551,23 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   // nécessaire au-dessus d'une pilule qui, elle, reste compacte.
   const tabBarBottomPad = Platform.OS === 'android' ? Math.min(Math.max(insetBottom, 12), 24) : insetBottom;
   const tabBarOverlayH  = TAB_BAR_HEIGHT + tabBarBottomPad;
-  // insetBottom RÉEL (non plafonné) ici : c'est la vraie distance entre le bas
-  // de la pilule et le bord physique de l'écran (zone système), à ne jamais
-  // confondre avec la hauteur de la pilule elle-même ci-dessus.
-  const safeBottom    = Math.max(insetBottom, Platform.OS === 'android' ? 56 : 0) + tabBarOverlayH;
+  // Position RÉELLE du bas de la pilule — EXACTEMENT la même formule que
+  // bottomOffset dans AppTabBar.tsx (même hook useSafeAreaInsets(), donc
+  // insets.bottom identique entre les deux composants). Un plancher fixe à 56
+  // avait été ajouté ici (2026-11) en pensant corriger un chevauchement sur
+  // appareil à boutons physiques, mais ce plancher cassait le collage exact
+  // sur les appareils SANS bouton (confirmé) sans que le chevauchement sur
+  // appareil à boutons soit lié à cette formule — AppTabBar.tsx utilise la
+  // même formule sans plancher et colle correctement sur les deux types
+  // d'appareils partout ailleurs dans l'app. Retiré pour revenir identique.
+  const tabBarBottomOffset = Math.max(insetBottom - 8, 4);
+  const safeBottom    = tabBarBottomOffset + tabBarOverlayH;
   // Barre de commentaire + barre de progression retirées (le tap sur "commenter"
   // dans la colonne d'actions ouvre CommentsBottomSheet) — la colonne d'actions
-  // et les infos du reel se calent directement sur safeBottom, footer fixe.
-  const COMMENT_BAR_H = 14;
+  // et les infos du reel se calent directement sur safeBottom, footer fixe,
+  // SANS marge supplémentaire (retiré 2026-11 : un residu +14px laissait un
+  // espace visible entre le bloc nom/description et le footer alors que le
+  // commentaire ci-dessus disait déjà "se calent directement").
 
   // Le fond sombre en bas (bottomGradient) doit s'adapter à ce qu'il y a
   // réellement à lire dans le footer (légende, musique, référence, source) —
@@ -3536,6 +3600,21 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insetTop, backgroundColor: '#000', zIndex: 9 }}
         pointerEvents="none"
       />
+
+      {/* Indicateur discret "préchargement en cours" — voisin pas encore actif,
+          pas encore en cache disque (hasCachedFile), dont le téléchargement
+          tourne déjà en tâche de fond (cf. cacheInBackground plus bas dans ce
+          composant). Jamais affiché sur le reel ACTIF (pas de spinner gênant
+          pendant le visionnage), uniquement sur les voisins proches pour
+          confirmer visuellement que la suite se prépare. */}
+      {isPreload && !isActive && !hasCachedFile && (
+        <View
+          style={{ position: 'absolute', top: insetTop + 14, right: 14, zIndex: 9, opacity: 0.55 }}
+          pointerEvents="none"
+        >
+          <ActivityIndicator size="small" color="#ffffff" />
+        </View>
+      )}
 
       {/* Thumbnail retiree (2026-09) — demande explicite : jouer la video
           directement des l'arrivee sur le reel, sans jamais afficher de
@@ -3670,7 +3749,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       )}
 
       <GestureDetector gesture={Gesture.Simultaneous(hScrubGesture, tapGesture)}>
-        <View style={{ position: 'absolute', top: 0, left: 0, right: ui.reelInfoRight, bottom: safeBottom + COMMENT_BAR_H }} />
+        <View style={{ position: 'absolute', top: 0, left: 0, right: ui.reelInfoRight, bottom: safeBottom }} />
       </GestureDetector>
 
       {/* Tuto "appuyez et maintenez pour envoyer un cadeau" — seulement sur le
@@ -3727,7 +3806,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
       <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} pointerEvents="box-none">
 
         {showInterface && (
-        <View style={[s.reelInfo, { bottom: safeBottom + COMMENT_BAR_H, right: ui.reelInfoRight }]} pointerEvents="box-none">
+        <View style={[s.reelInfo, { bottom: safeBottom, right: ui.reelInfoRight }]} pointerEvents="box-none">
           {refInfo && (
             <View style={s.refBand}>
               <View style={[s.refKindDot, { backgroundColor: refInfo.color }]} />
@@ -3830,6 +3909,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           {captionSt ? (
             <RichText
               text={captionSt}
+              maxLines={1}
               textStyle={[s.caption, { fontSize: ui.caption, lineHeight: Math.round(ui.caption * 1.42) }]}
               primaryColor="#93C5FD"
               showLinkPreview={false}
@@ -3871,7 +3951,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
         <HeartRain active={isActive} likeCount={likes} contentId={reel.id} />
 
         {showInterface && (
-        <View style={[s.actions, { bottom: safeBottom + COMMENT_BAR_H, gap: ui.railGap }]}>
+        <View style={[s.actions, { bottom: safeBottom, gap: ui.railGap }]}>
           <ActionBtn ui={ui} icon="heart" useMCIcon label={formatCount(likes)} color={liked ? REEL_LIKE : '#fff'} onPress={handleLike} active={liked} activeBackground="rgba(224,56,154,0.25)" activeBorder={REEL_LIKE} activeGlow={REEL_LIKE} />
           {!commentsDisabledSt && <ActionBtn ui={ui} icon="comment" useMCIcon label={formatCount(commentCount)} color="#fff" onPress={() => setShowComments(true)} />}
           <ActionBtn ui={ui} icon="share-variant" useMCIcon label={formatCount(shareCount)} color="#fff" onPress={handleShare} />

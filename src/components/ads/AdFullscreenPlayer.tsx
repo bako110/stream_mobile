@@ -12,6 +12,7 @@ import { adIsPhone, adCtaLabel, type AdData } from './types';
 import { openPhoneMenu } from '../../utils/phoneMenu';
 import { Linking } from 'react-native';
 import { useTheme } from '../../hooks/useTheme';
+import { RichText } from '../common/RichText';
 
 export const AdFullscreenPlayer: React.FC<{ ad: AdData; onClose: () => void; onClick?: (adId: string, url?: string) => void }> = ({ ad, onClose, onClick }) => {
   const insets = useSafeAreaInsets();
@@ -44,7 +45,16 @@ export const AdFullscreenPlayer: React.FC<{ ad: AdData; onClose: () => void; onC
 
       <View style={[st.bottom, { bottom: Math.max(insets.bottom, 16) + 10 }]}>
         <Text style={st.title} numberOfLines={1}>{ad.title}</Text>
-        {ad.description ? <Text style={st.desc} numberOfLines={3}>{ad.description}</Text> : null}
+        {ad.description ? (
+          <RichText
+            text={ad.description}
+            localTruncate
+            maxLines={3}
+            textStyle={st.desc}
+            primaryColor="#93C5FD"
+            showLinkPreview={false}
+          />
+        ) : null}
         {rawCta ? (
           <TouchableOpacity activeOpacity={0.88} onPress={handleCta} style={[st.cta, { marginTop: 4, backgroundColor: colors.primary }]}>
             <Icon name={ctaIcon === 'phone' ? 'phone' : ctaIcon === 'download' ? 'download' : 'globe'} size={15} color="#fff" />

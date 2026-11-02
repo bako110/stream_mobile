@@ -33,6 +33,26 @@ export function invalidateFeedCache(): void {
   localCache.del(FEED_CACHE_KEY);
 }
 
+// ── "Mes stories" cache (MyStoriesScreen) — même pattern stale-while-revalidate
+// que le feed, clé séparée : ce sont des données différentes (mes propres
+// stories, avec vues/réponses), jamais mélangées avec le feed des autres.
+// Avant ce cache, l'écran retombait sur une liste vide sans réseau (aucun
+// repli), donnant l'impression que "ça ne marche pas hors-ligne".
+const MY_STORIES_CACHE_KEY = 'story_mine';
+const MY_STORIES_TTL_MS    = 5 * 60 * 1000; // 5 min, même fraîcheur que le feed
+
+export function getCachedMyStories(): Story[] | null {
+  return localCache.get<Story[]>(MY_STORIES_CACHE_KEY);
+}
+
+export function getStaleMyStories(): Story[] | null {
+  return localCache.getPersistent<Story[]>(MY_STORIES_CACHE_KEY);
+}
+
+export function setCachedMyStories(stories: Story[]): void {
+  localCache.set(MY_STORIES_CACHE_KEY, stories, MY_STORIES_TTL_MS);
+}
+
 // ── IDs des stories vues (persistes entre sessions) ───────────────────────────
 
 function loadViewedIds(): Set<string> {

@@ -96,6 +96,24 @@ async function togglePost(item: any): Promise<boolean> {
   return true;
 }
 
+async function toggleStory(item: any): Promise<boolean> {
+  const id: string = item.id;
+  if (saveService.isStorySaved(id)) {
+    saveService.unsaveStory(id);
+    await unsave('story', id).catch(() => {});
+    return false;
+  }
+  saveService.saveStory(item);
+  await save({
+    target_type: 'story',
+    target_id: id,
+    target_title: item.caption,
+    target_subtitle: item.author?.display_name ?? item.author?.username,
+    target_thumbnail: item.thumbnail_url ?? item.media_url,
+  }).catch(() => {});
+  return true;
+}
+
 async function toggleAd(item: { id: string; title: string; thumbnail_url?: string; creative_url?: string; advertiser_name?: string }): Promise<boolean> {
   const id: string = item.id;
   if (saveService.isAdSaved(id)) {
@@ -160,6 +178,11 @@ async function syncFromServer(): Promise<void> {
             saveService.saveAd({ id: fav.target_id, title: fav.target_title ?? '', thumbnail_url: fav.target_thumbnail ?? undefined, advertiser_name: fav.target_subtitle ?? undefined } as any);
           }
           break;
+        case 'story':
+          if (!saveService.isStorySaved(fav.target_id)) {
+            saveService.saveStory({ id: fav.target_id, caption: fav.target_title, thumbnail_url: fav.target_thumbnail } as any);
+          }
+          break;
       }
     }
   } catch {
@@ -179,4 +202,5 @@ export const favoriteService = {
   togglePost,
   toggleCommunity,
   toggleAd,
+  toggleStory,
 };

@@ -60,6 +60,14 @@ export const storyService = {
     return Array.isArray(res.data) ? res.data : [];
   },
 
+  // ── Une story par ID — favoris, accessible même après expiration (cf.
+  // backend GET /stories/{id} : épargnée de la suppression si en favoris) ──
+
+  async getById(storyId: string): Promise<Story> {
+    const res = await apiClient.get<Story>(Endpoints.stories.byId(storyId));
+    return res.data;
+  },
+
   // ── Créer une story ───────────────────────────────────────────────────────
 
   async create(data: StoryCreate): Promise<Story> {

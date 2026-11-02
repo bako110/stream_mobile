@@ -92,7 +92,7 @@ function useSafeNavigation() {
 
 export const RichText: React.FC<Props> = ({
   text,
-  maxLines = 0,
+  maxLines = 2,
   textStyle,
   primaryColor,
   moreLabel = 'Voir plus',
@@ -121,8 +121,8 @@ export const RichText: React.FC<Props> = ({
   // clone invisible (measureNode plus bas), jamais recalculé après.
   const [isLocallyLong, setIsLocallyLong] = useState(false);
   const onFullTextLayout = useCallback((e: any) => {
-    if (e.nativeEvent.lines.length > 2) setIsLocallyLong(true);
-  }, []);
+    if (e.nativeEvent.lines.length > maxLines) setIsLocallyLong(true);
+  }, [maxLines]);
 
   const effectiveTruncated = localTruncate ? isLocallyLong : isTruncated;
 
@@ -231,7 +231,7 @@ export const RichText: React.FC<Props> = ({
   const textNode = (
     <Text
       style={textStyle}
-      numberOfLines={effectiveTruncated && !expanded ? 2 : undefined}
+      numberOfLines={effectiveTruncated && !expanded ? maxLines : undefined}
       ellipsizeMode={effectiveTruncated && !expanded ? 'clip' : 'tail'}
       suppressHighlighting
     >

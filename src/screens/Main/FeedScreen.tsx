@@ -34,6 +34,7 @@ import { showConfirm } from '../../services';
 import { confirmService } from '../../services/confirmService';
 import { SkeletonBox, SkeletonFeed, SkeletonFeedScreen, AvatarWithBadge, ReportModal, CommentsBottomSheet, PostCard, ExpandableText, LikersBottomSheet, FriendsWhoLiked, CachedImage, LiveThumbnailBackground, PriceWithLocal, PeopleSuggestions } from '../../components/common';
 import { cacheImage } from '../../services/imageCacheService';
+import { prefetchReelsFeed } from '../../utils/reelsFeedPrefetch';
 import { AdCard, AdFullscreenPlayer, adIsPhone, type AdData } from '../../components/ads';
 import { BoostPromptBottomSheet, type BoostSuggestion } from '../../components/ads/BoostPromptBottomSheet';
 import { StartScreenSurveySheet } from '../../components/common/StartScreenSurveySheet';
@@ -572,10 +573,29 @@ const ReelSuggestionTile: React.FC<{
     transform: [{ scale: interpolate(pulse.value, [0, 0.5, 1], [1, 1.06, 1]) }],
   }));
 
+  // Démarre GET /reels/feed (seedReelIds=[reel.id]) dès l'appui — pas de
+  // manipulation de VideoView ici (contrairement à une tentative précédente
+  // qui avait causé un scroll parasite en changeant les props de la vidéo),
+  // juste un appel réseau fire-and-forget consommé par ReelsScreen au
+  // montage s'il arrive à temps (cf. reelsFeedPrefetch.ts).
+  const handlePressIn = useCallback(() => {
+    prefetchReelsFeed(reel.id);
+  }, [reel.id]);
+
   return (
-    <TouchableOpacity activeOpacity={0.92} onPress={onPress} style={{ width, height, borderRadius: large ? 20 : 16, overflow: 'hidden', backgroundColor: '#0B0B0F' }}>
+    <View style={{ width, height, borderRadius: large ? 20 : 16, overflow: 'hidden', backgroundColor: '#0B0B0F' }}>
       {shouldPlay && player ? (
-        <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        // Enveloppé dans un View pointerEvents="none" plutôt que de poser cette
+        // prop directement sur VideoView (ça avait provoqué un scroll parasite
+        // la dernière fois, probable remount de la surface vidéo native à
+        // chaque changement de prop) — ce wrapper, lui, ne force jamais
+        // VideoView à se recréer : seule sa capacité à intercepter les
+        // touches est neutralisée, de façon fiable même au tout premier tap
+        // (contrairement au simple ordre d'empilement JSX, qui pouvait encore
+        // laisser la surface native absorber ce premier tap sur Android).
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          <VideoView player={player} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        </View>
       ) : reel.thumbnail_url ? (
         <Image source={{ uri: reel.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
       ) : (
@@ -667,7 +687,23 @@ const ReelSuggestionTile: React.FC<{
           </View>
         )}
       </View>
-    </TouchableOpacity>
+
+      {/* Couche de tap dédiée, montée APRÈS (donc visuellement au-dessus de)
+          VideoView — jamais de pointerEvents="none" ni d'autre prop changée
+          directement sur VideoView lui-même : une tentative précédente avait
+          causé un scroll parasite dans le feed (probable remount de la vue
+          vidéo native à chaque changement de prop). Ce TouchableOpacity
+          transparent capte le tap de façon fiable, sans jamais toucher à
+          VideoView — permet de cliquer la tuile même pendant sa lecture
+          automatique (avant ce fix, le tap était intercepté par la surface
+          vidéo native et n'atteignait jamais ce composant). */}
+      <TouchableOpacity
+        activeOpacity={0.92}
+        onPressIn={handlePressIn}
+        onPress={onPress}
+        style={StyleSheet.absoluteFill}
+      />
+    </View>
   );
 };
 

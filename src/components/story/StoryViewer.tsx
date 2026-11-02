@@ -17,6 +17,7 @@ import type { StoryGroup, StoryViewerUser } from '../../types/story';
 import { storyService } from '../../services/storyService';
 import { showConfirm } from '../../services/confirmService';
 import { saveService } from '../../services/saveService';
+import { favoriteService } from '../../services/favoriteService';
 import { useWs } from '../../context/WebSocketContext';
 import { GofolyxLoader, HeartRain, LikeNamesFeed } from '../common';
 import { getLocalUri, getLocalUriAsync, cacheInBackground, invalidateCacheEntry } from '../../services/videoCacheService';
@@ -835,9 +836,14 @@ export const StoryViewer: React.FC<Props> = ({
 
   const handleSave = useCallback(() => {
     if (!story) return;
-    if (saved) { saveService.unsaveStory(story.id); setSaved(false); }
-    else       { saveService.saveStory(story);      setSaved(true); }
-  }, [story, saved]);
+    // favoriteService.toggleStory gère le cache local MMKV ET la synchro
+    // serveur (saveService seul, utilisé avant ce fix, ne faisait que le
+    // local — la story sauvegardée disparaissait après réinstall/changement
+    // d'appareil, et surtout jamais retrouvable une fois la story expirée
+    // côté feed si elle n'était pas aussi conservée côté serveur).
+    setSaved(s => !s);
+    favoriteService.toggleStory(story).catch(() => {});
+  }, [story]);
 
   // ── Like state — reset à chaque story ────────────────────────────────────
 
@@ -930,14 +936,35 @@ export const StoryViewer: React.FC<Props> = ({
   }, [story, replyText, replySending]);
 
   // ── Audio ──────────────────────────────────────────────────────────────────
+  // audioGenRef invalide tout startPlayer() en vol au moment d'un stop — sans
+  // ça, un démarrage asynchrone (startPlayer n'est jamais attendu, juste
+  // .catch()) pouvait se résoudre APRÈS un stopAudio() déjà passé (fermeture
+  // du viewer, swipe, changement de story), laissant le son jouer en continu
+  // malgré la fermeture (bug constaté : musique toujours audible après avoir
+  // fermé la story). Chaque appel incrémente la génération ; un startPlayer
+  // dont la génération a changé avant sa résolution se stoppe lui-même.
+
+  const audioGenRef = useRef(0);
 
   const stopAudio = useCallback(async () => {
+    audioGenRef.current += 1;
     try { await audioPlayer.stopPlayer(); audioPlayer.removePlayBackListener(); } catch {}
   }, []);
 
   useEffect(() => {
+    const myGen = ++audioGenRef.current;
     if (story?.audio_url && !paused) {
-      audioPlayer.startPlayer(story.audio_url!).catch(() => {});
+      audioPlayer.startPlayer(story.audio_url!)
+        .then(() => {
+          // Une fermeture/changement a eu lieu pendant le démarrage — ce
+          // player ne doit jamais rester audible, on le stoppe aussitôt
+          // plutôt que de laisser tourner un son qui ne correspond plus à
+          // rien à l'écran.
+          if (audioGenRef.current !== myGen) {
+            audioPlayer.stopPlayer().catch(() => {});
+          }
+        })
+        .catch(() => {});
       audioPlayer.addPlayBackListener(() => {});
     } else {
       stopAudio();
@@ -1086,7 +1113,10 @@ export const StoryViewer: React.FC<Props> = ({
           setPaused(false);
         } else if (gs.dy > 120) {
           stopAudio();
-          Animated.timing(translateY, { toValue: H, duration: 200, useNativeDriver: true }).start(onClose);
+          // Fermeture immédiate, sans animation de glissement — demande
+          // explicite : le swipe vers le bas doit fermer directement, pas
+          // jouer une transition de 200ms avant de quitter.
+          onClose();
         } else {
           Animated.spring(translateY, { toValue: 0, useNativeDriver: true }).start(() => setPaused(false));
         }
@@ -1362,19 +1392,10 @@ export const StoryViewer: React.FC<Props> = ({
           </View>
         ) : null}
 
-        {/* ── Music widget ─────────────────────────────────────────────────
-            audio_url peut être vidé une fois la musique fusionnée dans la
-            vidéo côté serveur (cf. render_content_with_music) — le badge
-            reste affiché tant qu'audio_name est là. */}
-        {(story.audio_url || story.audio_name) && (
-          <MusicWidget
-            audioUrl={story.audio_url}
-            audioName={story.audio_name}
-            accent={accent}
-            playing={!paused}
-            mediaType={story.media_type}
-          />
-        )}
+        {/* Music widget retiré (2026-11, demande explicite) — plus de badge
+            musique affiché pendant le visionnage d'une story, quel que soit
+            audio_url/audio_name. Le son continue de jouer normalement, seul
+            l'indicateur visuel disparaît. */}
 
         {/* ── Tap zones (double-tap = like) ─────────────────────────────── */}
         <View style={s.tapZones} pointerEvents="box-none">

@@ -9,9 +9,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { favoriteService } from '../../services/favoriteService';
 import type { FavoriteType } from '../../services/favoriteService';
+import { storyService } from '../../services/storyService';
+import { StoryViewer } from '../../components/story/StoryViewer';
+import type { StoryGroup } from '../../types/story';
 import { BackButton, GofolyxLoader } from '../../components/common';
+import { toastService } from '../../services';
 
-type Tab = 'events' | 'concerts' | 'reels' | 'posts' | 'communities' | 'films' | 'series';
+type Tab = 'events' | 'concerts' | 'reels' | 'posts' | 'communities' | 'films' | 'series' | 'stories';
 
 const TAB_TO_TYPE: Record<Tab, FavoriteType> = {
   events:      'event',
@@ -21,6 +25,7 @@ const TAB_TO_TYPE: Record<Tab, FavoriteType> = {
   communities: 'community',
   films:       'film',
   series:      'serie',
+  stories:     'story',
 };
 
 const TABS: { key: Tab; label: string; icon: string }[] = [
@@ -30,6 +35,7 @@ const TABS: { key: Tab; label: string; icon: string }[] = [
   { key: 'series',      label: 'Series',     icon: 'tv'             },
   { key: 'reels',       label: 'Reels',      icon: 'play-circle'    },
   { key: 'posts',       label: 'Posts',      icon: 'file-text'      },
+  { key: 'stories',     label: 'Stories',    icon: 'circle'         },
   { key: 'communities', label: 'Communautes',icon: 'users'          },
 ];
 
@@ -103,6 +109,26 @@ export const FavoritesScreen: React.FC = () => {
     } catch {}
   };
 
+  // Groupe synthétique à un seul élément pour StoryViewer — une story en
+  // favoris est ouverte seule, hors de tout groupe (le groupe d'origine côté
+  // feed n'existe plus une fois la story expirée).
+  const [viewerGroup, setViewerGroup] = useState<StoryGroup | null>(null);
+  const [loadingStoryId, setLoadingStoryId] = useState<string | null>(null);
+
+  const openFavoriteStory = async (storyId: string) => {
+    if (loadingStoryId) return;
+    setLoadingStoryId(storyId);
+    try {
+      const story = await storyService.getById(storyId);
+      if (!story.author) { toastService.error('Erreur', 'Story introuvable.'); return; }
+      setViewerGroup({ user: story.author, stories: [story], has_unseen: false });
+    } catch {
+      toastService.error('Erreur', 'Impossible de charger cette story.');
+    } finally {
+      setLoadingStoryId(null);
+    }
+  };
+
   const handlePress = (item: any) => {
     switch (tab) {
       case 'events':      nav.navigate('EventDetail',    { eventId:     item.id }); break;
@@ -112,6 +138,7 @@ export const FavoritesScreen: React.FC = () => {
       case 'communities': nav.navigate('CommunityChat',  { communityId: item.id, communityName: item.name }); break;
       case 'films':       nav.navigate('FilmDetail',     { item: { id: item.id, type: 'film',  title: item.title, thumbnail_url: item.thumbnail_url } }); break;
       case 'series':      nav.navigate('FilmDetail',     { item: { id: item.id, type: 'serie', title: item.title, thumbnail_url: item.thumbnail_url } }); break;
+      case 'stories':     openFavoriteStory(item.id); break;
     }
   };
 
@@ -268,6 +295,14 @@ export const FavoritesScreen: React.FC = () => {
           );
         }}
       />
+
+      {viewerGroup && (
+        <StoryViewer
+          groups={[viewerGroup]}
+          initialGroupIndex={0}
+          onClose={() => setViewerGroup(null)}
+        />
+      )}
     </View>
   );
 };

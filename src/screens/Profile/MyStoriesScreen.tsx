@@ -16,6 +16,7 @@ import { toastService, showConfirm } from '../../services';
 import { storyService } from '../../services/storyService';
 import { authService } from '../../services/authService';
 import { cacheInBackground } from '../../services/videoCacheService';
+import { getCachedMyStories, getStaleMyStories, setCachedMyStories } from '../../services/storyCacheService';
 import { BackButton } from '../../components/common';
 import type { Story, StoryGroup } from '../../types/story';
 
@@ -185,14 +186,27 @@ export const MyStoriesScreen: React.FC<Props> = ({ navigation }) => {
     try {
       const data = await storyService.getMyStories();
       setStories(data);
+      setCachedMyStories(data);
       _cacheVideos(data);
-    } catch { /**/ } finally {
+    } catch {
+      // Hors-ligne (ou échec réseau quelconque) — repli sur le dernier
+      // résultat connu plutôt qu'un écran vide silencieux. getStaleMyStories
+      // ignore le TTL (toujours disponible tant que non effacé) : mieux vaut
+      // montrer un contenu potentiellement périmé que rien du tout.
+      const stale = getStaleMyStories();
+      if (stale) setStories(stale);
+    } finally {
       setLoading(false);
       if (refresh) setRefreshing(false);
     }
   }, [_cacheVideos]);
 
   useEffect(() => {
+    // Affichage instantané depuis le cache frais (TTL non expiré) pendant que
+    // load() revalide en réseau — même pattern stale-while-revalidate que le
+    // feed de stories (storyCacheService.ts).
+    const cached = getCachedMyStories();
+    if (cached) { setStories(cached); setLoading(false); }
     load();
     authService.getMe().then(u => setMyId(String(u.id))).catch(() => {});
   }, []);
