@@ -52,6 +52,7 @@ export const STORAGE_KEYS = {
   LAST_USER_ID:   'gofolyx_last_user_id',
   CACHED_USER:    'gofolyx_cached_user',
   CURRENCY_CODE:  'gofolyx_currency_code',
+  CURRENCY_AUTO_DETECTED: 'gofolyx_currency_auto_detected',
   ACCOUNTS:       'gofolyx_accounts_v1',
   REELS_AUTO_ADVANCE: 'gofolyx_reels_auto_advance',
   LIVE_CHAT_VISIBLE: 'gofolyx_live_chat_visible',

@@ -225,6 +225,20 @@ export const ReelsScreen: React.FC = () => {
   const SCREEN_H = screenDims.height;
   const HEADER_H = insets.top + 54;
 
+  // insets.bottom peut valoir 0 sur CERTAINS appareils à barre de navigation
+  // système à boutons (confirmé par capture de debug, 2026-11 : un modèle
+  // précis où react-native-safe-area-context ne détecte pas cette barre, alors
+  // qu'elle occupe bien un espace réel et visible à l'écran). windowInsetBottom
+  // compare la hauteur FENÊTRE (zone réellement utilisable par l'app) à la
+  // hauteur ÉCRAN (physique totale, celle utilisée par SCREEN_H) : leur
+  // différence est la vraie hauteur système en bas, indépendamment de ce que
+  // rapporte insets.bottom. On garde le MAX des deux sources — jamais pire
+  // que l'ancien comportement sur les appareils où insets.bottom est fiable
+  // (la plupart), corrige uniquement le cas où il ment.
+  const windowDims = Dimensions.get('window');
+  const windowInsetBottom = Math.max(0, Math.round(screenDims.height - windowDims.height - insets.top));
+  const safeInsetBottom = Math.max(insets.bottom, windowInsetBottom);
+
   // ── Échelle responsive de l'UI overlay ──────────────────────────────────────
   // Toutes les tailles de la surface overlay (colonne d'actions, header, bandes)
   // dérivent d'UN facteur, au lieu d'être figées en px — sinon les icônes
@@ -1562,7 +1576,7 @@ export const ReelsScreen: React.FC = () => {
           screenW={SCREEN_W}
           screenH={SCREEN_H}
           insetTop={insets.top}
-          insetBottom={insets.bottom}
+          insetBottom={safeInsetBottom}
           hasTabBar
           ui={ui}
           onAuthorPress={onAuthorPress}
@@ -1583,7 +1597,7 @@ export const ReelsScreen: React.FC = () => {
         screenW={SCREEN_W}
         screenH={SCREEN_H}
         insetTop={insets.top}
-        insetBottom={insets.bottom}
+        insetBottom={safeInsetBottom}
         colors={colors}
         currentUserId={myId ?? undefined}
         currentUserAvatar={myAvatar ?? undefined}
@@ -2340,7 +2354,9 @@ const AdSlide: React.FC<{ ad: AdData; isActive: boolean; muted: boolean; screenW
     <View style={{ width: screenW, height: screenH, backgroundColor: '#000' }}>
       {/* Fond noir uni derrière le média — plus de thumbnail flouté agrandi. */}
 
-      {/* Média — contain, jamais rogné */}
+      {/* Média — contain, jamais rogné, plein écran (voir VideoSlice.VideoView —
+          même raison : le bloc overlay flotte par-dessus, pas de cadre à faire
+          correspondre). */}
       {isVideo && ad.creative_url ? (
         <VideoView player={player} style={{ position: 'absolute', width: screenW, height: screenH }} resizeMode="contain" controls={false} />
       ) : staticImageUri ? (
@@ -3543,23 +3559,22 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
   // (Accueil/Découvrir/Reels/Profil) flotte en overlay par-dessus la vidéo sur
   // cet écran (voir AppTabBar.tsx) — sans ajouter sa hauteur ici, le titre/
   // description du reel se retrouvait caché dessous.
-  // tabBarBottomPad PLAFONNÉ à 24 — même formule que AppTabBar.tsx (synchronisé
-  // exprès) : sert uniquement à estimer la HAUTEUR de la pilule (tabBarOverlayH),
-  // jamais sa distance réelle au bord de l'écran. Sans ce plafond, un appareil
-  // à barre de navigation système (Samsung) donnait un insetBottom de 40-48px+,
-  // gonflant tabBarOverlayH et poussant actions/texte bien plus haut que
-  // nécessaire au-dessus d'une pilule qui, elle, reste compacte.
+  // tabBarBottomPad PLAFONNÉ à 24 — DOIT rester identique à bottomPad dans
+  // AppTabBar.tsx (la VRAIE pilule reste volontairement compacte sur un
+  // appareil à boutons physiques, capture d'écran déjà confirmée ailleurs :
+  // un insetBottom non plafonné la rendrait démesurée). Le bug ici (2026-11,
+  // nouvelle capture) n'était PAS que la pilule grandissait trop — c'est que
+  // tabBarBottomOffset (ci-dessous, jamais plafonné) montait bien avec
+  // insetBottom, mais qu'une tentative précédente avait retiré ce plafond ICI
+  // sans le retirer dans AppTabBar.tsx, créant un safeBottom qui ne
+  // correspondait plus au dessus réel de la pilule (toujours compacte côté
+  // AppTabBar). Garder les DEUX plafonds strictement synchronisés résout le
+  // vide observé sans jamais recréer la pilule démesurée déjà corrigée.
   const tabBarBottomPad = Platform.OS === 'android' ? Math.min(Math.max(insetBottom, 12), 24) : insetBottom;
   const tabBarOverlayH  = TAB_BAR_HEIGHT + tabBarBottomPad;
   // Position RÉELLE du bas de la pilule — EXACTEMENT la même formule que
   // bottomOffset dans AppTabBar.tsx (même hook useSafeAreaInsets(), donc
-  // insets.bottom identique entre les deux composants). Un plancher fixe à 56
-  // avait été ajouté ici (2026-11) en pensant corriger un chevauchement sur
-  // appareil à boutons physiques, mais ce plancher cassait le collage exact
-  // sur les appareils SANS bouton (confirmé) sans que le chevauchement sur
-  // appareil à boutons soit lié à cette formule — AppTabBar.tsx utilise la
-  // même formule sans plancher et colle correctement sur les deux types
-  // d'appareils partout ailleurs dans l'app. Retiré pour revenir identique.
+  // insets.bottom identique entre les deux composants).
   const tabBarBottomOffset = Math.max(insetBottom - 8, 4);
   const safeBottom    = tabBarBottomOffset + tabBarOverlayH;
   // Barre de commentaire + barre de progression retirées (le tap sur "commenter"
@@ -3583,7 +3598,13 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
           l'espace vide autour du média quel que soit son ratio. */}
 
       {/* Média réel — toujours "contain" : jamais rogné, quel que soit son ratio par
-          rapport à l'écran (portrait strict 9:16, legerement different, ou paysage). */}
+          rapport à l'écran (portrait strict 9:16, legerement different, ou paysage).
+          Plein écran (comme avant) — le bloc nom/description/actions flotte en
+          OVERLAY par-dessus la vidéo (bottom: safeBottom), il n'y a jamais de "bas
+          de cadre vidéo" séparé à faire correspondre. Réduire la hauteur du cadre
+          vidéo lui-même (tenté puis annulé) ne fait que rapetisser la vidéo sans
+          rien résoudre : le letterboxing (bandes noires) vient du RATIO de la
+          vidéo source comparé à l'écran, pas de la zone système en bas. */}
       <VideoView
         player={player}
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: screenW, height: screenH }}

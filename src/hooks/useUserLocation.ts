@@ -14,6 +14,18 @@ export interface UserCoords {
 let lastSyncedCoords: UserCoords | null = null;
 
 /**
+ * Dernière position GPS connue de la session, sans jamais déclencher de
+ * demande de permission — utilisé par CurrencyContext pour la pré-sélection
+ * automatique de la devise locale (cf. useUserCountry) : la détection ne
+ * doit se faire que si un écran avec `enabled=true` (FeedScreen typiquement)
+ * a déjà obtenu la position, jamais provoquer son propre prompt GPS au
+ * lancement de l'app depuis un provider racine.
+ */
+export function getLastKnownCoords(): UserCoords | null {
+  return lastSyncedCoords;
+}
+
+/**
  * `enabled` par defaut a false — ne demande la permission localisation que quand
  * l'appelant l'active explicitement (ex: ouverture d'une section "a proximite"),
  * plutot qu'automatiquement des le montage de l'ecran d'accueil.

@@ -598,6 +598,7 @@ export const Endpoints = {
   currencies: {
     list: `${V1}/currencies`,
     get:  (code: string) => `${V1}/currencies/${code}`,
+    byCountry: (countryCode: string) => `${V1}/currencies/by-country/${countryCode}`,
   },
 
   sounds: {

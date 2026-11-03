@@ -12,6 +12,7 @@ const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 interface CountryCache {
   country_name: string | null;
+  country_code: string | null;
   lat_r: number;
   lon_r: number;
   cachedAt: number;
@@ -43,20 +44,27 @@ function writeCache(c: CountryCache): void {
   try { storage.setItem(STORAGE_KEY, JSON.stringify(c)); } catch {}
 }
 
+export interface UserCountry {
+  countryName: string | null;
+  countryCode: string | null;
+}
+
 /**
- * Déduit automatiquement le nom du pays de l'utilisateur depuis sa position
- * GPS (reverse geocoding côté serveur, jamais demandé explicitement) —
- * utilisé par le carrousel "événements proches / dans ton pays" du feed
- * d'accueil pour comparer à Event.venue_country (normalizeCountryName des
- * deux côtés). Mis en cache localement (24h, position arrondie à 0.1°
- * ~11km) pour ne jamais rappeler l'API à chaque montage tant que
- * l'utilisateur n'a pas significativement changé de position.
+ * Déduit automatiquement le pays de l'utilisateur depuis sa position GPS
+ * (reverse geocoding côté serveur, jamais demandé explicitement) — utilisé
+ * par (1) le carrousel "événements proches / dans ton pays" du feed d'accueil
+ * (countryName, comparé à Event.venue_country via normalizeCountryName des
+ * deux côtés) et (2) la pré-sélection automatique de la devise locale
+ * (countryCode ISO2, cf. CurrencyContext). Mis en cache localement (24h,
+ * position arrondie à 0.1° ~11km) pour ne jamais rappeler l'API à chaque
+ * montage tant que l'utilisateur n'a pas significativement changé de
+ * position.
  */
-export function useUserCountry(coords: UserCoords | null): string | null {
-  const [countryName, setCountryName] = useState<string | null>(() => {
+export function useUserCountry(coords: UserCoords | null): UserCountry {
+  const [country, setCountry] = useState<UserCountry>(() => {
     const cached = readCache();
-    if (!cached || Date.now() - cached.cachedAt > CACHE_TTL_MS) return null;
-    return cached.country_name;
+    if (!cached || Date.now() - cached.cachedAt > CACHE_TTL_MS) return { countryName: null, countryCode: null };
+    return { countryName: cached.country_name, countryCode: cached.country_code };
   });
   const fetchedForRef = useRef<string | null>(null);
 
@@ -70,7 +78,7 @@ export function useUserCountry(coords: UserCoords | null): string | null {
     const cached = readCache();
     if (cached && cached.lat_r === lat_r && cached.lon_r === lon_r && Date.now() - cached.cachedAt <= CACHE_TTL_MS) {
       fetchedForRef.current = key;
-      setCountryName(cached.country_name);
+      setCountry({ countryName: cached.country_name, countryCode: cached.country_code });
       return;
     }
 
@@ -79,10 +87,11 @@ export function useUserCountry(coords: UserCoords | null): string | null {
       Endpoints.utils.geocodeCountry(coords.lat, coords.lon),
     ).then(res => {
       const country_name = res.data?.country_name ?? null;
-      writeCache({ country_name, lat_r, lon_r, cachedAt: Date.now() });
-      setCountryName(country_name);
+      const country_code = res.data?.country_code ?? null;
+      writeCache({ country_name, country_code, lat_r, lon_r, cachedAt: Date.now() });
+      setCountry({ countryName: country_name, countryCode: country_code });
     }).catch(() => {});
   }, [coords?.lat, coords?.lon]);
 
-  return countryName;
+  return country;
 }

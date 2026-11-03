@@ -45,6 +45,7 @@ import { boostPromptService } from '../../services/boostPromptService';
 import { openPhoneMenu } from '../../utils/phoneMenu';
 import { prefetchConcertLive } from '../../utils/livePrefetch';
 import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
+import { FeedLiveConcertPlayer } from '../../components/live/FeedLiveConcertPlayer';
 import { ShareBottomSheet } from '../../components/common/ShareBottomSheet';
 import { RepostBottomSheet } from '../../components/common/RepostBottomSheet';
 import type { UserPublic } from '../../types/user';
@@ -871,7 +872,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   // écran de démarrage, elle n'est pas juste une sollicitation secondaire à
   // étaler dans le temps.
   const userLocation = useUserLocation(true);
-  const userCountry = useUserCountry(userLocation);
+  const { countryName: userCountry } = useUserCountry(userLocation);
   const [filter,      setFilter]      = useState<FeedFilter>('all');
   const [items,       setItems]       = useState<FeedItem[]>([]);
   const [loading,     setLoading]     = useState(true);
@@ -1033,6 +1034,10 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   // automatique") dans ReelSuggestionTile : jamais plus d'une vidéo ne joue à la
   // fois, jamais de lecture du tout si le réglage est désactivé.
   const [activeReelId,      setActiveReelId]      = useState<string | null>(null);
+  // Concert live actuellement visible dans le feed (porté par
+  // onFeedViewableChanged, même mécanisme qu'activeReelId) — déclenche la
+  // lecture vidéo réelle (LiveKit) inline dans sa carte, voir FeedCard.
+  const [activeLiveConcertId, setActiveLiveConcertId] = useState<string | null>(null);
   const [autoplayEnabled,   setAutoplayEnabled]    = useState(() => getAppPreferences().feed_autoplay_reels);
   const [feedFocused,       setFeedFocused]        = useState(true);
   const [feedScrollEnabled, setFeedScrollEnabled]  = useState(true);
@@ -1266,6 +1271,14 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     // → null, ce qui coupe la lecture (cf. ReelSuggestionTile, shouldPlay).
     const visibleReel = viewableItems.find(v => v.item?.kind === 'reel');
     setActiveReelId(visibleReel?.item?.id ?? null);
+
+    // Concert live visible — même principe qu'activeReelId : au plus un live
+    // lit réellement son flux à la fois, limité aux concerts en accès libre
+    // (gated vérifié en temps réel seulement, voir FeedLiveConcertPlayer).
+    const visibleLive = viewableItems.find(v =>
+      v.item?.kind === 'concert' && v.item?.data?.status === 'live' && v.item?.data?.access_type === 'free'
+    );
+    setActiveLiveConcertId(visibleLive?.item?.id ?? null);
 
     // Pub vidéo : ne joue que quand réellement visible à l'écran (coupe le stream sinon)
     setAdVisible(viewableItems.some(v => v.item?.kind === 'ad'));
@@ -2124,6 +2137,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         clearTimeout(timer);
         setFeedFocused(false);
         setActiveReelId(null);
+        setActiveLiveConcertId(null);
       };
     }
     // Retour : refresh silencieux si données > 60s — forceRefresh=true pour
@@ -2137,6 +2151,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
     return () => {
       setFeedFocused(false);
       setActiveReelId(null);
+      setActiveLiveConcertId(null);
       clearSettleTimers();
     };
   }, [filter]));
@@ -2389,6 +2404,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         colors={colors}
         currentUserId={currentUser?.id}
         isFollowing={!!aid && followingSet.has(aid)}
+        isLiveActive={item.kind === 'concert' && activeLiveConcertId === item.id}
         onToggleFollow={() => { if (aid) handleToggleFollow(aid); }}
         onComment={(onCountChange, onCountLoaded) => { commentCountChangeRef.current = onCountChange; commentCountLoadedRef.current = onCountLoaded; openComments(item); }}
         onPress={() => {
@@ -2399,7 +2415,7 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
         onHide={() => setItems(prev => prev.filter(i => !(i.kind === item.kind && i.id === item.id)))}
       />
     );
-  }, [colors, currentUser?.id, followingSet, handleToggleFollow, handlePostDeleted, openComments, nav, load, filter, handleAdImpression, handleAdPress, activeReelId, autoplayEnabled]);
+  }, [colors, currentUser?.id, followingSet, handleToggleFollow, handlePostDeleted, openComments, nav, load, filter, handleAdImpression, handleAdPress, activeReelId, activeLiveConcertId, autoplayEnabled]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -2886,6 +2902,10 @@ interface FeedCardProps {
   colors:    AppColors;
   currentUserId?: string;
   isFollowing: boolean;
+  // Carte concert live actuellement visible dans le scroll — déclenche la
+  // lecture vidéo réelle inline (voir FeedLiveConcertPlayer), jamais pour un
+  // concert payant (accès vérifié en temps réel seulement à l'ouverture).
+  isLiveActive?: boolean;
   onToggleFollow: () => void;
   onComment: (onCountChange: (delta: number) => void, onCountLoaded: (count: number) => void) => void;
   onPress:   () => void;
@@ -3067,7 +3087,7 @@ const cm = StyleSheet.create({
   actionSub:  { fontSize: FontSize.sm, marginTop: 1 },
 });
 
-const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUserId, isFollowing, onToggleFollow, onComment, onPress, onAuthorPress, onHide }) => {
+const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUserId, isFollowing, isLiveActive = false, onToggleFollow, onComment, onPress, onAuthorPress, onHide }) => {
   const nav = useNavigation<Nav>();
   const isEvent  = item.kind === 'event';
   const isConcert = item.kind === 'concert';
@@ -3409,7 +3429,31 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
       {/* ── Media — encadré dans la carte, coins arrondis (radius média = 12) ─ */}
       <View style={fc.mediaWrap}>
         <View style={[fc.mediaClip, videoUrl ? null : { height: BANNER_H }]}>
-          {videoUrl ? (
+          {isLive ? (
+            <TouchableOpacity onPress={onPress} activeOpacity={0.95} style={StyleSheet.absoluteFill}>
+              <FeedLiveConcertPlayer
+                concertId={item.id}
+                thumbnailUrl={thumbUrl}
+                isActive={isLiveActive}
+                muted
+              />
+              {/* Overlay LIVE + viewers — au-dessus du flux vidéo comme sur
+                  LiveConcertCard (carrousel "En direct"), pour une lecture
+                  cohérente que la carte lise réellement ou affiche sa
+                  couverture (carte pas encore active dans le scroll). */}
+              <LinearGradient colors={['rgba(0,0,0,0.45)', 'transparent']} style={fc.liveTopFade} pointerEvents="none" />
+              <View style={fc.liveBadgeRow} pointerEvents="none">
+                <View style={[fc.liveBadge, { backgroundColor: colors.liveTag }]}>
+                  <View style={fc.liveDotSmall} />
+                  <Text style={fc.liveBadgeText}>LIVE</Text>
+                </View>
+                <View style={fc.viewersBadge}>
+                  <Icon name="eye" size={10} color="#fff" />
+                  <Text style={fc.viewersBadgeText}>{concert?.current_viewers ?? 0}</Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          ) : videoUrl ? (
             <InlineVideoPlayer
               uri={videoUrl}
               thumbnailUri={thumbUrl}
@@ -3575,6 +3619,16 @@ const fc = StyleSheet.create({
   // Media — encadré, coins arrondis
   mediaWrap:      { paddingHorizontal: FCPAD, paddingBottom: 10 },
   mediaClip:      { borderRadius: FeedRadius.media, overflow: 'hidden', backgroundColor: '#0d0d1a' },
+  // Overlay concert live inline (FeedLiveConcertPlayer) — même esprit visuel
+  // que LiveConcertCard (carrousel "En direct"), appliqué par-dessus le flux
+  // réel ou sa couverture statique selon isLiveActive.
+  liveTopFade:     { position: 'absolute', top: 0, left: 0, right: 0, height: 40 },
+  liveBadgeRow:    { position: 'absolute', top: 8, left: 8, right: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  liveBadge:       { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5 },
+  liveDotSmall:    { width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#fff' },
+  liveBadgeText:   { color: '#fff', fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold },
+  viewersBadge:    { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 5 },
+  viewersBadgeText:{ color: '#fff', fontSize: FontSize['2xs'], fontWeight: FontWeight.bold },
   // Compteurs
   countsRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: FCPAD, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth },
   countChip:    { flexDirection: 'row', alignItems: 'center', gap: 5 },
