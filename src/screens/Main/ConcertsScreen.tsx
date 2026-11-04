@@ -14,6 +14,7 @@ import { concertService, toastService, showConfirm } from '../../services';
 import type { Concert } from '../../types';
 import type { AppColors } from '../../theme/colors';
 import { concertsStyles as s } from '../../styles/ConcertsScreen.styles';
+import { getConcertEnd, isMultiDay, formatDateRange, daysSpan } from '../../utils/eventTiming';
 
 export const ConcertsScreen: React.FC = () => {
   const { theme } = useTheme();
@@ -51,13 +52,26 @@ export const ConcertsScreen: React.FC = () => {
   useEffect(() => { setLoading(true); load(); }, []);
   useEffect(() => { loadNearby(); }, [loadNearby]);
 
-  const filteredConcerts = searchQuery.trim()
+  const searched = searchQuery.trim()
     ? myConcerts.filter(c =>
         c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (c.venue_city ?? '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (c.genre    ?? '').toLowerCase().includes(searchQuery.toLowerCase()),
       )
     : myConcerts;
+  // En cours/imminents d'abord (du plus proche au plus lointain), terminés en
+  // dernier (du plus récent au plus ancien) — même tri que sortEventsByProximity
+  // côté événements et qu'ExploreConcertsPage.tsx côté web.
+  const filteredConcerts = [...searched].sort((a, b) => {
+    const now = Date.now();
+    const endA = getConcertEnd(a).getTime();
+    const endB = getConcertEnd(b).getTime();
+    const pastA = endA < now, pastB = endB < now;
+    if (pastA !== pastB) return pastA ? 1 : -1;
+    const startA = new Date(a.scheduled_at).getTime();
+    const startB = new Date(b.scheduled_at).getTime();
+    return pastA ? endB - endA : startA - startB;
+  });
 
   const handleToggleSearch = () => {
     if (searchVisible) {
@@ -199,6 +213,10 @@ interface ConcertCardProps { concert: Concert; colors: AppColors; onPress: () =>
 const ConcertCard: React.FC<ConcertCardProps> = ({ concert, colors, onPress, onDelete }) => {
   const isLive     = concert.status === 'live';
   const isFree     = concert.access_type === 'free';
+  const start      = new Date(concert.scheduled_at);
+  const end        = getConcertEnd(concert);
+  const multiDay   = isMultiDay(start, end);
+  const inProgress = !isLive && start <= new Date() && new Date() <= end;
 
   return (
     <TouchableOpacity
@@ -224,13 +242,18 @@ const ConcertCard: React.FC<ConcertCardProps> = ({ concert, colors, onPress, onD
           style={s.thumbOverlay}
         />
 
-        {/* Badge LIVE */}
-        {isLive && (
+        {/* Badge LIVE / En cours */}
+        {isLive ? (
           <View style={[s.liveBadge, { backgroundColor: colors.accentOrange }]}>
             <View style={[s.liveDot, { backgroundColor: colors.textOnBrand }]} />
             <Text style={[s.liveBadgeText, { color: colors.textOnBrand }]}>LIVE</Text>
           </View>
-        )}
+        ) : inProgress ? (
+          <View style={[s.liveBadge, { backgroundColor: '#EF4444' }]}>
+            <View style={[s.liveDot, { backgroundColor: colors.textOnBrand }]} />
+            <Text style={[s.liveBadgeText, { color: colors.textOnBrand }]}>EN COURS</Text>
+          </View>
+        ) : null}
       </View>
 
       {/* Corps */}
@@ -248,10 +271,10 @@ const ConcertCard: React.FC<ConcertCardProps> = ({ concert, colors, onPress, onD
         <View style={s.cardMeta}>
           <View style={s.metaItem}>
             <Icon name="calendar" size={11} color={colors.textTertiary} />
-            <Text style={[s.metaText, { color: colors.textTertiary }]}>
-              {new Date(concert.scheduled_at).toLocaleDateString('fr-FR', {
-                day: 'numeric', month: 'short',
-              })}
+            <Text style={[s.metaText, { color: colors.textTertiary }]} numberOfLines={1}>
+              {multiDay
+                ? `${formatDateRange(start, end)} · ${daysSpan(start, end)} j`
+                : start.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
             </Text>
           </View>
 
@@ -295,6 +318,12 @@ interface NearbyCardProps { concert: Concert; colors: AppColors; onPress: () => 
 
 const NearbyCard: React.FC<NearbyCardProps> = ({ concert, colors, onPress }) => {
   const isLive = concert.status === 'live';
+  const inProgress = !isLive && (() => {
+    const start = new Date(concert.scheduled_at);
+    const end   = getConcertEnd(concert);
+    const now   = new Date();
+    return start <= now && now <= end;
+  })();
   const distLabel = formatDist(concert.distance_km);
 
   return (
@@ -315,13 +344,18 @@ const NearbyCard: React.FC<NearbyCardProps> = ({ concert, colors, onPress }) => 
           </View>
         )}
 
-        {/* Badge LIVE */}
-        {isLive && (
+        {/* Badge LIVE / En cours */}
+        {isLive ? (
           <View style={[s.liveBadge, { backgroundColor: colors.accentOrange }]}>
             <View style={[s.liveDot, { backgroundColor: colors.textOnBrand }]} />
             <Text style={[s.liveBadgeText, { color: colors.textOnBrand }]}>LIVE</Text>
           </View>
-        )}
+        ) : inProgress ? (
+          <View style={[s.liveBadge, { backgroundColor: '#EF4444' }]}>
+            <View style={[s.liveDot, { backgroundColor: colors.textOnBrand }]} />
+            <Text style={[s.liveBadgeText, { color: colors.textOnBrand }]}>EN COURS</Text>
+          </View>
+        ) : null}
 
         {/* Badge distance */}
         {distLabel ? (

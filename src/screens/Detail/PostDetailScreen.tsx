@@ -23,6 +23,7 @@ import { RichText } from '../../components/common/RichText';
 import { InlineVideoPlayer } from '../../components/common/InlineVideoPlayer';
 import { LinkPreviewCard } from '../../components/common/LinkPreviewCard';
 import { useMediaDownload } from '../../hooks/useMediaDownload';
+import { Images } from '../../assets';
 import type { Post } from '../../types/post';
 
 const { width: W } = Dimensions.get('window');
@@ -718,7 +719,11 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
             style={s.actionBtn}
           >
             <Animated.View style={heartStyle}>
-              <MCIcon name={liked ? 'heart' : 'heart-outline'} size={20} color={liked ? colors.primary : colors.textSecondary} />
+              {liked ? (
+                <Image source={Images.reactionLove} style={{ width: 26, height: 26 }} resizeMode="contain" />
+              ) : (
+                <MCIcon name="heart-outline" size={20} color={colors.textSecondary} />
+              )}
             </Animated.View>
             {likeCount > 0 && (
               <Text style={[s.actionBtnTxt, { color: liked ? colors.primary : colors.textSecondary }]}>{fmtN(likeCount)}</Text>
@@ -735,7 +740,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
                 onPress={() => setCommentsOpen(true)}
                 style={s.actionBtn}
               >
-                <MCIcon name="comment-outline" size={20} color={commentCount > 0 ? colors.primary : colors.textSecondary} />
+                <Image source={Images.reactionComment} style={{ width: 26, height: 26 }} resizeMode="contain" />
                 {commentCount > 0 && (
                   <Text style={[s.actionBtnTxt, { color: colors.primary }]}>{fmtN(commentCount)}</Text>
                 )}
@@ -750,20 +755,20 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
             onPress={handleShare}
             style={s.actionBtn}
           >
-            <MCIcon name="share-outline" size={20} color={colors.textSecondary} />
+            <Image source={Images.reactionShare} style={{ width: 26, height: 26 }} resizeMode="contain" />
           </TouchableOpacity>
 
           <View style={[s.actionSep, { backgroundColor: colors.divider }]} />
 
           {/* Repartager — republication dans le fil, distinct du partage
-              externe ci-dessus (icône repeat, jamais share-outline). */}
+              externe ci-dessus (illustration dédiée, jamais share-outline). */}
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={handleRepostPress}
             disabled={reposting}
             style={s.actionBtn}
           >
-            <Icon name="repeat" size={20} color={reposting ? colors.textDisabled : colors.textSecondary} />
+            <Image source={Images.reactionRepost} style={{ width: 26, height: 26, opacity: reposting ? 0.5 : 1 }} resizeMode="contain" />
             {repostCount > 0 && (
               <Text style={[s.actionBtnTxt, { color: colors.textSecondary }]}>{fmtN(repostCount)}</Text>
             )}
@@ -830,7 +835,7 @@ export const PostDetailScreen: React.FC<Props> = ({ postId, initialPost, onBack,
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             style={s.topBtn}
           >
-            <MCIcon name="share-outline" size={22} color={colors.primary} />
+            <Image source={Images.reactionShare} style={{ width: 26, height: 26 }} resizeMode="contain" />
           </TouchableOpacity>
         </View>
       </View>

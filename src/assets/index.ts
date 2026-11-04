@@ -14,6 +14,16 @@ export const Images = {
   liveMatches1v1:        require('./images/1vs1.jpeg'),
   liveMatchesTournament: require('./images/competition.jpeg'),
 
+  // Réactions sociales 3D glossy (fond transparent, palette violet/magenta
+  // Gofolyx) — déco onboarding (OnboardingScreen.tsx::DECO_ICONS) ET barre
+  // d'actions des cartes feed (FeedScreen.tsx, PostCard.tsx).
+  reactionLike:    require('./images/reactions/reaction_like.png'),
+  reactionLove:    require('./images/reactions/reaction_love.png'),
+  reactionShare:   require('./images/reactions/reaction_share.png'),
+  reactionComment: require('./images/reactions/reaction_comment.png'),
+  reactionRepost:  require('./images/reactions/reaction_repost.png'),
+  reactionSave:    require('./images/reactions/reaction_save.png'),
+
   // Placeholders
   // thumbPlaceholder: require('./images/thumb_placeholder.png'),
   // avatarPlaceholder: require('./images/avatar_placeholder.png'),

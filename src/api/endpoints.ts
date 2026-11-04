@@ -36,6 +36,7 @@ export const Endpoints = {
   users: {
     me:             `${V1}/users/me`,
     updateMe:       `${V1}/users/me`,
+    checkPhone:     `${V1}/users/check-phone`,
     generateGofolyxId: `${V1}/users/me/generate-gofolyx-id`,
     watchHistory:   `${V1}/users/me/history`,
     publicProfile:  (id: string) => `${V1}/users/${id}/profile`,
@@ -235,6 +236,14 @@ export const Endpoints = {
     walletCheck:   `${V1}/subscriptions/wallet-check`,
     cancel:        `${V1}/subscriptions/me`,
     history:       `${V1}/subscriptions/history`,
+    entitlements:  `${V1}/subscriptions/entitlements`,
+    consumeDownload: `${V1}/subscriptions/downloads`,
+  },
+  // Écrans simultanés : une session par lecture (battement de coeur ~30 s)
+  playback: {
+    sessions:  `${V1}/playback/sessions`,
+    heartbeat: (id: string) => `${V1}/playback/sessions/${id}/heartbeat`,
+    end:       (id: string) => `${V1}/playback/sessions/${id}`,
   },
 
   // ── Payments (prefix: /api/v1/payments) ───────────────────────────────────

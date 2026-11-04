@@ -4,6 +4,7 @@ import { API_BASE_URL, STORAGE_KEYS } from '../utils/constants';
 import { storage } from '../utils/storage';
 import { downloadToastService } from '../services/downloadToastService';
 import { toastService } from '../services';
+import { playbackService } from '../services/playbackService';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const RNBlobUtil = require('react-native-blob-util').default;
@@ -34,7 +35,7 @@ export function useMediaDownload() {
     return states[id] ?? { progress: 0, localUri: null, downloading: false };
   }, [states]);
 
-  const download = useCallback(async (id: string, url: string, isVideo: boolean) => {
+  const download = useCallback(async (id: string, url: string, isVideo: boolean, opts?: { quota?: boolean }) => {
     if (!url || states[id]?.downloading || states[id]?.localUri) return;
 
     // Aucun MP4 n'est jamais stocké côté serveur — seul le HLS existe. Pour un .m3u8,
@@ -64,6 +65,16 @@ export function useMediaDownload() {
       );
       if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
         toastService.error('Permission refusée', 'Impossible de sauvegarder sans permission.');
+        return;
+      }
+    }
+
+    // Film / épisode : 1 téléchargement du mois est réservé côté serveur AVANT de commencer
+    // (403 si le plan n'en inclut pas ou si le quota est atteint). Les médias sociaux n'en consomment pas.
+    if (opts?.quota) {
+      const q = await playbackService.consumeDownload();
+      if (!q.ok) {
+        toastService.error('Téléchargement indisponible', q.message);
         return;
       }
     }

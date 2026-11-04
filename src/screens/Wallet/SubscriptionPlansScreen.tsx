@@ -11,7 +11,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { subscriptionService } from '../../services/subscriptionService';
 import { toastService } from '../../services/toastService';
 import type { PlanType, Subscription } from '../../types';
-import { PLAN_CONFIG } from '../../types/subscription';
+import { PLAN_CONFIG, planFeatures } from '../../types/subscription';
 
 // ── Plan definitions ──────────────────────────────────────────────────────────
 
@@ -21,31 +21,18 @@ const PLANS: {
   gradient: string[];
   icon: string;
   badge?: string;
-  features: string[];
 }[] = [
   {
     type: 'free',
     label: 'Gratuit',
     gradient: ['#4B5563', '#374151'],
     icon: 'user',
-    features: [
-      '1 écran simultané',
-      'Qualité 480p',
-      'Contenu limité',
-      'Publicités',
-    ],
   },
   {
     type: 'basic',
     label: 'Basic',
     gradient: ['#3B82F6', '#2563EB'],
     icon: 'star',
-    features: [
-      '1 écran simultané',
-      'Qualité HD 720p',
-      'Sans publicité',
-      'Catalogue complet',
-    ],
   },
   {
     type: 'premium',
@@ -53,28 +40,12 @@ const PLANS: {
     gradient: ['#7B3FF2', '#E0389A'],
     icon: 'zap',
     badge: 'POPULAIRE',
-    features: [
-      '2 écrans simultanés',
-      'Qualité Full HD 1080p',
-      '3 profils',
-      '10 téléchargements',
-      'Sans publicité',
-      'Accès anticipé',
-    ],
   },
   {
     type: 'family',
     label: 'Famille',
     gradient: ['#F59E0B', '#FF8C00'],
     icon: 'users',
-    features: [
-      '5 écrans simultanés',
-      'Qualité 4K Ultra HD',
-      '6 profils',
-      '30 téléchargements',
-      'Contrôle parental',
-      'Partage famille',
-    ],
   },
 ];
 
@@ -212,7 +183,7 @@ export default function SubscriptionPlansScreen() {
 
               {/* Features */}
               <View style={s.features}>
-                {plan.features.map(f => (
+                {planFeatures(plan.type).map(f => (
                   <View key={f} style={s.featureRow}>
                     <Icon name="check" size={14} color={plan.gradient[0]} />
                     <Text style={[s.featureText, { color: colors.textSecondary }]}>{f}</Text>

@@ -55,8 +55,10 @@ function getIndex(): CacheIndex {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+// Durci 2026-11 ("miser sur le cache", éviter tout doublon évitable) — voir
+// reelVideoCacheService.ts::normalizeUrl pour le détail des cas couverts.
 function normalizeUrl(url: string): string {
-  return url.split('?')[0];
+  return url.split('?')[0].split('#')[0].replace(/\/+$/, '').toLowerCase();
 }
 
 function urlToFilename(url: string): string {

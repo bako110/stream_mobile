@@ -176,8 +176,8 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onNeedsVerificati
                 setLoading(true);
                 try {
                   const id = isEmail ? identifier.trim() : `${country.dial}${identifier.trim()}`;
-                  await authService.reactivate(id, password);
-                  onLoginSuccess();
+                  const result = await authService.reactivate(id, password);
+                  onLoginSuccess(result.user.profile_incomplete);
                 } catch (err: any) {
                   setError(err?.message ?? 'Impossible de réactiver le compte.');
                 } finally {
@@ -202,7 +202,7 @@ export const LoginScreen: React.FC<Props> = ({ onLoginSuccess, onNeedsVerificati
     return (
       <PhoneOtpScreen
         mode="login"
-        onSuccess={() => { setShowPhoneOtp(false); onLoginSuccess(); }}
+        onSuccess={(result) => { setShowPhoneOtp(false); onLoginSuccess(result.profileIncomplete); }}
         onGoBack={() => setShowPhoneOtp(false)}
       />
     );

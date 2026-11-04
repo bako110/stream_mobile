@@ -71,7 +71,7 @@ const RegisterWrapper: React.FC<{ onAuthSuccess: () => void }> = ({ onAuthSucces
   );
 };
 
-const VerifyRegistrationWrapper: React.FC<{ onAuthSuccess: () => void }> = ({ onAuthSuccess }) => {
+const VerifyRegistrationWrapper: React.FC<{ onAuthSuccess: (profileIncomplete?: boolean) => void }> = ({ onAuthSuccess }) => {
   const nav = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
   const route = useRoute<RouteProp<AuthStackParamList, 'VerifyRegistration'>>();
   const { userId, identifier, password } = route.params;
@@ -128,7 +128,7 @@ export const AuthNavigator: React.FC<Props> = ({ onAuthSuccess, initialBlockedIn
     <Stack.Screen name="QRLogin" options={{ animation: 'slide_from_bottom', presentation: 'fullScreenModal' }}>
       {({ navigation }) => (
         <QRScannerScreen
-          onLoginSuccess={() => { navigation.goBack(); onAuthSuccess(); }}
+          onLoginSuccess={(profileIncomplete) => { navigation.goBack(); onAuthSuccess(profileIncomplete); }}
           onClose={() => navigation.goBack()}
         />
       )}

@@ -18,6 +18,7 @@ import { eventService, concertService } from '../../services';
 import type { Event } from '../../types/event';
 import type { Concert } from '../../types/concert';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
+import { getConcertEnd } from '../../utils/eventTiming';
 
 // ── Item unifié événement/concert ───────────────────────────────────────────
 // Mélange des deux types sur cet écran (comme le carrousel "Près de chez toi"
@@ -28,12 +29,27 @@ type NearbyItem = { kind: 'event'; data: Event } | { kind: 'concert'; data: Conc
 function itemStartDate(item: NearbyItem): string {
   return item.kind === 'event' ? (item.data.starts_at ?? '') : item.data.scheduled_at;
 }
-function sortByStartDate(items: NearbyItem[]): NearbyItem[] {
-  return [...items].sort((a, b) => {
-    const ta = new Date(itemStartDate(a)).getTime();
-    const tb = new Date(itemStartDate(b)).getTime();
-    return (isNaN(ta) ? Infinity : ta) - (isNaN(tb) ? Infinity : tb);
-  });
+// Fin réelle (fenêtre "en cours") de l'item — ends_at pour un événement (sinon
+// +24h après le début, un festival type SIAO reste donc "en cours" tant qu'on
+// est dans sa plage), fin calculée via duration_min pour un concert.
+function itemEndDate(item: NearbyItem): number {
+  if (item.kind === 'concert') return getConcertEnd(item.data).getTime();
+  const start = new Date(item.data.starts_at ?? '').getTime();
+  if (isNaN(start)) return -Infinity;
+  const endsAt = item.data.ends_at;
+  return endsAt ? new Date(endsAt).getTime() : start + 24 * 3600_000;
+}
+// Seuls les événements/concerts en cours ou à venir — jamais les passés, même
+// à proximité. Tri : en cours/à venir du plus proche au plus lointain.
+function filterAndSortUpcoming(items: NearbyItem[]): NearbyItem[] {
+  const now = Date.now();
+  return items
+    .filter(it => itemEndDate(it) >= now)
+    .sort((a, b) => {
+      const ta = new Date(itemStartDate(a)).getTime();
+      const tb = new Date(itemStartDate(b)).getTime();
+      return (isNaN(ta) ? Infinity : ta) - (isNaN(tb) ? Infinity : tb);
+    });
 }
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
@@ -80,6 +96,13 @@ function isEventOngoingNow(startsAt?: string | null, endsAt?: string | null): bo
     return now >= start && now <= end;
   }
   return now >= start && now <= start + 24 * 3600_000;
+}
+// Concert "en cours" — même fenêtre que itemEndDate (scheduled_at → fin
+// calculée via duration_min).
+function isConcertOngoingNow(item: Concert): boolean {
+  const start = new Date(item.scheduled_at).getTime();
+  const now = Date.now();
+  return now >= start && now <= getConcertEnd(item).getTime();
 }
 
 // ── Card composant ────────────────────────────────────────────────────────────
@@ -248,6 +271,7 @@ const ConcertCard: React.FC<{ item: Concert; colors: any; onPress: () => void }>
   const dist = item.distance_km;
   const distLabel = formatDist(dist);
   const isFree = item.access_type === 'free' || (item.ticket_price == null && item.access_type !== 'ticket');
+  const isOngoing = isConcertOngoingNow(item);
 
   const scale = useSharedValue(1);
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
@@ -306,6 +330,12 @@ const ConcertCard: React.FC<{ item: Concert; colors: any; onPress: () => void }>
                   <Text style={st.coverDate}>
                     {formatDate(item.scheduled_at)} · {formatTime(item.scheduled_at)}
                   </Text>
+                  {isOngoing && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 4 }}>
+                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#36D9A0' }} />
+                      <Text style={{ color: '#36D9A0', fontSize: FontSize.xs, fontWeight: FontWeight.extraBold }}>En cours</Text>
+                    </View>
+                  )}
                 </View>
               )}
             </View>
@@ -407,7 +437,7 @@ export const NearbyEventsScreen: React.FC = () => {
         ...ev.map(data => ({ kind: 'event' as const, data })),
         ...conc.map(data => ({ kind: 'concert' as const, data })),
       ];
-      setItems(prev => sortByStartDate(replace ? fresh : [...prev, ...fresh]));
+      setItems(prev => filterAndSortUpcoming(replace ? fresh : [...prev, ...fresh]));
       setHasMore(ev.length >= PAGE_LIMIT || conc.length >= PAGE_LIMIT);
       setPage(p);
     } finally {

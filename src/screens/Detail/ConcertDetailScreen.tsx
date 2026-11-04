@@ -19,6 +19,8 @@ import { TicketPaymentSheet } from '../../components/wallet/TicketPaymentSheet';
 import { concertService, socialService, authService, toastService, showConfirm } from '../../services';
 import { favoriteService } from '../../services/favoriteService';
 import { prefetchConcertLive } from '../../utils/livePrefetch';
+import { getConcertEnd, isMultiDay, formatDateRange, daysSpan } from '../../utils/eventTiming';
+import { Images } from '../../assets';
 import type { Concert } from '../../types';
 import type { AppColors } from '../../theme/colors';
 import { useNavigation } from '@react-navigation/native';
@@ -503,6 +505,15 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
   const hasVideo    = !!(concert.hls_url ?? concert.video_url);
   const hasReplay   = isEnded && !!replayUrl;
 
+  // Concert multi-jours (ex. festival type SIAO sur 8 j) : reste "En cours"
+  // tant que now est dans scheduled_at→fin, pas seulement le jour du début —
+  // même logique que ConcertsScreen.tsx/MyConcertsScreen.tsx et le web
+  // (ExploreConcertsPage.tsx ConcertCard.inProgress).
+  const concertStart = new Date(concert.scheduled_at);
+  const concertEnd   = getConcertEnd(concert);
+  const multiDay      = isMultiDay(concertStart, concertEnd);
+  const isOngoingByDate = !isLive && !isEnded && concertStart <= new Date() && new Date() <= concertEnd;
+
   const scheduledIn = (() => {
     if (!isScheduled || !concert.scheduled_at) return null;
     const diff = new Date(concert.scheduled_at).getTime() - Date.now();
@@ -573,7 +584,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
         {showVideo && hasVideo && <VideoModal uri={(concert.hls_url ?? concert.video_url)!} onClose={() => setShowVideo(false)} />}
 
         {/* ── Live / Replay / Schedulé ─────────────────────────────── */}
-        {(isLive || isScheduled || hasReplay || (isEnded && concert.live_id && !hasReplay)) && (
+        {(isLive || isScheduled || hasReplay || isOngoingByDate || (isEnded && concert.live_id && !hasReplay)) && (
           <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4, gap: 10 }}>
             {isLive && (
               <TouchableOpacity onPress={handleWatchLive} activeOpacity={0.88}>
@@ -585,6 +596,15 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
                   </View>
                 </View>
               </TouchableOpacity>
+            )}
+            {!isLive && isOngoingByDate && (
+              <View style={[ds.infoBanner, { borderColor: '#EF444455', backgroundColor: '#EF444410' }]}>
+                <Icon name="radio" size={20} color="#EF4444" />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: FontSize.base, fontWeight: FontWeight.extraBold, color: '#EF4444' }}>En cours</Text>
+                  {multiDay && <Text style={{ fontSize: FontSize.sm, color: colors.textSecondary, marginTop: 2 }}>Jusqu'au {formatDate(concertEnd.toISOString())}</Text>}
+                </View>
+              </View>
             )}
             {isScheduled && (
               <View style={[ds.infoBanner, { borderColor: colors.primary + '55', backgroundColor: colors.primary + '10' }]}>
@@ -618,7 +638,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
             <Icon name="calendar" size={13} color={colors.primary} />
             <View>
               <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.extraBold, color: colors.primary }}>
-                {formatDate(concert.scheduled_at)}
+                {multiDay ? `${formatDateRange(concertStart, concertEnd)} · ${daysSpan(concertStart, concertEnd)} j` : formatDate(concert.scheduled_at)}
               </Text>
               <Text style={{ fontSize: FontSize.xsPlus, color: colors.textTertiary, marginTop: 1 }}>
                 {formatTime(concert.scheduled_at)}
@@ -646,7 +666,11 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
         <View style={[ds.socialBar, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
           <TouchableOpacity style={ds.socialBtn} onPress={handleLike} activeOpacity={0.7}>
             <Animated.View style={heartStyle}>
-              <MCIcon name={liked ? 'heart' : 'heart-outline'} size={21} color={liked ? '#7B3FF2' : colors.textTertiary} />
+              {liked ? (
+                <Image source={Images.reactionLove} style={{ width: 27, height: 27 }} resizeMode="contain" />
+              ) : (
+                <MCIcon name="heart-outline" size={21} color={colors.textTertiary} />
+              )}
             </Animated.View>
             {likeCount > 0 && (
               <Text style={[ds.socialBtnText, { color: liked ? '#7B3FF2' : colors.textTertiary, fontWeight: liked ? '700' : '500' }]}>
@@ -657,12 +681,12 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
           {!concert?.comments_disabled && <View style={[ds.socialSep, { backgroundColor: colors.divider }]} />}
           {!concert?.comments_disabled && (
             <TouchableOpacity style={ds.socialBtn} onPress={() => setShowComments(true)} activeOpacity={0.7}>
-              <MCIcon name="comment-outline" size={21} color={colors.textTertiary} />
+              <Image source={Images.reactionComment} style={{ width: 27, height: 27 }} resizeMode="contain" />
             </TouchableOpacity>
           )}
           <View style={[ds.socialSep, { backgroundColor: colors.divider }]} />
           <TouchableOpacity style={ds.socialBtn} onPress={handleSharePress} activeOpacity={0.7}>
-            <MCIcon name="share-outline" size={21} color={shareCount > 0 ? colors.primary : colors.textTertiary} />
+            <Image source={Images.reactionShare} style={{ width: 27, height: 27 }} resizeMode="contain" />
             {shareCount > 0 && (
               <Text style={[ds.socialBtnText, { color: colors.textTertiary }]}>
                 {shareCount > 999 ? `${(shareCount / 1000).toFixed(1)}k` : shareCount}
@@ -671,7 +695,7 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
           </TouchableOpacity>
           <View style={[ds.socialSep, { backgroundColor: colors.divider }]} />
           <TouchableOpacity style={ds.socialBtn} onPress={handleRepostPress} disabled={reposting} activeOpacity={0.7}>
-            <Icon name="repeat" size={20} color={colors.textTertiary} />
+            <Image source={Images.reactionRepost} style={{ width: 27, height: 27, opacity: reposting ? 0.5 : 1 }} resizeMode="contain" />
             {repostCount > 0 && (
               <Text style={[ds.socialBtnText, { color: colors.textTertiary }]}>
                 {repostCount > 999 ? `${(repostCount / 1000).toFixed(1)}k` : repostCount}
@@ -681,7 +705,11 @@ export const ConcertDetailScreen: React.FC<Props> = ({ concertId, onBack }) => {
           <View style={[ds.socialSep, { backgroundColor: colors.divider }]} />
           <TouchableOpacity style={[ds.socialBtn, { flex: 0, paddingHorizontal: 18 }]} onPress={handleSave} activeOpacity={0.7}>
             <Animated.View style={saveStyle}>
-              <MCIcon name={saved ? 'bookmark' : 'bookmark-outline'} size={21} color={saved ? colors.primary : colors.textTertiary} />
+              {saved ? (
+                <Image source={Images.reactionSave} style={{ width: 27, height: 27 }} resizeMode="contain" />
+              ) : (
+                <MCIcon name="bookmark-outline" size={21} color={colors.textTertiary} />
+              )}
             </Animated.View>
           </TouchableOpacity>
         </View>

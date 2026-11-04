@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  StatusBar, ActivityIndicator, Image,
+  StatusBar, ActivityIndicator, Image, Alert,
 } from 'react-native';
 import { VideoView, useVideoPlayer } from 'react-native-video';
 import Icon from 'react-native-vector-icons/Feather';
@@ -11,6 +11,7 @@ import { Endpoints } from '../../api/endpoints';
 import { getPlaybackPrefs } from '../../hooks/usePlaybackPrefs';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
 import { useMediaDownload } from '../../hooks/useMediaDownload';
+import { playbackService } from '../../services/playbackService';
 import { GofolyxLoader } from '../../components/common';
 
 interface Props {
@@ -73,6 +74,19 @@ export const VideoPlayerScreen: React.FC<Props> = ({ route, navigation }) => {
     return () => { subBuffer.remove(); subReady.remove(); };
   }, []);
 
+  // Écrans simultanés : le serveur compte cet écran tant que le lecteur est ouvert (battement 30 s).
+  // Plan déjà au maximum → on coupe la lecture et on ferme l'écran.
+  useEffect(() => {
+    let stop: (() => void) | null = null;
+    let unmounted = false;
+    playbackService.track(message => {
+      if (unmounted) return;
+      player.pause();
+      Alert.alert("Trop d'écrans en lecture", message, [{ text: 'OK', onPress: () => navigation.goBack() }], { cancelable: false });
+    }).then(fn => { if (unmounted) fn(); else stop = fn; });
+    return () => { unmounted = true; stop?.(); };
+  }, []);
+
   // Sauvegarde de la progression toutes les 15 secondes
   useEffect(() => {
     if (!videoId) return;
@@ -92,7 +106,8 @@ export const VideoPlayerScreen: React.FC<Props> = ({ route, navigation }) => {
     return () => { if (progressTimer.current) clearInterval(progressTimer.current); };
   }, [videoId, contentId, episodeId, contentType, title, thumbnailUrl, totalSeconds]);
 
-  const handleDownload = () => startDl(videoId ?? contentId ?? episodeId ?? url, url, true);
+  // Téléchargement d'un film / épisode : décompté du quota mensuel du plan (voir useMediaDownload).
+  const handleDownload = () => startDl(videoId ?? contentId ?? episodeId ?? url, url, true, { quota: true });
 
   return (
     <View style={s.container}>

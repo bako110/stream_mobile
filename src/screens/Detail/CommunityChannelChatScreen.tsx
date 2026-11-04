@@ -1041,36 +1041,45 @@ export const CommunityChannelChatScreen: React.FC = () => {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Menu pièces jointes */}
-      <Modal visible={attachOpen} transparent animationType="slide" onRequestClose={() => setAttachOpen(false)}>
-        <Pressable style={C.overlay} onPress={() => setAttachOpen(false)}>
-          <Pressable style={[C.attachSheet, { backgroundColor: colors.surface }]} onPress={() => {}}>
-            <View style={[C.sheetHandle, { backgroundColor: colors.divider }]} />
-            <Text style={[C.attachTitle, { color: colors.textPrimary }]}>Envoyer</Text>
-            <View style={C.attachGrid}>
-              {[
-                { icon: 'image',      label: 'Galerie',       color: '#7B3FF2', onPress: handlePickImage },
-                { icon: 'camera',     label: 'Appareil photo',color: '#10B981', onPress: handlePickCamera },
-                { icon: 'video',      label: 'Vidéo',         color: '#9C27B0', onPress: handlePickVideo },
-                { icon: 'headphones', label: 'Audio',         color: '#F59E0B', onPress: handlePickAudio },
-                { icon: 'file-text',  label: 'Fichier',       color: '#3B82F6', onPress: handlePickFile },
-                { icon: 'map-pin',    label: 'Localisation',  color: '#EF4444', onPress: handleSendLocation },
-              ].map(item => (
-                <TouchableOpacity key={item.label} style={C.attachItem} onPress={item.onPress} activeOpacity={0.8}>
-                  <View style={[C.attachIconBox, { backgroundColor: item.color + '18' }]}>
-                    <Icon name={item.icon} size={24} color={item.color} />
-                  </View>
-                  <Text style={[C.attachLabel, { color: colors.textSecondary }]}>{item.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <View style={{ height: Platform.OS === 'ios' ? 20 : 8 }} />
-          </Pressable>
-        </Pressable>
+      {/* Menu pièces jointes — sheet en position absolute/bottom:0 (même
+          structure que ShareBottomSheet.tsx, qui ancre toujours correctement
+          en bas) plutôt que justifyContent:'flex-end' sur un conteneur flex :
+          avec android:windowSoftInputMode="adjustResize" (manifest), un sheet
+          positionné par flexbox héritait de la hauteur de fenêtre REDIMENSIONNÉE
+          par le clavier (focus encore actif sur le champ message juste avant
+          l'ouverture), le comprimant vers le haut au lieu de l'ancrer au vrai
+          bas de l'écran — bug confirmé par capture d'écran. position:absolute
+          avec bottom:0 n'a pas ce problème : il s'ancre au bord réel du
+          conteneur Modal (statusBarTranslucent → plein écran), peu importe
+          l'état du clavier. */}
+      <Modal visible={attachOpen} transparent statusBarTranslucent animationType="fade" onRequestClose={() => setAttachOpen(false)}>
+        <Pressable style={C.attachBackdrop} onPress={() => setAttachOpen(false)} />
+        <View style={[C.attachSheet, { backgroundColor: colors.surface, paddingBottom: (Platform.OS === 'ios' ? 20 : 8) + insets.bottom }]}>
+          <View style={[C.sheetHandle, { backgroundColor: colors.divider }]} />
+          <Text style={[C.attachTitle, { color: colors.textPrimary }]}>Envoyer</Text>
+          <View style={C.attachGrid}>
+            {[
+              { icon: 'image',      label: 'Galerie',       color: '#7B3FF2', onPress: handlePickImage },
+              { icon: 'camera',     label: 'Appareil photo',color: '#10B981', onPress: handlePickCamera },
+              { icon: 'video',      label: 'Vidéo',         color: '#9C27B0', onPress: handlePickVideo },
+              { icon: 'headphones', label: 'Audio',         color: '#F59E0B', onPress: handlePickAudio },
+              { icon: 'file-text',  label: 'Fichier',       color: '#3B82F6', onPress: handlePickFile },
+              { icon: 'map-pin',    label: 'Localisation',  color: '#EF4444', onPress: handleSendLocation },
+            ].map(item => (
+              <TouchableOpacity key={item.label} style={C.attachItem} onPress={item.onPress} activeOpacity={0.8}>
+                <View style={[C.attachIconBox, { backgroundColor: item.color + '18' }]}>
+                  <Icon name={item.icon} size={24} color={item.color} />
+                </View>
+                <Text style={[C.attachLabel, { color: colors.textSecondary }]}>{item.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
       </Modal>
 
-      {/* Context menu message */}
-      <Modal visible={!!menuMsg} transparent animationType="fade" onRequestClose={() => setMenuMsg(null)}>
+      {/* Context menu message — statusBarTranslucent (même raison que le menu
+          pièces jointes ci-dessus). */}
+      <Modal visible={!!menuMsg} transparent statusBarTranslucent animationType="fade" onRequestClose={() => setMenuMsg(null)}>
         <Pressable style={C.overlay} onPress={() => setMenuMsg(null)}>
           <View style={[C.menuSheet, { backgroundColor: colors.surface, paddingBottom: (Platform.OS === 'ios' ? 36 : 20) + insets.bottom }]}>
             {menuMsg?.message_type === 'text' && (
@@ -1274,7 +1283,8 @@ const C = StyleSheet.create({
   menuItemIcon:   { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   menuItemText:   { fontSize: FontSize.basePlus, fontWeight: FontWeight.medium },
 
-  attachSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12, paddingHorizontal: 16 },
+  attachBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
+  attachSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12, paddingHorizontal: 16 },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
   attachTitle: { fontSize: FontSize.md, fontWeight: FontWeight.extraBold, marginBottom: 16, textAlign: 'center' },
   attachGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center', marginBottom: 8 },

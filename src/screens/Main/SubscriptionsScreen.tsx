@@ -12,7 +12,7 @@ import { AppHeader, SkeletonSubscriptions, PriceWithLocal } from '../../componen
 import { toastService, showConfirm } from '../../services';
 import { subscriptionService, WalletCheck } from '../../services/subscriptionService';
 import type { Subscription, PlanType } from '../../types';
-import { PLAN_CONFIG } from '../../types/subscription';
+import { PLAN_CONFIG, planFeatures } from '../../types/subscription';
 
 // ── Config plans alignée sur backend (basic / premium / family) ────────────────
 const PLAN_COLORS: Record<string, string[]> = {
@@ -29,12 +29,9 @@ const PLAN_LABELS: Record<string, string> = {
   family:  'Family',
 };
 
-const PLAN_FEATURES: Record<string, string[]> = {
-  free:    ['480p', '1 écran', '1 profil', 'Sans téléchargement'],
-  basic:   ['HD 720p', '1 écran', '1 profil', 'Sans téléchargement'],
-  premium: ['Full HD 1080p', '2 écrans simultanés', '3 profils', '10 téléchargements'],
-  family:  ['4K Ultra HD', '5 écrans simultanés', '6 profils', '30 téléchargements'],
-};
+const PLAN_FEATURES: Record<string, string[]> = Object.fromEntries(
+  (['free', 'basic', 'premium', 'family'] as PlanType[]).map(p => [p, planFeatures(p)]),
+);
 
 const PAID_PLANS: PlanType[] = ['basic', 'premium', 'family'];
 

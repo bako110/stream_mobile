@@ -11,7 +11,7 @@ import { BackButton, ShareBottomSheet, PriceWithLocal } from '../../components/c
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
-import { contentService, toastService, showConfirm } from '../../services';
+import { contentService, toastService, showConfirm, playbackService } from '../../services';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import type { VideoMeta } from '../../types';
@@ -233,8 +233,10 @@ export const FilmDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       setLaunching(true);
       const totalSeconds = defaultVideo!.duration_sec ?? undefined;
       const isNearEnd = !!totalSeconds && watchProgressSec >= totalSeconds * 0.9;
+      // Variante autorisée par le plan (ex. gratuit → 480p), sinon le flux maître.
+      const ent = await playbackService.getEntitlements();
       navigation.navigate('VideoPlayer', {
-        url:         defaultVideo!.hls_url!,
+        url:         playbackService.pickUrl(defaultVideo, ent?.max_height) ?? defaultVideo!.hls_url!,
         title:       item.title,
         videoId:     defaultVideo!.id,
         contentId:   item.id,

@@ -56,6 +56,7 @@ export const STORAGE_KEYS = {
   ACCOUNTS:       'gofolyx_accounts_v1',
   REELS_AUTO_ADVANCE: 'gofolyx_reels_auto_advance',
   LIVE_CHAT_VISIBLE: 'gofolyx_live_chat_visible',
+  REELS_SEEN_COUNT: 'gofolyx_reels_seen_count',
 } as const;
 
 // ── Multi-compte ───────────────────────────────────────────────────────────

@@ -7,7 +7,7 @@
  * non demandés.
  */
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withSequence, withTiming } from 'react-native-reanimated';
 import MCIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useTheme } from '../../hooks/useTheme';
@@ -16,6 +16,7 @@ import { socialService } from '../../services/socialService';
 import { favoriteService } from '../../services/favoriteService';
 import { saveService } from '../../services/saveService';
 import { CommentsBottomSheet } from '../common/CommentsBottomSheet';
+import { Images } from '../../assets';
 import type { AdData } from './types';
 
 const fmtCount = (n: number) => {
@@ -101,11 +102,11 @@ export const AdSocialBar: React.FC<Props> = ({ ad, showDivider = true }) => {
           hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
         >
           <Animated.View style={[s.row, heartStyle]}>
-            <MCIcon
-              name={liked ? 'heart' : 'heart-outline'}
-              size={FeedActionIcon.size}
-              color={liked ? colors.likeActive : colors.textSecondary}
-            />
+            {liked ? (
+              <Image source={Images.reactionLove} style={{ width: FeedActionIcon.size + 6, height: FeedActionIcon.size + 6 }} resizeMode="contain" />
+            ) : (
+              <MCIcon name="heart-outline" size={FeedActionIcon.size} color={colors.textSecondary} />
+            )}
             {likeCount > 0 && (
               <Text style={[s.count, { color: liked ? colors.likeActive : colors.textSecondary }]}>
                 {fmtCount(likeCount)}
@@ -121,7 +122,7 @@ export const AdSocialBar: React.FC<Props> = ({ ad, showDivider = true }) => {
           hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
         >
           <View style={s.row}>
-            <MCIcon name="comment-outline" size={FeedActionIcon.size} color={colors.textSecondary} />
+            <Image source={Images.reactionComment} style={{ width: FeedActionIcon.size + 6, height: FeedActionIcon.size + 6 }} resizeMode="contain" />
             {commentCount > 0 && (
               <Text style={[s.count, { color: colors.textSecondary }]}>{fmtCount(commentCount)}</Text>
             )}
@@ -134,11 +135,11 @@ export const AdSocialBar: React.FC<Props> = ({ ad, showDivider = true }) => {
           activeOpacity={0.7}
           hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
         >
-          <MCIcon
-            name={saved ? 'bookmark' : 'bookmark-outline'}
-            size={FeedActionIcon.size}
-            color={saved ? colors.textPrimary : colors.textSecondary}
-          />
+          {saved ? (
+            <Image source={Images.reactionSave} style={{ width: FeedActionIcon.size + 6, height: FeedActionIcon.size + 6 }} resizeMode="contain" />
+          ) : (
+            <MCIcon name="bookmark-outline" size={FeedActionIcon.size} color={colors.textSecondary} />
+          )}
         </TouchableOpacity>
       </View>
 

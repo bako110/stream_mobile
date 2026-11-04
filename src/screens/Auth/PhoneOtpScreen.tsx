@@ -35,7 +35,7 @@ export type PhoneOtpMode = 'login' | 'forgot' | 'verify';
 
 interface Props {
   mode:          PhoneOtpMode;
-  onSuccess:     (result: { isNewUser?: boolean }) => void;
+  onSuccess:     (result: { isNewUser?: boolean; profileIncomplete?: boolean }) => void;
   onGoBack:      () => void;
   firstName?:    string;
   lastName?:     string;
@@ -123,7 +123,7 @@ export const PhoneOtpScreen: React.FC<Props> = ({
       }
 
       const result = await phoneAuthService.verifyOtp(otp, { firstName, lastName, referralCode });
-      onSuccess({ isNewUser: result.is_new_user });
+      onSuccess({ isNewUser: result.is_new_user, profileIncomplete: result.profile_incomplete });
     } catch (e: any) {
       setError(e?.response?.data?.detail ?? e?.message ?? 'Code incorrect ou expiré.');
     } finally { setLoading(false); }

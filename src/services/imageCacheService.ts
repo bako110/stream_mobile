@@ -9,8 +9,12 @@ import { storage } from '../utils/storage';
 const CACHE_DIR     = `${RNBlobUtil.fs.dirs.CacheDir}/gofolyx_images`;
 const INDEX_KEY      = 'image_cache_index';
 const INDEX_KEY_BAK  = 'image_cache_index_bak';
-const MAX_AGE_MS     = 7 * 24 * 3600 * 1000; // 7 jours
-const MAX_SIZE_B     = 120 * 1024 * 1024;     // 120 Mo
+// 21 jours / 250 Mo (étendus 2026-11, demande explicite "miser sur le cache"
+// pour économiser la data mobile) — les images sont légères par rapport aux
+// vidéos, un plafond plus généreux coûte peu de stockage pour beaucoup moins
+// de retéléchargements (avatars, miniatures vus en boucle dans le feed).
+const MAX_AGE_MS     = 21 * 24 * 3600 * 1000; // 21 jours
+const MAX_SIZE_B     = 250 * 1024 * 1024;     // 250 Mo
 
 interface CacheEntry { path: string; size: number; ts: number; }
 type CacheIndex = Record<string, CacheEntry>;
@@ -43,8 +47,10 @@ function getIndex(): CacheIndex {
   return _index;
 }
 
+// Durci 2026-11 ("miser sur le cache", éviter tout doublon évitable) — voir
+// reelVideoCacheService.ts::normalizeUrl pour le détail des cas couverts.
 function normalizeUrl(url: string): string {
-  return url.split('?')[0];
+  return url.split('?')[0].split('#')[0].replace(/\/+$/, '').toLowerCase();
 }
 
 function urlToFilename(url: string): string {

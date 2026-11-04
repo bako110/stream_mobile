@@ -34,6 +34,7 @@ import { FriendsWhoLiked } from './FriendsWhoLiked';
 import { LinkPreviewCard } from './LinkPreviewCard';
 import { CachedImage } from './CachedImage';
 import { AvatarWithBadge } from './AvatarWithBadge';
+import { Images } from '../../assets';
 
 const { width: SW } = Dimensions.get('window');
 // Largeur du contenu média DANS la carte flottante : largeur écran moins les deux
@@ -266,8 +267,11 @@ const VideoFsModal: React.FC<{
             <TouchableOpacity style={pc.vfActionBtn} onPress={onLike} activeOpacity={0.7}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
               <Animated.View style={heartStyle}>
-                <MCIcon name={liked ? 'heart' : 'heart-outline'} size={FeedActionIcon.size}
-                  color={liked ? '#EF4444' : '#fff'} />
+                {liked ? (
+                  <Image source={Images.reactionLove} style={{ width: FeedActionIcon.size + 6, height: FeedActionIcon.size + 6 }} resizeMode="contain" />
+                ) : (
+                  <MCIcon name="heart-outline" size={FeedActionIcon.size} color="#fff" />
+                )}
               </Animated.View>
               {likeCount > 0 && <Text style={pc.vfActionCount}>{fmtN(likeCount)}</Text>}
             </TouchableOpacity>
@@ -277,7 +281,7 @@ const VideoFsModal: React.FC<{
                 <View style={pc.vfActionSep} />
                 <TouchableOpacity style={pc.vfActionBtn} onPress={onComment} activeOpacity={0.7}
                   hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                  <MCIcon name="comment-outline" size={FeedActionIcon.size} color="#fff" />
+                  <Image source={Images.reactionComment} style={{ width: FeedActionIcon.size + 6, height: FeedActionIcon.size + 6 }} resizeMode="contain" />
                   {commentCount > 0 && <Text style={pc.vfActionCount}>{fmtN(commentCount)}</Text>}
                 </TouchableOpacity>
               </>
@@ -286,15 +290,18 @@ const VideoFsModal: React.FC<{
             <View style={pc.vfActionSep} />
             <TouchableOpacity style={pc.vfActionBtn} onPress={onShare} activeOpacity={0.7}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-              <MCIcon name="share-outline" size={FeedActionIcon.size} color="#fff" />
+              <Image source={Images.reactionShare} style={{ width: FeedActionIcon.size + 6, height: FeedActionIcon.size + 6 }} resizeMode="contain" />
               {shareCount > 0 && <Text style={pc.vfActionCount}>{fmtN(shareCount)}</Text>}
             </TouchableOpacity>
 
             <View style={pc.vfActionSep} />
             <TouchableOpacity style={pc.vfActionBtn} onPress={onSave} activeOpacity={0.7}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-              <MCIcon name={saved ? 'bookmark' : 'bookmark-outline'} size={FeedActionIcon.size}
-                color={saved ? '#fff' : '#fff'} />
+              {saved ? (
+                <Image source={Images.reactionSave} style={{ width: FeedActionIcon.size + 6, height: FeedActionIcon.size + 6 }} resizeMode="contain" />
+              ) : (
+                <MCIcon name="bookmark-outline" size={FeedActionIcon.size} color="#fff" />
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -687,11 +694,11 @@ const PostCardInner: React.FC<PostCardProps> = ({
           hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
         >
           <Animated.View style={heartStyle}>
-            <MCIcon
-              name={liked ? 'heart' : 'heart-outline'}
-              size={FeedActionIcon.size}
-              color={liked ? colors.likeActive : colors.textSecondary}
-            />
+            {liked ? (
+              <Image source={Images.reactionLove} style={{ width: FeedActionIcon.size + 6, height: FeedActionIcon.size + 6 }} resizeMode="contain" />
+            ) : (
+              <MCIcon name="heart-outline" size={FeedActionIcon.size} color={colors.textSecondary} />
+            )}
           </Animated.View>
         </TouchableOpacity>
 
@@ -702,7 +709,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
             activeOpacity={0.7}
             hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           >
-            <MCIcon name="comment-outline" size={FeedActionIcon.size} color={colors.textSecondary} />
+            <Image source={Images.reactionComment} style={{ width: FeedActionIcon.size + 6, height: FeedActionIcon.size + 6 }} resizeMode="contain" />
           </TouchableOpacity>
         )}
 
@@ -712,12 +719,12 @@ const PostCardInner: React.FC<PostCardProps> = ({
           activeOpacity={0.7}
           hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
         >
-          <MCIcon name="share-outline" size={FeedActionIcon.size} color={colors.textSecondary} />
+          <Image source={Images.reactionShare} style={{ width: FeedActionIcon.size + 6, height: FeedActionIcon.size + 6 }} resizeMode="contain" />
         </TouchableOpacity>
 
         {/* Repartager (repost) — republication dans le fil, DIFFÉRENT du
             partage externe ci-dessus (ShareBottomSheet) : icône distincte
-            (repeat, jamais share-2/share-outline déjà pris). */}
+            (illustration 3D glossy, même esprit que like/share/comment). */}
         <TouchableOpacity
           style={pc.actionBtn}
           onPress={handleRepostPress}
@@ -725,7 +732,7 @@ const PostCardInner: React.FC<PostCardProps> = ({
           disabled={reposting}
           hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
         >
-          <Icon name="repeat" size={FeedActionIcon.size} color={reposting ? colors.textDisabled : colors.textSecondary} />
+          <Image source={Images.reactionRepost} style={{ width: FeedActionIcon.size + 6, height: FeedActionIcon.size + 6, opacity: reposting ? 0.5 : 1 }} resizeMode="contain" />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -734,11 +741,11 @@ const PostCardInner: React.FC<PostCardProps> = ({
           activeOpacity={0.7}
           hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
         >
-          <MCIcon
-            name={saved ? 'bookmark' : 'bookmark-outline'}
-            size={FeedActionIcon.size}
-            color={saved ? colors.textPrimary : colors.textSecondary}
-          />
+          {saved ? (
+            <Image source={Images.reactionSave} style={{ width: FeedActionIcon.size + 6, height: FeedActionIcon.size + 6 }} resizeMode="contain" />
+          ) : (
+            <MCIcon name="bookmark-outline" size={FeedActionIcon.size} color={colors.textSecondary} />
+          )}
         </TouchableOpacity>
       </View>
 

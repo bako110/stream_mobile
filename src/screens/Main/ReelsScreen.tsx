@@ -50,7 +50,7 @@ import type { MainStackParamList } from '../../navigation/MainNavigator';
 import { type FilterKey, type ReelEditResult, FILTERS, FILTER_VIDEO_OPACITY, FILTER_VIDEO_OPACITY2, ReelEditorScreen } from '../Create/ReelEditorScreen';
 import Sound from 'react-native-sound';
 import { BackButton } from '../../components/common';
-import { getLogo } from '../../assets';
+import { getLogo, Images } from '../../assets';
 import * as reelVideoCache from '../../services/reelVideoCacheService';
 import { consumeReelsFeedPrefetch } from '../../utils/reelsFeedPrefetch';
 import { consumeReelsPrefetch } from '../../services/reelsPrefetchService';
@@ -195,6 +195,9 @@ const USER_REELS_PAGE_LIMIT = 20;
 // SEARCH_AD_INTERVAL cartes (placement="search" côté backend, distinct de "reels").
 const SEARCH_AD_INTERVAL = 6;
 const SEARCH_PAGE_LIMIT = 20;
+// Nombre de reels distincts vus (compteur persisté, cf. reelsSeenEnough) avant
+// d'autoriser l'affichage du tuto cadeau — robuste face aux fermetures d'app.
+const GIFT_HINT_UNLOCK_AFTER = 2;
 
 export const ReelsScreen: React.FC = () => {
   useKeepAwake();
@@ -331,6 +334,17 @@ export const ReelsScreen: React.FC = () => {
   const searchInputRef    = useRef<TextInput>(null);
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 });
   const lastLoadedAtRef   = useRef<number>(0);
+  // Jeton de génération pour load() — contrairement à loadMore (protégé par
+  // isLoadingMoreRef), load() pouvait être appelée en concurrence (pull-to-
+  // refresh + useFocusEffect quasi simultanés, ex. retour d'arrière-plan OS
+  // pendant un geste de tirer-pour-rafraîchir) sans aucun verrou : les deux
+  // promesses réseau écrivaient alors reels/hasMore dans n'importe quel ordre
+  // de résolution, pas forcément celui du dernier appel réellement voulu par
+  // l'utilisateur. Chaque appel à load() incrémente ce jeton ; seul l'appel
+  // dont le jeton est encore le plus récent au retour a le droit d'écrire le
+  // state — les autres sont silencieusement abandonnés (pas d'erreur visible,
+  // juste leur résultat réseau jeté).
+  const loadGenRef        = useRef(0);
   const didFocusOnceRef   = useRef(false);
   const lastInitialReelRef  = useRef<string | undefined>(undefined);
   // Reel demandé depuis FeedScreen — consommé dans onLayout (FlatList montée = garantie)
@@ -531,6 +545,17 @@ export const ReelsScreen: React.FC = () => {
   // Tant que false, le tuto cadeau (VideoSlide → GiftHoldHint) reste masqué —
   // évite que les deux tutos d'onboarding se superposent à l'écran.
   const [swipeHintDone, setSwipeHintDone] = useState(false);
+  // Déblocage du tuto cadeau basé sur un compteur de reels vus PERSISTÉ (MMKV),
+  // pas sur un minuteur en mémoire (ancien swipeHintDone seul) : si l'utilisateur
+  // ferme l'app avant que SwipeUpHint ait fini son cycle (5.5s ou swipe réel), le
+  // minuteur était perdu et recommençait de zéro à la prochaine session — pour
+  // certains utilisateurs qui relancent l'app souvent sans jamais rester assez
+  // longtemps, le tuto cadeau pouvait ne jamais apparaître pendant plusieurs
+  // jours. Le compteur survit lui aux fermetures d'app, donc le déblocage finit
+  // toujours par arriver, indépendamment de la vitesse/du téléphone de chacun.
+  const [reelsSeenEnough, setReelsSeenEnough] = useState(
+    () => (storage.getNumber(STORAGE_KEYS.REELS_SEEN_COUNT) ?? 0) >= GIFT_HINT_UNLOCK_AFTER,
+  );
   const [listKey,       setListKey]       = useState('reels-0');
   const [screenFocused, setScreenFocused] = useState(true);
   const [muted,         setMuted]         = useState(false);
@@ -664,6 +689,18 @@ export const ReelsScreen: React.FC = () => {
     listRef.current?.scrollToOffset({ offset: SCREEN_H * scrollIdx, animated: false });
   }, [reels, SCREEN_H, toRenderedIndex]);
 
+  // Incrémente le compteur persisté de reels vus à chaque changement d'index —
+  // seule source de vérité pour débloquer le tuto cadeau (cf. reelsSeenEnough
+  // ci-dessus), peu importe par quel chemin currentIndex a changé (scroll,
+  // injection, flèche header…) et peu importe si l'app est fermée juste après.
+  useEffect(() => {
+    if (reelsSeenEnough) return;
+    const next = (storage.getNumber(STORAGE_KEYS.REELS_SEEN_COUNT) ?? 0) + 1;
+    storage.setNumber(STORAGE_KEYS.REELS_SEEN_COUNT, next);
+    if (next >= GIFT_HINT_UNLOCK_AFTER) setReelsSeenEnough(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex]);
+
   const toggleMute = useCallback(() => setMuted(v => !v), []);
 
   // Scroll direct par offset — verrou isScrollingRef pour bloquer onViewableItemsChanged
@@ -727,6 +764,11 @@ export const ReelsScreen: React.FC = () => {
   // silent   : garder le contenu actuel visible pendant le chargement background
   const load = useCallback(async (silent = false, forceRefresh = false) => {
     if (!mountedRef.current) return;
+    // Jeton de cet appel — si un appel PLUS RÉCENT à load() démarre avant que
+    // celui-ci ne reçoive sa réponse réseau, loadGenRef aura déjà changé à ce
+    // moment-là : ce résultat, désormais obsolète, est alors silencieusement
+    // abandonné (voir les `if (loadGenRef.current !== myGen) return;` plus bas).
+    const myGen = ++loadGenRef.current;
     // Ne montrer le loading que si pas de contenu actuellement affiché
     if (!silent && reelsRef.current.length === 0) setLoading(true);
     pageRef.current = 1;
@@ -737,7 +779,7 @@ export const ReelsScreen: React.FC = () => {
     if (userMode) {
       try {
         const data = await userService.getUserReels(userMode, 1, USER_REELS_PAGE_LIMIT) as Reel[];
-        if (!mountedRef.current) return;
+        if (!mountedRef.current || loadGenRef.current !== myGen) return;
         const filtered = (Array.isArray(data) ? data : []).filter((r: Reel) => (!!r.hls_url || !!r.mp4_url));
         setHasMore(filtered.length >= USER_REELS_PAGE_LIMIT);
         lastLoadedAtRef.current = Date.now();
@@ -758,7 +800,7 @@ export const ReelsScreen: React.FC = () => {
       } catch {
         // garder les reels actuellement affichés
       } finally {
-        if (mountedRef.current) setLoading(false);
+        if (mountedRef.current && loadGenRef.current === myGen) setLoading(false);
       }
       return;
     }
@@ -774,7 +816,7 @@ export const ReelsScreen: React.FC = () => {
         refresh: !silent || forceRefresh,
         seedReelIds: seedIdsForLoad,
       });
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || loadGenRef.current !== myGen) return;
 
       const filtered = (data.items ?? []).filter((r: Reel) => (!!r.hls_url || !!r.mp4_url));
 
@@ -826,7 +868,7 @@ export const ReelsScreen: React.FC = () => {
     } catch {
       // Erreur réseau — garder les reels actuellement affichés (ne pas mettre [])
     } finally {
-      if (mountedRef.current) setLoading(false);
+      if (mountedRef.current && loadGenRef.current === myGen) setLoading(false);
     }
   }, []); // pas de dépendances sur params — targetId passé en argument
 
@@ -1609,11 +1651,11 @@ export const ReelsScreen: React.FC = () => {
         ui={ui}
         autoAdvance={autoAdvance}
         onToggleAutoAdvance={toggleAutoAdvanceHeader}
-        giftHintEnabled={swipeHintDone}
+        giftHintEnabled={swipeHintDone || reelsSeenEnough}
         reelsShowInterface={reelsShowInterface}
       />
     );
-  }, [currentIndex, screenFocused, fullscreenAd, searchOpen, awaitingTarget, muted, insets.top, insets.bottom, colors, myId, myAvatar, myInitial, toggleMute, onAuthorPress, goNextReel, SCREEN_W, SCREEN_H, isWifi, ui, autoAdvance, toggleAutoAdvanceHeader, swipeHintDone, reelsShowInterface]);
+  }, [currentIndex, screenFocused, fullscreenAd, searchOpen, awaitingTarget, muted, insets.top, insets.bottom, colors, myId, myAvatar, myInitial, toggleMute, onAuthorPress, goNextReel, SCREEN_W, SCREEN_H, isWifi, ui, autoAdvance, toggleAutoAdvanceHeader, swipeHintDone, reelsSeenEnough, reelsShowInterface]);
 
   // ── Render: loading ───────────────────────────────────────────────────────
   if (loading && reels.length === 0) {
@@ -4093,7 +4135,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                   </View>
                   <View style={[s.sheetStatSep, { backgroundColor: colors.divider }]} />
                   <View style={s.sheetStat}>
-                    <Icon name="share-2" size={14} color={colors.textSecondary} />
+                    <Image source={Images.reactionShare} style={{ width: 18, height: 18 }} resizeMode="contain" />
                     <Text style={[s.sheetStatVal, { color: colors.textPrimary }]}>{formatCount(shareCount)}</Text>
                     <Text style={[s.sheetStatLbl, { color: colors.textTertiary }]}>Partages</Text>
                   </View>
@@ -4106,7 +4148,7 @@ const VideoSlide: React.FC<VideoSlideProps> = memo(({
                   <View style={[s.sheetItemIcon, { backgroundColor: 'rgba(167,139,250,0.15)' }]}>
                     {remixLoading
                       ? <ActivityIndicator size="small" color="#A78BFA" />
-                      : <Icon name="repeat" size={18} color="#A78BFA" />
+                      : <Image source={Images.reactionRepost} style={{ width: 22, height: 22 }} resizeMode="contain" />
                     }
                   </View>
                   <View style={{ flex: 1 }}>

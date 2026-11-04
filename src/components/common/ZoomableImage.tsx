@@ -3,8 +3,8 @@
  * double-tap pour zoomer/dézoomer rapidement. À utiliser dans toutes les visionneuses
  * plein écran (posts, chat, bannières/avatars) pour un comportement uniforme.
  */
-import React, { useCallback, useState } from 'react';
-import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -26,6 +26,14 @@ interface ZoomableImageProps {
 }
 
 export const ZoomableImage: React.FC<ZoomableImageProps> = ({ uri, width, height, style, onZoomChange }) => {
+  // Spinner tant que l'image réseau n'a pas fini de charger — même comportement
+  // que les visionneuses event/concert, qui affichent toujours un indicateur de
+  // chargement au lieu d'un écran vide/noir pendant la requête.
+  const [loading, setLoading] = useState(true);
+  // Remonte le spinner si uri change sans que le composant soit démonté —
+  // ne dépend pas de la façon dont il est consommé (FlatList avec clé par
+  // URL le remonte déjà, mais ce effect reste correct dans tous les cas).
+  useEffect(() => { setLoading(true); }, [uri]);
   const scale      = useSharedValue(1);
   const savedScale = useSharedValue(1);
   const translateX = useSharedValue(0);
@@ -129,8 +137,21 @@ export const ZoomableImage: React.FC<ZoomableImageProps> = ({ uri, width, height
           source={{ uri }}
           resizeMode="contain"
           style={[StyleSheet.absoluteFill, animatedStyle]}
+          onLoadEnd={() => setLoading(false)}
+          onError={() => setLoading(false)}
         />
+        {loading && (
+          <View style={StyleSheet.absoluteFill} pointerEvents="none">
+            <View style={st.loaderCenter}>
+              <ActivityIndicator size="large" color="#fff" />
+            </View>
+          </View>
+        )}
       </Animated.View>
     </GestureDetector>
   );
 };
+
+const st = StyleSheet.create({
+  loaderCenter: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+});

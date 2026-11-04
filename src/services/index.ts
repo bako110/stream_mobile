@@ -9,6 +9,8 @@ export { reelService }           from './reelService';
 export { socialService }         from './socialService';
 export { searchService }         from './searchService';
 export { subscriptionService, paymentService, ticketService } from './subscriptionService';
+export { playbackService } from './playbackService';
+export type { Entitlements } from './playbackService';
 export { saveService } from './saveService';
 export { uploadService } from './uploadService';
 export { storyService }  from './storyService';

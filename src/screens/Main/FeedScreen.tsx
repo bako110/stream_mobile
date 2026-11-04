@@ -51,6 +51,7 @@ import { RepostBottomSheet } from '../../components/common/RepostBottomSheet';
 import type { UserPublic } from '../../types/user';
 import { StoryBar } from '../../components/story';
 import { eventService, concertService, socialService, authService, searchService, userService, reelService, feedPreferenceService, accountsService, toastService } from '../../services';
+import { getConcertEnd } from '../../utils/eventTiming';
 import type { StoredAccount } from '../../services';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
@@ -74,6 +75,7 @@ import { FontSize, FontWeight } from '../../theme';
 import { Spacing } from '../../theme/spacing';
 import { SectionHeader } from '../../components/common/SectionHeader';
 import { FeedCarousel, FeedCardLayout, FeedRadius, FeedActionIcon, getFeedCardStyle } from '../../theme/feed';
+import { Images } from '../../assets';
 import { feedStyles as s } from '../../styles/FeedScreen.styles';
 import { TAB_BAR_HEIGHT } from '../../styles';
 import { FILTERS, FILTER_VIDEO_OPACITY, FILTER_VIDEO_OPACITY2 } from '../Create/ReelEditorScreen';
@@ -119,6 +121,18 @@ export type NearbyItem =
 
 function nearbyItemStartDate(item: NearbyItem): string | null {
   return item.kind === 'event' ? item.data.starts_at : item.data.scheduled_at;
+}
+
+// Fin réelle (fenêtre "en cours") de l'item — ends_at pour un événement
+// (sinon +24h après le début, un festival type SIAO reste donc "en cours"
+// tant qu'on est dans sa plage), fin calculée via duration_min pour un
+// concert (getConcertEnd, voir utils/eventTiming.ts).
+function nearbyItemEndDate(item: NearbyItem): number {
+  if (item.kind === 'concert') return getConcertEnd(item.data).getTime();
+  const start = new Date(item.data.starts_at ?? '').getTime();
+  if (isNaN(start)) return -Infinity;
+  const endsAt = item.data.ends_at;
+  return endsAt ? new Date(endsAt).getTime() : start + 24 * 3600_000;
 }
 
 // Trie par date de début croissante — un item sans date valide est relégué
@@ -1985,20 +1999,16 @@ export const FeedScreen: React.FC<FeedScreenProps> = ({ onLogout, onSwitchAccoun
   // vide ou quasi vide. Classé par date de DÉBUT croissante (starts_at pour
   // un event, scheduled_at pour un concert) — l'ordre brut renvoyé par le
   // backend (distance/pertinence) ne garantit aucun classement
-  // chronologique. Les événements/concerts déjà passés sont exclus : seule
-  // la date de début compte ici (pas de notion de "fin" fiable pour un
-  // concert), donc "passé" = starts_at/scheduled_at strictement antérieur à
-  // maintenant.
+  // chronologique. Les événements/concerts déjà TERMINÉS sont exclus — mais
+  // un item en cours (ex. festival type SIAO sur 8 j, toujours dans sa
+  // fenêtre starts_at→fin) reste affiché : on compare à la fin réelle
+  // (nearbyItemEndDate), pas seulement à la date de début, sinon un item en
+  // cours disparaîtrait à tort dès que son starts_at est passé.
   useEffect(() => {
     if (!userLocation) return;
     let cancelled = false;
 
-    const isUpcoming = (item: NearbyItem) => {
-      const raw = nearbyItemStartDate(item);
-      if (!raw) return true; // pas de date connue : ne pas exclure à tort
-      const t = new Date(raw).getTime();
-      return isNaN(t) || t >= Date.now();
-    };
+    const isUpcoming = (item: NearbyItem) => nearbyItemEndDate(item) >= Date.now();
 
     (async () => {
       const [nearbyEv, nearbyConc] = await Promise.all([
@@ -3511,33 +3521,45 @@ const FeedCard: React.FC<FeedCardProps> = React.memo(({ item, colors, currentUse
       )}
 
       {/* ── Barre d'actions — icônes seules 22px, like actif rouge. Les nombres
-          restent dans countsRow (pas de double affichage). ──────────────── */}
+          restent dans countsRow (pas de double affichage). Like/partage utilisent
+          les illustrations 3D glossy (voir assets/images/reactions/) plutôt que
+          des icônes outline — même esprit visuel que les réactions décoratives
+          de l'onboarding. Le like reste outline gris tant qu'il n'est PAS actif
+          (l'image colorée signifierait déjà "aimé", trompeur sinon). ───────── */}
       <View style={[fc.actionBar, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
         <TouchableOpacity style={fc.actionBtn} onPress={handleLike} activeOpacity={0.7} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
           <Animated.View style={heartStyle}>
-            <MCIcon name={liked ? 'heart' : 'heart-outline'} size={FeedActionIcon.size} color={liked ? colors.likeActive : colors.textSecondary} />
+            {liked ? (
+              <Image source={Images.reactionLove} style={{ width: FeedActionIcon.size + 6, height: FeedActionIcon.size + 6 }} resizeMode="contain" />
+            ) : (
+              <MCIcon name="heart-outline" size={FeedActionIcon.size} color={colors.textSecondary} />
+            )}
           </Animated.View>
         </TouchableOpacity>
 
         {!commentsDisabled && (
           <TouchableOpacity style={fc.actionBtn} onPress={() => onComment((d: number) => setCommentCount((v: number) => v + d), (n: number) => setCommentCount((v: number) => Math.max(v, n)))} activeOpacity={0.7} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-            <MCIcon name="comment-outline" size={FeedActionIcon.size} color={colors.textSecondary} />
+            <Image source={Images.reactionComment} style={{ width: FeedActionIcon.size + 6, height: FeedActionIcon.size + 6 }} resizeMode="contain" />
           </TouchableOpacity>
         )}
 
         <TouchableOpacity style={fc.actionBtn} onPress={handleShare} activeOpacity={0.7} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-          <MCIcon name="share-outline" size={FeedActionIcon.size} color={colors.textSecondary} />
+          <Image source={Images.reactionShare} style={{ width: FeedActionIcon.size + 6, height: FeedActionIcon.size + 6 }} resizeMode="contain" />
         </TouchableOpacity>
 
         {(isEvent || isConcert) && (
           <TouchableOpacity style={fc.actionBtn} onPress={handleRepostPress} disabled={reposting} activeOpacity={0.7} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-            <Icon name="repeat" size={FeedActionIcon.size} color={colors.textSecondary} />
+            <Image source={Images.reactionRepost} style={{ width: FeedActionIcon.size + 6, height: FeedActionIcon.size + 6 }} resizeMode="contain" />
           </TouchableOpacity>
         )}
 
         <TouchableOpacity style={[fc.actionBtn, fc.actionBtnSave]} onPress={handleSave} activeOpacity={0.7} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
           <Animated.View style={saveStyle}>
-            <MCIcon name={saved ? 'bookmark' : 'bookmark-outline'} size={FeedActionIcon.size} color={saved ? colors.textPrimary : colors.textSecondary} />
+            {saved ? (
+              <Image source={Images.reactionSave} style={{ width: FeedActionIcon.size + 6, height: FeedActionIcon.size + 6 }} resizeMode="contain" />
+            ) : (
+              <MCIcon name="bookmark-outline" size={FeedActionIcon.size} color={colors.textSecondary} />
+            )}
           </Animated.View>
         </TouchableOpacity>
       </View>

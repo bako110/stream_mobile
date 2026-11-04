@@ -100,6 +100,14 @@ function isEventOngoingNow(startsAt?: string | null, endsAt?: string | null): bo
   }
   return now >= start && now <= start + 24 * 3600_000;
 }
+// Vrai si l'événement est déjà terminé (même fenêtre de fin que isEventOngoingNow)
+// — sert à exclure les événements passés du carrousel "Près de toi".
+function isEventPast(startsAt?: string | null, endsAt?: string | null): boolean {
+  if (!startsAt) return true;
+  const start = new Date(startsAt).getTime();
+  const end = endsAt ? new Date(endsAt).getTime() : start + 24 * 3600_000;
+  return Date.now() > end;
+}
 
 // ── SpontLiveCard — mémoïsé pour éviter re-renders dans la map ───────────────
 
@@ -460,7 +468,11 @@ export const HomeScreen: React.FC = () => {
         limit: 8, lat: userLocation.lat, lon: userLocation.lon,
         radius_km: 20, status: 'published', noCache: true,
       }).then(data => {
-        if (!cancelled) setNearbyEvents(Array.isArray(data) ? data : []);
+        if (cancelled) return;
+        const list = (Array.isArray(data) ? data : [])
+          .filter(ev => !isEventPast(ev.starts_at, (ev as any).ends_at))
+          .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
+        setNearbyEvents(list);
       }).catch(() => {});
       return () => { cancelled = true; };
     }

@@ -6,13 +6,68 @@ import {
 import Animated, {
   useSharedValue, useAnimatedStyle,
   withTiming, withDelay, withSpring,
-  Easing,
+  withRepeat, interpolate, Easing, cancelAnimation,
 } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
-import { getLogo } from '../../assets';
+import { getLogo, Images } from '../../assets';
 
 const { width: W, height: H } = Dimensions.get('window');
+
+// ── Réactions sociales décoratives ───────────────────────────────────────────
+// Dispersées dans les espaces libres du fond (autour du logo, dans les lueurs)
+// — renforcent l'identité "réseau social" dès l'onboarding. Vraies illustrations
+// 3D glossy (fond transparent, voir assets/images/reactions/), pas des icônes
+// outline ni des emojis Unicode — couleurs déjà fixées dans l'image elle-même.
+// Apparition SÉQUENTIELLE (like → cœur → partage, délais bien écartés, pas
+// quasi simultanés comme avant) avec un effet "pop" (part de 0 et grossit
+// avec un léger rebond), puis légère dérive continue une fois posée.
+// Tailles en fraction de la largeur d'écran (pas de px fixes) : sur un petit
+// téléphone (ex. ~360dp de large) des icônes de 170/150/130px dévoraient tout
+// le haut de l'écran et chevauchaient le logo. Bornées par un min/max pour
+// rester cohérentes sur tablette comme sur petit écran.
+interface DecoIconSpec { source: any; top: number; left: number; sizeRatio: number; delay: number; driftX: number; driftY: number; }
+const DECO_ICONS: DecoIconSpec[] = [
+  { source: Images.reactionLike,  top: 0.01, left: 0.00, sizeRatio: 0.34, delay: 300,  driftX: -8, driftY: 7  },
+  { source: Images.reactionLove,  top: 0.02, left: 0.46, sizeRatio: 0.30, delay: 900,  driftX: 9,  driftY: -6 },
+  { source: Images.reactionShare, top: 0.19, left: 0.58, sizeRatio: 0.26, delay: 1500, driftX: 7,  driftY: 8  },
+];
+const clampSize = (ratio: number) => Math.round(Math.min(150, Math.max(96, W * ratio)));
+
+const DecoIcon: React.FC<{ spec: DecoIconSpec }> = ({ spec }) => {
+  const opacity = useSharedValue(0);
+  const scale   = useSharedValue(0);
+  const drift   = useSharedValue(0);
+
+  useEffect(() => {
+    opacity.value = withDelay(spec.delay, withTiming(1, { duration: 280 }));
+    scale.value   = withDelay(spec.delay, withSpring(1, { damping: 9, stiffness: 160, mass: 0.8 }));
+    drift.value = withRepeat(
+      withTiming(1, { duration: 3400, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true,
+    );
+    return () => { cancelAnimation(opacity); cancelAnimation(scale); cancelAnimation(drift); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const style = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [
+      { translateX: interpolate(drift.value, [0, 1], [0, spec.driftX]) },
+      { translateY: interpolate(drift.value, [0, 1], [0, spec.driftY]) },
+      { scale: scale.value },
+    ],
+  }));
+
+  return (
+    <Animated.View
+      style={[{ position: 'absolute', top: `${spec.top * 100}%`, left: `${spec.left * 100}%` }, style]}
+      pointerEvents="none"
+    >
+      <Image source={spec.source} style={{ width: clampSize(spec.sizeRatio), height: clampSize(spec.sizeRatio) }} resizeMode="contain" />
+    </Animated.View>
+  );
+};
 
 interface Props {
   onFinish:    () => void;
@@ -111,6 +166,11 @@ export const OnboardingScreen: React.FC<Props> = ({ onFinish, onLogin, onGoCGU, 
         width: W * 0.8, height: W * 0.8,
         backgroundColor: '#7B3FF2', opacity: glowOp,
       }]} />
+
+      {/* Réactions sociales décoratives — espaces libres du fond. */}
+      {DECO_ICONS.map((spec, i) => (
+        <DecoIcon key={i} spec={spec} />
+      ))}
 
       {/* Corps */}
       <View style={s.body}>

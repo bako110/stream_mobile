@@ -20,8 +20,12 @@ import { storage } from '../utils/storage';
 const CACHE_DIR      = `${RNBlobUtil.fs.dirs.CacheDir}/gofolyx_reel_videos`;
 const INDEX_KEY      = 'reel_video_cache_index';
 const INDEX_KEY_BAK  = 'reel_video_cache_index_bak';
-const MAX_AGE_MS     = 7 * 24 * 3600 * 1000;   // 7 jours — contenu permanent, pas éphémère
-const MAX_SIZE_B     = 1024 * 1024 * 1024;      // 1 Go
+// 14 jours / 1.5 Go (étendus 2026-11, demande explicite "miser sur le cache"
+// pour économiser la data mobile) — contenu permanent, pas éphémère, et les
+// reels déjà vus sont justement ceux qu'on revoit le plus souvent (scroll
+// retour, partage, algo qui re-suggère un contenu populaire).
+const MAX_AGE_MS     = 14 * 24 * 3600 * 1000;  // 14 jours
+const MAX_SIZE_B     = 1536 * 1024 * 1024;     // 1.5 Go
 
 interface CacheEntry { path: string; size: number; ts: number; }
 type CacheIndex = Record<string, CacheEntry>;
@@ -54,8 +58,13 @@ function getIndex(): CacheIndex {
   return _index;
 }
 
+// Durci 2026-11 ("miser sur le cache", éviter tout doublon évitable) : en plus
+// de la query string, retire aussi le fragment (#...) et un slash final, et
+// uniformise la casse — sinon deux URLs logiquement identiques (différant
+// seulement par une casse ou un slash de fin côté backend/CDN) produiraient
+// deux entrées de cache séparées pour le même fichier physique.
 function normalizeUrl(url: string): string {
-  return url.split('?')[0];
+  return url.split('?')[0].split('#')[0].replace(/\/+$/, '').toLowerCase();
 }
 
 function urlToFilename(url: string): string {

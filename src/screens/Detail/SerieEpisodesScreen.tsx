@@ -15,7 +15,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { FontSize, FontWeight } from '../../theme';
 import { useTheme } from '../../hooks/useTheme';
 import { BackButton, PriceWithLocal } from '../../components/common';
-import { contentService, toastService, showConfirm } from '../../services';
+import { contentService, toastService, showConfirm, playbackService } from '../../services';
 import { apiClient } from '../../api/client';
 import { Endpoints } from '../../api/endpoints';
 import type { Season, Episode } from '../../types';
@@ -314,8 +314,10 @@ export const SerieEpisodesScreen: React.FC<Props> = ({ route, navigation }) => {
     setPlayingEpId(ep.id);
     try {
       const video = await contentService.getEpisodeVideo(ep.id).catch(() => null);
+      // Variante autorisée par le plan (ex. gratuit → 480p), sinon le flux maître.
+      const ent = await playbackService.getEntitlements();
       navigation.navigate('VideoPlayer', {
-        url:          video?.hls_url ?? ep.hls_url ?? ep.video_url!,
+        url:          playbackService.pickUrl(video, ent?.max_height) ?? ep.hls_url ?? ep.video_url!,
         title:        `${item.title} · E${ep.number} — ${ep.title}`,
         videoId:      video?.id ?? undefined,
         contentId:    item.id,

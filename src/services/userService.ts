@@ -14,6 +14,12 @@ export const userService = {
     return res.data;
   },
 
+  async checkPhoneAvailability(phone: string): Promise<{ available: boolean; reason?: string }> {
+    const query = `?${new URLSearchParams({ value: phone }).toString()}`;
+    const res = await apiClient.get<{ available: boolean; reason?: string }>(`${Endpoints.users.checkPhone}${query}`);
+    return res.data;
+  },
+
   async getWatchHistory(): Promise<WatchHistoryItem[]> {
     const res = await apiClient.get<WatchHistoryItem[]>(Endpoints.users.watchHistory);
     return res.data;

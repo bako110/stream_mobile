@@ -8,15 +8,29 @@ export interface PlanConfig {
   screens: number;
   profiles: number;
   downloads: number;
-  quality: '480p' | '720p' | '1080p' | '4k';
+  quality: 'SD' | 'HD' | '4K';
+  /** Hauteur vidéo maximale autorisée (480 / 1080 / 2160). */
+  maxHeight: number;
 }
 
+// Miroir de PLAN_CONFIG (stream_backend/app/db/postgres/models/subscription.py) — le serveur reste
+// la source de vérité et applique réellement ces limites (écrans, qualité, quota de téléchargements).
 export const PLAN_CONFIG: Record<PlanType, PlanConfig> = {
-  free:    { price: 0,    screens: 1, profiles: 1, downloads: 0,  quality: '480p'  },
-  basic:   { price: 3.99, screens: 1, profiles: 1, downloads: 0,  quality: '720p'  },
-  premium: { price: 6.99, screens: 2, profiles: 3, downloads: 10, quality: '1080p' },
-  family:  { price: 9.99, screens: 5, profiles: 6, downloads: 30, quality: '4k'    },
+  free:    { price: 0,    screens: 1, profiles: 1, downloads: 0,  quality: 'SD', maxHeight: 480  },
+  basic:   { price: 3.99, screens: 2, profiles: 2, downloads: 5,  quality: 'HD', maxHeight: 1080 },
+  premium: { price: 6.99, screens: 4, profiles: 4, downloads: 25, quality: '4K', maxHeight: 2160 },
+  family:  { price: 9.99, screens: 6, profiles: 6, downloads: 50, quality: '4K', maxHeight: 2160 },
 };
+
+/** Avantages affichés = uniquement ce que le serveur applique réellement. */
+export function planFeatures(plan: PlanType): string[] {
+  const c = PLAN_CONFIG[plan];
+  const f = [plan === 'free' ? 'Contenu standard uniquement' : 'Tout le contenu premium'];
+  f.push(`${c.screens} écran${c.screens > 1 ? 's' : ''} simultané${c.screens > 1 ? 's' : ''}`);
+  f.push(`Qualité ${c.quality === '4K' ? '4K Ultra HD' : c.quality}`);
+  f.push(c.downloads > 0 ? `${c.downloads} téléchargements / mois` : 'Sans téléchargement');
+  return f;
+}
 
 export interface Subscription {
   id: string;

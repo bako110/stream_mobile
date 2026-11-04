@@ -16,6 +16,7 @@ import { BackButton, GofolyxLoader } from '../../components/common';
 import { concertService, toastService, showConfirm } from '../../services';
 import type { MainStackParamList } from '../../navigation/MainNavigator';
 import type { Concert, ConcertStatus } from '../../types/concert';
+import { getConcertEnd, isMultiDay, formatDateRange, daysSpan } from '../../utils/eventTiming';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
@@ -84,9 +85,19 @@ export const MyConcertsScreen: React.FC = () => {
   };
 
   const renderItem = ({ item }: { item: Concert }) => {
-    const scheduledDate = new Date(item.scheduled_at).toLocaleDateString('fr-FR', {
-      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-    });
+    const start      = new Date(item.scheduled_at);
+    const end         = getConcertEnd(item);
+    const multiDay    = isMultiDay(start, end);
+    // Un concert multi-jours (ex. festival sur 8 j) reste "En cours" tant que
+    // now est dans la fenêtre scheduled_at→end, pas seulement le jour du
+    // début — même logique que isEventOngoingNow pour les événements et que
+    // ExploreConcertsPage.tsx côté web (ConcertCard.inProgress).
+    const inProgress  = item.status !== 'live' && start <= new Date() && new Date() <= end;
+    const scheduledDate = multiDay
+      ? `${formatDateRange(start, end)} · ${daysSpan(start, end)} j`
+      : start.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    const pillColor = item.status === 'live' ? STATUS_COLOR.live : inProgress ? '#EF4444' : STATUS_COLOR[item.status];
+    const pillLabel = item.status === 'live' ? STATUS_LABEL.live : inProgress ? 'En cours' : STATUS_LABEL[item.status];
     return (
       <TouchableOpacity
         style={[st.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
@@ -101,9 +112,9 @@ export const MyConcertsScreen: React.FC = () => {
           </View>
         )}
         <View style={st.info}>
-          <View style={[st.statusPill, { backgroundColor: STATUS_COLOR[item.status] + '22' }]}>
-            {item.status === 'live' && <View style={[st.liveDot, { backgroundColor: STATUS_COLOR[item.status] }]} />}
-            <Text style={[st.statusText, { color: STATUS_COLOR[item.status] }]}>{STATUS_LABEL[item.status]}</Text>
+          <View style={[st.statusPill, { backgroundColor: pillColor + '22' }]}>
+            {(item.status === 'live' || inProgress) && <View style={[st.liveDot, { backgroundColor: pillColor }]} />}
+            <Text style={[st.statusText, { color: pillColor }]}>{pillLabel}</Text>
           </View>
           <Text style={[st.title, { color: colors.textPrimary }]} numberOfLines={1}>{item.title}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>

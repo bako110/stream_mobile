@@ -184,9 +184,16 @@ export const SettingsContenuScreen: React.FC = () => {
 
         <Text style={[st.sectionLabel, { color: colors.textTertiary }]}>Reels dans le fil</Text>
         <Card>
+          {/* Distinct de "Lecture automatique des reels" dans Lecture
+              (playback_prefs.autoplay, SettingsLectureScreen.tsx) — même
+              libellé auparavant sur les deux écrans, confusion confirmée par
+              l'utilisateur. Label + sous-titre précisent que CE réglage ne
+              concerne que les reels suggérés dans le fil d'accueil, jamais
+              l'écran Reels plein écran. */}
           <Row
             icon="play-circle"
-            label="Lecture automatique"
+            label="Lecture automatique dans le fil"
+            value="Lance la vidéo des reels suggérés au scroll, dans le fil d'accueil"
             last
             right={
               savingAutoplay

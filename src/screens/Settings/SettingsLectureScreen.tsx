@@ -90,7 +90,13 @@ export const SettingsLectureScreen: React.FC = () => {
       ) : (
         <ScrollView contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false}>
           <Card>
-            <Row icon="play" label="Lecture automatique"
+            {/* Distinct de "Lecture automatique" dans Contenu (feed_autoplay_reels,
+                SettingsContenuScreen.tsx) — même libellé auparavant sur les deux
+                écrans, confusion confirmée par l'utilisateur qui pensait les deux
+                réglages liés. Sous-titre ajouté pour lever toute ambiguïté : ce
+                réglage ne concerne QUE l'écran Reels plein écran (ReelsScreen.tsx),
+                jamais les reels suggérés dans le fil d'accueil. */}
+            <Row icon="play" label="Lecture automatique des reels" value="Démarre la vidéo dès l'ouverture de l'écran Reels"
               right={sw('autoplay')}
             />
             <Row icon="wifi" label="Streaming HD" value="Utilise plus de données mobiles"

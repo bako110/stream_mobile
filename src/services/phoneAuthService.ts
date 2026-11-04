@@ -10,11 +10,12 @@ import { Endpoints } from '../api/endpoints';
 import { authService } from './authService';
 
 export interface PhoneVerifyResult {
-  access_token:  string;
-  refresh_token: string;
-  token_type:    string;
-  user_id:       string;
-  is_new_user:   boolean;
+  access_token:      string;
+  refresh_token:     string;
+  token_type:        string;
+  user_id:           string;
+  is_new_user:       boolean;
+  profile_incomplete?: boolean;
 }
 
 class PhoneAuthService {
@@ -57,7 +58,12 @@ class PhoneAuthService {
     });
 
     this._sessionInfo = null;
-    return res.data;
+
+    // Le backend ne renvoie pas toujours profile_incomplete sur cette réponse —
+    // un /auth/me frais est la seule source fiable pour savoir si sexe/date de
+    // naissance manquent, avant de laisser l'utilisateur entrer dans l'app.
+    const me = await authService.getMe(true);
+    return { ...res.data, profile_incomplete: me.profile_incomplete };
   }
 
   reset() {

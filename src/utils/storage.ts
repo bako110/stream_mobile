@@ -25,6 +25,15 @@ export const storage = {
     mmkv.set(key, value);
   },
 
+  getNumber: (key: string): number | null => {
+    if (!mmkv.contains(key)) return null;
+    return mmkv.getNumber(key) ?? null;
+  },
+
+  setNumber: (key: string, value: number): void => {
+    mmkv.set(key, value);
+  },
+
   clear: (): void => {
     mmkv.clearAll();
   },

@@ -20,7 +20,7 @@ interface Props {
   userId:      string;
   identifier:  string;
   password:    string;
-  onSuccess:   () => void;
+  onSuccess:   (profileIncomplete?: boolean) => void;
   onGoBack:    () => void;
 }
 
@@ -60,8 +60,8 @@ export const VerifyRegistrationScreen: React.FC<Props> = ({
     try {
       await authService.verifyRegistration(userId, otp);
       // Compte vérifié — connexion avec l'identifiant/mot de passe fournis à l'inscription
-      await authService.login({ identifier, password });
-      onSuccess();
+      const result = await authService.login({ identifier, password });
+      onSuccess(result.profile_incomplete);
     } catch (e: any) {
       const detail = e?.data?.detail ?? e?.response?.data?.detail;
       setError(typeof detail === 'string' ? detail : e?.message ?? 'Code incorrect ou expiré.');

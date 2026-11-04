@@ -24,6 +24,8 @@ import { TicketPaymentSheet } from '../../components/wallet/TicketPaymentSheet';
 import { eventService, socialService, authService, toastService, showConfirm, liveService } from '../../services';
 import { prefetchSimpleLive } from '../../utils/livePrefetch';
 import { favoriteService } from '../../services/favoriteService';
+import { isEventOngoingNow, isEventOver, isMultiDayEvent, eventDaysSpan, formatEventRange } from '../../services/eventTiming';
+import { Images } from '../../assets';
 import type { Event } from '../../types/event';
 import type { AppColors } from '../../theme/colors';
 import { useNavigation } from '@react-navigation/native';
@@ -33,20 +35,6 @@ import { StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ── Config ────────────────────────────────────────────────────────────────────
-
-// Événement "en cours" — starts_at déjà passé, toujours dans sa fenêtre active
-// (ends_at si renseigné, sinon 24h après le début). Même logique que
-// FeedScreen.tsx (FeedCard.isEventOngoing), gardée synchronisée.
-function isEventOngoingNow(startsAt?: string | null, endsAt?: string | null): boolean {
-  if (!startsAt) return false;
-  const start = new Date(startsAt).getTime();
-  const now = Date.now();
-  if (endsAt) {
-    const end = new Date(endsAt).getTime();
-    return now >= start && now <= end;
-  }
-  return now >= start && now <= start + 24 * 3600_000;
-}
 
 const EVENT_CONFIG: Record<string, { icon: string; label: string; color: string }> = {
   concert:    { icon: 'music',    label: 'Concert',      color: '#7B3FF2' },
@@ -185,12 +173,12 @@ const HeroCarousel: React.FC<{
 // ── HeroInfoCard — titre + organisateur + badges, dans une vraie section sous
 // le hero, pas en overlay sur l'image ─────────────────────────────────────────
 const HeroInfoCard: React.FC<{
-  title: string; accent: string; eventType: string; isFree: boolean; isOnline: boolean; isOngoing?: boolean;
+  title: string; accent: string; eventType: string; isFree: boolean; isOnline: boolean; isOngoing?: boolean; isOver?: boolean;
   organizerName?: string; organizerAvatar?: string;
   showAiPending?: boolean;
   onAiPendingPress?: () => void;
   colors: AppColors;
-}> = ({ title, accent, eventType, isFree, isOnline, isOngoing, organizerName, organizerAvatar, showAiPending, onAiPendingPress, colors }) => (
+}> = ({ title, accent, eventType, isFree, isOnline, isOngoing, isOver, organizerName, organizerAvatar, showAiPending, onAiPendingPress, colors }) => (
   <View style={{ backgroundColor: colors.surface, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12, gap: 8 }}>
     <Text style={{ fontSize: FontSize.mdPlus, fontWeight: FontWeight.extraBold, color: colors.textPrimary, lineHeight: 22, letterSpacing: -0.2 }}>
       {title}
@@ -222,6 +210,11 @@ const HeroInfoCard: React.FC<{
       <View style={{ backgroundColor: accent + '15', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 }}>
         <Text style={{ fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold, color: accent, letterSpacing: 0.4 }}>{eventType.toUpperCase()}</Text>
       </View>
+      {isOver && (
+        <View style={{ backgroundColor: '#6B728022', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 }}>
+          <Text style={{ fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold, color: '#6B7280', letterSpacing: 0.4 }}>TERMINÉ</Text>
+        </View>
+      )}
       {isOngoing && (
         <View style={{ backgroundColor: '#36D9A022', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 }}>
           <Text style={{ fontSize: FontSize['2xs'], fontWeight: FontWeight.extraBold, color: '#1F9D6E', letterSpacing: 0.4 }}>EN COURS</Text>
@@ -649,6 +642,9 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
   const isOngoingByDate = !isCompleted && !isLiveNow
     && isEventOngoingNow(event.starts_at, (event as any).ends_at);
 
+  const isOverByDate = !isOngoingByDate && isEventOver(event.starts_at, (event as any).ends_at);
+  const multiDay     = isMultiDayEvent(event.starts_at, event.ends_at);
+
   const scheduledIn = (() => {
     if (!isScheduled) return null;
     const diff = new Date(event.starts_at).getTime() - Date.now();
@@ -681,7 +677,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
         {/* ── Titre + organisateur + badges — section séparée, pas sur l'image ─── */}
         <HeroInfoCard
           title={event.title} accent={accent}
-          eventType={cfg.label} isFree={isFree} isOnline={!!event.is_online} isOngoing={isOngoingByDate}
+          eventType={cfg.label} isFree={isFree} isOnline={!!event.is_online} isOngoing={isOngoingByDate} isOver={isOverByDate}
           organizerName={organizerName ?? undefined} organizerAvatar={organizerAvatar}
           showAiPending={isOwner && event.ai_analysis_status === 'pending'}
           onAiPendingPress={() => nav.navigate('AiAnalysisStatus', { contentType: 'event', contentId: event.id, initialStatus: event.ai_analysis_status })}
@@ -739,10 +735,12 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
             <Icon name="calendar" size={13} color={accent} />
             <View>
               <Text style={{ fontSize: FontSize.sm, fontWeight: FontWeight.extraBold, color: accent }}>
-                {formatDate(event.starts_at)}
+                {multiDay && event.ends_at ? formatEventRange(event.starts_at, event.ends_at) : formatDate(event.starts_at)}
               </Text>
               <Text style={{ fontSize: FontSize.xsPlus, color: colors.textTertiary, marginTop: 1 }}>
-                {formatTime(event.starts_at)}{event.ends_at ? ` – ${formatTime(event.ends_at)}` : ''}
+                {multiDay && event.ends_at
+                  ? `${eventDaysSpan(event.starts_at, event.ends_at)} jours${isOngoingByDate ? ' · en cours' : isOverByDate ? ' · terminé' : ''}`
+                  : `${formatTime(event.starts_at)}${event.ends_at ? ` – ${formatTime(event.ends_at)}` : ''}${isOverByDate ? ' · terminé' : ''}`}
               </Text>
             </View>
           </View>
@@ -768,7 +766,11 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
         <View style={[ds.socialBar, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
           <TouchableOpacity style={ds.socialBtn} onPress={handleLike} activeOpacity={0.7}>
             <Animated.View style={heartStyle}>
-              <MCIcon name={liked ? 'heart' : 'heart-outline'} size={21} color={liked ? '#7B3FF2' : colors.textTertiary} />
+              {liked ? (
+                <Image source={Images.reactionLove} style={{ width: 27, height: 27 }} resizeMode="contain" />
+              ) : (
+                <MCIcon name="heart-outline" size={21} color={colors.textTertiary} />
+              )}
             </Animated.View>
             {likeCount > 0 && (
               <Text style={[ds.socialBtnText, { color: liked ? '#7B3FF2' : colors.textTertiary, fontWeight: liked ? '700' : '500' }]}>
@@ -779,12 +781,12 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
           {!event?.comments_disabled && <View style={[ds.socialSep, { backgroundColor: colors.divider }]} />}
           {!event?.comments_disabled && (
             <TouchableOpacity style={ds.socialBtn} onPress={() => setShowComments(true)} activeOpacity={0.7}>
-              <MCIcon name="comment-outline" size={21} color={colors.textTertiary} />
+              <Image source={Images.reactionComment} style={{ width: 27, height: 27 }} resizeMode="contain" />
             </TouchableOpacity>
           )}
           <View style={[ds.socialSep, { backgroundColor: colors.divider }]} />
           <TouchableOpacity style={ds.socialBtn} onPress={handleSharePress} activeOpacity={0.7}>
-            <MCIcon name="share-outline" size={21} color={shareCount > 0 ? colors.primary : colors.textTertiary} />
+            <Image source={Images.reactionShare} style={{ width: 27, height: 27 }} resizeMode="contain" />
             {shareCount > 0 && (
               <Text style={[ds.socialBtnText, { color: colors.textTertiary }]}>
                 {shareCount > 999 ? `${(shareCount / 1000).toFixed(1)}k` : shareCount}
@@ -793,7 +795,7 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
           </TouchableOpacity>
           <View style={[ds.socialSep, { backgroundColor: colors.divider }]} />
           <TouchableOpacity style={ds.socialBtn} onPress={handleRepostPress} disabled={reposting} activeOpacity={0.7}>
-            <Icon name="repeat" size={20} color={reposting ? colors.textTertiary : colors.textTertiary} />
+            <Image source={Images.reactionRepost} style={{ width: 27, height: 27, opacity: reposting ? 0.5 : 1 }} resizeMode="contain" />
             {repostCount > 0 && (
               <Text style={[ds.socialBtnText, { color: colors.textTertiary }]}>
                 {repostCount > 999 ? `${(repostCount / 1000).toFixed(1)}k` : repostCount}
@@ -803,7 +805,11 @@ export const EventDetailScreen: React.FC<Props> = ({ eventId, onBack }) => {
           <View style={[ds.socialSep, { backgroundColor: colors.divider }]} />
           <TouchableOpacity style={[ds.socialBtn, { flex: 0, paddingHorizontal: 18 }]} onPress={handleSave} activeOpacity={0.7}>
             <Animated.View style={saveStyle}>
-              <MCIcon name={saved ? 'bookmark' : 'bookmark-outline'} size={21} color={saved ? accent : colors.textTertiary} />
+              {saved ? (
+                <Image source={Images.reactionSave} style={{ width: 27, height: 27 }} resizeMode="contain" />
+              ) : (
+                <MCIcon name="bookmark-outline" size={21} color={colors.textTertiary} />
+              )}
             </Animated.View>
           </TouchableOpacity>
         </View>

@@ -13,7 +13,7 @@ import { authService } from '../../services';
 import { BackButton, GofolyxLoader } from '../../components/common';
 
 interface Props {
-  onLoginSuccess: () => void;
+  onLoginSuccess: (profileIncomplete?: boolean) => void;
   onClose:        () => void;
 }
 
@@ -35,9 +35,9 @@ export const QRScannerScreen: React.FC<Props> = ({ onLoginSuccess, onClose }) =>
     Vibration.vibrate(60);
     setPhase('verifying');
     try {
-      await authService.qrVerify(token);
+      const result = await authService.qrVerify(token);
       setPhase('success');
-      setTimeout(onLoginSuccess, 1200);
+      setTimeout(() => onLoginSuccess(result.user.profile_incomplete), 1200);
     } catch (e: any) {
       setErrorMsg(e?.message ?? 'QR code invalide ou expiré.');
       setPhase('error');

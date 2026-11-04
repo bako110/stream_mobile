@@ -53,6 +53,12 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [bannerUploading, setBannerUploading] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  // Vérification du numéro en temps réel (debounce) — évite d'attendre
+  // "Enregistrer" pour découvrir qu'un autre compte l'a déjà, cf. check-phone
+  // (même pattern que check-username, mais authentifié pour s'exclure soi-même).
+  const [phoneCheck, setPhoneCheck] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+  const originalPhoneRef = useRef('');
+  const phoneCheckTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     refreshUser().then(me => {
@@ -77,10 +83,32 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
       setLocation(me.location ?? '');
       setWebsite(me.website ?? '');
       setPhone(me.phone ?? '');
+      originalPhoneRef.current = me.phone ?? '';
       setDateOfBirth(me.date_of_birth ?? '');
       setGender(me.gender ?? '');
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
+
+  // Vérifie la disponibilité du numéro ~500ms après la dernière frappe — pas à
+  // chaque caractère (évite de spammer l'API pendant la saisie).
+  useEffect(() => {
+    if (phoneCheckTimer.current) clearTimeout(phoneCheckTimer.current);
+    const trimmed = phone.trim();
+    if (!trimmed || trimmed === originalPhoneRef.current) {
+      setPhoneCheck('idle');
+      return;
+    }
+    setPhoneCheck('checking');
+    phoneCheckTimer.current = setTimeout(async () => {
+      try {
+        const res = await userService.checkPhoneAvailability(trimmed);
+        setPhoneCheck(res.available ? 'available' : 'taken');
+      } catch {
+        setPhoneCheck('idle'); // vérif indisponible — handleSave reste le filet de sécurité
+      }
+    }, 500);
+    return () => { if (phoneCheckTimer.current) clearTimeout(phoneCheckTimer.current); };
+  }, [phone]);
 
   const handleAvatar = () => {
     const options: { text: string; onPress: () => void; style?: 'destructive' | 'cancel' | 'default' }[] = [
@@ -173,6 +201,10 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
       toastService.error('Erreur', 'Renseigne au moins ton prénom ou ton nom');
       return;
     }
+    if (phoneCheck === 'taken') {
+      toastService.error('Erreur', 'Ce numéro de téléphone est déjà associé à un autre compte');
+      return;
+    }
     setSaving(true);
     try {
       // display_name n'est plus un champ éditable directement — recalculé ici
@@ -194,6 +226,8 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
       await userService.updateMe(data);
       const me = await refreshUser();
       if (me) setUser(me);
+      originalPhoneRef.current = phone.trim();
+      setPhoneCheck('idle');
       showConfirm('Succès', 'Profil mis à jour', [{ text: 'OK', onPress: () => navigation.goBack() }]);
     } catch (e: any) {
       toastService.error('Erreur', e?.message ?? 'Mise à jour échouée');
@@ -362,7 +396,23 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
           <Section title="Contact" icon="mail" colors={colors}>
             <Field label="Localisation" value={location} onChange={setLocation} colors={colors} placeholder="Ville, Pays" icon="map-pin" />
             <Field label="Site web" value={website} onChange={setWebsite} colors={colors} placeholder="https://..." icon="link" autoCapitalize="none" />
-            <Field label="Téléphone" value={phone} onChange={setPhone} colors={colors} placeholder="+33 6 12 34 56 78" icon="phone" keyboardType="phone-pad" />
+            <Field
+              label="Téléphone"
+              value={phone}
+              onChange={setPhone}
+              colors={colors}
+              placeholder="+33 6 12 34 56 78"
+              icon="phone"
+              keyboardType="phone-pad"
+              rightSlot={
+                phoneCheck === 'checking' ? <ActivityIndicator size="small" color={colors.textTertiary} /> :
+                phoneCheck === 'available' ? <Icon name="check-circle" size={16} color={colors.success ?? '#36D9A0'} /> :
+                phoneCheck === 'taken' ? <Icon name="alert-circle" size={16} color={colors.error} /> :
+                null
+              }
+              helperText={phoneCheck === 'taken' ? 'Ce numéro est déjà associé à un autre compte' : undefined}
+              helperColor={colors.error}
+            />
           </Section>
         </ScrollView>
       )}
@@ -402,17 +452,23 @@ interface FieldProps {
   autoCapitalize?: 'none' | 'sentences';
   keyboardType?: any;
   style?: any;
+  rightSlot?: React.ReactNode;
+  helperText?: string;
+  helperColor?: string;
 }
 
-const Field: React.FC<FieldProps> = ({ label, value, onChange, colors, style, ...rest }) => (
+const Field: React.FC<FieldProps> = ({ label, value, onChange, colors, style, helperText, helperColor, ...rest }) => (
   <View style={style}>
     <Text style={[styles.fieldLabel, { color: colors.textTertiary }]}>{label}</Text>
     <FieldInput value={value} onChange={onChange} colors={colors} {...rest} />
+    {helperText ? (
+      <Text style={[styles.fieldHelper, { color: helperColor ?? colors.textTertiary }]}>{helperText}</Text>
+    ) : null}
   </View>
 );
 
-const FieldInput: React.FC<Omit<FieldProps, 'label' | 'style'> & { multiline?: boolean; maxLength?: number }> = ({
-  value, onChange, colors, placeholder, icon, autoCapitalize, keyboardType, multiline, maxLength,
+const FieldInput: React.FC<Omit<FieldProps, 'label' | 'style' | 'helperText' | 'helperColor'> & { multiline?: boolean; maxLength?: number }> = ({
+  value, onChange, colors, placeholder, icon, autoCapitalize, keyboardType, multiline, maxLength, rightSlot,
 }) => {
   const [focused, setFocused] = useState(false);
   const handleFocus = () => setFocused(true);
@@ -448,6 +504,7 @@ const FieldInput: React.FC<Omit<FieldProps, 'label' | 'style'> & { multiline?: b
         onFocus={handleFocus}
         onBlur={handleBlur}
       />
+      {rightSlot}
     </View>
   );
 };
@@ -491,6 +548,7 @@ const styles = StyleSheet.create({
 
   fieldLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
   fieldLabel: { fontSize: 12.5, fontWeight: '700', marginBottom: 6 },
+  fieldHelper: { fontSize: 11.5, fontWeight: '600', marginTop: 5, marginLeft: 2 },
   charCount: { fontSize: 11, fontWeight: '600' },
 
   inputWrap: {
